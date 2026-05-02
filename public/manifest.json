@@ -1,0 +1,25 @@
+{
+  "name": "Global Tech Radar",
+  "short_name": "TechRadar",
+  "description": "全球科技资讯聚合平台 - 实时追踪AI、芯片、开源、投资动态",
+  "theme_color": "#0a0c10",
+  "background_color": "#0a0c10",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "scope": "/",
+  "start_url": "/",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0%25' stop-color='%230ff0fc'/%3E%3Cstop offset='100%25' stop-color='%23a78bfa'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='192' height='192' rx='32' fill='url(%23g)'/%3E%3Ccircle cx='96' cy='96' r='40' fill='none' stroke='%23020509' stroke-width='8'/%3E%3Ccircle cx='96' cy='96' r='12' fill='%23020509'/%3E%3Cline x1='96' y1='16' x2='96' y2='44' stroke='%23020509' stroke-width='8' stroke-linecap='round'/%3E%3Cline x1='96' y1='148' x2='96' y2='176' stroke='%23020509' stroke-width='8' stroke-linecap='round'/%3E%3Cline x1='16' y1='96' x2='44' y2='96' stroke='%23020509' stroke-width='8' stroke-linecap='round'/%3E%3Cline x1='148' y1='96' x2='176' y2='96' stroke='%23020509' stroke-width='8' stroke-linecap='round'/%3E%3C/svg%3E",
+      "sizes": "192x192",
+      "type": "image/svg+xml"
+    },
+    {
+      "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0%25' stop-color='%230ff0fc'/%3E%3Cstop offset='100%25' stop-color='%23a78bfa'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='512' height='512' rx='64' fill='url(%23g)'/%3E%3Ccircle cx='256' cy='256' r='100' fill='none' stroke='%23020509' stroke-width='20'/%3E%3Ccircle cx='256' cy='256' r='30' fill='%23020509'/%3E%3Cline x1='256' y1='40' x2='256' y2='110' stroke='%23020509' stroke-width='20' stroke-linecap='round'/%3E%3Cline x1='256' y1='402' x2='256' y2='472' stroke='%23020509' stroke-width='20' stroke-linecap='round'/%3E%3Cline x1='40' y1='256' x2='110' y2='256' stroke='%23020509' stroke-width='20' stroke-linecap='round'/%3E%3Cline x1='402' y1='256' x2='472' y2='256' stroke='%23020509' stroke-width='20' stroke-linecap='round'/%3E%3C/svg%3E",
+      "sizes": "512x512",
+      "type": "image/svg+xml"
+    }
+  ],
+  "categories": ["news", "productivity"],
+  "lang": "zh-CN"
+}

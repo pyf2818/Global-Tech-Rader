@@ -1,0 +1,128 @@
+{
+  "version": "1.0.0",
+  "lastScanned": 1777701446628,
+  "projectRoot": "E:\\VStudio_Project\\Global Tech Rader_V1\\workspace",
+  "techStack": {
+    "languages": [
+      {
+        "name": "JavaScript/TypeScript",
+        "version": null,
+        "confidence": "high",
+        "markers": [
+          "package.json"
+        ]
+      }
+    ],
+    "frameworks": [
+      {
+        "name": "vite",
+        "version": "latest",
+        "category": "build"
+      },
+      {
+        "name": "react",
+        "version": "latest",
+        "category": "frontend"
+      },
+      {
+        "name": "react-dom",
+        "version": "latest",
+        "category": "frontend"
+      }
+    ],
+    "packageManager": "npm",
+    "runtime": null
+  },
+  "build": {
+    "buildCommand": "npm run build",
+    "testCommand": null,
+    "lintCommand": null,
+    "devCommand": "npm run dev",
+    "scripts": {
+      "dev": "vite --host 0.0.0.0",
+      "build": "vite build",
+      "preview": "vite preview --host 0.0.0.0"
+    }
+  },
+  "conventions": {
+    "namingStyle": null,
+    "importStyle": null,
+    "testPattern": null,
+    "fileOrganization": null
+  },
+  "structure": {
+    "isMonorepo": false,
+    "workspaces": [],
+    "mainDirectories": [
+      "public",
+      "src"
+    ],
+    "gitBranches": null
+  },
+  "customNotes": [],
+  "directoryMap": {
+    "public": {
+      "path": "public",
+      "purpose": "Public files",
+      "fileCount": 2,
+      "lastAccessed": 1777701446541,
+      "keyFiles": [
+        "manifest.json",
+        "sw.js"
+      ]
+    },
+    "server": {
+      "path": "server",
+      "purpose": null,
+      "fileCount": 1,
+      "lastAccessed": 1777701446589,
+      "keyFiles": [
+        "newsPlugin.js"
+      ]
+    },
+    "src": {
+      "path": "src",
+      "purpose": "Source code",
+      "fileCount": 3,
+      "lastAccessed": 1777701446590,
+      "keyFiles": [
+        "App.jsx",
+        "main.jsx",
+        "styles.css"
+      ]
+    }
+  },
+  "hotPaths": [
+    {
+      "path": "",
+      "accessCount": 7,
+      "lastAccessed": 1777705490810,
+      "type": "directory"
+    },
+    {
+      "path": "CLAUDE.md",
+      "accessCount": 3,
+      "lastAccessed": 1777705098310,
+      "type": "file"
+    },
+    {
+      "path": "package.json",
+      "accessCount": 2,
+      "lastAccessed": 1777705475140,
+      "type": "file"
+    },
+    {
+      "path": "README.md",
+      "accessCount": 1,
+      "lastAccessed": 1777701468940,
+      "type": "file"
+    },
+    {
+      "path": ".monkeycode\\specs\\ROADMAP.md",
+      "accessCount": 1,
+      "lastAccessed": 1777701494377,
+      "type": "file"
+    }
+  ],
+  "userDirectives": []
+}

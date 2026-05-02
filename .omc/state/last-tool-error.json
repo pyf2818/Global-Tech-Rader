@@ -1,0 +1,7 @@
+{
+  "tool_name": "Glob",
+  "tool_input_preview": "{\"pattern\":\"*\",\"path\":\"E:\\\\VStudio_Project\\\\Global Tech Rader_V1\\\\workspace\"}",
+  "error": "ENOENT: no such file or directory, uv_spawn 'rg'",
+  "timestamp": "2026-05-02T07:04:30.781Z",
+  "retry_count": 1
+}
