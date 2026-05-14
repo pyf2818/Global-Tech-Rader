@@ -190,12 +190,14 @@ function App() {
   const [expandedSummary, setExpandedSummary] = useState({});
   const [summaryCache, setSummaryCache] = useState(() => loadLS('summaryCache', {}));
   const [followKeywords, setFollowKeywords] = useState(() => loadLS('followKeywords', []));
+  const [pinnedKeywords, setPinnedKeywords] = useState(() => loadLS('pinnedKeywords', []));
   const [newKeyword, setNewKeyword] = useState('');
   const [searchHistory, setSearchHistory] = useState(() => loadLS('searchHistory', []));
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchSort, setSearchSort] = useState('time');
   const [focusedIndex, setFocusedIndex] = useState(-1);
   const [showShortcuts, setShowShortcuts] = useState(false);
+  const [lightbox, setLightbox] = useState({ open: false, src: '', title: '' });
   const [expandedEvents, setExpandedEvents] = useState({});
   const [exportCategory, setExportCategory] = useState('all');
   const [exportRange, setExportRange] = useState('all');
@@ -222,6 +224,7 @@ function App() {
   useEffect(() => { saveLS('bookmarks', bookmarks); }, [bookmarks]);
   useEffect(() => { saveLS('summaryCache', summaryCache); }, [summaryCache]);
   useEffect(() => { saveLS('followKeywords', followKeywords); }, [followKeywords]);
+  useEffect(() => { saveLS('pinnedKeywords', pinnedKeywords); }, [pinnedKeywords]);
   useEffect(() => { saveLS('searchHistory', searchHistory); }, [searchHistory]);
   useEffect(() => { saveLS('viewMode', viewMode); }, [viewMode]);
   useEffect(() => { saveLS('recentVisits', recentVisits); }, [recentVisits]);
@@ -230,6 +233,13 @@ function App() {
   useEffect(() => { saveLS('readingHistory', readingHistory); }, [readingHistory]);
   useEffect(() => { saveLS('translations', translations); }, [translations]);
   useEffect(() => { saveLS('llmConfig', llmConfig); }, [llmConfig]);
+
+  useEffect(() => {
+    if (!lightbox.open) return;
+    const handler = (e) => { if (e.key === 'Escape') setLightbox({ open: false, src: '', title: '' }); };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [lightbox.open]);
 
   useEffect(() => {
     const el = feedRef.current;
@@ -379,6 +389,21 @@ function App() {
   }, [filtered]);
 
   const sourceStats = useMemo(() => items.reduce((s, i) => ({ ...s, [i.region]: (s[i.region] || 0) + 1 }), { domestic: 0, overseas: 0, global: 0 }), [items]);
+
+  const regionCategoryMatrix = useMemo(() => {
+    const regions = ['domestic', 'overseas', 'global'];
+    const matrix = {};
+    let maxVal = 0;
+    regions.forEach(r => {
+      matrix[r] = {};
+      CATEGORIES.forEach(c => {
+        const count = items.filter(i => i.region === r && i.category === c.id).length;
+        matrix[r][c.id] = count;
+        if (count > maxVal) maxVal = count;
+      });
+    });
+    return { matrix, maxVal, regions };
+  }, [items]);
 
   const dailyBriefing = useMemo(() => {
     const now = new Date();
@@ -668,7 +693,22 @@ function App() {
 
   function removeFollowKeyword(kw) {
     setFollowKeywords(prev => prev.filter(k => k !== kw));
+    setPinnedKeywords(prev => prev.filter(k => k !== kw));
   }
+
+  function pinFollowKeyword(kw) {
+    setPinnedKeywords(prev => prev.includes(kw) ? prev : [...prev, kw]);
+  }
+
+  function unpinFollowKeyword(kw) {
+    setPinnedKeywords(prev => prev.filter(k => k !== kw));
+  }
+
+  const sortedFollowKeywords = useMemo(() => {
+    const pinned = pinnedKeywords.filter(k => followKeywords.includes(k));
+    const unpinned = followKeywords.filter(k => !pinned.includes(k));
+    return [...pinned, ...unpinned];
+  }, [followKeywords, pinnedKeywords]);
 
   function addTrackTarget() {
     if (!newTrackTarget.trim()) return;
@@ -832,10 +872,20 @@ function App() {
               {showFollowDropdown && (
                 <div className="sidebar-follow-list">
                   {followKeywords.length === 0 && <p className="no-follow-kw">暂无关注关键词</p>}
-                  {followKeywords.map(kw => (
-                    <div key={kw} className="follow-keyword-item">
-                      <span className="follow-kw-text">{kw}</span>
-                      <button className="follow-kw-remove" onClick={() => removeFollowKeyword(kw)}>{ICONS.x}</button>
+                  {sortedFollowKeywords.map(kw => (
+                    <div key={kw} className={`kw-card ${pinnedKeywords.includes(kw) ? 'kw-card-pinned' : ''}`}>
+                      <div className="kw-card-content">
+                        {pinnedKeywords.includes(kw) && <span className="kw-pin-indicator" />}
+                        <span className="kw-card-label">{kw}</span>
+                      </div>
+                      <div className="kw-card-btns">
+                        <button className="kw-btn-pin" onClick={() => pinnedKeywords.includes(kw) ? unpinFollowKeyword(kw) : pinFollowKeyword(kw)} title={pinnedKeywords.includes(kw) ? '取消置顶' : '置顶'}>
+                          <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2"><path d={pinnedKeywords.includes(kw) ? "M4 14l4-4 4 4M8 2v8" : "M8 14V2M4 6h8"} /></svg>
+                        </button>
+                        <button className="kw-btn-del" onClick={() => removeFollowKeyword(kw)} title="删除">
+                          <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="8" cy="8" r="6" /><line x1="5.5" y1="5.5" x2="10.5" y2="10.5" /><line x1="10.5" y1="5.5" x2="5.5" y2="10.5" /></svg>
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -990,7 +1040,7 @@ function App() {
                       </div>
                       {expandedEvents[cluster.id] && (
                         <div className="cluster-items">
-                          {cluster.items.map((item, ci) => <NewsItem key={item.id} item={item} index={ci} viewMode={viewMode} isFocused={focusedIndex === filtered.indexOf(item)} isBookmarked={isBookmarked(item.id)} onBookmark={() => toggleBookmark(item)} onSummary={() => setExpandedSummary(p => ({ ...p, [item.id]: !p[item.id] }))} isSummaryOpen={expandedSummary[item.id]} summaryText={generateSummary(item)} isFollowed={followKeywords.some(kw => `${item.title} ${item.summary}`.toLowerCase().includes(kw.toLowerCase()))} />)}
+                          {cluster.items.map((item, ci) => <NewsItem key={item.id} item={item} index={ci} viewMode={viewMode} isFocused={focusedIndex === filtered.indexOf(item)} isBookmarked={isBookmarked(item.id)} onBookmark={() => toggleBookmark(item)} onSummary={() => setExpandedSummary(p => ({ ...p, [item.id]: !p[item.id] }))} isSummaryOpen={expandedSummary[item.id]} summaryText={generateSummary(item)} isFollowed={followKeywords.some(kw => `${item.title} ${item.summary}`.toLowerCase().includes(kw.toLowerCase()))} onOpenLightbox={(src, title) => setLightbox({ open: true, src, title })} />)}
                         </div>
                       )}
                     </div>
@@ -1002,7 +1052,7 @@ function App() {
               {error && <div className="error-state"><p>加载失败: {error}</p><button onClick={() => loadNews()}>重试</button></div>}
               {!loading && !error && filtered.length === 0 && <div className="empty-state"><p>没有匹配的资讯</p><button onClick={() => { setQuery(''); setCategory('all'); setMode('all'); setSourceFilter('all'); }}>重置筛选</button></div>}
               <div className={`feed-list view-${viewMode} ${viewMode === 'card' ? 'card-grid' : ''}`}>
-                {filtered.map((item, i) => <NewsItem key={item.id} item={item} index={i} viewMode={viewMode} isFocused={focusedIndex === i} isBookmarked={isBookmarked(item.id)} onBookmark={() => toggleBookmark(item)} onSummary={() => setExpandedSummary(p => ({ ...p, [item.id]: !p[item.id] }))} isSummaryOpen={expandedSummary[item.id]} summaryText={generateSummary(item)} isFollowed={followKeywords.some(kw => `${item.title} ${item.summary}`.toLowerCase().includes(kw.toLowerCase()))} onRead={() => recordReading(item)} showTranslation={translationOpen[item.id]} onToggleTranslation={() => setTranslationOpen(p => ({ ...p, [item.id]: !p[item.id] }))} translation={getTranslation(item)} />)}
+                {filtered.map((item, i) => <NewsItem key={item.id} item={item} index={i} viewMode={viewMode} isFocused={focusedIndex === i} isBookmarked={isBookmarked(item.id)} onBookmark={() => toggleBookmark(item)} onSummary={() => setExpandedSummary(p => ({ ...p, [item.id]: !p[item.id] }))} isSummaryOpen={expandedSummary[item.id]} summaryText={generateSummary(item)} isFollowed={followKeywords.some(kw => `${item.title} ${item.summary}`.toLowerCase().includes(kw.toLowerCase()))} onRead={() => recordReading(item)} showTranslation={translationOpen[item.id]} onToggleTranslation={() => setTranslationOpen(p => ({ ...p, [item.id]: !p[item.id] }))} translation={getTranslation(item)} onOpenLightbox={(src, title) => setLightbox({ open: true, src, title })} />)}
               </div>
             </>
           )}
@@ -1015,7 +1065,7 @@ function App() {
                 <p className="section-desc">来自 InfoQ、量子位、机器之心、ArXiv、Hacker News、TechCrunch 等平台的热门 AI 文章</p>
               </div>
               {trendingLoading && <div className={`feed-list view-${viewMode} ${viewMode === 'card' ? 'card-grid' : ''}`}>{Array.from({ length: 4 }).map((_, i) => <SkeletonCard key={i} viewMode={viewMode} />)}</div>}
-              <div className={`feed-list view-${viewMode} ${viewMode === 'card' ? 'card-grid' : ''}`}>{trendingItems.map((item, i) => <NewsItem key={item.id} item={item} index={i} viewMode={viewMode} isBookmarked={isBookmarked(item.id)} onBookmark={() => toggleBookmark(item)} isFollowed={false} />)}</div>
+              <div className={`feed-list view-${viewMode} ${viewMode === 'card' ? 'card-grid' : ''}`}>{trendingItems.map((item, i) => <NewsItem key={item.id} item={item} index={i} viewMode={viewMode} isBookmarked={isBookmarked(item.id)} onBookmark={() => toggleBookmark(item)} isFollowed={false} onOpenLightbox={(src, title) => setLightbox({ open: true, src, title })} />)}</div>
             </>
           )}
 
@@ -1038,7 +1088,7 @@ function App() {
               )}
               <div className={`feed-list view-${viewMode} ${viewMode === 'card' ? 'card-grid' : ''}`}>
                 {smartRecommendations.map((item, i) => (
-                  <NewsItem key={item.id} item={item} index={i} viewMode={viewMode} isBookmarked={isBookmarked(item.id)} onBookmark={() => toggleBookmark(item)} onSummary={() => setExpandedSummary(p => ({ ...p, [item.id]: !p[item.id] }))} isSummaryOpen={expandedSummary[item.id]} summaryText={generateSummary(item)} isFollowed={followKeywords.some(kw => `${item.title} ${item.summary}`.toLowerCase().includes(kw.toLowerCase()))} onRead={() => recordReading(item)} />
+                  <NewsItem key={item.id} item={item} index={i} viewMode={viewMode} isBookmarked={isBookmarked(item.id)} onBookmark={() => toggleBookmark(item)} onSummary={() => setExpandedSummary(p => ({ ...p, [item.id]: !p[item.id] }))} isSummaryOpen={expandedSummary[item.id]} summaryText={generateSummary(item)} isFollowed={followKeywords.some(kw => `${item.title} ${item.summary}`.toLowerCase().includes(kw.toLowerCase()))} onRead={() => recordReading(item)} onOpenLightbox={(src, title) => setLightbox({ open: true, src, title })} />
                 ))}
               </div>
             </>
@@ -1049,7 +1099,7 @@ function App() {
             <>
               <div className="section-header"><h2 className="section-title">{ICONS.github} GitHub {GITHUB_PERIODS.find(p => p.id === githubSince)?.label || '周榜'}热门项目</h2><p className="section-desc">{githubSince === 'daily' ? '今日增星最多的开源项目' : githubSince === 'monthly' ? '本月增星最多的开源项目' : '本周增星最多的开源项目'}（实时同步）</p></div>
               {githubLoading && <div className="github-grid">{Array.from({ length: 6 }).map((_, i) => <article key={i} className="github-card skeleton"><div className="skeleton-gh-header" /><div className="skeleton-gh-desc" /><div className="skeleton-gh-stats" /></article>)}</div>}
-              <div className="github-grid">{githubRepos.map((repo, i) => <GithubRepoCard key={repo.id} repo={repo} index={i} since={githubSince} isBookmarked={isBookmarked(repo.url)} onBookmark={() => toggleBookmark({ id: repo.url, title: repo.fullName, url: repo.url, source: 'GitHub', summary: repo.description, tags: [repo.language].filter(Boolean), region: 'global', mode: 'deep', publishedAt: new Date().toISOString(), category: 'open-source' })} />)}</div>
+              <div className="github-grid">{githubRepos.map((repo, i) => <GithubRepoCard key={repo.id} repo={repo} index={i} since={githubSince} isBookmarked={isBookmarked(repo.url)} onBookmark={() => toggleBookmark({ id: repo.url, title: repo.fullName, url: repo.url, source: 'GitHub', summary: repo.description, tags: [repo.language].filter(Boolean), region: 'global', mode: 'deep', publishedAt: new Date().toISOString(), category: 'open-source' })} onOpenLightbox={(src, title) => setLightbox({ open: true, src, title })} />)}</div>
             </>
           )}
 
@@ -1450,17 +1500,47 @@ function App() {
               <h3 className="panel-title">{ICONS.sparkle}<span>我的关注</span></h3>
               <div className="follow-keywords-panel">
                 {followKeywords.length === 0 && <p className="no-keywords">添加关键词优先展示相关资讯</p>}
-                <div className="follow-kw-list">{followKeywords.map(kw => <span key={kw} className="follow-kw-tag">{kw}<button onClick={() => removeFollowKeyword(kw)}>{ICONS.x}</button></span>)}</div>
+                <div className="kw-card-list">
+                  {sortedFollowKeywords.map(kw => (
+                    <div key={kw} className={`kw-card ${pinnedKeywords.includes(kw) ? 'kw-card-pinned' : ''}`}>
+                      <div className="kw-card-content">
+                        {pinnedKeywords.includes(kw) && <span className="kw-pin-indicator" />}
+                        <span className="kw-card-label">{kw}</span>
+                      </div>
+                      <div className="kw-card-btns">
+                        <button className="kw-btn-pin" onClick={() => pinnedKeywords.includes(kw) ? unpinFollowKeyword(kw) : pinFollowKeyword(kw)} title={pinnedKeywords.includes(kw) ? '取消置顶' : '置顶'}>
+                          <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2"><path d={pinnedKeywords.includes(kw) ? "M4 14l4-4 4 4M8 2v8" : "M8 14V2M4 6h8"} /></svg>
+                        </button>
+                        <button className="kw-btn-del" onClick={() => removeFollowKeyword(kw)} title="删除">
+                          <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="8" cy="8" r="6" /><line x1="5.5" y1="5.5" x2="10.5" y2="10.5" /><line x1="10.5" y1="5.5" x2="5.5" y2="10.5" /></svg>
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
                 <div className="follow-add-form"><input value={newKeyword} onChange={e => setNewKeyword(e.target.value)} placeholder="输入关键词" onKeyDown={e => e.key === 'Enter' && addFollowKeyword()} /><button className="kw-add-btn" onClick={addFollowKeyword}>{ICONS.plus}</button></div>
               </div>
             </section>
             <section className="panel-section"><h3 className="panel-title">{ICONS.fire}<span>热门标签</span></h3><div className="hot-tags">{hotTags.map((item, i) => <button key={item.tag} className="hot-tag" onClick={() => executeSearch(item.tag)}><span className="tag-rank">{i + 1}</span><span className="tag-name">{item.tag}</span><span className="tag-trend">24h +{item.trend}</span><span className="tag-count">{item.count}</span></button>)}</div></section>
-            <section className="panel-section"><h3 className="panel-title">{ICONS.globe}<span>来源分布</span></h3><div className="source-stats"><div className="source-row"><div className="source-info"><span className="source-dot overseas" /><span>海外源</span></div><div className="source-bar-wrap"><div className="source-bar" style={{ width: `${items.length ? (sourceStats.overseas / items.length) * 100 : 0}%` }} /></div><span className="source-num">{sourceStats.overseas}</span></div><div className="source-row"><div className="source-info"><span className="source-dot domestic" /><span>国内源</span></div><div className="source-bar-wrap"><div className="source-bar" style={{ width: `${items.length ? (sourceStats.domestic / items.length) * 100 : 0}%` }} /></div><span className="source-num">{sourceStats.domestic}</span></div><div className="source-row"><div className="source-info"><span className="source-dot global" /><span>全球源</span></div><div className="source-bar-wrap"><div className="source-bar" style={{ width: `${items.length ? (sourceStats.global / items.length) * 100 : 0}%` }} /></div><span className="source-num">{sourceStats.global}</span></div></div></section>
+            <section className="panel-section"><h3 className="panel-title">{ICONS.globe}<span>来源分布</span></h3>
+              <HexRadarChart categories={CATEGORIES.slice(0, 6)} regions={regionCategoryMatrix.regions} matrix={regionCategoryMatrix.matrix} maxVal={regionCategoryMatrix.maxVal} />
+            </section>
           </>
         )}
       </aside>
 
       {/* Settings Modal */}
+      {/* Lightbox */}
+      {lightbox.open && (
+        <div className="lightbox-overlay" onClick={() => setLightbox({ open: false, src: '', title: '' })}>
+          <div className="lightbox-content" onClick={e => e.stopPropagation()}>
+            <button className="lightbox-close" onClick={() => setLightbox({ open: false, src: '', title: '' })}>{ICONS.x}</button>
+            <img src={lightbox.src} alt={lightbox.title} className="lightbox-img" />
+            {lightbox.title && <p className="lightbox-title">{lightbox.title}</p>}
+          </div>
+        </div>
+      )}
+
       {showSettings && (
         <div className="modal-overlay" onClick={() => setShowSettings(false)}>
           <div className="modal modal-lg" onClick={e => e.stopPropagation()}>
@@ -1650,16 +1730,10 @@ function SkeletonCard({ viewMode = 'standard' }) {
   );
 }
 
-function NewsItem({ item, index, viewMode = 'standard', isFocused = false, isBookmarked = false, onBookmark, onSummary, isSummaryOpen, summaryText, isFollowed = false, onRead, showTranslation, onToggleTranslation, translation }) {
+function NewsItem({ item, index, viewMode = 'standard', isFocused = false, isBookmarked = false, onBookmark, onSummary, isSummaryOpen, summaryText, isFollowed = false, onRead, showTranslation, onToggleTranslation, translation, onOpenLightbox }) {
   const isCompact = viewMode === 'compact';
   const isCard = viewMode === 'card';
-
-  const readingTime = useMemo(() => {
-    const text = `${item.title} ${item.summary || ''}`;
-    const charCount = text.length;
-    const minutes = Math.max(1, Math.ceil(charCount / 350));
-    return minutes;
-  }, [item.title, item.summary]);
+  const hasMedia = item.imageUrl || item.videoUrl;
 
   const isEnglish = /^[a-zA-Z0-9\s\-.,!?'"():]+$/.test(item.title);
 
@@ -1679,11 +1753,30 @@ function NewsItem({ item, index, viewMode = 'standard', isFocused = false, isBoo
         </div>
       </div>
       <div className="item-main">
-        <h2 className="item-title"><span className="item-rank">{index + 1}.</span> {item.title}</h2>
-        {showTranslation && translation && <p className="item-translation">{translation.title}</p>}
-        {!isCompact && <p className="item-summary">{item.summary}</p>}
-        {!isCompact && item.bodyIntro && <p className="item-intro">导读：{item.bodyIntro}</p>}
-        {showTranslation && translation && !isCompact && translation.summary && <p className="item-translation">{translation.summary}</p>}
+        <div className="item-content-row">
+          <div className="item-text">
+            <h2 className="item-title"><span className="item-rank">{index + 1}.</span> {item.title}</h2>
+            {showTranslation && translation && <p className="item-translation">{translation.title}</p>}
+            {!isCompact && <p className="item-summary">{item.summary}</p>}
+            {!isCompact && item.bodyIntro && <p className="item-intro">导读：{item.bodyIntro}</p>}
+            {showTranslation && translation && !isCompact && translation.summary && <p className="item-translation">{translation.summary}</p>}
+          </div>
+          {hasMedia && !isCompact && (
+            <div className="item-media">
+              {item.imageUrl && (
+                <div className="item-media-thumb" onClick={() => onOpenLightbox?.(item.imageUrl, item.title)}>
+                  <img src={item.imageUrl} alt="" loading="lazy" onError={e => { e.target.style.display = 'none'; }} />
+                  {item.videoUrl && <span className="item-media-play">{ICONS.eye}</span>}
+                </div>
+              )}
+              {!item.imageUrl && item.videoUrl && (
+                <a href={item.videoUrl} target="_blank" rel="noreferrer" className="item-media-video-link">
+                  {ICONS.eye}<span>视频</span>
+                </a>
+              )}
+            </div>
+          )}
+        </div>
         {isSummaryOpen && summaryText && (
           <div className="ai-summary">
             <div className="ai-summary-header">{ICONS.sparkle}<span>AI 摘要</span></div>
@@ -1694,7 +1787,6 @@ function NewsItem({ item, index, viewMode = 'standard', isFocused = false, isBoo
           <div className="item-tags-row">{item.tags?.slice(0, 4).map(t => <span key={t} className="item-tag">{t}</span>)}</div>
           <div className="item-footer">
             <span className="item-source">{item.source}{item.platform ? ` · ${item.platform}` : ''}</span>
-            <span className="item-reading-time" title="预计阅读时长">{ICONS.clock}{readingTime} 分钟</span>
             <a href={item.url} target="_blank" rel="noreferrer" className="item-link" onClick={() => onRead?.(item)}>阅读原文 {ICONS.arrowRight}</a>
           </div>
         </div>}
@@ -1704,6 +1796,78 @@ function NewsItem({ item, index, viewMode = 'standard', isFocused = false, isBoo
         </div>}
       </div>
     </article>
+  );
+}
+
+function HexRadarChart({ categories, regions, matrix, maxVal }) {
+  const size = 200;
+  const cx = size / 2;
+  const cy = size / 2;
+  const r = 75;
+  const levels = 4;
+  const n = categories.length;
+  const angleStep = (2 * Math.PI) / n;
+  const startAngle = -Math.PI / 2;
+
+  const regionColors = { domestic: '#3b82f6', overseas: '#22d3ee', global: '#a78bfa' };
+
+  const getPoint = (idx, value) => {
+    const ratio = maxVal > 0 ? value / maxVal : 0;
+    const angle = startAngle + idx * angleStep;
+    const px = cx + r * ratio * Math.cos(angle);
+    const py = cy + r * ratio * Math.sin(angle);
+    return { px, py };
+  };
+
+  const hexPoints = (level) => {
+    const lr = r * (level / levels);
+    return Array.from({ length: n }, (_, i) => {
+      const angle = startAngle + i * angleStep;
+      return `${cx + lr * Math.cos(angle)},${cy + lr * Math.sin(angle)}`;
+    }).join(' ');
+  };
+
+  const regionPath = (region) => {
+    const values = categories.map(c => matrix[region]?.[c.id] || 0);
+    return values.map((v, i) => {
+      const p = getPoint(i, v);
+      return `${p.px},${p.py}`;
+    }).join(' ');
+  };
+
+  return (
+    <div className="hex-radar-wrap">
+      <svg viewBox={`0 0 ${size} ${size}`} className="hex-radar-svg">
+        {Array.from({ length: levels }, (_, l) => (
+          <polygon key={`grid-${l}`} points={hexPoints(l + 1)} fill="none" stroke="var(--border-color)" strokeWidth="0.5" opacity="0.6" />
+        ))}
+        {categories.map((cat, i) => {
+          const angle = startAngle + i * angleStep;
+          const ex = cx + (r + 18) * Math.cos(angle);
+          const ey = cy + (r + 18) * Math.sin(angle);
+          const ax = cx + r * Math.cos(angle);
+          const ay = cy + r * Math.sin(angle);
+          return (
+            <g key={`axis-${cat.id}`}>
+              <line x1={cx} y1={cy} x2={ax} y2={ay} stroke="var(--border-color)" strokeWidth="0.5" opacity="0.4" />
+              <text x={ex} y={ey} textAnchor="middle" dominantBaseline="central" fontSize="8" fill="var(--text-muted)">{cat.label.slice(0, 5)}</text>
+            </g>
+          );
+        })}
+        {regions.map(region => (
+          <polygon key={region} points={regionPath(region)} fill={regionColors[region]} fillOpacity="0.15" stroke={regionColors[region]} strokeWidth="1.5" strokeLinejoin="round" />
+        ))}
+        {regions.map(region => categories.map((cat, i) => {
+          const v = matrix[region]?.[cat.id] || 0;
+          if (!v) return null;
+          const p = getPoint(i, v);
+          return <circle key={`dot-${region}-${cat.id}`} cx={p.px} cy={p.py} r="2.5" fill={regionColors[region]} />;
+        }))}
+      </svg>
+      <div className="hex-radar-legend">
+        {regions.map(r => <span key={r} className="hex-legend-item" style={{ color: regionColors[r] }}><i style={{ background: regionColors[r] }} />{REGION_MAP[r]}</span>)}
+      </div>
+    </div>
   );
 }
 
@@ -1794,7 +1958,10 @@ function TrendLineChart({ labels = [], series = [] }) {
   );
 }
 
-function GithubRepoCard({ repo, index, since = 'weekly', isBookmarked = false, onBookmark }) {
+function GithubRepoCard({ repo, index, since = 'weekly', isBookmarked = false, onBookmark, onOpenLightbox }) {
+  const [tutorialExpanded, setTutorialExpanded] = useState(false);
+  const tutorialLines = repo.tutorial ? repo.tutorial.split('\n') : [];
+  const hasLongTutorial = tutorialLines.length > 4;
   return (
     <article className="github-card" style={{ animationDelay: `${index * 60}ms` }}>
       <div className="gh-bookmark-wrap">
@@ -1807,7 +1974,18 @@ function GithubRepoCard({ repo, index, since = 'weekly', isBookmarked = false, o
           {repo.language && <span className="gh-lang"><span className="gh-lang-dot" />{repo.language}</span>}
         </div>
       </div>
+      {repo.imageUrl && (
+        <div className="gh-card-image" onClick={() => onOpenLightbox?.(repo.imageUrl, repo.fullName)}>
+          <img src={repo.imageUrl} alt={repo.name} loading="lazy" onError={e => { e.target.style.display = 'none'; }} />
+        </div>
+      )}
       <p className="gh-desc">{repo.description}</p>
+      {repo.tutorial && <div className="gh-tutorial">
+        <span className="gh-tutorial-label">使用教程</span>
+        <pre className={`gh-tutorial-text ${tutorialExpanded ? 'expanded' : ''}`}>{tutorialExpanded ? repo.tutorial : tutorialLines.slice(0, 4).join('\n')}</pre>
+        {hasLongTutorial && <button className="gh-tutorial-toggle" onClick={() => setTutorialExpanded(v => !v)}>{tutorialExpanded ? '收起' : '展开全文'}</button>}
+      </div>}
+      {repo.topics?.length > 0 && <div className="gh-topics">{repo.topics.slice(0, 4).map(t => <span key={t} className="gh-topic">{t}</span>)}</div>}
       <div className="gh-card-stats">
         <span className="gh-stat">{ICONS.star}<span className="gh-stat-val">{formatStars(repo.totalStars)}</span><span className="gh-stat-label">stars</span></span>
         <span className="gh-stat">{ICONS.fork}<span className="gh-stat-val">{formatStars(repo.forks)}</span><span className="gh-stat-label">forks</span></span>

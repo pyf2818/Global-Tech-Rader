@@ -386,7 +386,9 @@ async function getGithubTrending(lang, since) {
     if (!response.ok) throw new Error(`GitHub API responded ${response.status}`);
 
     const data = await response.json();
-    const repos = (data.items || []).map(item => ({
+    const rawRepos = data.items || [];
+
+    const repos = rawRepos.slice(0, 25).map(item => ({
       id: hash(item.full_name),
       fullName: item.full_name,
       name: item.name,
@@ -399,15 +401,92 @@ async function getGithubTrending(lang, since) {
       starsThisWeek: validSince === 'weekly' ? item.stargazers_count : 0,
       starsThisMonth: validSince === 'monthly' ? item.stargazers_count : 0,
       period: validSince,
-      periodLabel: validSince === 'daily' ? 'today' : validSince === 'monthly' ? 'this month' : 'this week'
+      periodLabel: validSince === 'daily' ? 'today' : validSince === 'monthly' ? 'this month' : 'this week',
+      homepage: item.homepage || '',
+      topics: item.topics || [],
+      openIssues: item.open_issues_count || 0,
+      watchers: item.watchers_count || 0,
+      imageUrl: '',
+      readmeIntro: '',
+      tutorial: ''
     }));
 
+    const settled = await Promise.allSettled(rawRepos.slice(0, 5).map(async (item, i) => {
+      try {
+        const readmeUrl = `https://api.github.com/repos/${item.full_name}/readme`;
+        const readmeRes = await fetch(readmeUrl, {
+          headers: { 'User-Agent': 'GlobalTechRadar/0.1', 'Accept': 'application/vnd.github.raw' },
+          signal: AbortSignal.timeout(6000)
+        });
+        if (!readmeRes.ok) return null;
+        const content = await readmeRes.text();
+const imageUrls = [...content.matchAll(/<img[^>]+src=["']([^"']+)["']/gi)].map(m => m[1]);
+        const markdownImages = [...content.matchAll(/!\[[^\]]*\]\(([^)]+)\)/g)].map(m => m[1]);
+        const readmeBadImgRe = /(badge|shield|icon|logo|status|build|coverage|codecov|travis|circleci|github\.com\/.*\/badges|npm\/badge|snyk|dependabot|renovate|license|downloads|version|size|rating|stars|follow|tweet|share|sponsor|patreon|ko-fi|buy_me_a_coffee|opencollective|code_style|lint|test|ci|workflow|actions|progress|compat|platform|browser|stack|node|python|java|rust|go|typescript|javascript|swift|kotlin|ruby|php|docker|podman|kubernetes|terraform|ansible|visual.studio|vscode|jetbrains|intellij|emacs|vim|neovim|sublime)\b/i;
+        const readmeGoodImgRe = /(screenshot|demo|preview|example|result|output|architecture|diagram|flow|chart|graph|figure|fig|illustration|展示|演示|截图|效果图|架构图|流程图|界面|画面|界面截图)/i;
+        const candidates = [];
+        const markdownMatches = [...content.matchAll(/!\[([^\]]*)\]\(([^)]+)\)/g)];
+        for (const m of markdownMatches) {
+          const alt = m[1];
+          const src = m[2];
+          if (!/\.(jpg|jpeg|png|gif|webp)/i.test(src)) continue;
+          if (readmeBadImgRe.test(src) || readmeBadImgRe.test(alt)) continue;
+          if (!isGoodImageUrl(src, content)) continue;
+          const goodScore = (readmeGoodImgRe.test(src) || readmeGoodImgRe.test(alt)) ? 2 : 0;
+          const pathScore = /\/(img|images|assets|static|public|media|pics|screenshots|screens|docs\/images|doc\/img|examples)\b/i.test(src) ? 1 : 0;
+          candidates.push({ src, score: goodScore + pathScore });
+        }
+        const htmlMatches = [...content.matchAll(/<img[^>]+src=["']([^"']+)["'][^>]*>/gi)];
+        for (const m of htmlMatches) {
+          const src = m[1];
+          if (!/\.(jpg|jpeg|png|gif|webp)/i.test(src)) continue;
+          if (readmeBadImgRe.test(src)) continue;
+          if (!isGoodImageUrl(src, content)) continue;
+          const goodScore = readmeGoodImgRe.test(src) ? 2 : 0;
+          const pathScore = /\/(img|images|assets|static|public|media|pics|screenshots|screens|docs\/images|doc\/img|examples)\b/i.test(src) ? 1 : 0;
+          candidates.push({ src, score: goodScore + pathScore });
+        }
+        candidates.sort((a, b) => b.score - a.score);
+        const imageUrl = candidates.length > 0 ? candidates[0].src : '';
+
+        const tutorial = extractTutorial(content);
+        const intro = content.replace(/!\[[^\]]*\]\([^\)]+\)/g, '').replace(/<[^>]+>/g, '').replace(/#{1,4}\s/g, '').replace(/\s+/g, ' ').trim().slice(0, 200);
+        return { index: i, imageUrl, tutorial, readmeIntro: intro };
+      } catch { return null; }
+    }));
+
+    settled.forEach(result => {
+      if (result.status === 'fulfilled' && result.value) {
+        const { index, imageUrl, tutorial, readmeIntro } = result.value;
+        if (repos[index]) {
+          repos[index].imageUrl = imageUrl;
+          repos[index].tutorial = tutorial;
+          repos[index].readmeIntro = readmeIntro;
+        }
+      }
+    });
+
     const payload = { updatedAt: new Date().toISOString(), language: lang || 'all', period: validSince, repos };
-    githubCaches[cacheKey] = { data: payload, expiresAt: now + 1000 * 60 * 5 };
+    githubCaches[cacheKey] = { data: payload, expiresAt: now + 1000 * 60 * 30 };
     return payload;
   } catch (e) {
     return { updatedAt: new Date().toISOString(), language: lang || 'all', period: validSince, repos: [], error: e.message };
   }
+}
+
+function extractTutorial(readme) {
+  const sections = readme.split(/\n(?=#{1,3}\s)/);
+  for (const section of sections) {
+    const lower = section.toLowerCase();
+    if (/(installation|install|setup|getting started|quick start|usage|how to use|how to run|教程|使用说明|安装|快速开始)/i.test(lower.slice(0, 80))) {
+      const cleaned = section.replace(/#{1,3}\s/g, '').replace(/!\[[^\]]*\]\([^\)]+\)/g, '').replace(/<[^>]+>/g, '').replace(/\[([^\]]+)\]\([^\)]+\)/g, '$1').trim();
+      const lines = cleaned.split('\n').filter(l => l.trim());
+      const meaningfulLines = lines.filter(l => !/^\s*(```|---|\*|\*\*|$)/.test(l.trim()));
+      if (meaningfulLines.length < 2) return '';
+      return meaningfulLines.join('\n').trim();
+    }
+  }
+  return '';
 }
 
 function getYesterday() {
@@ -455,13 +534,17 @@ function parseFeed(xml, source) {
 function normalizeItem(block, source, index) {
   const title = cleanText(pick(block, ['title']));
   const rawSummary = cleanText(pick(block, ['description', 'summary']));
-  const bodyIntro = trimIntro(cleanText(pick(block, ['content:encoded', 'content'])));
+  const rawContent = pick(block, ['content:encoded', 'content']);
+  const bodyIntro = trimIntro(cleanText(rawContent));
   const summary = trimSummary(rawSummary || bodyIntro);
   const url = cleanText(pick(block, ['link'])) || pickAtomLink(block);
   const publishedAt = normalizeDate(pick(block, ['pubDate', 'published', 'updated', 'dc:date']));
   const text = `${title} ${summary} ${bodyIntro} ${source.name}`;
   const category = detectCategory(text, source.defaultCategory);
   const tags = detectTags(text, category);
+
+  const imageUrl = extractImageUrl(block, rawContent);
+  const videoUrl = extractVideoUrl(block);
 
   return {
     id: hash(`${source.name}-${url}-${index}`),
@@ -475,7 +558,9 @@ function normalizeItem(block, source, index) {
     category,
     mode: detectMode(text, source.name),
     publishedAt,
-    tags
+    tags,
+    imageUrl,
+    videoUrl
   };
 }
 
@@ -496,6 +581,72 @@ function pick(block, tags) {
 function pickAtomLink(block) {
   const href = block.match(/<link\\b[^>]*href=["']([^"']+)["'][^>]*>/i)?.[1];
   return href ? decodeEntities(href) : '';
+}
+
+const IMAGE_BLACKLIST_RE = /(\/|^)(ads|advert|banner|sponsor|promo|tracking|pixel|beacon|stat|analytics|share-bar|social-bar|gravatar|feedburner|rss|newsletter-signup|popup|overlay|interstitial|cdnp|cloudfront\.net\/images\/ui|fb-[a-z]|tw-[a-z]|linkedin-[a-z]|pinterest-[a-z]|buffer-[a-z]|addthis|sharethis|disqus|wp-emoticon|mstile|apple-touch-icon|android-chrome|safari-pinned|og-image-default|placeholder|stock|ticker|chart-bar|subscribe|related-post|sidebar|widget|newsletter|popup-icon|notification|push|web-push)\b/i;
+const IMAGE_BLACKLIST_DOMAINS = /\/\/(feedburner\.|gravatar\.|disqus\.|addthis\.|sharethis\.|buffer\.|pixel\.|tracking\.|analytics\.|doubleclick\.|adsense\.|adnxs\.|moatads\.|chartbeat\.|newrelic\.|pingdom\.|taboola\.|outbrain\.|zemanta\.|scoopit\.)/i;
+const IMAGE_MIN_DIM_HINT = /width=["']([0-9]+)["']|height=["']([0-9]+)["']/i;
+
+function isGoodImageUrl(url, htmlSource) {
+  if (!url) return false;
+  if (IMAGE_BLACKLIST_RE.test(url)) return false;
+  if (IMAGE_BLACKLIST_DOMAINS.test(url)) return false;
+  if (/\.(ico|cur|bmp|svg)$/i.test(url) && !/\/(thumbnail|preview|featured|hero|cover|banner-img|article-img)\b/i.test(url)) return false;
+
+  const dimMatch = htmlSource?.match(IMAGE_MIN_DIM_HINT);
+  if (dimMatch) {
+    const w = parseInt(dimMatch[1] || '0', 10);
+    const h = parseInt(dimMatch[2] || '0', 10);
+    if ((w > 0 && w < 50) || (h > 0 && h < 50)) return false;
+  }
+
+  return true;
+}
+
+function extractImageUrl(block, rawContent) {
+  // 1. <enclosure> with image type
+  const enclosure = block.match(/<enclosure[^>]+url=["']([^"']+)["'][^>]+type=["'][^"']*image[^"']*["']/i)
+    || block.match(/<enclosure[^>]+type=["'][^"']*image[^"']*["'][^>]+url=["']([^"']+)["']/i);
+  if (enclosure && isGoodImageUrl(enclosure[1], block)) return enclosure[1];
+
+  // 2. <media:thumbnail> or <media:content> with image
+  const mediaThumb = block.match(/<media:thumbnail[^>]+url=["']([^"']+)["']/i);
+  if (mediaThumb && isGoodImageUrl(mediaThumb[1], block)) return mediaThumb[1];
+  const mediaContent = block.match(/<media:content[^>]+(?:medium|type)=["']image["'][^>]+url=["']([^"']+)["']/i)
+    || block.match(/<media:content[^>]+url=["']([^"']+)["'][^>]+(?:medium|type)=["']image["']/i);
+  if (mediaContent && isGoodImageUrl(mediaContent[1], block)) return mediaContent[1];
+
+  // 3. <enclosure> without type (assume image if url looks like one)
+  const encNoType = block.match(/<enclosure[^>]+url=["']([^"']+)["']/i);
+  if (encNoType && /\.(jpg|jpeg|png|gif|webp)/i.test(encNoType[1]) && isGoodImageUrl(encNoType[1], block)) return encNoType[1];
+
+  // 4. <img> inside content/description HTML — scan all images, pick best one
+  const htmlSource = rawContent || pick(block, ['description', 'summary']);
+  const allImages = [...htmlSource.matchAll(/<img[^>]+src=["']([^"']+)["'][^>]*>/gi)];
+  for (const imgMatch of allImages) {
+    const src = imgMatch[1];
+    const fullTag = imgMatch[0];
+    if (isGoodImageUrl(src, fullTag) && /\.(jpg|jpeg|png|gif|webp)/i.test(src)) return src;
+  }
+
+  return '';
+}
+
+function extractVideoUrl(block) {
+  // <enclosure> with video type
+  const videoEnc = block.match(/<enclosure[^>]+url=["']([^"']+)["'][^>]+type=["'][^"']*video[^"']*["']/i)
+    || block.match(/<enclosure[^>]+type=["'][^"']*video[^"']*["'][^>]+url=["']([^"']+)["']/i);
+  if (videoEnc) return videoEnc[1];
+
+  // <media:content> with video
+  const mediaVideo = block.match(/<media:content[^>]+(?:medium|type)=["']video["'][^>]+url=["']([^"']+)["']/i);
+  if (mediaVideo) return mediaVideo[1];
+
+  // YouTube embed in content
+  const ytEmbed = block.match(/youtube\.com\/embed\/([a-zA-Z0-9_-]+)/i);
+  if (ytEmbed) return `https://www.youtube.com/watch?v=${ytEmbed[1]}`;
+
+  return '';
 }
 
 function cleanText(value) {
