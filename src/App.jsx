@@ -6,7 +6,7 @@ const NAV_ITEMS = [
   { id: 'briefing', label: '每日简报', icon: 'document' },
   { id: 'tracker', label: '公司追踪', icon: 'follow' },
   { id: 'trending', label: '爆款 AI 文章', icon: 'fire' },
-  { id: 'github', label: 'GitHub 周榜', icon: 'github' },
+  { id: 'github', label: 'GitHub 热门', icon: 'github' },
   { id: 'calendar', label: '日历管理', icon: 'calendar' },
   { id: 'reading-list', label: '阅读列表', icon: 'bookmark' },
   { id: 'trends', label: '趋势分析', icon: 'chart' },
@@ -55,6 +55,12 @@ const GITHUB_LANGS = [
   { id: 'go', label: 'Go' },
   { id: 'cpp', label: 'C++' },
   { id: 'java', label: 'Java' }
+];
+
+const GITHUB_PERIODS = [
+  { id: 'daily', label: '日榜' },
+  { id: 'weekly', label: '周榜' },
+  { id: 'monthly', label: '月榜' }
 ];
 
 const REGION_MAP = { domestic: '国内', overseas: '海外', global: '全球' };
@@ -156,12 +162,24 @@ function App() {
   const [panelCollapsed, setPanelCollapsed] = useState(() => localStorage.getItem('panelCollapsed') === 'true');
   const [customSources, setCustomSources] = useState(() => loadLS('customSources', []));
   const [newSource, setNewSource] = useState({ name: '', url: '', region: 'overseas' });
+  const [sourceVerifyResult, setSourceVerifyResult] = useState(null);
+  const [sourceVerifying, setSourceVerifying] = useState(false);
+  const [llmConfig, setLlmConfig] = useState(() => loadLS('llmConfig', { baseUrl: '', apiKey: '', selectedModel: '', manualModels: [] }));
+  const [llmModels, setLlmModels] = useState([]);
+  const [llmFetching, setLlmFetching] = useState(false);
+  const [llmFetchError, setLlmFetchError] = useState('');
+  const [llmTestResult, setLlmTestResult] = useState(null);
+  const [llmTesting, setLlmTesting] = useState(false);
+  const [llmManualInput, setLlmManualInput] = useState('');
+
+  const allLlmModels = useMemo(() => [...llmModels, ...(llmConfig.manualModels || [])], [llmModels, llmConfig.manualModels]);
   const [allSources, setAllSources] = useState([]);
   const [trendingItems, setTrendingItems] = useState([]);
   const [trendingLoading, setTrendingLoading] = useState(false);
   const [githubRepos, setGithubRepos] = useState([]);
   const [githubLoading, setGithubLoading] = useState(false);
   const [githubLang, setGithubLang] = useState('');
+  const [githubSince, setGithubSince] = useState('weekly');
   const [calendarDate, setCalendarDate] = useState(new Date());
   const [events, setEvents] = useState(() => loadLS('calendarEvents', []));
   const [selectedDate, setSelectedDate] = useState(null);
@@ -211,6 +229,7 @@ function App() {
   useEffect(() => { saveLS('briefingConfig', briefingConfig); }, [briefingConfig]);
   useEffect(() => { saveLS('readingHistory', readingHistory); }, [readingHistory]);
   useEffect(() => { saveLS('translations', translations); }, [translations]);
+  useEffect(() => { saveLS('llmConfig', llmConfig); }, [llmConfig]);
 
   useEffect(() => {
     const el = feedRef.current;
@@ -572,9 +591,12 @@ function App() {
     fetch('/api/trending').then(r => r.json()).then(d => setTrendingItems(d.items || [])).catch(() => {}).finally(() => setTrendingLoading(false));
   }
 
-  function loadGithub(lang = githubLang) {
+  function loadGithub(lang = githubLang, since = githubSince) {
     setGithubLoading(true);
-    fetch(`/api/github-trending${lang ? `?lang=${encodeURIComponent(lang)}` : ''}`).then(r => r.json()).then(d => setGithubRepos(d.repos || [])).catch(() => {}).finally(() => setGithubLoading(false));
+    const params = new URLSearchParams();
+    if (lang) params.set('lang', lang);
+    params.set('since', since);
+    fetch(`/api/github-trending?${params}`).then(r => r.json()).then(d => setGithubRepos(d.repos || [])).catch(() => {}).finally(() => setGithubLoading(false));
   }
 
   function toggleBookmark(item) {
@@ -901,10 +923,17 @@ function App() {
                 </div>
               )}
               {nav === 'github' && (
-                <div className="lang-tabs">
-                  {GITHUB_LANGS.slice(0, 6).map(l => (
-                    <button key={l.id} className={`lang-tab ${githubLang === l.id ? 'active' : ''}`} onClick={() => { setGithubLang(l.id); loadGithub(l.id); }}>{l.label}</button>
-                  ))}
+                <div className="github-filter-bar">
+                  <div className="lang-tabs">
+                    {GITHUB_PERIODS.map(p => (
+                      <button key={p.id} className={`lang-tab ${githubSince === p.id ? 'active' : ''}`} onClick={() => { setGithubSince(p.id); loadGithub(githubLang, p.id); }}>{p.label}</button>
+                    ))}
+                  </div>
+                  <div className="lang-tabs">
+                    {GITHUB_LANGS.slice(0, 6).map(l => (
+                      <button key={l.id} className={`lang-tab ${githubLang === l.id ? 'active' : ''}`} onClick={() => { setGithubLang(l.id); loadGithub(l.id, githubSince); }}>{l.label}</button>
+                    ))}
+                  </div>
                 </div>
               )}
               {(nav === 'all' || nav === 'trending' || nav === 'reading-list' || nav === 'recommendations') && (
@@ -937,7 +966,7 @@ function App() {
         <div className="stats-bar">
           {nav === 'all' && <><div className="stat-item"><span className="stat-value">{items.length}</span><span className="stat-label">资讯总数</span></div><div className="stat-item"><span className="stat-value highlight">{filtered.length}</span><span className="stat-label">筛选结果</span></div><div className="stat-item"><span className="stat-value live">{stats.sourceCount - stats.failedSources}</span><span className="stat-label">活跃源</span></div></>}
           {nav === 'trending' && <><div className="stat-item"><span className="stat-value highlight">{trendingItems.length}</span><span className="stat-label">爆款文章</span></div><div className="stat-item"><span className="stat-value live">AI</span><span className="stat-label">专题聚焦</span></div></>}
-          {nav === 'github' && <><div className="stat-item"><span className="stat-value highlight">{githubRepos.length}</span><span className="stat-label">热门项目</span></div><div className="stat-item"><span className="stat-value live">Weekly</span><span className="stat-label">周榜</span></div></>}
+          {nav === 'github' && <><div className="stat-item"><span className="stat-value highlight">{githubRepos.length}</span><span className="stat-label">热门项目</span></div><div className="stat-item"><span className="stat-value live">{GITHUB_PERIODS.find(p => p.id === githubSince)?.label || '周榜'}</span><span className="stat-label">当前榜单</span></div></>}
           {nav === 'reading-list' && <><div className="stat-item"><span className="stat-value highlight">{bookmarks.length}</span><span className="stat-label">收藏总数</span></div><div className="stat-item"><span className="stat-value live">{bookmarks.filter(b => !b.isRead).length}</span><span className="stat-label">未读</span></div></>}
           {nav === 'calendar' && <><div className="stat-item"><span className="stat-value highlight">{events.length}</span><span className="stat-label">日程事件</span></div></>}
           <div className="stat-item time">{ICONS.clock}<span>{stats.updatedAt ? formatTime(stats.updatedAt) : '--'}</span></div>
@@ -1018,9 +1047,9 @@ function App() {
           {/* GITHUB */}
           {nav === 'github' && (
             <>
-              <div className="section-header"><h2 className="section-title">{ICONS.github} GitHub 周榜热门项目</h2><p className="section-desc">本周增星最多的开源项目（实时同步）</p></div>
+              <div className="section-header"><h2 className="section-title">{ICONS.github} GitHub {GITHUB_PERIODS.find(p => p.id === githubSince)?.label || '周榜'}热门项目</h2><p className="section-desc">{githubSince === 'daily' ? '今日增星最多的开源项目' : githubSince === 'monthly' ? '本月增星最多的开源项目' : '本周增星最多的开源项目'}（实时同步）</p></div>
               {githubLoading && <div className="github-grid">{Array.from({ length: 6 }).map((_, i) => <article key={i} className="github-card skeleton"><div className="skeleton-gh-header" /><div className="skeleton-gh-desc" /><div className="skeleton-gh-stats" /></article>)}</div>}
-              <div className="github-grid">{githubRepos.map((repo, i) => <GithubRepoCard key={repo.id} repo={repo} index={i} isBookmarked={isBookmarked(repo.url)} onBookmark={() => toggleBookmark({ id: repo.url, title: repo.fullName, url: repo.url, source: 'GitHub', summary: repo.description, tags: [repo.language].filter(Boolean), region: 'global', mode: 'deep', publishedAt: new Date().toISOString(), category: 'open-source' })} />)}</div>
+              <div className="github-grid">{githubRepos.map((repo, i) => <GithubRepoCard key={repo.id} repo={repo} index={i} since={githubSince} isBookmarked={isBookmarked(repo.url)} onBookmark={() => toggleBookmark({ id: repo.url, title: repo.fullName, url: repo.url, source: 'GitHub', summary: repo.description, tags: [repo.language].filter(Boolean), region: 'global', mode: 'deep', publishedAt: new Date().toISOString(), category: 'open-source' })} />)}</div>
             </>
           )}
 
@@ -1434,11 +1463,63 @@ function App() {
       {/* Settings Modal */}
       {showSettings && (
         <div className="modal-overlay" onClick={() => setShowSettings(false)}>
-          <div className="modal" onClick={e => e.stopPropagation()}>
+          <div className="modal modal-lg" onClick={e => e.stopPropagation()}>
             <div className="modal-header"><h3>设置</h3><button className="modal-close" onClick={() => setShowSettings(false)}>{ICONS.x}</button></div>
             <div className="modal-body">
               <div className="setting-item"><label>关键词屏蔽</label><textarea value={blocked} onChange={e => setBlocked(e.target.value)} placeholder="输入屏蔽词，逗号分隔" /><p className="setting-note">已过滤 {stats.blockedCount} 条资讯</p></div>
-              <div className="setting-item"><label>自定义信息源</label><p className="setting-desc">添加 RSS/Atom 订阅源</p><div className="custom-sources-list">{customSources.map(source => <div key={source.id} className="custom-source-item"><div className="custom-source-info"><span className="custom-source-name">{source.name}</span><span className="custom-source-region">{REGION_MAP[source.region] || source.region}</span></div><button className="remove-source-btn" onClick={() => removeCustomSource(source.id)}>{ICONS.x}</button></div>)}</div><div className="add-source-form"><input type="text" placeholder="名称" value={newSource.name} onChange={e => setNewSource(prev => ({ ...prev, name: e.target.value }))} /><input type="text" placeholder="RSS/Atom URL" value={newSource.url} onChange={e => setNewSource(prev => ({ ...prev, url: e.target.value }))} className="url-input" /><select value={newSource.region} onChange={e => setNewSource(prev => ({ ...prev, region: e.target.value }))}><option value="overseas">海外</option><option value="domestic">国内</option><option value="global">全球</option></select><button className="add-source-btn" onClick={addCustomSource}>{ICONS.plus}</button></div><div className="builtin-sources"><p className="builtin-title">内置信息源 ({allSources.length})</p><div className="builtin-list">{allSources.slice(0, 8).map((s, i) => <span key={i} className="builtin-source">{s.name}</span>)}{allSources.length > 8 && <span className="builtin-more">+{allSources.length - 8} 更多</span>}</div></div></div>
+
+              <div className="setting-item">
+                <label>自定义信息源</label>
+                <p className="setting-desc">添加 RSS/Atom 订阅源，可验证连接有效性</p>
+                <div className="custom-sources-list">{customSources.map(source => <div key={source.id} className="custom-source-item"><div className="custom-source-info"><span className="custom-source-name">{source.name}</span><span className="custom-source-region">{REGION_MAP[source.region] || source.region}</span></div><button className="remove-source-btn" onClick={() => removeCustomSource(source.id)}>{ICONS.x}</button></div>)}</div>
+                <div className="add-source-form">
+                  <input type="text" placeholder="名称" value={newSource.name} onChange={e => setNewSource(prev => ({ ...prev, name: e.target.value }))} />
+                  <input type="text" placeholder="RSS/Atom URL" value={newSource.url} onChange={e => { setNewSource(prev => ({ ...prev, url: e.target.value })); setSourceVerifyResult(null); }} className="url-input" />
+                  <select value={newSource.region} onChange={e => setNewSource(prev => ({ ...prev, region: e.target.value }))}><option value="overseas">海外</option><option value="domestic">国内</option><option value="global">全球</option></select>
+                  <button className="verify-source-btn" onClick={verifySource} disabled={sourceVerifying || !newSource.url} title="验证连接">{sourceVerifying ? '...' : '验证'}</button>
+                  <button className="add-source-btn" onClick={addCustomSource}>{ICONS.plus}</button>
+                </div>
+                {sourceVerifyResult && (
+                  <div className={`source-verify-result ${sourceVerifyResult.ok ? 'verify-ok' : 'verify-fail'}`}>
+                    {sourceVerifyResult.ok ? <>{ICONS.check} 有效: {sourceVerifyResult.title} ({sourceVerifyResult.itemCount} 条内容)</> : <>无效: {sourceVerifyResult.message}</>}
+                  </div>
+                )}
+                <div className="builtin-sources"><p className="builtin-title">内置信息源 ({allSources.length})</p><div className="builtin-list">{allSources.slice(0, 8).map((s, i) => <span key={i} className="builtin-source">{s.name}</span>)}{allSources.length > 8 && <span className="builtin-more">+{allSources.length - 8} 更多</span>}</div></div>
+              </div>
+
+              <div className="setting-item">
+                <label>大模型配置</label>
+                <p className="setting-desc">配置 OpenAI 兼容 API，自动拉取或手动输入模型</p>
+                <div className="llm-config-form">
+                  <div className="llm-config-row">
+                    <input type="text" placeholder="API Base URL (如 https://api.openai.com)" value={llmConfig.baseUrl} onChange={e => setLlmConfig(prev => ({ ...prev, baseUrl: e.target.value }))} className="llm-input url-input" />
+                    <input type="password" placeholder="API Key (可选)" value={llmConfig.apiKey} onChange={e => setLlmConfig(prev => ({ ...prev, apiKey: e.target.value }))} className="llm-input" />
+                    <button className="fetch-models-btn" onClick={fetchLlmModels} disabled={llmFetching || !llmConfig.baseUrl}>{llmFetching ? '拉取中...' : '拉取模型'}</button>
+                  </div>
+                  {llmFetchError && <div className="llm-fetch-error">{llmFetchError}</div>}
+                  <div className="llm-config-row">
+                    <select className="llm-model-select" value={llmConfig.selectedModel} onChange={e => setLlmConfig(prev => ({ ...prev, selectedModel: e.target.value }))}>
+                      <option value="">选择模型</option>
+                      {allLlmModels.map(m => <option key={m.id} value={m.id}>{m.name}{m.owned_by ? ` (${m.owned_by})` : ''}</option>)}
+                    </select>
+                    <input type="text" placeholder="手动输入模型名称" value={llmManualInput} onChange={e => setLlmManualInput(e.target.value)} className="llm-input" />
+                    <button className="add-source-btn" onClick={addManualModel} disabled={!llmManualInput.trim()}>{ICONS.plus}</button>
+                  </div>
+                  {(llmConfig.manualModels || []).length > 0 && (
+                    <div className="manual-models-list">
+                      {(llmConfig.manualModels || []).map(m => <div key={m.id} className="custom-source-item"><div className="custom-source-info"><span className="custom-source-name">{m.name}</span><span className="custom-source-region">手动</span></div><button className="remove-source-btn" onClick={() => removeManualModel(m.id)}>{ICONS.x}</button></div>)}
+                    </div>
+                  )}
+                  <div className="llm-config-row">
+                    <button className="test-llm-btn" onClick={testLlmConnection} disabled={llmTesting || !llmConfig.baseUrl || !llmConfig.selectedModel}>{llmTesting ? '测试中...' : '测试连接'}</button>
+                  </div>
+                  {llmTestResult && (
+                    <div className={`source-verify-result ${llmTestResult.ok ? 'verify-ok' : 'verify-fail'}`}>
+                      {llmTestResult.ok ? <>{ICONS.check} 连接成功 ({llmTestResult.model}): {llmTestResult.reply}</> : <>连接失败: {llmTestResult.message}</>}
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
             <div className="modal-footer"><button className="btn-cancel" onClick={() => setShowSettings(false)}>取消</button><button className="btn-save" onClick={() => { loadNews(); setShowSettings(false); }}>保存并刷新</button></div>
           </div>
@@ -1478,12 +1559,79 @@ function App() {
     if (!newSource.name || !newSource.url) return;
     setCustomSources(prev => [...prev, { ...newSource, id: Date.now() }]);
     setNewSource({ name: '', url: '', region: 'overseas' });
+    setSourceVerifyResult(null);
   }
 
   function removeCustomSource(id) {
     setCustomSources(prev => prev.filter(s => s.id !== id));
   }
-}
+
+  function verifySource() {
+    if (!newSource.url) return;
+    setSourceVerifying(true);
+    setSourceVerifyResult(null);
+    fetch(`/api/verify-source?url=${encodeURIComponent(newSource.url)}`).then(r => r.json()).then(d => {
+      setSourceVerifyResult(d);
+      if (d.ok && !newSource.name && d.title) {
+        setNewSource(prev => ({ ...prev, name: d.title }));
+      }
+    }).catch(() => {
+      setSourceVerifyResult({ ok: false, message: 'Network error' });
+    }).finally(() => setSourceVerifying(false));
+  }
+
+  function fetchLlmModels() {
+    if (!llmConfig.baseUrl) return;
+    setLlmFetching(true);
+    setLlmFetchError('');
+    const params = new URLSearchParams({ baseUrl: llmConfig.baseUrl, apiKey: llmConfig.apiKey });
+    fetch(`/api/llm-models?${params}`).then(r => r.json()).then(d => {
+      if (d.ok) {
+        setLlmModels(d.models || []);
+      } else {
+        setLlmFetchError(d.message || 'Failed to fetch models');
+        setLlmModels([]);
+      }
+    }).catch(() => {
+      setLlmFetchError('Network error');
+      setLlmModels([]);
+    }).finally(() => setLlmFetching(false));
+  }
+
+  function addManualModel() {
+    if (!llmManualInput.trim()) return;
+    setLlmConfig(prev => ({
+      ...prev,
+      manualModels: [...(prev.manualModels || []), { id: llmManualInput.trim(), name: llmManualInput.trim() }],
+      selectedModel: prev.selectedModel || llmManualInput.trim()
+    }));
+    setLlmManualInput('');
+  }
+
+  function removeManualModel(modelId) {
+    setLlmConfig(prev => ({
+      ...prev,
+      manualModels: (prev.manualModels || []).filter(m => m.id !== modelId),
+      selectedModel: prev.selectedModel === modelId ? '' : prev.selectedModel
+    }));
+  }
+
+  function testLlmConnection() {
+    if (!llmConfig.baseUrl || !llmConfig.selectedModel) return;
+    setLlmTesting(true);
+    setLlmTestResult(null);
+    fetch('/api/llm-test', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ baseUrl: llmConfig.baseUrl, apiKey: llmConfig.apiKey, model: llmConfig.selectedModel })
+    }).then(r => r.json()).then(d => {
+      setLlmTestResult(d);
+    }).catch(() => {
+      setLlmTestResult({ ok: false, message: 'Network error' });
+    }).finally(() => setLlmTesting(false));
+  }
+
+  }
 
 function SkeletonCard({ viewMode = 'standard' }) {
   const isCompact = viewMode === 'compact';
@@ -1646,7 +1794,7 @@ function TrendLineChart({ labels = [], series = [] }) {
   );
 }
 
-function GithubRepoCard({ repo, index, isBookmarked = false, onBookmark }) {
+function GithubRepoCard({ repo, index, since = 'weekly', isBookmarked = false, onBookmark }) {
   return (
     <article className="github-card" style={{ animationDelay: `${index * 60}ms` }}>
       <div className="gh-bookmark-wrap">
@@ -1661,8 +1809,7 @@ function GithubRepoCard({ repo, index, isBookmarked = false, onBookmark }) {
       </div>
       <p className="gh-desc">{repo.description}</p>
       <div className="gh-card-stats">
-        <span className="gh-stat">{ICONS.star}<span className="gh-stat-val">{formatStars(repo.starsThisWeek ?? repo.starsToday ?? 0)}</span><span className="gh-stat-label">this week</span></span>
-        <span className="gh-stat">{ICONS.star}<span className="gh-stat-val">{formatStars(repo.totalStars)}</span><span className="gh-stat-label">total</span></span>
+        <span className="gh-stat">{ICONS.star}<span className="gh-stat-val">{formatStars(repo.totalStars)}</span><span className="gh-stat-label">stars</span></span>
         <span className="gh-stat">{ICONS.fork}<span className="gh-stat-val">{formatStars(repo.forks)}</span><span className="gh-stat-label">forks</span></span>
       </div>
     </article>

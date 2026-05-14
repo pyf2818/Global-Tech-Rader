@@ -127,7 +127,7 @@ const TAG_RULES = [
 
 let newsCache = { data: null, expiresAt: 0 };
 let trendingCache = { data: null, expiresAt: 0 };
-let githubCache = { data: null, expiresAt: 0 };
+let githubCaches = {};
 
 const MAX_NEWS_ITEMS = 360;
 const MAX_ITEMS_PER_SOURCE = 16;
@@ -169,10 +169,87 @@ export function newsPlugin() {
           return sendJson(res, payload);
         }
 
-        if (requestUrl.pathname === '/api/github-trending' || requestUrl.pathname === '/api/github-daily') {
+        if (requestUrl.pathname === '/api/github-trending') {
           const lang = requestUrl.searchParams.get('lang') || '';
-          const payload = await getGithubTrending(lang);
+          const since = requestUrl.searchParams.get('since') || 'weekly';
+          const payload = await getGithubTrending(lang, since);
           return sendJson(res, payload);
+        }
+
+        if (requestUrl.pathname === '/api/verify-source') {
+          const url = requestUrl.searchParams.get('url') || '';
+          if (!url) return sendJson(res, { ok: false, message: 'URL is required' }, 400);
+          try {
+            const controller = new AbortController();
+            const timeout = setTimeout(() => controller.abort(), 8000);
+            const response = await fetch(url, {
+              headers: { 'User-Agent': 'GlobalTechRadar/0.1 (+https://localhost)' },
+              signal: controller.signal
+            });
+            clearTimeout(timeout);
+            if (!response.ok) return sendJson(res, { ok: false, message: `HTTP ${response.status}`, status: response.status });
+            const xml = await response.text();
+            const isFeed = /<rss\b|<feed\b|<channel\b/i.test(xml);
+            if (!isFeed) return sendJson(res, { ok: false, message: 'Not a valid RSS/Atom feed' });
+            const items = matchBlocks(xml, 'item').length || matchBlocks(xml, 'entry').length;
+            const title = cleanText(pick(matchBlocks(xml, 'channel').concat(matchBlocks(xml, 'feed')).join(''), ['title'])) || url;
+            return sendJson(res, { ok: true, title, itemCount: items, message: 'Feed is valid' });
+          } catch (e) {
+            return sendJson(res, { ok: false, message: e.message });
+          }
+        }
+
+        if (requestUrl.pathname === '/api/llm-models') {
+          const baseUrl = requestUrl.searchParams.get('baseUrl') || '';
+          const apiKey = requestUrl.searchParams.get('apiKey') || '';
+          if (!baseUrl) return sendJson(res, { ok: false, message: 'baseUrl is required' }, 400);
+          try {
+            const apiUrl = baseUrl.replace(/\/+$/, '') + '/v1/models';
+            const headers = { 'Content-Type': 'application/json' };
+            if (apiKey) headers['Authorization'] = `Bearer ${apiKey}`;
+            const controller = new AbortController();
+            const timeout = setTimeout(() => controller.abort(), 10000);
+            const response = await fetch(apiUrl, { headers, signal: controller.signal });
+            clearTimeout(timeout);
+            if (!response.ok) {
+              const errText = await response.text().catch(() => '');
+              return sendJson(res, { ok: false, message: `API responded ${response.status}: ${errText.slice(0, 200)}`, status: response.status });
+            }
+            const data = await response.json();
+            const models = (data.data || []).map(m => ({ id: m.id, name: m.id, owned_by: m.owned_by || '' }));
+            return sendJson(res, { ok: true, models });
+          } catch (e) {
+            return sendJson(res, { ok: false, message: e.message });
+          }
+        }
+
+        if (requestUrl.pathname === '/api/llm-test') {
+          const body = await parseBody(req);
+          const { baseUrl = '', apiKey = '', model = '', prompt = 'Hello' } = body;
+          if (!baseUrl || !model) return sendJson(res, { ok: false, message: 'baseUrl and model are required' }, 400);
+          try {
+            const apiUrl = baseUrl.replace(/\/+$/, '') + '/v1/chat/completions';
+            const headers = { 'Content-Type': 'application/json' };
+            if (apiKey) headers['Authorization'] = `Bearer ${apiKey}`;
+            const controller = new AbortController();
+            const timeout = setTimeout(() => controller.abort(), 15000);
+            const response = await fetch(apiUrl, {
+              method: 'POST',
+              headers,
+              body: JSON.stringify({ model, messages: [{ role: 'user', content: prompt }], max_tokens: 50 }),
+              signal: controller.signal
+            });
+            clearTimeout(timeout);
+            if (!response.ok) {
+              const errText = await response.text().catch(() => '');
+              return sendJson(res, { ok: false, message: `API responded ${response.status}: ${errText.slice(0, 200)}` });
+            }
+            const data = await response.json();
+            const reply = data.choices?.[0]?.message?.content || '';
+            return sendJson(res, { ok: true, reply, model });
+          } catch (e) {
+            return sendJson(res, { ok: false, message: e.message });
+          }
         }
 
         if (requestUrl.pathname.startsWith('/api/ai/') || requestUrl.pathname.startsWith('/api/translate') || requestUrl.pathname.startsWith('/api/subscriptions') || requestUrl.pathname.startsWith('/api/bookmarks')) {
@@ -284,82 +361,71 @@ async function fetchTrendingSource(source) {
   }
 }
 
-async function getGithubTrending(lang) {
+async function getGithubTrending(lang, since) {
+  const validSince = ['daily', 'weekly', 'monthly'].includes(since) ? since : 'weekly';
   const now = Date.now();
-  const cacheKey = `github-${lang}`;
-  if (githubCache.data && githubCache.key === cacheKey && githubCache.expiresAt > now) {
-    return githubCache.data;
+  const cacheKey = `github-${lang}-${validSince}`;
+  if (githubCaches[cacheKey] && githubCaches[cacheKey].expiresAt > now) {
+    return githubCaches[cacheKey].data;
   }
 
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 10000);
-
   try {
-    const langParam = lang ? `/${lang}` : '';
-    const since = 'weekly';
-    const url = `https://github.com/trending${langParam}?since=${since}`;
+    const dateRange = validSince === 'daily' ? getYesterday() : validSince === 'monthly' ? get30DaysAgo() : get7DaysAgo();
+    const langQuery = lang ? `+language:${encodeURIComponent(lang)}` : '';
+    const apiUrl = `https://api.github.com/search/repositories?q=created:>${dateRange}${langQuery}&sort=stars&order=desc&per_page=25`;
 
-    const response = await fetch(url, {
-      headers: { 'User-Agent': 'GlobalTechRadar/0.1 (+https://localhost)', 'Accept': 'text/html' },
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15000);
+
+    const response = await fetch(apiUrl, {
+      headers: { 'User-Agent': 'GlobalTechRadar/0.1', 'Accept': 'application/vnd.github.v3+json' },
       signal: controller.signal
     });
+    clearTimeout(timeout);
 
-    if (!response.ok) throw new Error(`GitHub responded ${response.status}`);
+    if (!response.ok) throw new Error(`GitHub API responded ${response.status}`);
 
-    const html = await response.text();
-    const repos = parseGithubTrending(html);
+    const data = await response.json();
+    const repos = (data.items || []).map(item => ({
+      id: hash(item.full_name),
+      fullName: item.full_name,
+      name: item.name,
+      url: item.html_url,
+      description: item.description || '暂无描述',
+      language: item.language || '',
+      totalStars: item.stargazers_count || 0,
+      forks: item.forks_count || 0,
+      starsToday: validSince === 'daily' ? item.stargazers_count : 0,
+      starsThisWeek: validSince === 'weekly' ? item.stargazers_count : 0,
+      starsThisMonth: validSince === 'monthly' ? item.stargazers_count : 0,
+      period: validSince,
+      periodLabel: validSince === 'daily' ? 'today' : validSince === 'monthly' ? 'this month' : 'this week'
+    }));
 
-    const payload = { updatedAt: new Date().toISOString(), language: lang || 'all', period: 'weekly', repos };
-    githubCache = { data: payload, key: cacheKey, expiresAt: now + 1000 * 60 * 15 };
+    const payload = { updatedAt: new Date().toISOString(), language: lang || 'all', period: validSince, repos };
+    githubCaches[cacheKey] = { data: payload, expiresAt: now + 1000 * 60 * 5 };
     return payload;
   } catch (e) {
-    return { updatedAt: new Date().toISOString(), language: lang || 'all', period: 'weekly', repos: [], error: e.message };
-  } finally {
-    clearTimeout(timeout);
+    return { updatedAt: new Date().toISOString(), language: lang || 'all', period: validSince, repos: [], error: e.message };
   }
 }
 
-function parseGithubTrending(html) {
-  const repos = [];
-  const repoPattern = /<article class="Box-row">(.*?)<\/article>/gs;
-  const matches = [...html.matchAll(repoPattern)];
+function getYesterday() {
+  const d = new Date();
+  d.setDate(d.getDate() - 1);
+  return d.toISOString().split('T')[0];
+}
 
-  for (const match of matches) {
-    const block = match[1];
+function get7DaysAgo() {
+  const d = new Date();
+  d.setDate(d.getDate() - 7);
+  return d.toISOString().split('T')[0];
+}
 
-    const ownerMatch = block.match(/<h2[^>]*>[\s\S]*?<a[^>]*href="\/([^"]+)"[^>]*>/);
-    const fullName = ownerMatch ? ownerMatch[1].trim() : '';
-    if (!fullName) continue;
-
-    const descMatch = block.match(/<p class="[^"]*col-9[^"]*"[^>]*>([\s\S]*?)<\/p>/);
-    const description = descMatch ? descMatch[1].replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim() : '';
-
-    const langMatch = block.match(/<span itemprop="programmingLanguage">(.*?)<\/span>/);
-    const language = langMatch ? langMatch[1].trim() : '';
-
-    const starsMatch = block.match(/(\d[\d,]*)\s*stars\s*this\s*week/i) || block.match(/class="[^"]*d-inline-block[^"]*"[^>]*>[\s\S]*?(\d[\d,]*)[\s\S]*?<\/a>/i);
-    const starsThisWeek = starsMatch ? starsMatch[1].replace(/,/g, '') : '0';
-
-    const totalStarsMatch = block.match(/(\d[\d,]*)\s*<\/svg>\s*<\/a>/g);
-    const totalStars = totalStarsMatch ? totalStarsMatch[0].replace(/[^\d]/g, '') : '0';
-
-    const forksMatch = block.match(/(\d[\d,]*)\s*(?:<\/svg>\s*<\/a>)/g);
-    const forks = forksMatch && forksMatch.length > 1 ? forksMatch[1].replace(/[^\d]/g, '') : '0';
-
-    repos.push({
-      id: hash(fullName),
-      fullName,
-      name: fullName.split('/')[1] || fullName,
-      url: `https://github.com/${fullName}`,
-      description: description || '暂无描述',
-      language,
-      starsThisWeek: parseInt(starsThisWeek, 10) || 0,
-      totalStars: parseInt(totalStars, 10) || 0,
-      forks: parseInt(forks, 10) || 0
-    });
-  }
-
-  return repos.sort((a, b) => b.starsThisWeek - a.starsThisWeek).slice(0, 25);
+function get30DaysAgo() {
+  const d = new Date();
+  d.setDate(d.getDate() - 30);
+  return d.toISOString().split('T')[0];
 }
 
 async function fetchSource(source) {
@@ -509,4 +575,14 @@ function sendJson(res, payload, status = 200) {
   res.statusCode = status;
   res.setHeader('Content-Type', 'application/json; charset=utf-8');
   res.end(JSON.stringify(payload));
+}
+
+function parseBody(req) {
+  return new Promise(resolve => {
+    let body = '';
+    req.on('data', chunk => { body += chunk; });
+    req.on('end', () => {
+      try { resolve(JSON.parse(body)); } catch { resolve({}); }
+    });
+  });
 }
