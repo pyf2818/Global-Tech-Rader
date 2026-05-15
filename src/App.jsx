@@ -685,9 +685,10 @@ function App() {
     return result;
   }
 
-  function addFollowKeyword() {
-    if (!newKeyword.trim() || followKeywords.includes(newKeyword.trim())) return;
-    setFollowKeywords(prev => [...prev, newKeyword.trim()]);
+  function addFollowKeyword(kw) {
+    const keyword = kw || newKeyword;
+    if (!keyword.trim() || followKeywords.includes(keyword.trim())) return;
+    setFollowKeywords(prev => [...prev, keyword.trim()]);
     setNewKeyword('');
   }
 
@@ -709,6 +710,14 @@ function App() {
     const unpinned = followKeywords.filter(k => !pinned.includes(k));
     return [...pinned, ...unpinned];
   }, [followKeywords, pinnedKeywords]);
+
+  const matchCountPerKeyword = useMemo(() => {
+    const map = {};
+    followKeywords.forEach(kw => {
+      map[kw] = filtered.filter(item => `${item.title} ${item.summary}`.toLowerCase().includes(kw.toLowerCase())).length;
+    });
+    return map;
+  }, [followKeywords, filtered]);
 
   function addTrackTarget() {
     if (!newTrackTarget.trim()) return;
@@ -863,31 +872,35 @@ function App() {
             );
           })}
           {!sidebarCollapsed && (
-            <div className="sidebar-follow-dropdown">
-              <button className="sidebar-follow-toggle" onClick={() => setShowFollowDropdown(v => !v)}>
-                <span className="follow-toggle-label">我的关注</span>
-                <span className="follow-toggle-count">{followKeywords.length}</span>
-                <span className={`follow-toggle-chevron ${showFollowDropdown ? 'open' : ''}`}>{ICONS.chevronDown}</span>
+            <div className="nav-group nav-follow-group">
+              <button className="nav-group-toggle" onClick={() => setShowFollowDropdown(v => !v)}>
+                <span className="nav-group-title">我的关注</span>
+                {followKeywords.length > 0 && <span className="nav-group-follow-count">{followKeywords.length}</span>}
+                <span className={`nav-group-chevron ${showFollowDropdown ? 'open' : ''}`}>{ICONS.chevronDown}</span>
               </button>
               {showFollowDropdown && (
-                <div className="sidebar-follow-list">
-                  {followKeywords.length === 0 && <p className="no-follow-kw">暂无关注关键词</p>}
+                <div className="nav-follow-list">
+                  {followKeywords.length === 0 && <p className="nav-follow-empty">暂无关注关键词</p>}
                   {sortedFollowKeywords.map(kw => (
-                    <div key={kw} className={`kw-card ${pinnedKeywords.includes(kw) ? 'kw-card-pinned' : ''}`}>
-                      <div className="kw-card-content">
-                        {pinnedKeywords.includes(kw) && <span className="kw-pin-indicator" />}
-                        <span className="kw-card-label">{kw}</span>
-                      </div>
-                      <div className="kw-card-btns">
-                        <button className="kw-btn-pin" onClick={() => pinnedKeywords.includes(kw) ? unpinFollowKeyword(kw) : pinFollowKeyword(kw)} title={pinnedKeywords.includes(kw) ? '取消置顶' : '置顶'}>
-                          <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2"><path d={pinnedKeywords.includes(kw) ? "M4 14l4-4 4 4M8 2v8" : "M8 14V2M4 6h8"} /></svg>
+                    <div key={kw} className={`nav-follow-item ${pinnedKeywords.includes(kw) ? 'nav-follow-item-pinned' : ''}`}>
+                      <button className="nav-follow-name" onClick={() => executeSearch(kw)}>
+                        {pinnedKeywords.includes(kw) && <span className="nav-follow-pin-dot" />}
+                        {kw}
+                      </button>
+                      <div className="nav-follow-btns">
+                        <button className={`nav-follow-pin-btn ${pinnedKeywords.includes(kw) ? 'pinned' : ''}`} onClick={() => pinnedKeywords.includes(kw) ? unpinFollowKeyword(kw) : pinFollowKeyword(kw)} title={pinnedKeywords.includes(kw) ? '取消置顶' : '置顶'}>
+                          <svg viewBox="0 0 16 16" width="12" height="12" fill={pinnedKeywords.includes(kw) ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.5"><path d="M3 13l5-5 5 5M8 1v7"/></svg>
                         </button>
-                        <button className="kw-btn-del" onClick={() => removeFollowKeyword(kw)} title="删除">
-                          <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="8" cy="8" r="6" /><line x1="5.5" y1="5.5" x2="10.5" y2="10.5" /><line x1="10.5" y1="5.5" x2="5.5" y2="10.5" /></svg>
+                        <button className="nav-follow-del-btn" onClick={() => removeFollowKeyword(kw)} title="删除">
+                          <svg viewBox="0 0 16 16" width="10" height="10" fill="none" stroke="currentColor" strokeWidth="2"><line x1="3" y1="3" x2="13" y2="13"/><line x1="13" y1="3" x2="3" y2="13"/></svg>
                         </button>
                       </div>
                     </div>
                   ))}
+                  <div className="nav-follow-add">
+                    <input value={newKeyword} onChange={e => setNewKeyword(e.target.value)} placeholder="关键词" onKeyDown={e => e.key === 'Enter' && addFollowKeyword()} />
+                    <button className="nav-follow-add-btn" onClick={() => addFollowKeyword()}>{ICONS.plus}</button>
+                  </div>
                 </div>
               )}
             </div>
@@ -1496,29 +1509,61 @@ function App() {
       <aside className={`panel ${panelCollapsed ? 'collapsed' : ''}`}>
         {!panelCollapsed && (
           <>
-            <section className="panel-section">
-              <h3 className="panel-title">{ICONS.sparkle}<span>我的关注</span></h3>
+            <section className="panel-section follow-panel-section">
+              <div className="follow-panel-header">
+                <h3 className="panel-title">{ICONS.sparkle}<span>我的关注</span></h3>
+                {followKeywords.length > 0 && <span className="follow-total-badge">{followKeywords.length} 个关键词</span>}
+              </div>
               <div className="follow-keywords-panel">
-                {followKeywords.length === 0 && <p className="no-keywords">添加关键词优先展示相关资讯</p>}
-                <div className="kw-card-list">
-                  {sortedFollowKeywords.map(kw => (
-                    <div key={kw} className={`kw-card ${pinnedKeywords.includes(kw) ? 'kw-card-pinned' : ''}`}>
-                      <div className="kw-card-content">
-                        {pinnedKeywords.includes(kw) && <span className="kw-pin-indicator" />}
-                        <span className="kw-card-label">{kw}</span>
-                      </div>
-                      <div className="kw-card-btns">
-                        <button className="kw-btn-pin" onClick={() => pinnedKeywords.includes(kw) ? unpinFollowKeyword(kw) : pinFollowKeyword(kw)} title={pinnedKeywords.includes(kw) ? '取消置顶' : '置顶'}>
-                          <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2"><path d={pinnedKeywords.includes(kw) ? "M4 14l4-4 4 4M8 2v8" : "M8 14V2M4 6h8"} /></svg>
-                        </button>
-                        <button className="kw-btn-del" onClick={() => removeFollowKeyword(kw)} title="删除">
-                          <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="8" cy="8" r="6" /><line x1="5.5" y1="5.5" x2="10.5" y2="10.5" /><line x1="10.5" y1="5.5" x2="5.5" y2="10.5" /></svg>
-                        </button>
+                {followKeywords.length === 0 && (
+                  <div className="follow-panel-empty">
+                    <div className="follow-empty-visual">
+                      <svg viewBox="0 0 40 40" width="40" height="40" fill="none" stroke="var(--accent-cyan)" strokeWidth="1.2" opacity="0.3"><circle cx="20" cy="20" r="18"/><path d="M20 12v8"/><path d="M16 20h8"/></svg>
+                    </div>
+                    <p className="follow-empty-title">追踪你感兴趣的话题</p>
+                    <p className="follow-empty-desc">添加关键词，优先展示匹配资讯</p>
+                  </div>
+                )}
+                {followKeywords.length > 0 && (
+                  <div className="follow-panel-list">
+                    {sortedFollowKeywords.map(kw => {
+                      const count = matchCountPerKeyword[kw] || 0;
+                      const isPinned = pinnedKeywords.includes(kw);
+                      return (
+                        <div key={kw} className={`follow-panel-item ${isPinned ? 'follow-panel-item-pinned' : ''}`}>
+                          <div className="follow-panel-item-left">
+                            <button className="follow-panel-kw" onClick={() => executeSearch(kw)}>{kw}</button>
+                          </div>
+                          <div className="follow-panel-item-right">
+                            <button className={`follow-panel-pin ${isPinned ? 'is-pinned' : ''}`} onClick={() => isPinned ? unpinFollowKeyword(kw) : pinFollowKeyword(kw)} title={isPinned ? '取消置顶' : '置顶'}>
+                              <svg viewBox="0 0 16 16" width="14" height="14" fill={isPinned ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.5"><path d="M3 13l5-5 5 5M8 1v7"/></svg>
+                            </button>
+                            <button className="follow-panel-del" onClick={() => removeFollowKeyword(kw)} title="删除">
+                              <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2"><line x1="4" y1="4" x2="12" y2="12"/><line x1="12" y1="4" x2="4" y2="12"/></svg>
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+                <div className="follow-add-bar follow-add-bar-panel">
+                  <input value={newKeyword} onChange={e => setNewKeyword(e.target.value)} placeholder="添加关键词..." onKeyDown={e => e.key === 'Enter' && addFollowKeyword()} />
+                  <button className="follow-add-btn" onClick={() => addFollowKeyword()}><svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2"><line x1="8" y1="2" x2="8" y2="14"/><line x1="2" y1="8" x2="14" y2="8"/></svg></button>
+                </div>
+                {hotTags.length > 0 && (() => {
+                  const suggestions = hotTags.filter(t => !followKeywords.includes(t.tag)).slice(0, 4);
+                  return suggestions.length > 0 && followKeywords.length > 0 ? (
+                    <div className="follow-suggest">
+                      <span className="follow-suggest-label">热门推荐</span>
+                      <div className="follow-suggest-tags">
+                        {suggestions.map(s => (
+                          <button key={s.tag} className="follow-suggest-tag" onClick={() => addFollowKeyword(s.tag)}>{s.tag}</button>
+                        ))}
                       </div>
                     </div>
-                  ))}
-                </div>
-                <div className="follow-add-form"><input value={newKeyword} onChange={e => setNewKeyword(e.target.value)} placeholder="输入关键词" onKeyDown={e => e.key === 'Enter' && addFollowKeyword()} /><button className="kw-add-btn" onClick={addFollowKeyword}>{ICONS.plus}</button></div>
+                  ) : null;
+                })()}
               </div>
             </section>
             <section className="panel-section"><h3 className="panel-title">{ICONS.fire}<span>热门标签</span></h3><div className="hot-tags">{hotTags.map((item, i) => <button key={item.tag} className="hot-tag" onClick={() => executeSearch(item.tag)}><span className="tag-rank">{i + 1}</span><span className="tag-name">{item.tag}</span><span className="tag-trend">24h +{item.trend}</span><span className="tag-count">{item.count}</span></button>)}</div></section>
@@ -1800,16 +1845,18 @@ function NewsItem({ item, index, viewMode = 'standard', isFocused = false, isBoo
 }
 
 function HexRadarChart({ categories, regions, matrix, maxVal }) {
-  const size = 200;
+  const size = 220;
   const cx = size / 2;
   const cy = size / 2;
-  const r = 75;
+  const r = 78;
   const levels = 4;
   const n = categories.length;
   const angleStep = (2 * Math.PI) / n;
   const startAngle = -Math.PI / 2;
 
   const regionColors = { domestic: '#3b82f6', overseas: '#22d3ee', global: '#a78bfa' };
+  const regionGlows = { domestic: 'rgba(59,130,246,0.6)', overseas: 'rgba(34,211,238,0.6)', global: 'rgba(167,139,250,0.6)' };
+  const regionFills = { domestic: 'rgba(59,130,246,0.30)', overseas: 'rgba(34,211,238,0.30)', global: 'rgba(167,139,250,0.30)' };
 
   const getPoint = (idx, value) => {
     const ratio = maxVal > 0 ? value / maxVal : 0;
@@ -1838,34 +1885,51 @@ function HexRadarChart({ categories, regions, matrix, maxVal }) {
   return (
     <div className="hex-radar-wrap">
       <svg viewBox={`0 0 ${size} ${size}`} className="hex-radar-svg">
+        <defs>
+          {regions.map(region => (
+            <filter key={`glow-${region}`} id={`glow-${region}`} x="-50%" y="-50%" width="200%" height="200%">
+              <feGaussianBlur stdDeviation="2.5" result="blur" />
+              <feComposite in="SourceGraphic" in2="blur" operator="over" />
+            </filter>
+          ))}
+        </defs>
         {Array.from({ length: levels }, (_, l) => (
-          <polygon key={`grid-${l}`} points={hexPoints(l + 1)} fill="none" stroke="var(--border-color)" strokeWidth="0.5" opacity="0.6" />
+          <polygon key={`grid-${l}`} points={hexPoints(l + 1)} fill={l === levels ? 'var(--bg-hover)' : 'none'} stroke="var(--border-active)" strokeWidth="1" opacity={l === levels ? 0.4 : 0.25} />
         ))}
         {categories.map((cat, i) => {
           const angle = startAngle + i * angleStep;
-          const ex = cx + (r + 18) * Math.cos(angle);
-          const ey = cy + (r + 18) * Math.sin(angle);
+          const ex = cx + (r + 22) * Math.cos(angle);
+          const ey = cy + (r + 22) * Math.sin(angle);
           const ax = cx + r * Math.cos(angle);
           const ay = cy + r * Math.sin(angle);
           return (
             <g key={`axis-${cat.id}`}>
-              <line x1={cx} y1={cy} x2={ax} y2={ay} stroke="var(--border-color)" strokeWidth="0.5" opacity="0.4" />
-              <text x={ex} y={ey} textAnchor="middle" dominantBaseline="central" fontSize="8" fill="var(--text-muted)">{cat.label.slice(0, 5)}</text>
+              <line x1={cx} y1={cy} x2={ax} y2={ay} stroke="var(--border-active)" strokeWidth="1" opacity="0.35" />
+              <text x={ex} y={ey} textAnchor="middle" dominantBaseline="central" fontSize="9" fill="var(--text-secondary)" fontWeight="600">{cat.label.length > 4 ? cat.label.slice(0, 4) : cat.label}</text>
             </g>
           );
         })}
         {regions.map(region => (
-          <polygon key={region} points={regionPath(region)} fill={regionColors[region]} fillOpacity="0.15" stroke={regionColors[region]} strokeWidth="1.5" strokeLinejoin="round" />
+          <polygon key={region} points={regionPath(region)} fill={regionFills[region]} stroke={regionColors[region]} strokeWidth="2" strokeLinejoin="round" filter={`url(#glow-${region})`} />
         ))}
         {regions.map(region => categories.map((cat, i) => {
           const v = matrix[region]?.[cat.id] || 0;
           if (!v) return null;
           const p = getPoint(i, v);
-          return <circle key={`dot-${region}-${cat.id}`} cx={p.px} cy={p.py} r="2.5" fill={regionColors[region]} />;
+          return <circle key={`dot-${region}-${cat.id}`} cx={p.px} cy={p.py} r="3.5" fill={regionColors[region]} stroke="white" strokeWidth="1.5" />;
+        }))}
+        {regions.map(region => categories.map((cat, i) => {
+          const v = matrix[region]?.[cat.id] || 0;
+          if (!v) return null;
+          const p = getPoint(i, v);
+          const angle = startAngle + i * angleStep;
+          const lx = p.px + 10 * Math.cos(angle);
+          const ly = p.py + 10 * Math.sin(angle);
+          return <text key={`val-${region}-${cat.id}`} x={lx} y={ly} textAnchor="middle" dominantBaseline="central" fontSize="7" fill={regionColors[region]} fontWeight="600">{v}</text>;
         }))}
       </svg>
       <div className="hex-radar-legend">
-        {regions.map(r => <span key={r} className="hex-legend-item" style={{ color: regionColors[r] }}><i style={{ background: regionColors[r] }} />{REGION_MAP[r]}</span>)}
+        {regions.map(r => <span key={r} className="hex-legend-item"><span className="hex-legend-dot" style={{ background: regionColors[r], boxShadow: `0 0 6px ${regionGlows[r]}` }} />{REGION_MAP[r]}</span>)}
       </div>
     </div>
   );

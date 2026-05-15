@@ -128,6 +128,7 @@ const TAG_RULES = [
 let newsCache = { data: null, expiresAt: 0 };
 let trendingCache = { data: null, expiresAt: 0 };
 let githubCaches = {};
+let imageResolveCache = {};
 
 const MAX_NEWS_ITEMS = 360;
 const MAX_ITEMS_PER_SOURCE = 16;
@@ -280,6 +281,25 @@ async function getNews(blocked, customSources) {
     .sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime());
   const filtered = mergeDiverseItems(cleaned, sourceResults, MAX_NEWS_ITEMS, MAX_ITEMS_PER_SOURCE);
 
+  const itemsWithoutImage = filtered.filter(item => !item.imageUrl && item.url);
+  if (itemsWithoutImage.length > 0) {
+    const imageSettled = await Promise.allSettled(itemsWithoutImage.slice(0, 30).map(async (item) => {
+      try {
+        const resolved = await resolveImageFromArticle(item.url);
+        return { id: item.id, imageUrl: resolved.imageUrl, videoUrl: resolved.videoUrl || item.videoUrl };
+      } catch { return null; }
+    }));
+    imageSettled.forEach(result => {
+      if (result.status === 'fulfilled' && result.value) {
+        const idx = filtered.findIndex(i => i.id === result.value.id);
+        if (idx >= 0 && result.value.imageUrl) {
+          filtered[idx].imageUrl = result.value.imageUrl;
+          if (result.value.videoUrl) filtered[idx].videoUrl = result.value.videoUrl;
+        }
+      }
+    });
+  }
+
   const payload = {
     updatedAt: new Date().toISOString(),
     items: filtered,
@@ -321,6 +341,44 @@ function mergeDiverseItems(items, sourceResults, maxItems, perSourceLimit) {
 
 function normalizeUrl(url) {
   return String(url || '').replace(/^https?:\/\//, '').replace(/\/$/, '');
+}
+
+async function resolveImageFromArticle(articleUrl) {
+  if (!articleUrl) return { imageUrl: '', videoUrl: '' };
+  if (imageResolveCache[articleUrl]) return imageResolveCache[articleUrl];
+  try {
+    const res = await fetch(articleUrl, {
+      headers: { 'User-Agent': 'GlobalTechRadar/0.1' },
+      signal: AbortSignal.timeout(4000)
+    });
+    if (!res.ok) return { imageUrl: '', videoUrl: '' };
+    const html = await res.text();
+    const ogImage = html.match(/<meta\s+property=["']og:image["']\s+content=["']([^"']+)["']/i);
+    if (ogImage && isGoodImageUrl(ogImage[1], html)) {
+      const result = { imageUrl: ogImage[1], videoUrl: '' };
+      imageResolveCache[articleUrl] = result;
+      return result;
+    }
+    const twitterImage = html.match(/<meta\s+name=["']twitter:image["']\s+content=["']([^"']+)["']/i);
+    if (twitterImage && isGoodImageUrl(twitterImage[1], html)) {
+      const result = { imageUrl: twitterImage[1], videoUrl: '' };
+      imageResolveCache[articleUrl] = result;
+      return result;
+    }
+    const allImgs = [...html.matchAll(/<img[^>]+src=["']([^"']+)["'][^>]*>/gi)].map(m => m[1]);
+    for (const src of allImgs) {
+      if (!/\.(jpg|jpeg|png|gif|webp)/i.test(src)) continue;
+      if (!isGoodImageUrl(src, html)) continue;
+      const re = /(badge|shield|icon|logo|tracker|pixel|gravatar|avatar|emoji)/i;
+      if (r.test(src)) continue;
+      const result = { imageUrl: src, videoUrl: '' };
+      imageResolveCache[articleUrl] = result;
+      return result;
+    }
+    return { imageUrl: '', videoUrl: '' };
+  } catch {
+    return { imageUrl: '', videoUrl: '' };
+  }
 }
 
 async function getTrending() {
@@ -413,23 +471,42 @@ async function getGithubTrending(lang, since) {
 
     const settled = await Promise.allSettled(rawRepos.slice(0, 5).map(async (item, i) => {
       try {
-        const readmeUrl = `https://api.github.com/repos/${item.full_name}/readme`;
-        const readmeRes = await fetch(readmeUrl, {
-          headers: { 'User-Agent': 'GlobalTechRadar/0.1', 'Accept': 'application/vnd.github.raw' },
-          signal: AbortSignal.timeout(6000)
-        });
-        if (!readmeRes.ok) return null;
-        const content = await readmeRes.text();
+        const branches = ['main', 'master'];
+        let content = '';
+        for (const branch of branches) {
+          const rawUrl = `https://raw.githubusercontent.com/${item.full_name}/${branch}/README.md`;
+          const rawRes = await fetch(rawUrl, {
+            headers: { 'User-Agent': 'GlobalTechRadar/0.1' },
+            signal: AbortSignal.timeout(5000)
+          });
+          if (rawRes.ok) { content = await rawRes.text(); break; }
+        }
+        if (!content) {
+          const readmeUrl = `https://api.github.com/repos/${item.full_name}/readme`;
+          const readmeRes = await fetch(readmeUrl, {
+            headers: { 'User-Agent': 'GlobalTechRadar/0.1', 'Accept': 'application/vnd.github.raw' },
+            signal: AbortSignal.timeout(6000)
+          });
+          if (!readmeRes.ok) return null;
+          content = await readmeRes.text();
+        }
 const imageUrls = [...content.matchAll(/<img[^>]+src=["']([^"']+)["']/gi)].map(m => m[1]);
         const markdownImages = [...content.matchAll(/!\[[^\]]*\]\(([^)]+)\)/g)].map(m => m[1]);
         const readmeBadImgRe = /(badge|shield|icon|logo|status|build|coverage|codecov|travis|circleci|github\.com\/.*\/badges|npm\/badge|snyk|dependabot|renovate|license|downloads|version|size|rating|stars|follow|tweet|share|sponsor|patreon|ko-fi|buy_me_a_coffee|opencollective|code_style|lint|test|ci|workflow|actions|progress|compat|platform|browser|stack|node|python|java|rust|go|typescript|javascript|swift|kotlin|ruby|php|docker|podman|kubernetes|terraform|ansible|visual.studio|vscode|jetbrains|intellij|emacs|vim|neovim|sublime)\b/i;
         const readmeGoodImgRe = /(screenshot|demo|preview|example|result|output|architecture|diagram|flow|chart|graph|figure|fig|illustration|展示|演示|截图|效果图|架构图|流程图|界面|画面|界面截图)/i;
         const candidates = [];
+        const resolveUrl = (src) => {
+          if (src.startsWith('http://') || src.startsWith('https://')) return src;
+          const base = `https://raw.githubusercontent.com/${item.full_name}/main`;
+          const path = src.startsWith('/') ? src.slice(1) : src;
+          return `${base}/${path}`;
+        };
         const markdownMatches = [...content.matchAll(/!\[([^\]]*)\]\(([^)]+)\)/g)];
         for (const m of markdownMatches) {
           const alt = m[1];
-          const src = m[2];
+          let src = m[2];
           if (!/\.(jpg|jpeg|png|gif|webp)/i.test(src)) continue;
+          src = resolveUrl(src);
           if (readmeBadImgRe.test(src) || readmeBadImgRe.test(alt)) continue;
           if (!isGoodImageUrl(src, content)) continue;
           const goodScore = (readmeGoodImgRe.test(src) || readmeGoodImgRe.test(alt)) ? 2 : 0;
@@ -438,8 +515,9 @@ const imageUrls = [...content.matchAll(/<img[^>]+src=["']([^"']+)["']/gi)].map(m
         }
         const htmlMatches = [...content.matchAll(/<img[^>]+src=["']([^"']+)["'][^>]*>/gi)];
         for (const m of htmlMatches) {
-          const src = m[1];
+          let src = m[1];
           if (!/\.(jpg|jpeg|png|gif|webp)/i.test(src)) continue;
+          src = resolveUrl(src);
           if (readmeBadImgRe.test(src)) continue;
           if (!isGoodImageUrl(src, content)) continue;
           const goodScore = readmeGoodImgRe.test(src) ? 2 : 0;
@@ -447,7 +525,7 @@ const imageUrls = [...content.matchAll(/<img[^>]+src=["']([^"']+)["']/gi)].map(m
           candidates.push({ src, score: goodScore + pathScore });
         }
         candidates.sort((a, b) => b.score - a.score);
-        const imageUrl = candidates.length > 0 ? candidates[0].src : '';
+        const imageUrl = candidates.length > 0 ? candidates[0].src : (item.homepage ? '' : '');
 
         const tutorial = extractTutorial(content);
         const intro = content.replace(/!\[[^\]]*\]\([^\)]+\)/g, '').replace(/<[^>]+>/g, '').replace(/#{1,4}\s/g, '').replace(/\s+/g, ' ').trim().slice(0, 200);
