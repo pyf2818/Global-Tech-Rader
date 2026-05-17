@@ -192,6 +192,9 @@ function App() {
   const [query, setQuery] = useState('');
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [newsPage, setNewsPage] = useState(0);
+  const [newsHasMore, setNewsHasMore] = useState(true);
   const [error, setError] = useState('');
   const [blocked, setBlocked] = useState('');
   const [showSettings, setShowSettings] = useState(false);
@@ -286,6 +289,19 @@ function App() {
     el.addEventListener('scroll', handleScroll);
     return () => el.removeEventListener('scroll', handleScroll);
   }, []);
+
+  useEffect(() => {
+    if (nav !== 'all') return;
+    const el = feedRef.current;
+    if (!el || !newsHasMore || loadingMore || loading) return;
+    const observer = new IntersectionObserver(
+      (entries) => { if (entries[0].isIntersecting) loadMoreNews(); },
+      { root: el, rootMargin: '200px' }
+    );
+    const sentinel = document.getElementById('load-more-sentinel');
+    if (sentinel) observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [nav, newsHasMore, loadingMore, loading, items.length]);
 
   const scrollToTop = () => {
     feedRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
@@ -639,14 +655,30 @@ function App() {
     }
   }, [focusedIndex]);
 
-  function loadNews(b = blocked) {
-    setLoading(true); setError('');
+  function loadNews(b = blocked, append = false) {
+    if (!append) { setLoading(true); setError(''); setNewsPage(0); setNewsHasMore(true); }
+    const page = append ? newsPage + 1 : 0;
     const customParams = customSources.map(s => `custom=${encodeURIComponent(JSON.stringify(s))}`).join('&');
-    fetch(`/api/news?blocked=${encodeURIComponent(b)}${customParams ? '&' + customParams : ''}`)
+    fetch(`/api/news?blocked=${encodeURIComponent(b)}&page=${page}&pageSize=40${customParams ? '&' + customParams : ''}`)
       .then(r => r.json())
-      .then(d => { setItems(d.items || []); setStats(d); })
+      .then(d => {
+        if (append) {
+          setItems(prev => [...prev, ...(d.items || [])]);
+        } else {
+          setItems(d.items || []);
+        }
+        setStats({ ...d, items: undefined });
+        setNewsHasMore(d.hasMore ?? false);
+        setNewsPage(page);
+      })
       .catch(e => setError(e.message))
-      .finally(() => setLoading(false));
+      .finally(() => { setLoading(false); setLoadingMore(false); });
+  }
+
+  function loadMoreNews() {
+    if (!newsHasMore || loadingMore || loading) return;
+    setLoadingMore(true);
+    loadNews(blocked, true);
   }
 
   function loadTrending() {
@@ -1119,6 +1151,15 @@ function App() {
               <div className={`feed-list view-${viewMode} ${viewMode === 'card' ? 'card-grid' : ''}`}>
                 {filtered.map((item, i) => <NewsItem key={item.id} item={item} index={i} viewMode={viewMode} isFocused={focusedIndex === i} isBookmarked={isBookmarked(item.id)} onBookmark={() => toggleBookmark(item)} onSummary={() => setExpandedSummary(p => ({ ...p, [item.id]: !p[item.id] }))} isSummaryOpen={expandedSummary[item.id]} summaryText={generateSummary(item)} isFollowed={followKeywords.some(kw => `${item.title} ${item.summary}`.toLowerCase().includes(kw.toLowerCase()))} onRead={() => recordReading(item)} showTranslation={translationOpen[item.id]} onToggleTranslation={() => setTranslationOpen(p => ({ ...p, [item.id]: !p[item.id] }))} translation={getTranslation(item)} onOpenLightbox={(src, title) => setLightbox({ open: true, src, title })} />)}
               </div>
+              {nav === 'all' && newsHasMore && (
+                <div id="load-more-sentinel" className="load-more-area">
+                  {loadingMore && <div className="load-more-spinner"><div className="spinner" /><span>加载中...</span></div>}
+                  {!loadingMore && <span className="load-more-hint">滚动加载更多</span>}
+                </div>
+              )}
+              {nav === 'all' && !newsHasMore && items.length > 0 && (
+                <div className="load-more-area load-more-done">已全部加载</div>
+              )}
             </>
           )}
 

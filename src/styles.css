@@ -279,6 +279,13 @@ body {
 .error-state button, .empty-state button { padding: 8px 20px; background: var(--accent-cyan); border: none; border-radius: 6px; color: var(--bg-primary); font-weight: 600; cursor: pointer; }
 .feed-list { display: flex; flex-direction: column; gap: 10px; }
 
+/* Load More Sentinel */
+.load-more-area { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 20px 0; color: var(--text-muted); font-size: 13px; }
+.load-more-spinner { display: flex; align-items: center; gap: 10px; }
+.load-more-spinner .spinner { width: 20px; height: 20px; border-width: 2px; }
+.load-more-hint { opacity: 0.6; }
+.load-more-done { opacity: 0.4; }
+
 /* Section Header */
 .section-header { margin-bottom: 20px; }
 .section-title { display: flex; align-items: center; gap: 10px; font-size: 18px; font-weight: 700; color: var(--text-primary); margin-bottom: 4px; }

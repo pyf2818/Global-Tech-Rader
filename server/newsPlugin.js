@@ -228,8 +228,9 @@ let trendingCache = { data: null, expiresAt: 0 };
 let githubCaches = {};
 let imageResolveCache = {};
 
-const MAX_NEWS_ITEMS = 360;
+const MAX_NEWS_ITEMS = 500;
 const MAX_ITEMS_PER_SOURCE = 16;
+const PAGE_SIZE = 40;
 
 export function newsPlugin() {
   return {
@@ -259,7 +260,9 @@ export function newsPlugin() {
             customSources = customParams.map(p => JSON.parse(p)).filter(s => s.name && s.url);
           } catch {}
 
-          const payload = await getNews(blocked, customSources);
+          const page = parseInt(requestUrl.searchParams.get('page') || '0', 10);
+          const pageSize = parseInt(requestUrl.searchParams.get('pageSize') || String(PAGE_SIZE), 10);
+          const payload = await getNews(blocked, customSources, page, pageSize);
           return sendJson(res, payload);
         }
 
@@ -361,56 +364,73 @@ export function newsPlugin() {
   };
 }
 
-async function getNews(blocked, customSources) {
+async function getNews(blocked, customSources, page = 0, pageSize = PAGE_SIZE) {
   const now = Date.now();
   const allSources = [...DEFAULT_SOURCES, ...customSources];
+  const cacheKey = JSON.stringify({ blocked, customSources: customSources.map(s => s.url) });
 
-  if (!blocked.length && customSources.length === 0 && newsCache.data && newsCache.expiresAt > now) {
-    return newsCache.data;
-  }
+  const cacheValid = newsCache.data && newsCache.expiresAt > now && newsCache.key === cacheKey;
+  let fullItems;
+  let sourceResults;
+  let failedSources;
+  let blockedCount;
 
-  const settled = await Promise.allSettled(allSources.map(fetchSource));
-  const sourceResults = settled
-    .filter(result => result.status === 'fulfilled')
-    .map(result => result.value);
-  const items = sourceResults.flatMap(result => result.items);
-  const failedSources = settled.filter(result => result.status === 'rejected').length;
-  const cleaned = applyBlockedWords(items, blocked)
-    .sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime());
-  const filtered = mergeDiverseItems(cleaned, sourceResults, MAX_NEWS_ITEMS, MAX_ITEMS_PER_SOURCE);
+  if (cacheValid) {
+    fullItems = newsCache.data.items;
+    sourceResults = newsCache.data.sourceResults;
+    failedSources = newsCache.data.failedSources;
+    blockedCount = newsCache.data.blockedCount;
+  } else {
+    const settled = await Promise.allSettled(allSources.map(fetchSource));
+    sourceResults = settled
+      .filter(result => result.status === 'fulfilled')
+      .map(result => result.value);
+    const rawItems = sourceResults.flatMap(result => result.items);
+    failedSources = settled.filter(result => result.status === 'rejected').length;
+    const cleaned = applyBlockedWords(rawItems, blocked)
+      .sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime());
+    const deduped = mergeDiverseItems(cleaned, sourceResults, MAX_NEWS_ITEMS, MAX_ITEMS_PER_SOURCE);
+    blockedCount = rawItems.length - cleaned.length;
 
-  const itemsWithoutImage = filtered.filter(item => !item.imageUrl && item.url);
-  if (itemsWithoutImage.length > 0) {
-    const imageSettled = await Promise.allSettled(itemsWithoutImage.slice(0, 30).map(async (item) => {
-      try {
-        const resolved = await resolveImageFromArticle(item.url);
-        return { id: item.id, imageUrl: resolved.imageUrl, videoUrl: resolved.videoUrl || item.videoUrl };
-      } catch { return null; }
-    }));
-    imageSettled.forEach(result => {
-      if (result.status === 'fulfilled' && result.value) {
-        const idx = filtered.findIndex(i => i.id === result.value.id);
-        if (idx >= 0 && result.value.imageUrl) {
-          filtered[idx].imageUrl = result.value.imageUrl;
-          if (result.value.videoUrl) filtered[idx].videoUrl = result.value.videoUrl;
+    fullItems = deduped;
+
+    const itemsWithoutImage = fullItems.filter(item => !item.imageUrl && item.url);
+    if (itemsWithoutImage.length > 0) {
+      const imageSettled = await Promise.allSettled(itemsWithoutImage.slice(0, 30).map(async (item) => {
+        try {
+          const resolved = await resolveImageFromArticle(item.url);
+          return { id: item.id, imageUrl: resolved.imageUrl, videoUrl: resolved.videoUrl || item.videoUrl };
+        } catch { return null; }
+      }));
+      imageSettled.forEach(result => {
+        if (result.status === 'fulfilled' && result.value) {
+          const idx = fullItems.findIndex(i => i.id === result.value.id);
+          if (idx >= 0 && result.value.imageUrl) {
+            fullItems[idx].imageUrl = result.value.imageUrl;
+            if (result.value.videoUrl) fullItems[idx].videoUrl = result.value.videoUrl;
+          }
         }
-      }
-    });
+      });
+    }
+
+    newsCache = { data: { items: fullItems, sourceResults, failedSources, blockedCount }, expiresAt: now + 1000 * 60 * 5, key: cacheKey };
   }
 
-  const payload = {
+  const start = page * pageSize;
+  const end = start + pageSize;
+  const pagedItems = fullItems.slice(start, end);
+
+  return {
     updatedAt: new Date().toISOString(),
-    items: filtered,
+    items: pagedItems,
+    total: fullItems.length,
+    page,
+    pageSize,
+    hasMore: end < fullItems.length,
     sourceCount: allSources.length,
     failedSources,
-    blockedCount: items.length - filtered.length
+    blockedCount
   };
-
-  if (!blocked.length && customSources.length === 0) {
-    newsCache = { data: payload, expiresAt: now + 1000 * 60 * 5 };
-  }
-
-  return payload;
 }
 
 function mergeDiverseItems(items, sourceResults, maxItems, perSourceLimit) {
