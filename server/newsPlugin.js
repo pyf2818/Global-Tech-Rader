@@ -355,18 +355,20 @@ export function newsPlugin() {
           }
         }
 
-        if (requestUrl.pathname === '/api/ai-insights') {
+if (requestUrl.pathname === '/api/ai-insights') {
           const body = await parseBody(req);
           const { baseUrl = '', apiKey = '', model = '', items = [] } = body;
+          console.log('[AI Insights] Request:', { baseUrl, model, itemsCount: items.length, hasKey: !!apiKey });
           if (!baseUrl || !model) return sendJson(res, { error: 'baseUrl and model are required' }, 400);
           if (items.length === 0) return sendJson(res, { error: 'items required' }, 400);
           try {
             const apiUrl = baseUrl.replace(/\/+$/, '') + '/v1/chat/completions';
             const headers = { 'Content-Type': 'application/json' };
             if (apiKey) headers['Authorization'] = `Bearer ${apiKey}`;
+            console.log('[AI Insights] Calling:', apiUrl, 'model:', model);
             const prompt = `你是一个科技趋势分析师。请分析以下${items.length}条技术资讯，输出纯 JSON（不要包含 markdown 代码块或其他文字）：
 
-{"trends":["趋势1","趋势2","趋势3"],"correlations":["跨域关联1","跨域关联2"],"signals":["关键信号1","关键信号2","关键信号3"]}
+{"trends":["趋势 1","趋势 2","趋势 3"],"correlations":["跨域关联 1","跨域关联 2"],"signals":["关键信号 1","关键信号 2","关键信号 3"]}
 
 资讯列表：
 ${items.map((i, idx) => `${idx + 1}. [${i.category}] ${i.title} - ${i.source}`).join('\n')}
@@ -387,10 +389,38 @@ ${items.map((i, idx) => `${idx + 1}. [${i.category}] ${i.title} - ${i.source}`).
               signal: controller.signal
             });
             clearTimeout(timeout);
+            console.log('[AI Insights] API response status:', response.status);
             if (!response.ok) {
               const errText = await response.text().catch(() => '');
+              console.error('[AI Insights] API error:', response.status, errText);
               return sendJson(res, { error: `API responded ${response.status}: ${errText.slice(0, 200)}` });
             }
+            const data = await response.json();
+            console.log('[AI Insights] API response data:', JSON.stringify(data, null, 2).slice(0, 500));
+            const content = data.choices?.[0]?.message?.content || '';
+            console.log('[AI Insights] Raw response:', content.slice(0, 500));
+            try {
+              let cleaned = content.trim();
+              cleaned = cleaned.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '');
+              const start = cleaned.indexOf('{');
+              const end = cleaned.lastIndexOf('}');
+              if (start === -1 || end === -1 || end <= start) {
+                console.log('[AI Insights] No JSON braces found');
+                throw new Error('No JSON object found');
+              }
+              const jsonStr = cleaned.slice(start, end + 1);
+              console.log('[AI Insights] Extracted JSON:', jsonStr.slice(0, 300));
+              const insights = JSON.parse(jsonStr);
+              return sendJson(res, insights);
+            } catch (e) {
+              console.error('[AI Insights] Parse error:', e.message, 'Content:', content);
+              return sendJson(res, { error: `AI 返回格式错误：${e.message}`, raw: content.slice(0, 300) });
+            }
+          } catch (e) {
+            console.error('[AI Insights] Outer error:', e);
+            return sendJson(res, { error: e.message });
+          }
+        }
 const data = await response.json();
             const content = data.choices?.[0]?.message?.content || '';
             console.log('[AI Insights] Raw response:', content.slice(0, 500));
@@ -412,16 +442,6 @@ const insights = JSON.parse(jsonStr);
             } catch (e) {
               console.error('[AI Insights] Parse error:', e.message, 'Content:', content);
               return sendJson(res, { error: `AI 返回格式错误：${e.message}`, raw: content.slice(0, 300) });
-            }
-          } catch (e) {
-            return sendJson(res, { error: e.message });
-          }
-        }
-              const jsonStr = cleaned.slice(start, end + 1);
-              const insights = JSON.parse(jsonStr);
-              return sendJson(res, insights);
-            } catch (e) {
-              return sendJson(res, { error: `AI 返回格式错误: ${content.slice(0, 200)}` });
             }
           } catch (e) {
             return sendJson(res, { error: e.message });

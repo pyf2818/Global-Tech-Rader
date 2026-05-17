@@ -295,7 +295,11 @@ function App() {
           })
         });
         const data = await res.json();
-        if (data.error) throw new Error(data.error);
+        console.log('[AI Insights] Response:', data);
+        if (data.error) {
+          const msg = data.raw ? `AI 返回格式错误：${data.error}。原始输出：${data.raw.slice(0, 200)}` : data.error;
+          throw new Error(msg);
+        }
         setAiInsights({ loading: false, data, error: '' });
       } catch (e) {
         setAiInsights({ loading: false, data: null, error: e.message });
