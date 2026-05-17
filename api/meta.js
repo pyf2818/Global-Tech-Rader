@@ -1,15 +1,29 @@
 const CATEGORIES = [
   { id: 'all', label: '全部赛道' },
   { id: 'ai-models', label: 'AI 大模型' },
-  { id: 'chips-compute', label: '芯片算力' },
+  { id: 'research', label: '科研前沿' },
   { id: 'open-source', label: '开源生态' },
-  { id: 'silicon-valley', label: '硅谷欧美' },
-  { id: 'china-tech', label: '国内大厂' },
+  { id: 'data-science', label: '数据科学' },
+  { id: 'quantum', label: '量子计算' },
+  { id: 'cybersecurity', label: '网络安全' },
+  { id: 'chips-compute', label: '芯片半导体' },
   { id: 'devices', label: '硬件数码' },
   { id: 'robotics', label: '机器人' },
+  { id: 'iot-5g', label: '物联网5G' },
+  { id: 'silicon-valley', label: '硅谷欧美' },
+  { id: 'china-tech', label: '国内大厂' },
+  { id: 'policy-finance', label: '政策财经' },
+  { id: 'fintech', label: '金融科技' },
+  { id: 'space', label: '太空探索' },
+  { id: 'new-energy', label: '新能源' },
+  { id: 'climate-esg', label: '气候ESG' },
+  { id: 'gaming', label: '游戏电竞' },
+  { id: 'metaverse-xr', label: '元宇宙XR' },
+  { id: 'healthcare', label: '医疗健康' },
+  { id: 'education-tech', label: '教育科技' },
+  { id: 'agriculture-tech', label: '农业科技' },
   { id: 'cloud', label: '云计算' },
-  { id: 'research', label: '科研前沿' },
-  { id: 'policy-funding', label: '政策投融' }
+  { id: 'automotive', label: '智能汽车' }
 ];
 
 const MODES = [

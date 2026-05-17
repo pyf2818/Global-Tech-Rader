@@ -60,7 +60,29 @@ const DEFAULT_SOURCES = [
   
   // 硬件数码
   { name: "Tom's Hardware", url: 'https://www.tomshardware.com/feeds/all', region: 'overseas', defaultCategory: 'devices' },
-  { name: 'AnandTech', url: 'https://www.anandtech.com/rss/newsfeed.aspx', region: 'overseas', defaultCategory: 'devices' }
+  { name: 'AnandTech', url: 'https://www.anandtech.com/rss/newsfeed.aspx', region: 'overseas', defaultCategory: 'devices' },
+  
+  // 新能源
+  { name: 'Canary Media', url: 'https://www.canarymedia.com/feed', region: 'overseas', defaultCategory: 'new-energy' },
+  { name: 'Electrek', url: 'https://electrek.co/feed/', region: 'overseas', defaultCategory: 'new-energy' },
+  { name: 'Green Car Reports', url: 'https://www.greencarreports.com/news/rss.xml', region: 'overseas', defaultCategory: 'new-energy' },
+  
+  // 医疗健康
+  { name: 'Stat News', url: 'https://www.statnews.com/feed/', region: 'overseas', defaultCategory: 'healthcare' },
+  { name: 'FierceBiotech', url: 'https://www.fiercebiotech.com/rss', region: 'overseas', defaultCategory: 'healthcare' },
+  { name: 'Nature Medicine', url: 'https://www.nature.com/nm.rss', region: 'global', defaultCategory: 'healthcare' },
+  
+  // 政策财经
+  { name: 'Reuters Business', url: 'https://www.reuters.com/business/feed/', region: 'overseas', defaultCategory: 'policy-finance' },
+  { name: 'Bloomberg Technology', url: 'https://feeds.bloomberg.com/technology/news.rss', region: 'overseas', defaultCategory: 'policy-finance' },
+  { name: 'Financial Times Tech', url: 'https://www.ft.com/technology?format=rss', region: 'overseas', defaultCategory: 'policy-finance' },
+  { name: '华尔街见闻', url: 'https://rss.wallstreetcn.com/latest', region: 'domestic', defaultCategory: 'policy-finance' },
+  { name: '经济观察网', url: 'https://www.eeo.com.cn/rss.xml', region: 'domestic', defaultCategory: 'policy-finance' },
+  
+  // 网络安全
+  { name: 'KrebsOnSecurity', url: 'https://krebsonsecurity.com/feed/', region: 'overseas', defaultCategory: 'cybersecurity' },
+  { name: 'The Hacker News', url: 'https://feeds.feedburner.com/TheHackersNews', region: 'global', defaultCategory: 'cybersecurity' },
+  { name: 'Dark Reading', url: 'https://www.darkreading.com/rss.xml', region: 'overseas', defaultCategory: 'cybersecurity' }
 ];
 
 const TRENDING_SOURCES = [
@@ -77,18 +99,65 @@ const TRENDING_SOURCES = [
   { name: 'TechCrunch AI', url: 'https://techcrunch.com/tag/artificial-intelligence/feed/', region: 'overseas', platform: 'TechCrunch' }
 ];
 
+const CATEGORY_GROUPS = [
+  {
+    id: 'tech-frontier',
+    label: '科技前沿',
+    icon: 'flask',
+    categories: ['ai-models', 'research', 'open-source', 'data-science', 'quantum', 'cybersecurity']
+  },
+  {
+    id: 'hardware-compute',
+    label: '计算硬件',
+    icon: 'chip',
+    categories: ['chips-compute', 'devices', 'robotics', 'iot-5g']
+  },
+  {
+    id: 'industry-economy',
+    label: '产业经济',
+    icon: 'building',
+    categories: ['silicon-valley', 'china-tech', 'policy-finance', 'fintech']
+  },
+  {
+    id: 'emerging-fields',
+    label: '新兴领域',
+    icon: 'rocket',
+    categories: ['space', 'new-energy', 'climate-esg', 'gaming', 'metaverse-xr']
+  },
+  {
+    id: 'industry-apps',
+    label: '行业应用',
+    icon: 'globe',
+    categories: ['healthcare', 'education-tech', 'agriculture-tech', 'cloud', 'automotive']
+  }
+];
+
 const CATEGORIES = [
-  { id: 'all', label: '全部赛道' },
+  { id: 'all', label: '全部内容' },
   { id: 'ai-models', label: 'AI 大模型' },
-  { id: 'chips-compute', label: '芯片算力' },
+  { id: 'research', label: '科研前沿' },
   { id: 'open-source', label: '开源生态' },
-  { id: 'silicon-valley', label: '硅谷欧美' },
-  { id: 'china-tech', label: '国内大厂' },
+  { id: 'data-science', label: '数据科学' },
+  { id: 'quantum', label: '量子计算' },
+  { id: 'cybersecurity', label: '网络安全' },
+  { id: 'chips-compute', label: '芯片半导体' },
   { id: 'devices', label: '硬件数码' },
   { id: 'robotics', label: '机器人' },
+  { id: 'iot-5g', label: '物联网5G' },
+  { id: 'silicon-valley', label: '硅谷欧美' },
+  { id: 'china-tech', label: '国内大厂' },
+  { id: 'policy-finance', label: '政策财经' },
+  { id: 'fintech', label: '金融科技' },
+  { id: 'space', label: '太空探索' },
+  { id: 'new-energy', label: '新能源' },
+  { id: 'climate-esg', label: '气候ESG' },
+  { id: 'gaming', label: '游戏电竞' },
+  { id: 'metaverse-xr', label: '元宇宙XR' },
+  { id: 'healthcare', label: '医疗健康' },
+  { id: 'education-tech', label: '教育科技' },
+  { id: 'agriculture-tech', label: '农业科技' },
   { id: 'cloud', label: '云计算' },
-  { id: 'research', label: '科研前沿' },
-  { id: 'policy-funding', label: '政策投融' }
+  { id: 'automotive', label: '智能汽车' }
 ];
 
 const MODES = [
@@ -100,14 +169,29 @@ const MODES = [
 
 const CATEGORY_RULES = [
   ['ai-models', /\b(ai|artificial intelligence|llm|gpt|model|agent|deepmind|openai|anthropic|gemini|claude|大模型|人工智能|智能体|machine learning|neural|transformer)\b/i],
-  ['chips-compute', /\b(chip|semiconductor|gpu|nvidia|amd|intel|tsmc|compute|cuda|芯片|半导体|算力|processor|cpu|tpu|silicon)\b/i],
-  ['open-source', /\b(open source|github|linux|rust|python|kubernetes|developer|repo|开源|开发者|docker|k8s|javascript|typescript)\b/i],
-  ['devices', /\b(iphone|android|device|wearable|hardware|phone|laptop|数码|手机|硬件|macbook|ipad|watch|headphone)\b/i],
-  ['robotics', /\b(robot|robotics|humanoid|autonomous|机器人|自动驾驶|drone|automation)\b/i],
-  ['cloud', /\b(cloud|aws|azure|google cloud|serverless|database|云计算|云服务|kubernetes|docker|devops)\b/i],
   ['research', /\b(research|paper|study|scientist|arxiv|mit|科研|论文|研究|nature|science|academic)\b/i],
-  ['policy-funding', /\b(policy|regulation|funding|ipo|investment|venture|融资|政策|监管|投资|regulation|legislation)\b/i],
-  ['china-tech', /\b(alibaba|tencent|baidu|bytedance|huawei|xiaomi|china|阿里|腾讯|百度|字节|华为|小米|国内|jd|京东|美团|didi)\b/i]
+  ['open-source', /\b(open source|github|linux|rust|python|kubernetes|developer|repo|开源|开发者|docker|k8s|javascript|typescript)\b/i],
+  ['data-science', /\b(data science|big data|analytics|machine learning|deep learning|数据科学|大数据|分析|算法工程师|data analyst|data engineer)\b/i],
+  ['quantum', /\b(quantum|qubit|quantum computing|量子|量子计算|量子通信|量子纠缠|superposition|entanglement)\b/i],
+  ['cybersecurity', /\b(security|hack|breach|vulnerability|exploit|ransomware|phishing|malware|cyber|attack|漏洞|安全|黑客|勒索软件|钓鱼|数据泄露|隐私)\b/i],
+  ['chips-compute', /\b(chip|semiconductor|gpu|nvidia|amd|intel|tsmc|compute|cuda|芯片|半导体|算力|processor|cpu|tpu|silicon|asic|fpga|制程|光刻)\b/i],
+  ['devices', /\b(iphone|android|device|wearable|hardware|phone|laptop|数码|手机|硬件|macbook|ipad|watch|headphone)\b/i],
+  ['robotics', /\b(robot|robotics|humanoid|autonomous|机器人|自动驾驶|drone|automation|boston dynamics|协作机器人)\b/i],
+  ['iot-5g', /\b(iot|internet of things|5g|sensor|edge computing|物联网|传感器|边缘计算|smart city|智慧城市|connected device)\b/i],
+  ['silicon-valley', /\b(silicon valley|startup|tech company|硅谷|科技巨头|venture capital|unicorn)\b/i],
+  ['china-tech', /\b(alibaba|tencent|baidu|bytedance|huawei|xiaomi|china|阿里|腾讯|百度|字节|华为|小米|国内|jd|京东|美团|didi)\b/i],
+  ['policy-finance', /\b(policy|regulation|funding|ipo|investment|venture|finance|stock|market|earnings|gdp|inflation|fed|央行|融资|政策|监管|投资|金融|股票|财报|股市|利率|宏观经济|legislation)\b/i],
+  ['fintech', /\b(fintech|payment|blockchain|cryptocurrency|bitcoin|defi|digital banking|neobank|金融科技|支付|区块链|数字货币|银行科技|信贷科技|保险科技)\b/i],
+  ['space', /\b(space|nasa|spacex|rocket|satellite|mars|moon|starlink|blue origin|太空|航天|火箭|卫星|火星|月球|发射|轨道|starship)\b/i],
+  ['new-energy', /\b(solar|wind|ev|battery|lithium|carbon|储能|光伏|锂电|新能源|碳中和|清洁能源|电动车|solar energy|wind power|hydrogen|hydrogen fuel)\b/i],
+  ['climate-esg', /\b(climate|esg|carbon neutral|sustainability|green finance|emission|气候|碳减排|esg|可持续|绿色金融|碳中和|温室气体|减排)\b/i],
+  ['gaming', /\b(gaming|esports|video game|nintendo|playstation|xbox|steam|unreal engine|unity|游戏|电竞|主机游戏|手游|游戏引擎|game developer)\b/i],
+  ['metaverse-xr', /\b(metaverse|vr|ar|xr|virtual reality|augmented reality|oculus|vision pro|spatial computing|元宇宙|虚拟现实|增强现实|空间计算|headset)\b/i],
+  ['healthcare', /\b(health|medical|biotech|pharma|drug|clinical|医疗|健康|生物|制药|基因|therapy|diagnosis|patient|hospital|disease|cancer|数字医疗|ai医疗)\b/i],
+  ['education-tech', /\b(edtech|online learning|e-learning|mooc|education technology|教育科技|在线教育|数字教育|edtech|慕课|教育平台)\b/i],
+  ['agriculture-tech', /\b(agtech|precision agriculture|vertical farming|smart farming|agricultural technology|农业科技|精准农业|垂直农场|智慧农业|数字农业)\b/i],
+  ['cloud', /\b(cloud|aws|azure|google cloud|serverless|database|云计算|云服务|kubernetes|docker|devops|saas|paas|iaas)\b/i],
+  ['automotive', /\b(automotive|tesla|ev|self-driving|autonomous vehicle|smart car|汽车|电动车|自动驾驶|智能汽车|车载系统|车联网)\b/i]
 ];
 
 const TAG_RULES = [
@@ -122,7 +206,21 @@ const TAG_RULES = [
   ['Robotics', /\b(robot|robotics|机器人)\b/i],
   ['Mobile', /\b(iphone|android|ios|app store)\b/i],
   ['Security', /\b(security|漏洞|安全|cyber|hack)\b/i],
-  ['Startup', /\b(startup|创业|venture|funding)\b/i]
+  ['Startup', /\b(startup|创业|venture|funding)\b/i],
+  ['New Energy', /\b(solar|wind|ev|battery|新能源|储能|光伏|锂电)\b/i],
+  ['Healthcare', /\b(health|medical|biotech|pharma|drug|医疗|健康|生物|制药)\b/i],
+  ['Finance', /\b(finance|stock|market|earnings|金融|股票|财报|股市)\b/i],
+  ['Space', /\b(space|nasa|spacex|rocket|satellite|太空|航天|火箭|卫星)\b/i],
+  ['Gaming', /\b(gaming|esports|video game|游戏|电竞)\b/i],
+  ['Climate', /\b(climate|esg|carbon|sustainability|气候|碳减排|esg|可持续)\b/i],
+  ['Automotive', /\b(automotive|tesla|ev|self-driving|汽车|电动车|自动驾驶)\b/i],
+  ['Data', /\b(data science|big data|analytics|数据科学|大数据|算法)\b/i],
+  ['Quantum', /\b(quantum|量子计算|qubit)\b/i],
+  ['IoT', /\b(iot|5g|sensor|物联网|传感器|边缘计算)\b/i],
+  ['Fintech', /\b(fintech|payment|blockchain|cryptocurrency|金融科技|支付|区块链)\b/i],
+  ['Metaverse', /\b(metaverse|vr|ar|xr|虚拟现实|元宇宙)\b/i],
+  ['Education', /\b(edtech|online learning|教育科技|在线教育)\b/i],
+  ['Agriculture', /\b(agtech|precision agriculture|农业科技|智慧农业)\b/i]
 ];
 
 let newsCache = { data: null, expiresAt: 0 };
