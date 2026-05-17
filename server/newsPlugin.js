@@ -262,7 +262,8 @@ export function newsPlugin() {
 
           const page = parseInt(requestUrl.searchParams.get('page') || '0', 10);
           const pageSize = parseInt(requestUrl.searchParams.get('pageSize') || String(PAGE_SIZE), 10);
-          const payload = await getNews(blocked, customSources, page, pageSize);
+          const search = requestUrl.searchParams.get('search') || '';
+          const payload = await getNews(blocked, customSources, page, pageSize, search);
           return sendJson(res, payload);
         }
 
@@ -364,7 +365,7 @@ export function newsPlugin() {
   };
 }
 
-async function getNews(blocked, customSources, page = 0, pageSize = PAGE_SIZE) {
+async function getNews(blocked, customSources, page = 0, pageSize = PAGE_SIZE, search = '') {
   const now = Date.now();
   const allSources = [...DEFAULT_SOURCES, ...customSources];
   const cacheKey = JSON.stringify({ blocked, customSources: customSources.map(s => s.url) });
@@ -416,17 +417,49 @@ async function getNews(blocked, customSources, page = 0, pageSize = PAGE_SIZE) {
     newsCache = { data: { items: fullItems, sourceResults, failedSources, blockedCount }, expiresAt: now + 1000 * 60 * 5, key: cacheKey };
   }
 
+  let filteredItems = fullItems;
+  if (search) {
+    const q = search.toLowerCase();
+    const tokens = q.split(/\s+/).filter(Boolean);
+    if (tokens.length === 1 && /[a-z]/.test(q) && /[\u4e00-\u9fff]/.test(q)) {
+      const parts = q.match(/([a-z]+|[\u4e00-\u9fff]+)/g);
+      if (parts && parts.length > 1) tokens.length = 0;
+      if (parts && parts.length > 1) parts.forEach(p => tokens.push(p));
+    }
+
+    filteredItems = fullItems.filter(item => {
+      const txt = `${item.title} ${item.summary} ${item.source} ${(item.tags || []).join(' ')}`.toLowerCase();
+      if (tokens.length > 1) {
+        return tokens.every(t => txt.includes(t));
+      }
+      return txt.includes(q);
+    });
+
+    filteredItems.sort((a, b) => {
+      const aTxt = `${a.title} ${a.summary}`.toLowerCase();
+      const bTxt = `${b.title} ${b.summary}`.toLowerCase();
+      if (tokens.length > 1) {
+        const aScore = tokens.filter(t => aTxt.includes(t)).length;
+        const bScore = tokens.filter(t => bTxt.includes(t)).length;
+        if (aScore !== bScore) return bScore - aScore;
+      }
+      const aTitle = tokens.some(t => a.title.toLowerCase().includes(t)) ? 1 : 0;
+      const bTitle = tokens.some(t => b.title.toLowerCase().includes(t)) ? 1 : 0;
+      return bTitle - aTitle;
+    });
+  }
+
   const start = page * pageSize;
   const end = start + pageSize;
-  const pagedItems = fullItems.slice(start, end);
+  const pagedItems = filteredItems.slice(start, end);
 
   return {
     updatedAt: new Date().toISOString(),
     items: pagedItems,
-    total: fullItems.length,
+    total: filteredItems.length,
     page,
     pageSize,
-    hasMore: end < fullItems.length,
+    hasMore: end < filteredItems.length,
     sourceCount: allSources.length,
     failedSources,
     blockedCount

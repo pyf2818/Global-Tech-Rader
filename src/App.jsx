@@ -195,6 +195,7 @@ function App() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [newsPage, setNewsPage] = useState(0);
   const [newsHasMore, setNewsHasMore] = useState(true);
+  const [debouncedQuery, setDebouncedQuery] = useState('');
   const [error, setError] = useState('');
   const [blocked, setBlocked] = useState('');
   const [showSettings, setShowSettings] = useState(false);
@@ -309,6 +310,16 @@ function App() {
 
   useEffect(() => { fetch('/api/meta').then(r => r.json()).then(d => setAllSources(d.sources || [])).catch(() => {}); }, []);
   useEffect(() => { loadNews(); }, []);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedQuery(query.trim()), 300);
+    return () => clearTimeout(timer);
+  }, [query]);
+
+  useEffect(() => {
+    if (nav !== 'all') return;
+    loadNews(blocked, false, debouncedQuery);
+  }, [debouncedQuery, category, mode, sourceFilter]);
   useEffect(() => {
     if (nav === 'trending' && trendingItems.length === 0) loadTrending();
     if (nav === 'github' && githubRepos.length === 0) loadGithub();
@@ -374,13 +385,11 @@ function App() {
   }, [items]);
 
   const filtered = useMemo(() => {
-    const q = query.toLowerCase().trim();
     let result = items.filter(item => {
       const cat = category === 'all' || item.category === category;
       const md = mode === 'all' || item.mode === mode;
       const src = sourceFilter === 'all' || item.source === sourceFilter;
-      const txt = `${item.title} ${item.summary} ${item.source} ${(item.tags || []).join(' ')}`.toLowerCase();
-      return cat && md && src && (!q || txt.includes(q));
+      return cat && md && src;
     });
 
     if (followKeywords.length > 0) {
@@ -391,30 +400,20 @@ function App() {
       });
     }
 
-    if (searchSort === 'relevance' && q) {
-      result.sort((a, b) => {
-        const aScore = (`${a.title} ${a.summary}`).toLowerCase().split(q).length - 1;
-        const bScore = (`${b.title} ${b.summary}`).toLowerCase().split(q).length - 1;
-        return bScore - aScore;
-      });
-    }
-
     return result;
-  }, [items, category, mode, sourceFilter, query, followKeywords, searchSort]);
+  }, [items, category, mode, sourceFilter, followKeywords]);
 
   const sourceOptions = useMemo(() => {
     const counts = new Map();
-    const q = query.toLowerCase().trim();
     items
       .filter(item => {
         const cat = category === 'all' || item.category === category;
         const md = mode === 'all' || item.mode === mode;
-        const txt = `${item.title} ${item.summary} ${item.source} ${(item.tags || []).join(' ')}`.toLowerCase();
-        return cat && md && (!q || txt.includes(q));
+        return cat && md;
       })
       .forEach(item => counts.set(item.source, (counts.get(item.source) || 0) + 1));
     return [...counts.entries()].sort((a, b) => b[1] - a[1]);
-  }, [items, category, mode, query]);
+  }, [items, category, mode]);
 
   const addRecentVisit = useCallback((type, value, label) => {
     setRecentVisits(prev => {
@@ -655,11 +654,12 @@ function App() {
     }
   }, [focusedIndex]);
 
-  function loadNews(b = blocked, append = false) {
+  function loadNews(b = blocked, append = false, searchQuery = '') {
     if (!append) { setLoading(true); setError(''); setNewsPage(0); setNewsHasMore(true); }
     const page = append ? newsPage + 1 : 0;
     const customParams = customSources.map(s => `custom=${encodeURIComponent(JSON.stringify(s))}`).join('&');
-    fetch(`/api/news?blocked=${encodeURIComponent(b)}&page=${page}&pageSize=40${customParams ? '&' + customParams : ''}`)
+    const searchParam = searchQuery ? `&search=${encodeURIComponent(searchQuery)}` : '';
+    fetch(`/api/news?blocked=${encodeURIComponent(b)}&page=${page}&pageSize=40${searchParam}${customParams ? '&' + customParams : ''}`)
       .then(r => r.json())
       .then(d => {
         if (append) {
@@ -678,7 +678,7 @@ function App() {
   function loadMoreNews() {
     if (!newsHasMore || loadingMore || loading) return;
     setLoadingMore(true);
-    loadNews(blocked, true);
+    loadNews(blocked, true, debouncedQuery);
   }
 
   function loadTrending() {
