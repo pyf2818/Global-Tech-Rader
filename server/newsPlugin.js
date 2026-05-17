@@ -364,21 +364,14 @@ export function newsPlugin() {
             const apiUrl = baseUrl.replace(/\/+$/, '') + '/v1/chat/completions';
             const headers = { 'Content-Type': 'application/json' };
             if (apiKey) headers['Authorization'] = `Bearer ${apiKey}`;
-            const prompt = `分析以下${items.length}条技术资讯，生成洞察报告（JSON 格式）：
-{
-  "trends": ["趋势 1", "趋势 2", "趋势 3"],
-  "correlations": ["关联 1", "关联 2"],
-  "signals": ["信号 1", "信号 2", "信号 3"]
-}
+            const prompt = `你是一个科技趋势分析师。请分析以下${items.length}条技术资讯，输出纯 JSON（不要包含 markdown 代码块或其他文字）：
+
+{"trends":["趋势1","趋势2","趋势3"],"correlations":["跨域关联1","跨域关联2"],"signals":["关键信号1","关键信号2","关键信号3"]}
 
 资讯列表：
 ${items.map((i, idx) => `${idx + 1}. [${i.category}] ${i.title} - ${i.source}`).join('\n')}
 
-要求：
-- trends: 3 条最显著的技术趋势
-- correlations: 2 条跨领域/赛道关联
-- signals: 3 条值得关注的早期信号
-每条简洁明了，不超过 50 字。`;
+要求：trends 3 条最显著趋势，correlations 2 条跨领域关联，signals 3 条早期信号。每条不超过 50 字。只输出 JSON。`;
 
             const controller = new AbortController();
             const timeout = setTimeout(() => controller.abort(), 30000);
@@ -401,12 +394,20 @@ ${items.map((i, idx) => `${idx + 1}. [${i.category}] ${i.title} - ${i.source}`).
             const data = await response.json();
             const content = data.choices?.[0]?.message?.content || '';
             try {
-              const jsonMatch = content.match(/\{[\s\S]*\}/);
-              const jsonStr = jsonMatch ? jsonMatch[0] : content;
+              let cleaned = content.trim();
+              // strip markdown code fences
+              cleaned = cleaned.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '');
+              // find first { and last }
+              const start = cleaned.indexOf('{');
+              const end = cleaned.lastIndexOf('}');
+              if (start === -1 || end === -1 || end <= start) {
+                throw new Error('No JSON object found');
+              }
+              const jsonStr = cleaned.slice(start, end + 1);
               const insights = JSON.parse(jsonStr);
               return sendJson(res, insights);
             } catch (e) {
-              return sendJson(res, { error: 'Failed to parse AI response as JSON' });
+              return sendJson(res, { error: `AI 返回格式错误: ${content.slice(0, 200)}` });
             }
           } catch (e) {
             return sendJson(res, { error: e.message });
