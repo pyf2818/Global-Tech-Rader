@@ -391,8 +391,9 @@ ${items.map((i, idx) => `${idx + 1}. [${i.category}] ${i.title} - ${i.source}`).
               const errText = await response.text().catch(() => '');
               return sendJson(res, { error: `API responded ${response.status}: ${errText.slice(0, 200)}` });
             }
-            const data = await response.json();
+const data = await response.json();
             const content = data.choices?.[0]?.message?.content || '';
+            console.log('[AI Insights] Raw response:', content.slice(0, 500));
             try {
               let cleaned = content.trim();
               // strip markdown code fences
@@ -401,8 +402,21 @@ ${items.map((i, idx) => `${idx + 1}. [${i.category}] ${i.title} - ${i.source}`).
               const start = cleaned.indexOf('{');
               const end = cleaned.lastIndexOf('}');
               if (start === -1 || end === -1 || end <= start) {
+                console.log('[AI Insights] No JSON braces found');
                 throw new Error('No JSON object found');
               }
+              const jsonStr = cleaned.slice(start, end + 1);
+              console.log('[AI Insights] Extracted JSON:', jsonStr.slice(0, 300));
+const insights = JSON.parse(jsonStr);
+              return sendJson(res, insights);
+            } catch (e) {
+              console.error('[AI Insights] Parse error:', e.message, 'Content:', content);
+              return sendJson(res, { error: `AI 返回格式错误：${e.message}`, raw: content.slice(0, 300) });
+            }
+          } catch (e) {
+            return sendJson(res, { error: e.message });
+          }
+        }
               const jsonStr = cleaned.slice(start, end + 1);
               const insights = JSON.parse(jsonStr);
               return sendJson(res, insights);
