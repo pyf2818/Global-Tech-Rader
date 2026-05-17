@@ -634,6 +634,26 @@ body {
 .source-bar { height: 100%; background: var(--gradient-primary); }
 .source-num { font-size: 11px; color: var(--text-muted); text-align: right; }
 
+/* AI Insights Panel */
+.ai-insights-loading { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 20px 0; color: var(--text-muted); font-size: 12px; }
+.ai-loading-spinner { width: 20px; height: 20px; border: 2px solid var(--border-color); border-top-color: var(--accent-cyan); border-radius: 50%; animation: spin 1s linear infinite; }
+.ai-insights-error { display: flex; align-items: center; gap: 6px; padding: 10px; background: rgba(248, 113, 113, 0.08); border: 1px solid rgba(248, 113, 113, 0.2); border-radius: 8px; color: var(--accent-rose); font-size: 12px; }
+.ai-insights-error svg { width: 14px; height: 14px; }
+.ai-insights-content { display: flex; flex-direction: column; gap: 12px; }
+.ai-insight-block { }
+.ai-insight-label { display: flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 700; color: var(--text-primary); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px; }
+.ai-insight-label svg { width: 14px; height: 14px; color: var(--accent-cyan); }
+.ai-insight-list { display: flex; flex-direction: column; gap: 6px; }
+.ai-insight-list li { font-size: 12px; color: var(--text-secondary); line-height: 1.5; padding-left: 12px; position: relative; }
+.ai-insight-list li::before { content: ''; position: absolute; left: 0; top: 8px; width: 4px; height: 4px; border-radius: 50%; background: var(--accent-cyan); }
+.ai-signal-item { color: var(--accent-amber); }
+.ai-signal-item::before { background: var(--accent-amber); }
+.ai-insights-placeholder { text-align: center; padding: 24px 12px; }
+.ai-insights-placeholder p { font-size: 12px; color: var(--text-muted); margin-bottom: 10px; }
+.btn-goto-settings { display: inline-flex; align-items: center; gap: 4px; padding: 6px 12px; background: var(--gradient-primary); border: none; border-radius: 6px; color: var(--bg-primary); font-size: 11px; font-weight: 600; cursor: pointer; transition: opacity 0.2s; }
+.btn-goto-settings:hover { opacity: 0.85; }
+.btn-goto-settings svg { width: 12px; height: 12px; }
+
 .hex-radar-wrap { display: flex; flex-direction: column; gap: 10px; padding: 4px 0; }
 .hex-radar-svg { width: 100%; height: auto; }
 .hex-radar-legend { display: flex; gap: 12px; justify-content: center; }

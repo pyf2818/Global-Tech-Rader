@@ -150,8 +150,8 @@ const ICONS = {
   edu: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>,
   agriculture: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M12 22V8"/><path d="M5 12c0-3.87 3.13-7 7-7s7 3.13 7 7"/><path d="M3 22h18"/><path d="M7 16c0-2.76 2.24-5 5-5s5 2.24 5 5"/></svg>,
   auto: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M5 17h14M5 17a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h1l2-3h8l2 3h1a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2M5 17l-1 2h16l-1-2"/><circle cx="7.5" cy="17" r="1.5"/><circle cx="16.5" cy="17" r="1.5"/></svg>,
-  rocket: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"/><path d="M12 15l-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"/><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0"/><path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"/></svg>,
-  flask: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M10 2h4M9 2v5.39a2 2 0 0 1-.34 1.12L5.86 17.39A2 2 0 0 0 7.53 20h8.94a2 2 0 0 0 1.67-2.61l-3.8-6.88A2 2 0 0 1 14 9.39V2"/></svg>
+  sparkles: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M12 3l-1.5 4.5L6 9l4.5 1.5L12 15l1.5-4.5L18 9l-4.5-1.5L12 3z"/><path d="M6 18l-1 3 3-1 1 3-3 1-1-3-3 1 1-3 3-1z"/><path d="M18 18l-1 3 3-1 1 3-3 1-1-3-3 1 1-3 3-1z"/></svg>,
+  bell: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>,
 };
 
 function loadLS(key, fallback) {
@@ -252,6 +252,7 @@ function App() {
   const [newTrackTarget, setNewTrackTarget] = useState('');
   const [readingHistory, setReadingHistory] = useState(() => loadLS('readingHistory', []));
   const [translations, setTranslations] = useState(() => loadLS('translations', {}));
+  const [aiInsights, setAiInsights] = useState({ loading: false, data: null, error: '' });
   const [translationOpen, setTranslationOpen] = useState({});
   const [navGroupOpen, setNavGroupOpen] = useState({ core: true, insight: true, manage: false });
 
@@ -275,6 +276,34 @@ function App() {
   useEffect(() => { saveLS('readingHistory', readingHistory); }, [readingHistory]);
   useEffect(() => { saveLS('translations', translations); }, [translations]);
   useEffect(() => { saveLS('llmConfig', llmConfig); }, [llmConfig]);
+
+  useEffect(() => {
+    if (!llmConfig.baseUrl || !llmConfig.selectedModel || nav !== 'all') return;
+    const fetchInsights = async () => {
+      if (items.length === 0) return;
+      setAiInsights(p => ({ ...p, loading: true, error: '' }));
+      try {
+        const topItems = items.slice(0, 30).map(i => ({ title: i.title, category: i.category, source: i.source }));
+        const res = await fetch('/api/ai-insights', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            baseUrl: llmConfig.baseUrl,
+            apiKey: llmConfig.apiKey,
+            model: llmConfig.selectedModel,
+            items: topItems
+          })
+        });
+        const data = await res.json();
+        if (data.error) throw new Error(data.error);
+        setAiInsights({ loading: false, data, error: '' });
+      } catch (e) {
+        setAiInsights({ loading: false, data: null, error: e.message });
+      }
+    };
+    const timer = setTimeout(fetchInsights, 1000);
+    return () => clearTimeout(timer);
+  }, [items, llmConfig.baseUrl, llmConfig.apiKey, llmConfig.selectedModel, nav]);
 
   useEffect(() => {
     if (!lightbox.open) return;
@@ -1660,8 +1689,44 @@ function App() {
               </div>
             </section>
             <section className="panel-section"><h3 className="panel-title">{ICONS.fire}<span>热门标签</span></h3><div className="hot-tags">{hotTags.map((item, i) => <button key={item.tag} className="hot-tag" onClick={() => executeSearch(item.tag)}><span className="tag-rank">{i + 1}</span><span className="tag-name">{item.tag}</span><span className="tag-trend">24h +{item.trend}</span><span className="tag-count">{item.count}</span></button>)}</div></section>
-            <section className="panel-section"><h3 className="panel-title">{ICONS.globe}<span>来源分布</span></h3>
-              <HexRadarChart categories={CATEGORIES.slice(0, 6)} regions={regionCategoryMatrix.regions} matrix={regionCategoryMatrix.matrix} maxVal={regionCategoryMatrix.maxVal} />
+            <section className="panel-section">
+              <h3 className="panel-title">{ICONS.sparkles}<span>AI 洞察</span></h3>
+              {aiInsights.loading && <div className="ai-insights-loading"><div className="ai-loading-spinner" />正在分析...</div>}
+              {aiInsights.error && <div className="ai-insights-error">{ICONS.x} {aiInsights.error}</div>}
+              {aiInsights.data && (
+                <div className="ai-insights-content">
+                  {aiInsights.data.trends && (
+                    <div className="ai-insight-block">
+                      <span className="ai-insight-label">{ICONS.chart} 技术趋势</span>
+                      <ul className="ai-insight-list">
+                        {aiInsights.data.trends.map((t, i) => <li key={i}>{t}</li>)}
+                      </ul>
+                    </div>
+                  )}
+                  {aiInsights.data.correlations && (
+                    <div className="ai-insight-block">
+                      <span className="ai-insight-label">{ICONS.link} 跨域关联</span>
+                      <ul className="ai-insight-list">
+                        {aiInsights.data.correlations.map((c, i) => <li key={i}>{c}</li>)}
+                      </ul>
+                    </div>
+                  )}
+                  {aiInsights.data.signals && (
+                    <div className="ai-insight-block">
+                      <span className="ai-insight-label">{ICONS.bell} 关键信号</span>
+                      <ul className="ai-insight-list">
+                        {aiInsights.data.signals.map((s, i) => <li key={i} className="ai-signal-item">{s}</li>)}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              )}
+              {!aiInsights.loading && !aiInsights.data && !aiInsights.error && (
+                <div className="ai-insights-placeholder">
+                  <p>配置大模型后自动生成洞察</p>
+                  <button className="btn-goto-settings" onClick={() => setShowSettings(true)}>去设置</button>
+                </div>
+              )}
             </section>
           </>
         )}

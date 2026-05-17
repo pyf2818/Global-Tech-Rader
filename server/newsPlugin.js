@@ -355,6 +355,64 @@ export function newsPlugin() {
           }
         }
 
+        if (requestUrl.pathname === '/api/ai-insights') {
+          const body = await parseBody(req);
+          const { baseUrl = '', apiKey = '', model = '', items = [] } = body;
+          if (!baseUrl || !model) return sendJson(res, { error: 'baseUrl and model are required' }, 400);
+          if (items.length === 0) return sendJson(res, { error: 'items required' }, 400);
+          try {
+            const apiUrl = baseUrl.replace(/\/+$/, '') + '/v1/chat/completions';
+            const headers = { 'Content-Type': 'application/json' };
+            if (apiKey) headers['Authorization'] = `Bearer ${apiKey}`;
+            const prompt = `分析以下${items.length}条技术资讯，生成洞察报告（JSON 格式）：
+{
+  "trends": ["趋势 1", "趋势 2", "趋势 3"],
+  "correlations": ["关联 1", "关联 2"],
+  "signals": ["信号 1", "信号 2", "信号 3"]
+}
+
+资讯列表：
+${items.map((i, idx) => `${idx + 1}. [${i.category}] ${i.title} - ${i.source}`).join('\n')}
+
+要求：
+- trends: 3 条最显著的技术趋势
+- correlations: 2 条跨领域/赛道关联
+- signals: 3 条值得关注的早期信号
+每条简洁明了，不超过 50 字。`;
+
+            const controller = new AbortController();
+            const timeout = setTimeout(() => controller.abort(), 30000);
+            const response = await fetch(apiUrl, {
+              method: 'POST',
+              headers,
+              body: JSON.stringify({
+                model,
+                messages: [{ role: 'user', content: prompt }],
+                max_tokens: 500,
+                temperature: 0.7
+              }),
+              signal: controller.signal
+            });
+            clearTimeout(timeout);
+            if (!response.ok) {
+              const errText = await response.text().catch(() => '');
+              return sendJson(res, { error: `API responded ${response.status}: ${errText.slice(0, 200)}` });
+            }
+            const data = await response.json();
+            const content = data.choices?.[0]?.message?.content || '';
+            try {
+              const jsonMatch = content.match(/\{[\s\S]*\}/);
+              const jsonStr = jsonMatch ? jsonMatch[0] : content;
+              const insights = JSON.parse(jsonStr);
+              return sendJson(res, insights);
+            } catch (e) {
+              return sendJson(res, { error: 'Failed to parse AI response as JSON' });
+            }
+          } catch (e) {
+            return sendJson(res, { error: e.message });
+          }
+        }
+
         if (requestUrl.pathname.startsWith('/api/ai/') || requestUrl.pathname.startsWith('/api/translate') || requestUrl.pathname.startsWith('/api/subscriptions') || requestUrl.pathname.startsWith('/api/bookmarks')) {
           return sendJson(res, { ok: false, message: 'Reserved extension endpoint.' }, 501);
         }
