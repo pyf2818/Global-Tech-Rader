@@ -55,6 +55,14 @@ const CATEGORY_GROUPS = [
   { id: 'industry-apps', label: '行业应用', icon: 'globe', categories: ['healthcare', 'education-tech', 'agriculture-tech', 'cloud', 'automotive'] }
 ];
 
+const LLM_PRESETS = [
+  { id: 'openai', name: 'OpenAI', baseUrl: 'https://api.openai.com', models: ['gpt-4o', 'gpt-4-turbo', 'gpt-4o-mini', 'gpt-3.5-turbo'], icon: '🟢', placeholder: 'sk-...' },
+  { id: 'deepseek', name: 'DeepSeek', baseUrl: 'https://api.deepseek.com', models: ['deepseek-chat', 'deepseek-coder'], icon: '🔵', placeholder: 'sk-...' },
+  { id: 'moonshot', name: 'Moonshot', baseUrl: 'https://api.moonshot.cn', models: ['moonshot-v1-8k', 'moonshot-v1-32k', 'moonshot-v1-128k'], icon: '🌙', placeholder: 'sk-...' },
+  { id: 'zhipu', name: '智谱 AI', baseUrl: 'https://open.bigmodel.cn/api/paas/v4', models: ['glm-4', 'glm-4-flash', 'glm-4-air'], icon: '🟣', placeholder: '请输入 API Key' },
+  { id: 'custom', name: '自定义', baseUrl: '', models: [], icon: '⚙️', placeholder: 'https://...' }
+];
+
 const MODES = [
   { id: 'all', label: '全部' },
   { id: 'flash', label: '快讯' },
@@ -101,6 +109,8 @@ const ICONS = {
   bot: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="3" y="11" width="18" height="10" rx="2"/><circle cx="12" cy="5" r="2"/><line x1="12" y1="7" x2="12" y2="11"/><circle cx="8" cy="16" r="1"/><circle cx="16" cy="16" r="1"/></svg>,
   cloud: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/></svg>,
   beaker: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M9 3h6M10 3v6.39a2 2 0 0 1-.34 1.12L5.86 17.39A2 2 0 0 0 7.53 20h8.94a2 2 0 0 0 1.67-2.61l-3.8-6.88A2 2 0 0 1 14 9.39V3"/></svg>,
+  flask: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M10 2v7.31a2 2 0 0 1-.34 1.12L5.86 17.39A2 2 0 0 0 7.53 20h8.94a2 2 0 0 0 1.67-2.61l-3.8-6.88A2 2 0 0 1 14 9.39V2"/><line x1="6" y1="2" x2="18" y2="2"/></svg>,
+  rocket: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"/><path d="M12 15l-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"/><path d="M9 12l-3.62 3.62"/><path d="M14 9l3.62-3.62"/></svg>,
   document: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>,
   search: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>,
   refresh: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>,
@@ -206,13 +216,14 @@ function App() {
   const [newSource, setNewSource] = useState({ name: '', url: '', region: 'overseas' });
   const [sourceVerifyResult, setSourceVerifyResult] = useState(null);
   const [sourceVerifying, setSourceVerifying] = useState(false);
-  const [llmConfig, setLlmConfig] = useState(() => loadLS('llmConfig', { baseUrl: '', apiKey: '', selectedModel: '', manualModels: [] }));
+  const [llmConfig, setLlmConfig] = useState(() => loadLS('llmConfig', { baseUrl: '', apiKey: '', selectedModel: '', manualModels: [], provider: '' }));
   const [llmModels, setLlmModels] = useState([]);
   const [llmFetching, setLlmFetching] = useState(false);
   const [llmFetchError, setLlmFetchError] = useState('');
   const [llmTestResult, setLlmTestResult] = useState(null);
   const [llmTesting, setLlmTesting] = useState(false);
   const [llmManualInput, setLlmManualInput] = useState('');
+  const [showLlmQuickConfig, setShowLlmQuickConfig] = useState(false);
 
   const allLlmModels = useMemo(() => [...llmModels, ...(llmConfig.manualModels || [])], [llmModels, llmConfig.manualModels]);
   const [allSources, setAllSources] = useState([]);
@@ -277,37 +288,40 @@ function App() {
   useEffect(() => { saveLS('translations', translations); }, [translations]);
   useEffect(() => { saveLS('llmConfig', llmConfig); }, [llmConfig]);
 
-  useEffect(() => {
-    if (!llmConfig.baseUrl || !llmConfig.selectedModel || nav !== 'all') return;
-    const fetchInsights = async () => {
-      if (items.length === 0) return;
-      setAiInsights(p => ({ ...p, loading: true, error: '' }));
-      try {
-        const topItems = items.slice(0, 30).map(i => ({ title: i.title, category: i.category, source: i.source }));
-        const res = await fetch('/api/ai-insights', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            baseUrl: llmConfig.baseUrl,
-            apiKey: llmConfig.apiKey,
-            model: llmConfig.selectedModel,
-            items: topItems
-          })
-        });
-        const data = await res.json();
-        console.log('[AI Insights] Response:', data);
-        if (data.error) {
-          const msg = data.raw ? `AI 返回格式错误：${data.error}。原始输出：${data.raw.slice(0, 200)}` : data.error;
-          throw new Error(msg);
-        }
-        setAiInsights({ loading: false, data, error: '' });
-      } catch (e) {
-        setAiInsights({ loading: false, data: null, error: e.message });
+  const fetchAiInsights = async () => {
+    if (!llmConfig.baseUrl || !llmConfig.selectedModel || items.length === 0) {
+      return;
+    }
+    setAiInsights(p => ({ ...p, loading: true, error: '' }));
+    try {
+      const topItems = items.slice(0, 30).map(i => ({ title: i.title, category: i.category, source: i.source }));
+      const res = await fetch('/api/ai-insights', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          baseUrl: llmConfig.baseUrl,
+          apiKey: llmConfig.apiKey,
+          model: llmConfig.selectedModel,
+          items: topItems
+        })
+      });
+      const data = await res.json();
+      console.log('[AI Insights] Response:', data);
+      if (data.error) {
+        const msg = data.raw ? `AI 返回格式错误：${data.error}。原始输出：${data.raw.slice(0, 200)}` : data.error;
+        throw new Error(msg);
       }
-    };
-    const timer = setTimeout(fetchInsights, 1000);
+      setAiInsights({ loading: false, data, error: '' });
+    } catch (e) {
+      setAiInsights({ loading: false, data: null, error: e.message });
+    }
+  };
+
+  useEffect(() => {
+    if (!llmConfig.baseUrl || !llmConfig.selectedModel) return;
+    const timer = setTimeout(fetchAiInsights, 1000);
     return () => clearTimeout(timer);
-  }, [items, llmConfig.baseUrl, llmConfig.apiKey, llmConfig.selectedModel, nav]);
+  }, [items, llmConfig.baseUrl, llmConfig.apiKey, llmConfig.selectedModel]);
 
   useEffect(() => {
     if (!lightbox.open) return;
@@ -1694,7 +1708,14 @@ function App() {
             </section>
             <section className="panel-section"><h3 className="panel-title">{ICONS.fire}<span>热门标签</span></h3><div className="hot-tags">{hotTags.map((item, i) => <button key={item.tag} className="hot-tag" onClick={() => executeSearch(item.tag)}><span className="tag-rank">{i + 1}</span><span className="tag-name">{item.tag}</span><span className="tag-trend">24h +{item.trend}</span><span className="tag-count">{item.count}</span></button>)}</div></section>
             <section className="panel-section">
-              <h3 className="panel-title">{ICONS.sparkles}<span>AI 洞察</span></h3>
+              <div className="ai-insights-header">
+                <h3 className="panel-title">{ICONS.sparkles}<span>AI 洞察</span></h3>
+                {aiInsights.data && (
+                  <button className="btn-refresh-insights" onClick={fetchAiInsights} disabled={aiInsights.loading} title="重新分析">
+                    {ICONS.refresh}
+                  </button>
+                )}
+              </div>
               {aiInsights.loading && <div className="ai-insights-loading"><div className="ai-loading-spinner" />正在分析...</div>}
               {aiInsights.error && <div className="ai-insights-error">{ICONS.x} {aiInsights.error}</div>}
               {aiInsights.data && (
@@ -1727,8 +1748,24 @@ function App() {
               )}
               {!aiInsights.loading && !aiInsights.data && !aiInsights.error && (
                 <div className="ai-insights-placeholder">
-                  <p>配置大模型后自动生成洞察</p>
-                  <button className="btn-goto-settings" onClick={() => setShowSettings(true)}>去设置</button>
+                  {!llmConfig.baseUrl ? (
+                    <>
+                      <p>配置大模型后自动生成洞察</p>
+                      <button className="btn-quick-config" onClick={() => setShowLlmQuickConfig(true)}>{ICONS.settings}<span>快速配置</span></button>
+                    </>
+                  ) : (
+                    <>
+                      <div className="llm-status-row">
+                        <span className="llm-status-indicator" title="已配置">●</span>
+                        <span className="llm-model-name">{llmConfig.selectedModel || '未选择模型'}</span>
+                      </div>
+                      <p className="ai-insights-hint">已配置 LLM，点击「重新分析」生成当前资讯的洞察</p>
+                      <div className="llm-action-row">
+                        <button className="btn-test-inline" onClick={fetchAiInsights} disabled={llmTesting}>{llmTesting ? '...' : '分析'}</button>
+                        <button className="btn-edit-config" onClick={() => setShowLlmQuickConfig(true)}>{ICONS.settings}<span>修改</span></button>
+                      </div>
+                    </>
+                  )}
                 </div>
               )}
             </section>
@@ -1835,6 +1872,86 @@ function App() {
         </div>
       )}
 
+      {/* LLM Quick Config Modal */}
+      {showLlmQuickConfig && (
+        <div className="modal-overlay" onClick={() => setShowLlmQuickConfig(false)}>
+          <div className="modal modal-sm llm-quick-modal" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>🤖 大模型快速配置</h3>
+              <button className="modal-close" onClick={() => setShowLlmQuickConfig(false)}>{ICONS.x}</button>
+            </div>
+            <div className="modal-body">
+              <div className="llm-preset-bar">
+                {LLM_PRESETS.map(preset => (
+                  <button
+                    key={preset.id}
+                    className={`llm-preset-btn ${llmConfig.provider === preset.id ? 'active' : ''}`}
+                    onClick={() => handleSelectPreset(preset)}
+                    title={preset.name}
+                  >
+                    <span className="preset-icon">{preset.icon}</span>
+                    <span className="preset-name">{preset.name}</span>
+                  </button>
+                ))}
+              </div>
+
+              <div className="setting-item">
+                <label>API Base URL</label>
+                <input
+                  type="text"
+                  placeholder={llmConfig.provider === 'custom' ? 'https://...' : '已自动填充'}
+                  value={llmConfig.baseUrl}
+                  onChange={e => setLlmConfig(prev => ({ ...prev, baseUrl: e.target.value }))}
+                  className="llm-input"
+                />
+              </div>
+
+              <div className="setting-item">
+                <label>API Key</label>
+                <input
+                  type="password"
+                  placeholder={LLM_PRESETS.find(p => p.id === llmConfig.provider)?.placeholder || 'sk-...'}
+                  value={llmConfig.apiKey}
+                  onChange={e => setLlmConfig(prev => ({ ...prev, apiKey: e.target.value }))}
+                  className="llm-input"
+                />
+              </div>
+
+              <div className="setting-item">
+                <label>选择模型</label>
+                <select
+                  className="llm-model-select"
+                  value={llmConfig.selectedModel}
+                  onChange={e => setLlmConfig(prev => ({ ...prev, selectedModel: e.target.value }))}
+                >
+                  <option value="">选择模型</option>
+                  {allLlmModels.map(m => (
+                    <option key={m.id} value={m.id}>{m.name}{m.owned_by ? ` (${m.owned_by})` : ''}</option>
+                  ))}
+                </select>
+              </div>
+
+              {llmTestResult && (
+                <div className={`source-verify-result ${llmTestResult.ok ? 'verify-ok' : 'verify-fail'}`}>
+                  {llmTestResult.ok ? (
+                    <>{ICONS.check} 连接成功 ({llmTestResult.model}): {llmTestResult.reply}</>
+                  ) : (
+                    <>连接失败：{llmTestResult.message}</>
+                  )}
+                </div>
+              )}
+            </div>
+            <div className="modal-footer">
+              <button className="btn-cancel" onClick={() => setShowLlmQuickConfig(false)}>取消</button>
+              <button className="btn-test" onClick={handleQuickTest} disabled={llmTesting || !llmConfig.baseUrl || !llmConfig.selectedModel}>
+                {llmTesting ? '测试中...' : '测试连接'}
+              </button>
+              <button className="btn-save" onClick={handleQuickSave} disabled={!llmConfig.baseUrl || !llmConfig.selectedModel}>保存</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Back to Top */}
       <button className={`back-to-top ${showBackToTop ? 'visible' : ''}`} onClick={scrollToTop} title="回到顶部">
         {ICONS.chevronLeft ? <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="18 15 12 9 6 15"/></svg> : ICONS.chevronUp}
@@ -1916,6 +2033,27 @@ function App() {
     }).catch(() => {
       setLlmTestResult({ ok: false, message: 'Network error' });
     }).finally(() => setLlmTesting(false));
+  }
+
+  function handleSelectPreset(preset) {
+    setLlmConfig(prev => ({
+      ...prev,
+      provider: preset.id,
+      baseUrl: preset.baseUrl,
+      apiKey: ''
+    }));
+    setLlmModels(preset.models.map(m => ({ id: m, name: m, owned_by: preset.name })));
+  }
+
+  function handleQuickSave() {
+    if (!llmConfig.baseUrl || !llmConfig.selectedModel) return;
+    setShowLlmQuickConfig(false);
+    setAiInsights({ loading: false, data: null, error: '' });
+  }
+
+  function handleQuickTest() {
+    if (!llmConfig.baseUrl || !llmConfig.selectedModel) return;
+    testLlmConnection();
   }
 
   }

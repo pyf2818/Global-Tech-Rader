@@ -5,6 +5,7 @@ import { newsPlugin } from './server/newsPlugin.js';
 export default defineConfig({
   plugins: [newsPlugin(), react()],
   server: {
+    port: 5175,
     allowedHosts: ['.monkeycode-ai.online']
   }
 });

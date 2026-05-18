@@ -366,14 +366,19 @@ if (requestUrl.pathname === '/api/ai-insights') {
             const headers = { 'Content-Type': 'application/json' };
             if (apiKey) headers['Authorization'] = `Bearer ${apiKey}`;
             console.log('[AI Insights] Calling:', apiUrl, 'model:', model);
-            const prompt = `你是一个科技趋势分析师。请分析以下${items.length}条技术资讯，输出纯 JSON（不要包含 markdown 代码块或其他文字）：
+            const prompt = `你是一个科技趋势分析师。请分析以下${items.length}条技术资讯，输出**简洁**的纯 JSON（不要 markdown 代码块）：
 
-{"trends":["趋势 1","趋势 2","趋势 3"],"correlations":["跨域关联 1","跨域关联 2"],"signals":["关键信号 1","关键信号 2","关键信号 3"]}
+{"trends":["趋势 1","趋势 2","趋势 3"],"correlations":["关联 1","关联 2"],"signals":["信号 1","信号 2","信号 3"]}
 
 资讯列表：
-${items.map((i, idx) => `${idx + 1}. [${i.category}] ${i.title} - ${i.source}`).join('\n')}
+${items.map((i, idx) => `${idx + 1}. ${i.title}`).join('\n')}
 
-要求：trends 3 条最显著趋势，correlations 2 条跨领域关联，signals 3 条早期信号。每条不超过 50 字。只输出 JSON。`;
+要求：
+- trends：3 条技术趋势
+- correlations：2 条跨领域关联
+- signals：3 条早期信号
+- 每条**不超过 30 字**，简洁明了
+- 只输出 JSON，不要其他文字`;
 
             const controller = new AbortController();
             const timeout = setTimeout(() => controller.abort(), 30000);
@@ -383,7 +388,7 @@ ${items.map((i, idx) => `${idx + 1}. [${i.category}] ${i.title} - ${i.source}`).
               body: JSON.stringify({
                 model,
                 messages: [{ role: 'user', content: prompt }],
-                max_tokens: 500,
+                max_tokens: 800,
                 temperature: 0.7
               }),
               signal: controller.signal
@@ -403,15 +408,29 @@ ${items.map((i, idx) => `${idx + 1}. [${i.category}] ${i.title} - ${i.source}`).
               let cleaned = content.trim();
               cleaned = cleaned.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '');
               const start = cleaned.indexOf('{');
-              const end = cleaned.lastIndexOf('}');
-              if (start === -1 || end === -1 || end <= start) {
-                console.log('[AI Insights] No JSON braces found');
-                throw new Error('No JSON object found');
+              let end = cleaned.lastIndexOf('}');
+              
+              if (start === -1) {
+                console.log('[AI Insights] No opening brace found');
+                throw new Error('AI 响应缺少 JSON 开始标记');
               }
+              
+              if (end === -1 || end <= start) {
+                console.log('[AI Insights] No closing brace, trying to repair...');
+                end = cleaned.length - 1;
+                cleaned = cleaned + ']}]}'.repeat(3);
+              }
+              
               const jsonStr = cleaned.slice(start, end + 1);
               console.log('[AI Insights] Extracted JSON:', jsonStr.slice(0, 300));
-              const insights = JSON.parse(jsonStr);
-              return sendJson(res, insights);
+              
+              try {
+                const insights = JSON.parse(jsonStr);
+                return sendJson(res, insights);
+              } catch (parseErr) {
+                console.log('[AI Insights] JSON parse failed, content may be truncated');
+                throw new Error(`JSON 解析失败，响应可能被截断：${parseErr.message}`);
+              }
             } catch (e) {
               console.error('[AI Insights] Parse error:', e.message, 'Content:', content);
               return sendJson(res, { error: `AI 返回格式错误：${e.message}`, raw: content.slice(0, 300) });

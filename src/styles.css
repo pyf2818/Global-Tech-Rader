@@ -643,7 +643,7 @@ body {
 .ai-insight-block { }
 .ai-insight-label { display: flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 700; color: var(--text-primary); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px; }
 .ai-insight-label svg { width: 14px; height: 14px; color: var(--accent-cyan); }
-.ai-insight-list { display: flex; flex-direction: column; gap: 6px; }
+.ai-insight-list { display: flex; flex-direction: column; gap: 6px; list-style: none; padding: 0; margin: 0; }
 .ai-insight-list li { font-size: 12px; color: var(--text-secondary); line-height: 1.5; padding-left: 12px; position: relative; }
 .ai-insight-list li::before { content: ''; position: absolute; left: 0; top: 8px; width: 4px; height: 4px; border-radius: 50%; background: var(--accent-cyan); }
 .ai-signal-item { color: var(--accent-amber); }
@@ -653,6 +653,26 @@ body {
 .btn-goto-settings { display: inline-flex; align-items: center; gap: 4px; padding: 6px 12px; background: var(--gradient-primary); border: none; border-radius: 6px; color: var(--bg-primary); font-size: 11px; font-weight: 600; cursor: pointer; transition: opacity 0.2s; }
 .btn-goto-settings:hover { opacity: 0.85; }
 .btn-goto-settings svg { width: 12px; height: 12px; }
+.btn-quick-config { display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; background: linear-gradient(135deg, #22d3ee 0%, #3b82f6 100%); border: none; border-radius: 8px; color: white; font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.2s; margin-top: 8px; }
+.btn-quick-config:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(34, 211, 238, 0.3); }
+.btn-quick-config svg { width: 14px; height: 14px; }
+.btn-edit-config { display: inline-flex; align-items: center; gap: 6px; padding: 0 12px; height: 32px; background: var(--bg-hover); border: 1px solid var(--border-color); border-radius: 6px; color: var(--text-secondary); font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.2s; }
+.btn-edit-config:hover { border-color: var(--accent-cyan); color: var(--accent-cyan); }
+.btn-edit-config svg { width: 14px; height: 14px; }
+.llm-status-row { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; }
+.llm-status-indicator { color: var(--accent-emerald); font-size: 10px; animation: pulse 2s ease-in-out infinite; }
+.llm-model-name { font-size: 12px; font-weight: 600; color: var(--text-primary); }
+.llm-action-row { display: flex; gap: 6px; margin-top: 8px; align-items: center; }
+.btn-test-inline { height: 32px; padding: 0 12px; background: rgba(52, 211, 153, 0.1); border: 1px solid var(--accent-emerald); border-radius: 6px; color: var(--accent-emerald); font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.2s; }
+.btn-test-inline:hover { background: rgba(52, 211, 153, 0.2); }
+.btn-test-inline:disabled { opacity: 0.5; cursor: not-allowed; }
+.ai-insights-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.ai-insights-header .panel-title { margin-bottom: 0; }
+.btn-refresh-insights { background: transparent; border: 1px solid var(--border-color); border-radius: 6px; padding: 4px 8px; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; color: var(--text-secondary); }
+.btn-refresh-insights:hover { border-color: var(--accent-cyan); color: var(--accent-cyan); transform: rotate(90deg); }
+.btn-refresh-insights:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-refresh-insights svg { width: 14px; height: 14px; }
+.ai-insights-hint { font-size: 11px; color: var(--text-muted); margin: 6px 0 8px; line-height: 1.4; }
 
 .hex-radar-wrap { display: flex; flex-direction: column; gap: 10px; padding: 4px 0; }
 .hex-radar-svg { width: 100%; height: auto; }
@@ -723,6 +743,25 @@ body {
 .test-llm-btn:hover { opacity: 0.9; }
 .test-llm-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 .manual-models-list { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; }
+
+/* LLM Quick Config */
+.llm-quick-modal .modal-body { padding: 16px; }
+.llm-preset-bar { display: flex; gap: 6px; margin-bottom: 16px; flex-wrap: wrap; }
+.llm-preset-btn { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 8px 12px; background: var(--bg-hover); border: 1px solid var(--border-color); border-radius: 8px; cursor: pointer; transition: all 0.15s; min-width: 60px; }
+.llm-preset-btn:hover { border-color: var(--accent-cyan); background: rgba(56, 189, 248, 0.08); }
+.llm-preset-btn.active { border-color: var(--accent-cyan); background: rgba(56, 189, 248, 0.12); box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.2); }
+.preset-icon { font-size: 20px; }
+.preset-name { font-size: 11px; font-weight: 600; color: var(--text-secondary); }
+.llm-quick-modal .setting-item { margin-bottom: 12px; }
+.llm-quick-modal .setting-item label { display: block; font-size: 12px; font-weight: 600; color: var(--text-primary); margin-bottom: 6px; }
+.llm-quick-modal .llm-input { width: 100%; height: 36px; }
+.llm-quick-modal .llm-model-select { width: 100%; height: 36px; }
+.llm-quick-modal .modal-footer { display: flex; gap: 8px; justify-content: flex-end; padding: 12px 16px; border-top: 1px solid var(--border-color); }
+.btn-test { padding: 8px 16px; background: var(--accent-emerald); border: none; border-radius: 6px; color: var(--bg-primary); font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.15s; }
+.btn-test:hover { opacity: 0.9; }
+.btn-test:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-quick-config-inline { display: inline-flex; align-items: center; gap: 4px; padding: 6px 12px; background: linear-gradient(135deg, #22d3ee 0%, #3b82f6 100%); border: none; border-radius: 6px; color: white; font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.2s; margin-bottom: 12px; }
+.btn-quick-config-inline:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(34, 211, 238, 0.3); }
 .github-filter-bar { display: flex; gap: 8px; align-items: center; }
 .github-filter-bar .lang-tabs { display: flex; gap: 4px; }
 .github-filter-bar .lang-tab { padding: 4px 10px; font-size: 12px; }
