@@ -417,36 +417,10 @@ ${items.map((i, idx) => `${idx + 1}. [${i.category}] ${i.title} - ${i.source}`).
               return sendJson(res, { error: `AI 返回格式错误：${e.message}`, raw: content.slice(0, 300) });
             }
           } catch (e) {
-            console.error('[AI Insights] Outer error:', e);
-            return sendJson(res, { error: e.message });
-          }
-        }
-const data = await response.json();
-            const content = data.choices?.[0]?.message?.content || '';
-            console.log('[AI Insights] Raw response:', content.slice(0, 500));
-            try {
-              let cleaned = content.trim();
-              // strip markdown code fences
-              cleaned = cleaned.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '');
-              // find first { and last }
-              const start = cleaned.indexOf('{');
-              const end = cleaned.lastIndexOf('}');
-              if (start === -1 || end === -1 || end <= start) {
-                console.log('[AI Insights] No JSON braces found');
-                throw new Error('No JSON object found');
-              }
-              const jsonStr = cleaned.slice(start, end + 1);
-              console.log('[AI Insights] Extracted JSON:', jsonStr.slice(0, 300));
-const insights = JSON.parse(jsonStr);
-              return sendJson(res, insights);
-            } catch (e) {
-              console.error('[AI Insights] Parse error:', e.message, 'Content:', content);
-              return sendJson(res, { error: `AI 返回格式错误：${e.message}`, raw: content.slice(0, 300) });
+              console.error('[AI Insights] Outer error:', e);
+              return sendJson(res, { error: e.message });
             }
-          } catch (e) {
-            return sendJson(res, { error: e.message });
           }
-        }
 
         if (requestUrl.pathname.startsWith('/api/ai/') || requestUrl.pathname.startsWith('/api/translate') || requestUrl.pathname.startsWith('/api/subscriptions') || requestUrl.pathname.startsWith('/api/bookmarks')) {
           return sendJson(res, { ok: false, message: 'Reserved extension endpoint.' }, 501);
