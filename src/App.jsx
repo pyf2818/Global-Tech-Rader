@@ -101,6 +101,12 @@ const MODE_MAP = { flash: '快讯', deep: '深度', technical: '干货' };
 const MATERIAL_TYPES = { quote: '金句', data: '数据', case: '案例', viewpoint: '观点', chart: '图表' };
 const ARTICLE_STATUS = { draft: '草稿', published: '已发布', archived: '已归档' };
 const ARTICLE_TEMPLATES = { blank: '空白', briefing: '每日简报', analysis: '深度分析', tech: '技术解读' };
+const ARTICLE_TEMPLATE_CONTENT = {
+  blank: '',
+  briefing: `# 每日科技简报\n\n> 日期：{DATE}\n\n## 今日要闻\n\n1. \n2. \n3. \n\n## 重点分析\n\n### 事件背景\n\n\n### 影响解读\n\n\n## 趋势观察\n\n\n## 明日关注\n\n`,
+  analysis: `# 深度分析：标题\n\n## 摘要\n\n用 2-3 句话概括本文核心观点。\n\n## 背景\n\n介绍事件的来龙去脉，提供必要的上下文信息。\n\n## 核心观点\n\n### 观点一\n\n- 论据支撑\n- 数据引用\n- 案例说明\n\n### 观点二\n\n- 论据支撑\n- 数据引用\n- 案例说明\n\n## 影响分析\n\n- 对行业的影响\n- 对用户的影响\n- 对技术生态的影响\n\n## 趋势预判\n\n基于以上分析，对未来趋势做出预判。\n\n## 参考资料\n\n1. \n2. \n`,
+  tech: `# 技术解读：标题\n\n## 概述\n\n简要介绍要解读的技术/产品/工具。\n\n## 技术原理\n\n### 核心概念\n\n解释关键技术概念。\n\n### 架构设计\n\n描述技术的架构或设计思路。\n\n## 使用场景\n\n- 场景一：\n- 场景二：\n- 场景三：\n\n## 代码示例\n\n\`\`\`javascript\n// 示例代码\n\`\`\`\n\n## 优缺点分析\n\n### 优势\n\n- \n- \n\n### 局限\n\n- \n- \n\n## 总结\n\n总结技术的价值和适用场景。\n\n## 参考资料\n\n- \n`
+};
 const WEEKDAYS = ['日', '一', '二', '三', '四', '五', '六'];
 const MONTHS = ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月'];
 
@@ -170,6 +176,17 @@ const ICONS = {
   auto: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M5 17h14M5 17a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h1l2-3h8l2 3h1a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2M5 17l-1 2h16l-1-2"/><circle cx="7.5" cy="17" r="1.5"/><circle cx="16.5" cy="17" r="1.5"/></svg>,
   sparkles: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M12 3l-1.5 4.5L6 9l4.5 1.5L12 15l1.5-4.5L18 9l-4.5-1.5L12 3z"/><path d="M6 18l-1 3 3-1 1 3-3 1-1-3-3 1 1-3 3-1z"/><path d="M18 18l-1 3 3-1 1 3-3 1-1-3-3 1 1-3 3-1z"/></svg>,
   bell: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>,
+  bold: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 4h8a4 4 0 0 1 4 4 4 4 0 0 1-4 4H6z"/><path d="M6 12h9a4 4 0 0 1 4 4 4 4 0 0 1-4 4H6z"/></svg>,
+  italic: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="19" y1="4" x2="10" y2="4"/><line x1="14" y1="20" x2="5" y2="20"/><line x1="15" y1="4" x2="9" y2="20"/></svg>,
+  heading: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 12h8"/><path d="M4 18V6"/><path d="M12 18V6"/><path d="M17 12l3-2v8"/></svg>,
+  quoteIcon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 21c3 0 7-1 7-8V5c0-1.25-.756-2.017-2-2H4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2 1 0 1 0 1 1v1c0 1-1 2-2 2s-1 .008-1 1.031V21z"/><path d="M15 21c3 0 7-1 7-8V5c0-1.25-.757-2.017-2-2h-4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2h.75c0 2.25.25 4-2.75 4v3z"/></svg>,
+  listIcon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><circle cx="4" cy="6" r="1" fill="currentColor"/><circle cx="4" cy="12" r="1" fill="currentColor"/><circle cx="4" cy="18" r="1" fill="currentColor"/></svg>,
+  orderedList: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="10" y1="6" x2="21" y2="6"/><line x1="10" y1="12" x2="21" y2="12"/><line x1="10" y1="18" x2="21" y2="18"/><path d="M4 6h1v4"/><path d="M4 10h2"/><path d="M6 18H4c0-1 2-2 2-3s-1-1.5-2-1"/></svg>,
+  codeIcon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>,
+  tableIcon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="9"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/></svg>,
+  hr: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="2" y1="12" x2="22" y2="12"/></svg>,
+  image: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>,
+  copy: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>,
 };
 
 function loadLS(key, fallback) {
@@ -184,6 +201,14 @@ function loadLS(key, fallback) {
 
 function saveLS(key, value) {
   try { localStorage.setItem(key, JSON.stringify(value)); } catch {}
+}
+
+function showToast(message, duration = 2000) {
+  const toast = document.createElement('div');
+  toast.className = 'material-toast';
+  toast.textContent = message;
+  document.body.appendChild(toast);
+  setTimeout(() => toast.remove(), duration);
 }
 
 function clearStaleLS() {
@@ -294,6 +319,17 @@ function App() {
   const [showAddMaterial, setShowAddMaterial] = useState(false);
   const [aiResult, setAiResult] = useState({ loading: false, content: '', error: '', action: '' });
   const [articleExportFilter, setArticleExportFilter] = useState('all');
+  const [articleSearch, setArticleSearch] = useState('');
+  const [articleStatusFilter, setArticleStatusFilter] = useState('all');
+  const [articleTemplateFilter, setArticleTemplateFilter] = useState('all');
+  const [articleSort, setArticleSort] = useState('updated');
+  const [articleTagInput, setArticleTagInput] = useState('');
+  const [editingArticleTag, setEditingArticleTag] = useState(null);
+  const [autoSaveTimer, setAutoSaveTimer] = useState(null);
+  const [lastSavedAt, setLastSavedAt] = useState(null);
+  const [editorTab, setEditorTab] = useState('edit');
+  const [editorCursorPos, setEditorCursorPos] = useState({ start: 0, end: 0 });
+  const editorTextareaRef = useRef(null);
 
   const feedRef = useRef(null);
   const searchInputRef = useRef(null);
@@ -767,21 +803,58 @@ function App() {
 
   function renderMarkdown(text) {
     if (!text) return '';
-    let html = text
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/^### (.+)$/gm, '<h3>$1</h3>')
-      .replace(/^## (.+)$/gm, '<h2>$1</h2>')
-      .replace(/^# (.+)$/gm, '<h1>$1</h1>')
-      .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-      .replace(/\*(.+?)\*/g, '<em>$1</em>')
-      .replace(/`([^`]+)`/g, '<code>$1</code>')
-      .replace(/^&gt; (.+)$/gm, '<blockquote>$1</blockquote>')
-      .replace(/^- (.+)$/gm, '<li>$1</li>')
-      .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>')
-      .replace(/\n\n/g, '</p><p>')
-      .replace(/\n/g, '<br>');
+    let html = text;
+    // Escape HTML (but preserve existing markdown syntax)
+    html = html.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    // Fenced code blocks
+    html = html.replace(/```(\w*)\n([\s\S]*?)```/g, (_, lang, code) => {
+      return `<pre class="code-block${lang ? ` language-${lang}` : ''}"><code>${code.trim()}</code></pre>`;
+    });
+    // Inline code
+    html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
+    // Headers
+    html = html.replace(/^### (.+)$/gm, '<h3>$1</h3>');
+    html = html.replace(/^## (.+)$/gm, '<h2>$1</h2>');
+    html = html.replace(/^# (.+)$/gm, '<h1>$1</h1>');
+    // Bold and italic
+    html = html.replace(/\*\*\*(.+?)\*\*\*/g, '<strong><em>$1</em></strong>');
+    html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+    html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
+    // Strikethrough
+    html = html.replace(/~~(.+?)~~/g, '<del>$1</del>');
+    // Images
+    html = html.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<img src="$2" alt="$1" loading="lazy" />');
+    // Links
+    html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+    // Horizontal rule
+    html = html.replace(/^---$/gm, '<hr />');
+    // Tables
+    html = html.replace(/^(\|.+\|)\n(\|[-| :]+\|)\n((?:\|.+\|\n?)*)/gm, (_, headerRow, sepRow, bodyRows) => {
+      const headers = headerRow.split('|').filter(c => c.trim()).map(c => `<th>${c.trim()}</th>`).join('');
+      const rows = bodyRows.trim().split('\n').map(row => {
+        const cells = row.split('|').filter(c => c.trim()).map(c => `<td>${c.trim()}</td>`).join('');
+        return `<tr>${cells}</tr>`;
+      }).join('');
+      return `<table><thead><tr>${headers}</tr></thead><tbody>${rows}</tbody></table>`;
+    });
+    // Blockquotes (handle multi-line)
+    html = html.replace(/^(?:&gt; (.+)\n?)+/gm, match => {
+      const lines = match.split('\n').map(l => l.replace(/^&gt; /, '')).filter(Boolean);
+      return `<blockquote>${lines.join('<br>')}</blockquote>`;
+    });
+    // Unordered lists
+    html = html.replace(/((?:^[-*] .+\n?)+)/gm, list => {
+      const items = list.trim().split('\n').map(line => `<li>${line.replace(/^[-*] /, '')}</li>`).join('');
+      return `<ul>${items}</ul>`;
+    });
+    // Ordered lists
+    html = html.replace(/((?:^\d+\. .+\n?)+)/gm, list => {
+      const items = list.trim().split('\n').map(line => `<li>${line.replace(/^\d+\. /, '')}</li>`).join('');
+      return `<ol>${items}</ol>`;
+    });
+    // Line breaks and paragraphs
+    html = html.replace(/\n\n/g, '</p><p>');
+    html = html.replace(/\n/g, '<br>');
     return `<p>${html}</p>`;
   }
 
@@ -963,14 +1036,17 @@ function App() {
 
   // 文章操作
   function createArticle(template = 'blank') {
+    let templateContent = ARTICLE_TEMPLATE_CONTENT[template] || '';
+    templateContent = templateContent.replace('{DATE}', new Date().toLocaleDateString('zh-CN'));
+    const defaultTitle = template === 'briefing' ? `每日简报 · ${new Date().toLocaleDateString('zh-CN')}` : template === 'blank' ? '未命名文章' : '';
     const newArticle = {
       id: Date.now(),
-      title: '未命名文章',
-      content: '',
+      title: defaultTitle,
+      content: templateContent,
       template,
       materials: [],
       tags: [],
-      status: 'draft', // draft / published / archived
+      status: 'draft',
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       version: 1
@@ -999,6 +1075,80 @@ function App() {
       version: 1
     };
     setArticles(prev => [...prev, copy]);
+  }
+
+  function addArticleTag(id, tag) {
+    const trimmed = tag.trim();
+    if (!trimmed) return;
+    setArticles(prev => prev.map(a => a.id === id ? { ...a, tags: a.tags.includes(trimmed) ? a.tags : [...a.tags, trimmed], updatedAt: new Date().toISOString() } : a));
+  }
+
+  function removeArticleTag(id, tag) {
+    setArticles(prev => prev.map(a => a.id === id ? { ...a, tags: a.tags.filter(t => t !== tag), updatedAt: new Date().toISOString() } : a));
+  }
+
+  function triggerAutoSave(article) {
+    if (autoSaveTimer) clearTimeout(autoSaveTimer);
+    const timer = setTimeout(() => {
+      setLastSavedAt(new Date().toISOString());
+      setAutoSaveTimer(null);
+    }, 500);
+    setAutoSaveTimer(timer);
+  }
+
+  function handleContentChange(article, newContent) {
+    updateArticle(article.id, { content: newContent });
+    triggerAutoSave(article);
+  }
+
+  function handleTitleChange(article, newTitle) {
+    updateArticle(article.id, { title: newTitle });
+    triggerAutoSave(article);
+  }
+
+  function insertAtCursor(article, text, wrapBefore, wrapAfter) {
+    const ta = editorTextareaRef.current;
+    if (!ta) {
+      updateArticle(article.id, { content: article.content + (wrapBefore || '') + text + (wrapAfter || '') });
+      return;
+    }
+    const start = ta.selectionStart;
+    const end = ta.selectionEnd;
+    const selected = article.content.substring(start, end);
+    const before = article.content.substring(0, start);
+    const after = article.content.substring(end);
+    const insert = wrapBefore ? wrapBefore + (selected || text) + wrapAfter : text;
+    const newContent = before + insert + after;
+    updateArticle(article.id, { content: newContent });
+    setTimeout(() => {
+      ta.focus();
+      const newPos = wrapBefore ? start + wrapBefore.length + (selected || text).length + (wrapAfter || '').length : start + text.length;
+      ta.setSelectionRange(selected ? start + (wrapBefore || '').length : newPos, newPos);
+    }, 0);
+  }
+
+  function insertMaterialAtCursor(article, material) {
+    const ta = editorTextareaRef.current;
+    const ref = `\n> [${material.content.slice(0, 50)}...](${material.url || ''})\n> 来源: ${material.source}\n\n`;
+    if (!ta) {
+      const newContent = article.content + ref;
+      updateArticle(article.id, { content: newContent, materials: article.materials.includes(material.id) ? article.materials : [...article.materials, material.id] });
+      return;
+    }
+    const start = ta.selectionStart;
+    const before = article.content.substring(0, start);
+    const after = article.content.substring(start);
+    const newContent = before + ref + after;
+    updateArticle(article.id, { content: newContent, materials: article.materials.includes(material.id) ? article.materials : [...article.materials, material.id] });
+    setTimeout(() => {
+      ta.focus();
+      const newPos = start + ref.length;
+      ta.setSelectionRange(newPos, newPos);
+    }, 0);
+  }
+
+  function removeLinkedMaterial(article, materialId) {
+    setArticles(prev => prev.map(a => a.id === article.id ? { ...a, materials: a.materials.filter(id => id !== materialId) } : a));
   }
 
   // AI 辅助写作
@@ -1048,11 +1198,6 @@ function App() {
 
   function clearAiResult() {
     setAiResult({ loading: false, content: '', error: '', action: '' });
-  }
-
-  function insertMaterialToArticle(article, material) {
-    const ref = `> [${material.content.slice(0, 50)}...](${material.url || ''})\n> 来源: ${material.source}\n\n`;
-    updateArticle(article.id, { content: article.content + ref });
   }
 
   const readingStatsData = useMemo(() => {
@@ -1140,6 +1285,20 @@ function App() {
     return counts;
   }, [articles]);
 
+  const filteredArticles = useMemo(() => {
+    let result = [...articles];
+    if (articleSearch) {
+      const q = articleSearch.toLowerCase();
+      result = result.filter(a => (a.title || '').toLowerCase().includes(q) || (a.content || '').toLowerCase().includes(q) || (a.tags || []).some(t => t.toLowerCase().includes(q)));
+    }
+    if (articleStatusFilter !== 'all') result = result.filter(a => a.status === articleStatusFilter);
+    if (articleTemplateFilter !== 'all') result = result.filter(a => a.template === articleTemplateFilter);
+    if (articleSort === 'updated') result.sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
+    else if (articleSort === 'created') result.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    else if (articleSort === 'title') result.sort((a, b) => (a.title || '').localeCompare(b.title || '', 'zh-CN'));
+    return result;
+  }, [articles, articleSearch, articleStatusFilter, articleTemplateFilter, articleSort]);
+
   const filteredExportArticles = useMemo(() => {
     if (articleExportFilter === 'all') return articles;
     return articles.filter(a => a.status === articleExportFilter);
@@ -1147,7 +1306,7 @@ function App() {
 
   function exportArticle(article, format) {
     const dateStr = new Date().toISOString().slice(0, 10);
-    const filename = `${article.title.replace(/[^\w\s]/g, '')}-${dateStr}`;
+    const filename = `${article.title.replace(/[^\w\s\u4e00-\u9fff]/g, '')}-${dateStr}`;
 
     if (format === 'md') {
       const md = `# ${article.title}\n\n${article.content}`;
@@ -1158,29 +1317,59 @@ function App() {
       a.download = `${filename}.md`;
       a.click();
       URL.revokeObjectURL(url);
-    } else if (format === 'html') {
-      const html = `<!doctype html><html><head><meta charset="utf-8"><title>${article.title}</title><style>body{font-family:Arial,sans-serif;max-width:800px;margin:0 auto;padding:24px;color:#333;line-height:1.6}h1{border-bottom:2px solid #eee;padding-bottom:12px}pre{background:#f5f5f5;padding:12px;border-radius:4px;overflow-x:auto}code{font-family:monospace}blockquote{border-left:4px solid #ddd;padding-left:16px;color:#666}</style></head><body><h1>${article.title}</h1><div>${article.content.replace(/\n/g, '<br>')}</div></body></html>`;
-      const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+    } else if (format === 'pdf') {
+      const renderedHtml = renderMarkdown(article.content);
+      const printHtml = `<!doctype html><html><head><meta charset="utf-8"><title>${article.title}</title><style>body{font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue","PingFang SC","Microsoft YaHei",sans-serif;max-width:800px;margin:0 auto;padding:40px;color:#333;line-height:1.8}h1{font-size:28px;border-bottom:2px solid #eee;padding-bottom:12px;margin-bottom:24px}h2{font-size:22px;margin:28px 0 12px;color:#222}h3{font-size:18px;margin:20px 0 10px}p{margin-bottom:16px;text-align:justify}ul,ol{margin-bottom:16px;padding-left:24px}li{margin-bottom:6px}blockquote{border-left:4px solid #ddd;padding-left:16px;color:#666;margin:16px 0;font-style:italic}pre{background:#f5f5f5;padding:16px;border-radius:6px;overflow-x:auto;font-size:14px;line-height:1.5}code{background:#f0f0f0;padding:2px 6px;border-radius:3px;font-family:"DM Mono",monospace;font-size:14px}pre code{background:none;padding:0}table{border-collapse:collapse;width:100%;margin:16px 0}th,td{border:1px solid #ddd;padding:8px 12px;text-align:left}th{background:#f5f5f5;font-weight:600}img{max-width:100%;border-radius:6px;margin:12px 0}a{color:#3b82f6}hr{border:none;border-top:1px solid #eee;margin:24px 0}@media print{body{padding:0;max-width:100%}}</style></head><body><h1>${article.title}</h1><div class="meta" style="color:#999;font-size:14px;margin-bottom:24px">Tech Radar · ${dateStr} · ${ARTICLE_TEMPLATES[article.template]} · ${ARTICLE_STATUS[article.status]}</div>${renderedHtml}</body></html>`;
+      const blob = new Blob([printHtml], { type: 'text/html;charset=utf-8' });
       const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `${filename}.html`;
-      a.click();
-      URL.revokeObjectURL(url);
-    } else if (format === 'wechat') {
-      const html = `<!doctype html><html><head><meta charset="utf-8"><title>${article.title}</title><style>body{font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue","PingFang SC","Microsoft YaHei",sans-serif;max-width:677px;margin:0 auto;padding:16px;color:#333;line-height:1.8;font-size:16px}h1{font-size:24px;text-align:center;margin-bottom:8px}.meta{text-align:center;color:#999;font-size:14px;margin-bottom:24px}p{margin-bottom:16px;text-align:justify}blockquote{background:#f7f7f7;border-left:none;padding:16px;margin:16px 0;border-radius:8px}pre{background:#f7f7f7;padding:16px;border-radius:8px;overflow-x:auto;font-size:14px}</style></head><body><h1>${article.title}</h1><div class="meta">Tech Radar · ${dateStr}</div><div>${article.content.replace(/\n/g, '<br>')}</div></body></html>`;
-      const w = window.open('', '_blank');
+      const w = window.open(url, '_blank');
       if (!w) return;
-      w.document.write(html);
-      w.document.close();
-      w.focus();
-    } else if (format === 'zhihu') {
-      const html = `<!doctype html><html><head><meta charset="utf-8"><title>${article.title}</title><style>body{font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue","PingFang SC","Microsoft YaHei",sans-serif;max-width:700px;margin:0 auto;padding:20px;color:#1a1a1a;line-height:1.75;font-size:16px}h1{font-size:26px;font-weight:700;margin-bottom:16px}p{margin-bottom:16px}blockquote{border-left:4px solid #0066ff;padding-left:16px;color:#666;margin:16px 0}pre{background:#f6f6f6;padding:16px;border-radius:4px;overflow-x:auto}</style></head><body><h1>${article.title}</h1><div>${article.content.replace(/\n/g, '<br>')}</div></body></html>`;
-      const w = window.open('', '_blank');
-      if (!w) return;
-      w.document.write(html);
-      w.document.close();
-      w.focus();
+      setTimeout(() => { w.print(); }, 300);
+    } else {
+      const renderedHtml = renderMarkdown(article.content);
+      const cssMap = {
+        html: `body{font-family:Arial,sans-serif;max-width:800px;margin:0 auto;padding:24px;color:#333;line-height:1.8}h1{border-bottom:2px solid #eee;padding-bottom:12px;margin-bottom:20px}h2{font-size:20px;margin:24px 0 12px;color:#222}h3{font-size:17px;margin:18px 0 8px}p{margin-bottom:14px}ul,ol{margin-bottom:14px;padding-left:24px}li{margin-bottom:4px}blockquote{border-left:4px solid #ddd;padding-left:16px;color:#666;margin:14px 0}pre{background:#f5f5f5;padding:14px;border-radius:6px;overflow-x:auto;font-size:14px}code{background:#f0f0f0;padding:2px 6px;border-radius:3px;font-family:monospace}pre code{background:none;padding:0}table{border-collapse:collapse;width:100%;margin:14px 0}th,td{border:1px solid #ddd;padding:8px 12px;text-align:left}th{background:#f5f5f5}img{max-width:100%;border-radius:6px}a{color:#3b82f6}hr{border:none;border-top:1px solid #eee;margin:20px 0}`,
+        wechat: `body{font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue","PingFang SC","Microsoft YaHei",sans-serif;max-width:677px;margin:0 auto;padding:16px;color:#333;line-height:1.8;font-size:16px}h1{font-size:24px;text-align:center;margin-bottom:8px}h2{font-size:20px;border-left:4px solid #07c160;padding-left:12px;margin:20px 0 12px;color:#333}h3{font-size:17px;color:#666;margin:16px 0 8px}.meta{text-align:center;color:#999;font-size:14px;margin-bottom:24px}p{margin-bottom:16px;text-align:justify}ul,ol{margin-bottom:16px;padding-left:20px}li{margin-bottom:6px}blockquote{background:#f7f7f7;border-left:none;padding:16px;margin:16px 0;border-radius:8px}pre{background:#f7f7f7;padding:16px;border-radius:8px;overflow-x:auto;font-size:14px}code{background:#f7f7f7;padding:2px 6px;border-radius:3px}pre code{background:none;padding:0}table{border-collapse:collapse;width:100%;margin:16px 0}th,td{border:1px solid #e0e0e0;padding:8px 12px;text-align:left}th{background:#f7f7f7}img{max-width:100%;border-radius:6px;margin:12px 0}a{color:#576b95}hr{border:none;border-top:1px solid #e0e0e0;margin:24px 0}`,
+        zhihu: `body{font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue","PingFang SC","Microsoft YaHei",sans-serif;max-width:700px;margin:0 auto;padding:20px;color:#1a1a1a;line-height:1.75;font-size:16px}h1{font-size:26px;font-weight:700;margin-bottom:16px}h2{font-size:22px;font-weight:600;margin:24px 0 12px}h3{font-size:18px;font-weight:600;margin:18px 0 8px}p{margin-bottom:16px}ul,ol{margin-bottom:16px;padding-left:20px}li{margin-bottom:6px}blockquote{border-left:4px solid #0066ff;padding-left:16px;color:#666;margin:16px 0}pre{background:#f6f6f6;padding:16px;border-radius:4px;overflow-x:auto;font-size:14px}code{background:#f6f6f6;padding:2px 6px;border-radius:3px;font-family:monospace}pre code{background:none;padding:0}table{border-collapse:collapse;width:100%;margin:16px 0}th,td{border:1px solid #e0e0e0;padding:8px 12px;text-align:left}th{background:#f6f6f6}img{max-width:100%;border-radius:4px;margin:12px 0}a{color:#0066ff}hr{border:none;border-top:1px solid #e0e0e0;margin:24px 0}`
+      };
+      const css = cssMap[format] || cssMap.html;
+      const htmlContent = `<!doctype html><html><head><meta charset="utf-8"><title>${article.title}</title><style>${css}</style></head><body><h1>${article.title}</h1><div class="meta" style="color:#999;font-size:14px;margin-bottom:24px">Tech Radar · ${dateStr}</div>${renderedHtml}</body></html>`;
+
+      if (format === 'html') {
+        const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${filename}.html`;
+        a.click();
+        URL.revokeObjectURL(url);
+      } else {
+        const w = window.open('', '_blank');
+        if (!w) return;
+        w.document.write(htmlContent);
+        w.document.close();
+        w.focus();
+      }
+    }
+  }
+
+  function copyArticleAsRichText(article) {
+    const renderedHtml = renderMarkdown(article.content);
+    const fullHtml = `<h1>${article.title}</h1>${renderedHtml}`;
+    if (navigator.clipboard && window.ClipboardItem) {
+      const htmlBlob = new Blob([fullHtml], { type: 'text/html' });
+      const textBlob = new Blob([article.content], { type: 'text/plain' });
+      navigator.clipboard.write([new ClipboardItem({ 'text/html': htmlBlob, 'text/plain': textBlob })]).then(() => {
+        showToast('✓ 已复制富文本到剪贴板');
+      });
+    } else {
+      const ta = document.createElement('textarea');
+      ta.value = article.content;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+      showToast('✓ 已复制 Markdown 文本');
     }
   }
 
@@ -2276,36 +2465,50 @@ function App() {
             <div className="trends-dashboard">
               <div className="trends-header">
                 <h2>{ICONS.edit}<span>创作中心</span></h2>
-                <button className="btn-new-article" onClick={() => {
-                  const newArticle = createArticle('blank');
-                  setCurrentArticleId(newArticle.id);
-                }}>+ 新建文章</button>
+                <div className="header-actions">
+                  <div className="editor-template-dropdown">
+                    <button className="btn-new-article" onClick={() => { const a = createArticle('blank'); setCurrentArticleId(a.id); }}>+ 新建文章</button>
+                    <button className="btn-template-menu" title="从模板创建">{ICONS.chevronDown}</button>
+                    <div className="template-dropdown-menu">
+                      {Object.entries(ARTICLE_TEMPLATES).map(([id, label]) => (
+                        <button key={id} className="template-dropdown-item" onClick={() => { const a = createArticle(id); setCurrentArticleId(a.id); }}>
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
               </div>
 
               {currentArticleId ? (
                 <section className="trends-section article-editor">
-                  <div className="article-toolbar">
-                    <button className="btn-back-list" onClick={() => setCurrentArticleId(null)}>← 返回列表</button>
-                    <div className="article-actions">
-                      <button className="btn-save-article" onClick={() => {
-                        const toast = document.createElement('div');
-                        toast.className = 'material-toast';
-                        toast.textContent = '✓ 文章已保存';
-                        document.body.appendChild(toast);
-                        setTimeout(() => toast.remove(), 2000);
-                      }}>保存</button>
-                    </div>
-                  </div>
-
                   {(() => {
                     const article = articles.find(a => a.id === currentArticleId);
                     if (!article) return null;
+                    const wordCount = article.content.replace(/\s/g, '').length;
+                    const paragraphCount = article.content.split(/\n\s*\n/).filter(p => p.trim()).length;
+                    const readMinutes = Math.max(1, Math.ceil(wordCount / 500));
+                    const linkedMaterials = materials.filter(m => article.materials.includes(m.id));
+
                     return (
                       <>
+                        <div className="article-toolbar">
+                          <button className="btn-back-list" onClick={() => { setCurrentArticleId(null); setEditorTab('edit'); }}>← 返回列表</button>
+                          <div className="article-actions">
+                            {lastSavedAt && <span className="autosave-indicator">已自动保存 {new Date(lastSavedAt).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}</span>}
+                            <select className="article-status-select" value={article.status} onChange={e => updateArticle(article.id, { status: e.target.value })}>
+                              <option value="draft">草稿</option>
+                              <option value="published">已发布</option>
+                              <option value="archived">已归档</option>
+                            </select>
+                            <button className="btn-copy-article" onClick={() => copyArticleAsRichText(article)} title="复制全文">{ICONS.copy}</button>
+                          </div>
+                        </div>
+
                         <input
                           className="article-title-input"
                           value={article.title}
-                          onChange={e => updateArticle(article.id, { title: e.target.value })}
+                          onChange={e => handleTitleChange(article, e.target.value)}
                           placeholder="文章标题"
                         />
 
@@ -2315,31 +2518,93 @@ function App() {
                             value={article.template}
                             onChange={e => updateArticle(article.id, { template: e.target.value })}
                           >
-                            <option value="blank">空白</option>
-                            <option value="briefing">每日简报</option>
-                            <option value="analysis">深度分析</option>
-                            <option value="tech">技术解读</option>
+                            {Object.entries(ARTICLE_TEMPLATES).map(([id, label]) => (
+                              <option key={id} value={id}>{label}</option>
+                            ))}
                           </select>
-                          <span className="article-status">状态: {ARTICLE_STATUS[article.status] || article.status}</span>
-                          <span className="article-updated">更新于 {new Date(article.updatedAt).toLocaleString('zh-CN')}</span>
+                          <div className="article-tags-inline">
+                            {article.tags.map(tag => (
+                              <span key={tag} className="article-tag-pill">
+                                {tag}
+                                <button className="article-tag-remove" onClick={() => removeArticleTag(article.id, tag)}>{ICONS.x}</button>
+                              </span>
+                            ))}
+                            <input
+                              className="article-tag-input"
+                              value={editingArticleTag === article.id ? articleTagInput : ''}
+                              placeholder="+ 标签"
+                              onFocus={() => setEditingArticleTag(article.id)}
+                              onBlur={() => { if (articleTagInput.trim()) addArticleTag(article.id, articleTagInput); setEditingArticleTag(null); setArticleTagInput(''); }}
+                              onKeyDown={e => { if (e.key === 'Enter' && articleTagInput.trim()) { addArticleTag(article.id, articleTagInput); setArticleTagInput(''); e.preventDefault(); } }}
+                              onChange={e => setArticleTagInput(e.target.value)}
+                            />
+                          </div>
+                          <span className="article-updated">{wordCount} 字 · {readMinutes} 分钟阅读</span>
                         </div>
 
-                        <div className="editor-split-view">
-                          <div className="editor-pane">
-                            <textarea
-                              className="article-content-editor"
-                              value={article.content}
-                              onChange={e => updateArticle(article.id, { content: e.target.value })}
-                              placeholder="开始写作...&#10;&#10;支持 Markdown 格式&#10;可以使用 ## 标题、**粗体**、*斜体* 等语法"
-                            />
+                        <div className="editor-toolbar">
+                          <div className="editor-toolbar-group">
+                            <button className="editor-tool-btn" title="粗体 (Ctrl+B)" onClick={() => insertAtCursor(article, '', '**', '**')}>{ICONS.bold}</button>
+                            <button className="editor-tool-btn" title="斜体 (Ctrl+I)" onClick={() => insertAtCursor(article, '', '*', '*')}>{ICONS.italic}</button>
+                            <button className="editor-tool-btn" title="标题" onClick={() => insertAtCursor(article, '标题\n', '## ', '')}>{ICONS.heading}</button>
                           </div>
-                          <div className="preview-pane">
-                            <div className="preview-header">预览</div>
-                            <div 
-                              className="markdown-preview" 
-                              dangerouslySetInnerHTML={{ __html: renderMarkdown(article.content) }}
-                            />
+                          <div className="editor-toolbar-group">
+                            <button className="editor-tool-btn" title="引用" onClick={() => insertAtCursor(article, '引用内容', '> ', '')}>{ICONS.quoteIcon}</button>
+                            <button className="editor-tool-btn" title="无序列表" onClick={() => insertAtCursor(article, '- 列表项\n', '', '')}>{ICONS.listIcon}</button>
+                            <button className="editor-tool-btn" title="有序列表" onClick={() => insertAtCursor(article, '1. 列表项\n', '', '')}>{ICONS.orderedList}</button>
                           </div>
+                          <div className="editor-toolbar-group">
+                            <button className="editor-tool-btn" title="代码块" onClick={() => insertAtCursor(article, '代码', '```\n', '\n```')}>{ICONS.codeIcon}</button>
+                            <button className="editor-tool-btn" title="行内代码" onClick={() => insertAtCursor(article, '', '`', '`')}>{ICONS.code}</button>
+                            <button className="editor-tool-btn" title="表格" onClick={() => insertAtCursor(article, '\n| 列1 | 列2 | 列3 |\n|------|------|------|\n| 内容 | 内容 | 内容 |\n', '', '')}>{ICONS.tableIcon}</button>
+                            <button className="editor-tool-btn" title="分割线" onClick={() => insertAtCursor(article, '\n---\n', '', '')}>{ICONS.hr}</button>
+                          </div>
+                          <div className="editor-toolbar-group">
+                            <button className="editor-tool-btn" title="链接" onClick={() => insertAtCursor(article, '', '[链接文本](url)', '')}>{ICONS.link}</button>
+                            <button className="editor-tool-btn" title="图片" onClick={() => insertAtCursor(article, '', '![描述](图片URL)', '')}>{ICONS.image}</button>
+                          </div>
+                          <div className="editor-toolbar-group editor-tab-group">
+                            <button className={`editor-tab-btn ${editorTab === 'edit' ? 'active' : ''}`} onClick={() => setEditorTab('edit')}>编辑</button>
+                            <button className={`editor-tab-btn ${editorTab === 'split' ? 'active' : ''}`} onClick={() => setEditorTab('split')}>分栏</button>
+                            <button className={`editor-tab-btn ${editorTab === 'preview' ? 'active' : ''}`} onClick={() => setEditorTab('preview')}>预览</button>
+                          </div>
+                        </div>
+
+                        <div className={`editor-split-view editor-mode-${editorTab}`}>
+                          {editorTab !== 'preview' && (
+                            <div className="editor-pane">
+                              <textarea
+                                ref={editorTextareaRef}
+                                className="article-content-editor"
+                                value={article.content}
+                                onChange={e => handleContentChange(article, e.target.value)}
+                                placeholder="开始写作...&#10;&#10;支持 Markdown 格式：&#10;# 标题&#10;**粗体** *斜体*&#10;- 列表&#10;> 引用&#10;`代码`&#10;![图片](url)"
+                                onDragOver={e => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; }}
+                                onDrop={e => {
+                                  e.preventDefault();
+                                  try {
+                                    const data = JSON.parse(e.dataTransfer.getData('text/plain'));
+                                    if (data && data.materialId) {
+                                      const mat = materials.find(m => m.id === data.materialId);
+                                      if (mat) insertMaterialAtCursor(article, mat);
+                                    }
+                                  } catch {}
+                                }}
+                              />
+                            </div>
+                          )}
+                          {editorTab !== 'edit' && (
+                            <div className="preview-pane">
+                              <div className="preview-header">
+                                <span>预览</span>
+                                <span className="preview-stats">{wordCount} 字</span>
+                              </div>
+                              <div
+                                className="markdown-preview"
+                                dangerouslySetInnerHTML={{ __html: renderMarkdown(article.content) }}
+                              />
+                            </div>
+                          )}
                         </div>
 
                         <div className="article-ai-toolbar">
@@ -2381,16 +2646,32 @@ function App() {
                         </div>
 
                         <div className="article-materials-panel">
-                          <h4>关联素材 <span className="material-hint">（点击素材插入到正文末尾）</span></h4>
-                          {materials.length === 0 ? (
-                            <p className="hint">素材库为空，浏览资讯时点击收藏按钮或手动添加素材</p>
-                          ) : (
+                          <div className="materials-panel-header">
+                            <h4>关联素材 <span className="material-hint">（拖拽到编辑器中或点击插入）</span></h4>
+                            {linkedMaterials.length > 0 && (
+                              <span className="linked-material-count">{linkedMaterials.length} 篇已引用</span>
+                            )}
+                          </div>
+                          {linkedMaterials.length > 0 && (
+                            <div className="linked-materials-list">
+                              {linkedMaterials.map(m => (
+                                <div key={m.id} className="linked-material-item">
+                                  <span className={`material-type-badge type-${m.type}`}>{MATERIAL_TYPES[m.type]}</span>
+                                  <span className="linked-material-text">{m.content.slice(0, 50)}...</span>
+                                  <button className="linked-material-remove" onClick={() => removeLinkedMaterial(article, m.id)} title="移除引用">{ICONS.x}</button>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                          {materials.length > 0 && (
                             <div className="materials-picker-list">
-                              {materials.slice(0, 30).map(m => (
+                              {materials.filter(m => !article.materials.includes(m.id)).slice(0, 20).map(m => (
                                 <div
                                   key={m.id}
                                   className="material-picker-item"
-                                  onClick={() => insertMaterialToArticle(article, m)}
+                                  onClick={() => insertMaterialAtCursor(article, m)}
+                                  draggable
+                                  onDragStart={e => { e.dataTransfer.setData('text/plain', JSON.stringify({ materialId: m.id })); e.dataTransfer.effectAllowed = 'copy'; }}
                                   title={m.content}
                                 >
                                   <span className={`material-type-badge type-${m.type}`}>{MATERIAL_TYPES[m.type]}</span>
@@ -2398,6 +2679,9 @@ function App() {
                                 </div>
                               ))}
                             </div>
+                          )}
+                          {materials.length === 0 && (
+                            <p className="hint">素材库为空，浏览资讯时点击收藏按钮或手动添加素材</p>
                           )}
                         </div>
                       </>
@@ -2410,32 +2694,52 @@ function App() {
                     <div className="empty-articles">
                       <div className="empty-icon">{ICONS.edit}</div>
                       <p className="empty-title">暂无文章</p>
-                      <button className="btn-new-article-inline" onClick={() => {
-                        const newArticle = createArticle('blank');
-                        setCurrentArticleId(newArticle.id);
-                      }}>+ 创建第一篇文章</button>
+                      <button className="btn-new-article-inline" onClick={() => { const a = createArticle('blank'); setCurrentArticleId(a.id); }}>+ 创建第一篇文章</button>
                     </div>
                   ) : (
-                    <div className="articles-list">
-                      {articles.sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt)).map(a => (
-                        <div key={a.id} className="article-item">
-                          <div className="article-item-main" onClick={() => setCurrentArticleId(a.id)}>
-                            <h3 className="article-item-title">{a.title}</h3>
-                            <div className="article-item-meta">
-                              <span className={`article-status-badge status-${a.status}`}>{ARTICLE_STATUS[a.status]}</span>
-                              <span>{ARTICLE_TEMPLATES[a.template] || a.template}</span>
-                              <span>{new Date(a.updatedAt).toLocaleDateString('zh-CN')}</span>
+                    <>
+                      <div className="article-list-toolbar">
+                        <div className="article-search-box">
+                          {ICONS.search}
+                          <input type="text" placeholder="搜索文章标题..." value={articleSearch} onChange={e => setArticleSearch(e.target.value)} />
+                        </div>
+                        <select className="article-filter-select" value={articleStatusFilter} onChange={e => setArticleStatusFilter(e.target.value)}>
+                          <option value="all">全部状态</option>
+                          <option value="draft">草稿</option>
+                          <option value="published">已发布</option>
+                          <option value="archived">已归档</option>
+                        </select>
+                        <select className="article-filter-select" value={articleTemplateFilter} onChange={e => setArticleTemplateFilter(e.target.value)}>
+                          <option value="all">全部模板</option>
+                          {Object.entries(ARTICLE_TEMPLATES).map(([id, label]) => <option key={id} value={id}>{label}</option>)}
+                        </select>
+                        <select className="article-filter-select" value={articleSort} onChange={e => setArticleSort(e.target.value)}>
+                          <option value="updated">按更新时间</option>
+                          <option value="created">按创建时间</option>
+                          <option value="title">按标题排序</option>
+                        </select>
+                        <span className="article-count">{filteredArticles.length} 篇</span>
+                      </div>
+                      <div className="articles-list">
+                        {filteredArticles.map(a => (
+                          <div key={a.id} className="article-item">
+                            <div className="article-item-main" onClick={() => { setCurrentArticleId(a.id); setEditorTab('edit'); }}>
+                              <h3 className="article-item-title">{a.title}</h3>
+                              <div className="article-item-meta">
+                                <span className={`article-status-badge status-${a.status}`}>{ARTICLE_STATUS[a.status]}</span>
+                                <span>{ARTICLE_TEMPLATES[a.template] || a.template}</span>
+                                <span>{new Date(a.updatedAt).toLocaleDateString('zh-CN')}</span>
+                                {a.tags.length > 0 && a.tags.slice(0, 3).map(t => <span key={t} className="article-tag-pill">{t}</span>)}
+                              </div>
+                            </div>
+                            <div className="article-item-actions">
+                              <button className="btn-duplicate" onClick={() => duplicateArticle(a.id)} title="复制">{ICONS.layers}</button>
+                              <button className="btn-delete-article" onClick={() => { if (confirm('确定删除？')) deleteArticle(a.id); }} title="删除">{ICONS.trash}</button>
                             </div>
                           </div>
-                          <div className="article-item-actions">
-                            <button className="btn-duplicate" onClick={() => duplicateArticle(a.id)} title="复制">{ICONS.layers}</button>
-                            <button className="btn-delete-article" onClick={() => {
-                              if (confirm('确定删除？')) deleteArticle(a.id);
-                            }} title="删除">{ICONS.trash}</button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
+                        ))}
+                      </div>
+                    </>
                   )}
                 </section>
               )}
@@ -2467,6 +2771,7 @@ function App() {
                         <div className="article-export-actions">
                           <button className="btn-export-md" onClick={() => exportArticle(a, 'md')}>Markdown</button>
                           <button className="btn-export-html" onClick={() => exportArticle(a, 'html')}>HTML</button>
+                          <button className="btn-export-pdf" onClick={() => exportArticle(a, 'pdf')}>PDF</button>
                           <button className="btn-export-wechat" onClick={() => exportArticle(a, 'wechat')}>公众号</button>
                           <button className="btn-export-zhihu" onClick={() => exportArticle(a, 'zhihu')}>知乎</button>
                         </div>
