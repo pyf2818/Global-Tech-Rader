@@ -4,7 +4,7 @@
 
 ```bash
 npm install                    # Install dependencies
-npm run dev                    # Dev server on 0.0.0.0:5173
+npm run dev                    # Dev server on 0.0.0.0:5175
 npm run build                  # Production build -> dist/
 npm run preview                # Preview production build on 0.0.0.0
 ```
@@ -13,10 +13,10 @@ No test, lint, typecheck, or formatter commands exist. Do not run them.
 
 ## Architecture
 
-- **Single-file frontend**: `src/App.jsx` (~2000 lines) — all state, rendering, and logic. Inline components: `NewsItem`, `GithubRepoCard`, `HexRadarChart`, `Lightbox`. No component splitting.
-- **API is a Vite plugin**: `server/newsPlugin.js` (~740 lines) is a Vite middleware (`newsPlugin()`) that intercepts `/api/*` during dev. No separate backend server. Production uses `vercel.json` + `api/*.js` serverless functions.
+- **Single-file frontend**: `src/App.jsx` (~2400 lines) — all state, rendering, and logic. Inline components: `NewsItem`, `GithubRepoCard`, `HexRadarChart`, `Lightbox`. No component splitting.
+- **API is a Vite plugin**: `server/newsPlugin.js` (~1050 lines) is a Vite middleware (`newsPlugin()`) that intercepts `/api/*` during dev. No separate backend server. Production uses `vercel.json` + `api/*.js` serverless functions.
 - **Entrypoint**: `src/main.jsx` mounts `<App />` inside `<ErrorBoundary>` + `<React.StrictMode>`.
-- **Styling**: `src/styles.css` (~800 lines) with CSS custom properties for dark/light themes. Tailwind config only sets `content` paths and `fontFamily.sans` — no Tailwind utility classes in the component; all styling is custom CSS.
+- **Styling**: `src/styles.css` (~900 lines) with CSS custom properties for dark/light themes. Tailwind config only sets `content` paths and `fontFamily.sans` — no Tailwind utility classes in the component; all styling is custom CSS.
 
 ## Key Duplication (Must Update Both Files)
 
@@ -38,11 +38,18 @@ Additionally, `DEFAULT_SOURCES` and `CATEGORIES` are duplicated between `server/
 | `/api/news` | GET | `blocked=word1,word2`, `custom=<JSON>` | Aggregated RSS feed |
 | `/api/meta` | GET | — | Categories, modes, sources metadata |
 | `/api/trending` | GET | — | AI-filtered trending items |
-| `/api/github-trending` | GET | `lang=python`, `since=daily|weekly|monthly` | GitHub Search API, caches 30 min |
+| `/api/github-trending` | GET | `lang=python`, `since=daily\|weekly\|monthly` | GitHub Search API, caches 30 min |
 | `/api/verify-source` | GET | `url=<RSS_URL>` | Checks if URL is valid RSS/Atom |
-| `/api/llm-models` | GET | — | Returns curated LLM provider/model list |
-| `/api/llm-test` | POST | `endpoint`, `model`, `apiKey` | Tests LLM API connectivity |
+| `/api/llm-models` | GET | `baseUrl`, `apiKey` | Fetches available models from LLM provider |
+| `/api/llm-test` | POST | `baseUrl`, `model`, `apiKey` | Tests LLM API connectivity |
+| `/api/ai-insights` | POST | `baseUrl`, `apiKey`, `model`, `items[]` | Analyzes top 30 news items via LLM, returns `{trends, correlations, signals}` |
 | `/api/ai/*`, `/api/translate/*`, `/api/subscriptions/*`, `/api/bookmarks/*` | — | — | Stub endpoints returning 501 |
+
+## LLM Config
+
+`LLM_PRESETS` in `src/App.jsx` defines 5 providers with built-in base URLs and model lists: OpenAI, DeepSeek, Moonshot, 智谱 AI, 自定义. The quick-config modal lets users pick a preset, enter API key, and select a model in 3 steps. Config persists in `localStorage` as `llmConfig`.
+
+AI insights are triggered on `items` change (auto) or via manual refresh button. They POST to `/api/ai-insights` with the top 30 items and display `{trends, correlations, signals}` in the right panel.
 
 ## Source Config
 
@@ -65,8 +72,11 @@ Build command: `npm run build`, output: `dist/`.
 - `package.json` sets `"type": "module"` — all `.js` files use ESM.
 - Many dependencies pinned to `"latest"` rather than specific versions.
 - `vite.config.js` already includes `allowedHosts: ['.monkeycode-ai.online']`.
+- Dev server port is **5175** (changed from default 5173).
 - GitHub API unauthenticated rate limit is 60 requests/hour. When rate-limited, README image/tutorial data will be empty until the limit resets (~1 hour). The 30-minute cache mitigates this.
 - GitHub README images: uses a scoring system (badge/shield/icon/logo keywords = excluded; screenshot/demo/preview alt text or path = +2; `/img/`/`/assets/`/`/media/` paths = +1). Only the top-scoring image is shown.
 - Tutorial extraction (`extractTutorial`): only returns text if ≥2 meaningful lines found in Installation/Usage/Getting Started sections. Otherwise returns empty string and the card hides the tutorial block.
 - PWA: `public/sw.js` and `public/manifest.json` exist; `index.html` registers the service worker.
 - `index.html` has a global `onerror` handler that replaces the page with an error display and a "Clear localStorage & Reload" button.
+- `LLM_PRESETS` must be defined at file scope (top level of App.jsx), not inside a function — putting it inside `generateSummary` caused a `ReferenceError`.
+- `/api/ai-insights` prompts LLM for concise JSON output (max 800 tokens, 30 chars per item). Truncated responses are caught with a retry-friendly error message.
