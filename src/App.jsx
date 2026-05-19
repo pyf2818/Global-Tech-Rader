@@ -332,6 +332,11 @@ function App() {
   const [showTemplateMenu, setShowTemplateMenu] = useState(false);
   const [showAiPanel, setShowAiPanel] = useState(false);
   const [aiCustomPrompt, setAiCustomPrompt] = useState('');
+  const [articleSpaces, setArticleSpaces] = useState(() => loadLS('articleSpaces', []));
+  const [articleSpaceFilter, setArticleSpaceFilter] = useState('all');
+  const [articleSpaceFormOpen, setArticleSpaceFormOpen] = useState(false);
+  const [newArticleSpaceName, setNewArticleSpaceName] = useState('');
+  const [articleSpaceForNewArticle, setArticleSpaceForNewArticle] = useState('all');
   const editorTextareaRef = useRef(null);
 
   const feedRef = useRef(null);
@@ -345,6 +350,7 @@ function App() {
   useEffect(() => { saveLS('bookmarks', bookmarks); }, [bookmarks]);
   useEffect(() => { saveLS('materials', materials); }, [materials]);
   useEffect(() => { saveLS('materialSpaces', materialSpaces); }, [materialSpaces]);
+  useEffect(() => { saveLS('articleSpaces', articleSpaces); }, [articleSpaces]);
   useEffect(() => { saveLS('articles', articles); }, [articles]);
   useEffect(() => {
     if (!showTemplateMenu) return;
@@ -1044,7 +1050,7 @@ function App() {
   }
 
   // 文章操作
-  function createArticle(template = 'blank') {
+  function createArticle(template = 'blank', spaceId = null) {
     let templateContent = ARTICLE_TEMPLATE_CONTENT[template] || '';
     templateContent = templateContent.replace('{DATE}', new Date().toLocaleDateString('zh-CN'));
     const defaultTitle = template === 'briefing' ? `每日简报 · ${new Date().toLocaleDateString('zh-CN')}` : template === 'blank' ? '未命名文章' : '';
@@ -1056,6 +1062,7 @@ function App() {
       materials: [],
       tags: [],
       status: 'draft',
+      spaceId: spaceId || null,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       version: 1
@@ -1158,6 +1165,30 @@ function App() {
 
   function removeLinkedMaterial(article, materialId) {
     setArticles(prev => prev.map(a => a.id === article.id ? { ...a, materials: a.materials.filter(id => id !== materialId) } : a));
+  }
+
+  // 创作空间管理
+  function createArticleSpace(name) {
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    const newSpace = { id: Date.now(), name: trimmed, createdAt: new Date().toISOString() };
+    setArticleSpaces(prev => [...prev, newSpace]);
+    setNewArticleSpaceName('');
+    setArticleSpaceFormOpen(false);
+  }
+
+  function deleteArticleSpace(id) {
+    setArticleSpaces(prev => prev.filter(s => s.id !== id));
+    setArticles(prev => prev.map(a => a.spaceId === id ? { ...a, spaceId: null } : a));
+    if (articleSpaceFilter === String(id)) setArticleSpaceFilter('all');
+  }
+
+  function assignArticleToSpace(id, spaceId) {
+    setArticles(prev => prev.map(a => a.id === id ? { ...a, spaceId: spaceId || null } : a));
+  }
+
+  function batchAssignArticlesToSpace(ids, spaceId) {
+    setArticles(prev => prev.map(a => ids.includes(a.id) ? { ...a, spaceId: spaceId || null } : a));
   }
 
   // AI 辅助写作
@@ -1302,6 +1333,10 @@ function App() {
 
   const filteredArticles = useMemo(() => {
     let result = [...articles];
+    if (articleSpaceFilter !== 'all') {
+      const sid = Number(articleSpaceFilter);
+      result = result.filter(a => a.spaceId === sid);
+    }
     if (articleSearch) {
       const q = articleSearch.toLowerCase();
       result = result.filter(a => (a.title || '').toLowerCase().includes(q) || (a.content || '').toLowerCase().includes(q) || (a.tags || []).some(t => t.toLowerCase().includes(q)));
@@ -1312,7 +1347,7 @@ function App() {
     else if (articleSort === 'created') result.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
     else if (articleSort === 'title') result.sort((a, b) => (a.title || '').localeCompare(b.title || '', 'zh-CN'));
     return result;
-  }, [articles, articleSearch, articleStatusFilter, articleTemplateFilter, articleSort]);
+  }, [articles, articleSpaceFilter, articleSearch, articleStatusFilter, articleTemplateFilter, articleSort]);
 
   const filteredExportArticles = useMemo(() => {
     if (articleExportFilter === 'all') return articles;
@@ -2478,17 +2513,29 @@ function App() {
 
           {nav === 'editor' && (
             <div className="trends-dashboard">
-              <div className="trends-header">
+              <div className="trends-header editor-header">
                 <h2>{ICONS.edit}<span>创作中心</span></h2>
-                <div className="header-actions">
-                  <div className="editor-template-dropdown">
-                    <button className="btn-new-article" onClick={() => { const a = createArticle('blank'); setCurrentArticleId(a.id); }}>+ 新建文章</button>
-                    <button className="btn-template-menu" title="从模板创建" onClick={() => setShowTemplateMenu(!showTemplateMenu)}>{ICONS.chevronDown}</button>
+                <div className="editor-header-actions">
+                  <button className="btn-new-article-pro" onClick={() => { const a = createArticle('blank', articleSpaceFilter !== 'all' ? Number(articleSpaceFilter) : null); setCurrentArticleId(a.id); }}>
+                    {ICONS.plus}
+                    <span>新建文章</span>
+                    <span className="btn-key-hint">Ctrl+N</span>
+                  </button>
+                  <div className="template-popover">
+                    <button className="btn-template-popover" onClick={() => setShowTemplateMenu(!showTemplateMenu)} title="从模板创建">
+                      {ICONS.layers}
+                      <span>模板</span>
+                      {ICONS.chevronDown}
+                    </button>
                     {showTemplateMenu && (
-                      <div className="template-dropdown-menu">
+                      <div className="template-popover-menu">
+                        <div className="template-menu-title">选择模板</div>
                         {Object.entries(ARTICLE_TEMPLATES).map(([id, label]) => (
-                          <button key={id} className="template-dropdown-item" onClick={() => { const a = createArticle(id); setCurrentArticleId(a.id); setShowTemplateMenu(false); }}>
-                            {label}
+                          <button key={id} className="template-menu-item" onClick={() => { const a = createArticle(id, articleSpaceFilter !== 'all' ? Number(articleSpaceFilter) : null); setCurrentArticleId(a.id); setShowTemplateMenu(false); }}>
+                            <span className="template-menu-icon">{
+                              id === 'blank' ? ICONS.edit : id === 'briefing' ? ICONS.document : id === 'analysis' ? ICONS.chart : ICONS.code
+                            }</span>
+                            <span className="template-menu-label">{label}</span>
                           </button>
                         ))}
                       </div>
@@ -2805,6 +2852,31 @@ function App() {
                     </div>
                   ) : (
                     <>
+                      <div className="article-space-tabs">
+                        <button
+                          className={`article-space-tab ${articleSpaceFilter === 'all' ? 'active' : ''}`}
+                          onClick={() => setArticleSpaceFilter('all')}
+                        >
+                          全部文章
+                          <span className="article-space-count">{articles.length}</span>
+                        </button>
+                        {articleSpaces.map(space => {
+                          const count = articles.filter(a => a.spaceId === space.id).length;
+                          return (
+                            <button
+                              key={space.id}
+                              className={`article-space-tab ${articleSpaceFilter === String(space.id) ? 'active' : ''}`}
+                              onClick={() => setArticleSpaceFilter(String(space.id))}
+                            >
+                              {space.name}
+                              <span className="article-space-count">{count}</span>
+                            </button>
+                          );
+                        })}
+                        <button className="article-space-tab article-space-add" onClick={() => setArticleSpaceFormOpen(true)}>
+                          {ICONS.plus}
+                        </button>
+                      </div>
                       <div className="article-list-toolbar">
                         <div className="article-search-box">
                           {ICONS.search}
@@ -2835,11 +2907,16 @@ function App() {
                               <div className="article-item-meta">
                                 <span className={`article-status-badge status-${a.status}`}>{ARTICLE_STATUS[a.status]}</span>
                                 <span>{ARTICLE_TEMPLATES[a.template] || a.template}</span>
+                                {a.spaceId && (() => { const sp = articleSpaces.find(s => s.id === a.spaceId); return sp ? <span className="article-space-badge">{sp.name}</span> : null; })()}
                                 <span>{new Date(a.updatedAt).toLocaleDateString('zh-CN')}</span>
                                 {a.tags.length > 0 && a.tags.slice(0, 3).map(t => <span key={t} className="article-tag-pill">{t}</span>)}
                               </div>
                             </div>
                             <div className="article-item-actions">
+                              <select className="article-space-assign" value={a.spaceId || ''} onClick={e => e.stopPropagation()} onChange={e => assignArticleToSpace(a.id, e.target.value ? Number(e.target.value) : null)}>
+                                <option value="">未分配</option>
+                                {articleSpaces.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                              </select>
                               <button className="btn-duplicate" onClick={() => duplicateArticle(a.id)} title="复制">{ICONS.layers}</button>
                               <button className="btn-delete-article" onClick={() => { if (confirm('确定删除？')) deleteArticle(a.id); }} title="删除">{ICONS.trash}</button>
                             </div>
@@ -2850,6 +2927,34 @@ function App() {
                   )}
                 </section>
               )}
+            </div>
+          )}
+
+          {articleSpaceFormOpen && (
+            <div className="modal-backdrop" onClick={() => setArticleSpaceFormOpen(false)}>
+              <div className="modal-content modal-small" onClick={e => e.stopPropagation()}>
+                <div className="modal-header">
+                  <h3>新建创作空间</h3>
+                  <button className="modal-close" onClick={() => setArticleSpaceFormOpen(false)}>{ICONS.x}</button>
+                </div>
+                <form className="add-material-form" onSubmit={e => { e.preventDefault(); createArticleSpace(newArticleSpaceName); }}>
+                  <div className="form-group">
+                    <label>空间名称</label>
+                    <input 
+                      type="text" 
+                      placeholder="如：技术博客、产品测评、学习笔记" 
+                      value={newArticleSpaceName}
+                      onChange={e => setNewArticleSpaceName(e.target.value)}
+                      autoFocus
+                      required
+                    />
+                  </div>
+                  <div className="form-actions">
+                    <button type="button" className="btn-modal-cancel" onClick={() => setArticleSpaceFormOpen(false)}>取消</button>
+                    <button type="submit" className="btn-modal-submit">创建</button>
+                  </div>
+                </form>
+              </div>
             </div>
           )}
 
