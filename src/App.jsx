@@ -282,6 +282,17 @@ function App() {
   const [navGroupOpen, setNavGroupOpen] = useState({ core: true, insight: true, manage: false });
   const [currentArticleId, setCurrentArticleId] = useState(null);
   const [materialFilter, setMaterialFilter] = useState('all');
+  const [materialSearch, setMaterialSearch] = useState('');
+  const [materialTags, setMaterialTags] = useState([]);
+  const [materialTimeRange, setMaterialTimeRange] = useState('all');
+  const [materialSourceFilter, setMaterialSourceFilter] = useState('all');
+  const [materialSpaceFilter, setMaterialSpaceFilter] = useState('all');
+  const [materialSpaces, setMaterialSpaces] = useState(() => loadLS('materialSpaces', []));
+  const [showSpaceForm, setShowSpaceForm] = useState(false);
+  const [newSpaceName, setNewSpaceName] = useState('');
+  const [selectedMaterials, setSelectedMaterials] = useState([]);
+  const [showAddMaterial, setShowAddMaterial] = useState(false);
+  const [aiResult, setAiResult] = useState({ loading: false, content: '', error: '', action: '' });
   const [articleExportFilter, setArticleExportFilter] = useState('all');
 
   const feedRef = useRef(null);
@@ -294,6 +305,7 @@ function App() {
   useEffect(() => { saveLS('calendarEvents', events); }, [events]);
   useEffect(() => { saveLS('bookmarks', bookmarks); }, [bookmarks]);
   useEffect(() => { saveLS('materials', materials); }, [materials]);
+  useEffect(() => { saveLS('materialSpaces', materialSpaces); }, [materialSpaces]);
   useEffect(() => { saveLS('articles', articles); }, [articles]);
   useEffect(() => { saveLS('summaryCache', summaryCache); }, [summaryCache]);
   useEffect(() => { saveLS('followKeywords', followKeywords); }, [followKeywords]);
@@ -753,6 +765,26 @@ function App() {
     loadNews(blocked, true, debouncedQuery);
   }
 
+  function renderMarkdown(text) {
+    if (!text) return '';
+    let html = text
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/^### (.+)$/gm, '<h3>$1</h3>')
+      .replace(/^## (.+)$/gm, '<h2>$1</h2>')
+      .replace(/^# (.+)$/gm, '<h1>$1</h1>')
+      .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+      .replace(/\*(.+?)\*/g, '<em>$1</em>')
+      .replace(/`([^`]+)`/g, '<code>$1</code>')
+      .replace(/^&gt; (.+)$/gm, '<blockquote>$1</blockquote>')
+      .replace(/^- (.+)$/gm, '<li>$1</li>')
+      .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>')
+      .replace(/\n\n/g, '</p><p>')
+      .replace(/\n/g, '<br>');
+    return `<p>${html}</p>`;
+  }
+
   function loadTrending(append = false, platform = trendingPlatform) {
     if (!append) {
       setTrendingLoading(true);
@@ -813,7 +845,7 @@ function App() {
   function addMaterial(item, type = 'quote', note = '') {
     const newMaterial = {
       id: Date.now(),
-      type, // quote / data / case / viewpoint / chart
+      type,
       content: item.summary || item.title,
       source: item.source,
       url: item.url,
@@ -823,7 +855,6 @@ function App() {
       createdAt: new Date().toISOString()
     };
     setMaterials(prev => [...prev, newMaterial]);
-    // 显示成功提示
     const toast = document.createElement('div');
     toast.className = 'material-toast';
     toast.textContent = '✓ 已添加到素材库';
@@ -831,12 +862,103 @@ function App() {
     setTimeout(() => toast.remove(), 2000);
   }
 
+  function addManualMaterial({ title, content, type, source, url, tags, note }) {
+    const newMaterial = {
+      id: Date.now(),
+      type,
+      title,
+      content,
+      source: source || '手动添加',
+      url: url || '',
+      tags: tags ? tags.split(',').map(t => t.trim()).filter(Boolean) : [],
+      note,
+      createdAt: new Date().toISOString()
+    };
+    setMaterials(prev => [...prev, newMaterial]);
+    setShowAddMaterial(false);
+  }
+
   function removeMaterial(id) {
     setMaterials(prev => prev.filter(m => m.id !== id));
   }
 
+  function batchRemoveMaterials(ids) {
+    setMaterials(prev => prev.filter(m => !ids.includes(m.id)));
+    setSelectedMaterials([]);
+  }
+
+  function updateMaterialTags(id, tags) {
+    setMaterials(prev => prev.map(m => m.id === id ? { ...m, tags } : m));
+  }
+
+  function toggleMaterialSelection(id) {
+    setSelectedMaterials(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
+  }
+
+  function selectAllMaterials() {
+    setSelectedMaterials(filteredMaterials.map(m => m.id));
+  }
+
+  function clearMaterialSelection() {
+    setSelectedMaterials([]);
+  }
+
   function updateMaterialNote(id, note) {
     setMaterials(prev => prev.map(m => m.id === id ? { ...m, note } : m));
+  }
+
+  function assignMaterialsToSpace(ids, spaceId) {
+    setMaterials(prev => prev.map(m => ids.includes(m.id) ? { ...m, spaceId } : m));
+    setSelectedMaterials([]);
+  }
+
+  function createMaterialSpace() {
+    if (!newSpaceName.trim()) return;
+    const newSpace = { id: Date.now(), name: newSpaceName.trim(), createdAt: new Date().toISOString() };
+    setMaterialSpaces(prev => [...prev, newSpace]);
+    setNewSpaceName('');
+    setShowSpaceForm(false);
+  }
+
+  function deleteMaterialSpace(id) {
+    setMaterialSpaces(prev => prev.filter(s => s.id !== id));
+    setMaterials(prev => prev.map(m => m.spaceId === id ? { ...m, spaceId: null } : m));
+    if (materialSpaceFilter === String(id)) setMaterialSpaceFilter('all');
+  }
+
+  function toggleMaterialStar(id) {
+    setMaterials(prev => prev.map(m => m.id === id ? { ...m, starred: !m.starred } : m));
+  }
+
+  function exportMaterials() {
+    const data = JSON.stringify(materials, null, 2);
+    const blob = new Blob([data], { type: 'application/json;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `tech-radar-materials-${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function importMaterials(file) {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const imported = JSON.parse(e.target.result);
+        if (Array.isArray(imported)) {
+          setMaterials(prev => [...prev, ...imported.map(m => ({ ...m, id: Date.now() + Math.random() }))]);
+          const toast = document.createElement('div');
+          toast.className = 'material-toast';
+          toast.textContent = `✓ 成功导入 ${imported.length} 条素材`;
+          document.body.appendChild(toast);
+          setTimeout(() => toast.remove(), 2000);
+        }
+      } catch (err) {
+        alert('导入失败：文件格式错误');
+      }
+    };
+    reader.readAsText(file);
   }
 
   // 文章操作
@@ -879,6 +1001,60 @@ function App() {
     setArticles(prev => [...prev, copy]);
   }
 
+  // AI 辅助写作
+  async function aiAction(article, action, content) {
+    if (!llmConfig.baseUrl || !llmConfig.selectedModel) {
+      setAiResult({ loading: false, content: '', error: '请先配置大模型', action });
+      return;
+    }
+    setAiResult({ loading: true, content: '', error: '', action });
+    try {
+      const res = await fetch('/api/ai-generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          baseUrl: llmConfig.baseUrl,
+          apiKey: llmConfig.apiKey,
+          model: llmConfig.selectedModel,
+          action,
+          content
+        })
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setAiResult({ loading: false, content: data.content, error: '', action });
+      } else {
+        setAiResult({ loading: false, content: '', error: data.error || '请求失败', action });
+      }
+    } catch (e) {
+      setAiResult({ loading: false, content: '', error: e.message, action });
+    }
+  }
+
+  function insertAiResult(article) {
+    if (!aiResult.content) return;
+    if (aiResult.action === 'title') {
+      updateArticle(article.id, { title: aiResult.content.trim() });
+    } else if (aiResult.action === 'rewrite') {
+      const selected = window.getSelection().toString();
+      if (selected) {
+        updateArticle(article.id, { content: article.content.replace(selected, aiResult.content) });
+      }
+    } else {
+      updateArticle(article.id, { content: article.content + '\n\n' + aiResult.content });
+    }
+    setAiResult({ loading: false, content: '', error: '', action: '' });
+  }
+
+  function clearAiResult() {
+    setAiResult({ loading: false, content: '', error: '', action: '' });
+  }
+
+  function insertMaterialToArticle(article, material) {
+    const ref = `> [${material.content.slice(0, 50)}...](${material.url || ''})\n> 来源: ${material.source}\n\n`;
+    updateArticle(article.id, { content: article.content + ref });
+  }
+
   const readingStatsData = useMemo(() => {
     const buildDayKeys = (days) => Array.from({ length: days }).map((_, idx) => {
       const d = new Date();
@@ -911,9 +1087,58 @@ function App() {
   }, [bookmarks, exportCategory, exportRange]);
 
   const filteredMaterials = useMemo(() => {
-    if (materialFilter === 'all') return materials;
-    return materials.filter(m => m.type === materialFilter);
-  }, [materials, materialFilter]);
+    let result = materials;
+    if (materialSpaceFilter !== 'all') {
+      const sid = Number(materialSpaceFilter);
+      result = result.filter(m => m.spaceId === sid);
+    }
+    if (materialFilter !== 'all') result = result.filter(m => m.type === materialFilter);
+    if (materialTimeRange !== 'all') {
+      const now = Date.now();
+      const ms = materialTimeRange === '7d' ? 7 * 24 * 60 * 60 * 1000 : 30 * 24 * 60 * 60 * 1000;
+      result = result.filter(m => new Date(m.createdAt).getTime() >= now - ms);
+    }
+    if (materialSourceFilter !== 'all') {
+      result = result.filter(m => m.source === materialSourceFilter);
+    }
+    if (materialSearch) {
+      const q = materialSearch.toLowerCase();
+      result = result.filter(m => 
+        (m.content || '').toLowerCase().includes(q) || 
+        (m.source || '').toLowerCase().includes(q) || 
+        (m.tags || []).some(t => t.toLowerCase().includes(q)) ||
+        (m.note || '').toLowerCase().includes(q)
+      );
+    }
+    if (materialTags.length > 0) {
+      result = result.filter(m => (m.tags || []).some(t => materialTags.includes(t)));
+    }
+    result.sort((a, b) => (b.starred ? 1 : 0) - (a.starred ? 1 : 0) || new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    return result;
+  }, [materials, materialSpaceFilter, materialFilter, materialTimeRange, materialSourceFilter, materialSearch, materialTags]);
+
+  const allMaterialSources = useMemo(() => {
+    const sourceSet = new Set();
+    materials.forEach(m => m.source && sourceSet.add(m.source));
+    return Array.from(sourceSet).sort();
+  }, [materials]);
+
+  const allMaterialTags = useMemo(() => {
+    const tagSet = new Set();
+    materials.forEach(m => (m.tags || []).forEach(t => tagSet.add(t)));
+    return Array.from(tagSet).sort();
+  }, [materials]);
+
+  // 计算每个素材被文章引用的次数
+  const materialRefCounts = useMemo(() => {
+    const counts = {};
+    articles.forEach(a => {
+      (a.materials || []).forEach(mid => {
+        counts[mid] = (counts[mid] || 0) + 1;
+      });
+    });
+    return counts;
+  }, [articles]);
 
   const filteredExportArticles = useMemo(() => {
     if (articleExportFilter === 'all') return articles;
@@ -1791,40 +2016,157 @@ function App() {
               <div className="trends-header">
                 <h2>{ICONS.layers}<span>素材库</span></h2>
                 <p className="trends-desc">从资讯中收集的素材，共 {materials.length} 条</p>
+                <div className="header-actions">
+                  <button className="btn-icon" onClick={exportMaterials} title="导出素材">
+                    {ICONS.link}
+                  </button>
+                  <label className="btn-icon" title="导入素材">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                    <input 
+                      type="file" 
+                      accept=".json" 
+                      style={{ display: 'none' }} 
+                      onChange={e => { if (e.target.files[0]) importMaterials(e.target.files[0]); }}
+                    />
+                  </label>
+                  <button className="btn-add-material" onClick={() => setShowAddMaterial(true)}>
+                    {ICONS.plus} 添加素材
+                  </button>
+                </div>
               </div>
 
               <section className="trends-section">
-                <div className="materials-filters">
-                  <select className="material-filter" value={materialFilter} onChange={e => setMaterialFilter(e.target.value)}>
-                    <option value="all">全部类型</option>
-                    <option value="quote">金句</option>
-                    <option value="data">数据</option>
-                    <option value="case">案例</option>
-                    <option value="viewpoint">观点</option>
-                    <option value="chart">图表</option>
-                  </select>
-                  <span className="material-count">筛选结果: {filteredMaterials.length} 条</span>
+                <div className="materials-toolbar">
+                  <div className="materials-toolbar-row">
+                    <div className="space-tabs">
+                      <button 
+                        className={`space-tab ${materialSpaceFilter === 'all' ? 'active' : ''}`}
+                        onClick={() => setMaterialSpaceFilter('all')}
+                      >
+                        全部 ({materials.length})
+                      </button>
+                      {materialSpaces.map(space => {
+                        const count = materials.filter(m => m.spaceId === space.id).length;
+                        return (
+                          <button 
+                            key={space.id}
+                            className={`space-tab ${materialSpaceFilter === String(space.id) ? 'active' : ''}`}
+                            onClick={() => setMaterialSpaceFilter(String(space.id))}
+                          >
+                            {space.name} ({count})
+                          </button>
+                        );
+                      })}
+                      <button className="space-tab space-tab-add" onClick={() => setShowSpaceForm(true)}>+ 新建空间</button>
+                    </div>
+                  </div>
+                  <div className="materials-toolbar-row">
+                    <div className="material-search">
+                      {ICONS.search}
+                      <input 
+                        type="text" 
+                        placeholder="搜索素材内容、来源、标签..." 
+                        value={materialSearch} 
+                        onChange={e => setMaterialSearch(e.target.value)} 
+                      />
+                    </div>
+                    <select className="material-filter" value={materialFilter} onChange={e => setMaterialFilter(e.target.value)}>
+                      <option value="all">全部类型</option>
+                      <option value="quote">金句</option>
+                      <option value="data">数据</option>
+                      <option value="case">案例</option>
+                      <option value="viewpoint">观点</option>
+                      <option value="chart">图表</option>
+                    </select>
+                    <select className="material-filter" value={materialTimeRange} onChange={e => setMaterialTimeRange(e.target.value)}>
+                      <option value="all">全部时间</option>
+                      <option value="7d">近 7 天</option>
+                      <option value="30d">近 30 天</option>
+                    </select>
+                    {allMaterialSources.length > 0 && (
+                      <select className="material-filter" value={materialSourceFilter} onChange={e => setMaterialSourceFilter(e.target.value)}>
+                        <option value="all">全部来源</option>
+                        {allMaterialSources.map(s => <option key={s} value={s}>{s}</option>)}
+                      </select>
+                    )}
+                  </div>
+                  {allMaterialTags.length > 0 && (
+                    <div className="material-tag-filters">
+                      <span className="tag-filter-label">标签:</span>
+                      {allMaterialTags.slice(0, 15).map(tag => (
+                        <button 
+                          key={tag}
+                          className={`material-tag-btn ${materialTags.includes(tag) ? 'active' : ''}`}
+                          onClick={() => setMaterialTags(prev => prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag])}
+                        >
+                          {tag}
+                        </button>
+                      ))}
+                      {materialTags.length > 0 && (
+                        <button className="tag-clear-btn" onClick={() => setMaterialTags([])}>清除</button>
+                      )}
+                    </div>
+                  )}
+                  <div className="materials-actions">
+                    <span className="material-count">{filteredMaterials.length} / {materials.length} 条</span>
+                    {selectedMaterials.length > 0 && (
+                      <div className="batch-actions">
+                        <span className="batch-count">已选 {selectedMaterials.length} 项</span>
+                        <select className="batch-space-select" value="" onChange={e => { if (e.target.value) assignMaterialsToSpace(selectedMaterials, Number(e.target.value)); }}>
+                          <option value="">移动到空间...</option>
+                          {materialSpaces.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                        </select>
+                        <button className="btn-batch-delete" onClick={() => { if (confirm(`确定删除 ${selectedMaterials.length} 条素材？`)) batchRemoveMaterials(selectedMaterials); }}>批量删除</button>
+                        <button className="btn-clear-selection" onClick={clearMaterialSelection}>取消选择</button>
+                      </div>
+                    )}
+                    {selectedMaterials.length === 0 && materials.length > 0 && (
+                      <button className="btn-select-all" onClick={selectAllMaterials}>全选</button>
+                    )}
+                  </div>
                 </div>
 
                 {filteredMaterials.length === 0 ? (
                   <div className="empty-materials">
-                    <p>暂无素材</p>
-                    <p className="hint">浏览资讯时点击收藏即可添加素材</p>
+                    <div className="empty-icon">{ICONS.layers}</div>
+                    <p className="empty-title">{materialSearch || materialFilter !== 'all' || materialTags.length > 0 ? '没有找到匹配的素材' : '暂无素材'}</p>
+                    <p className="hint">{materialSearch || materialFilter !== 'all' || materialTags.length > 0 ? '试试调整筛选条件' : '浏览资讯时点击收藏按钮，或点击右上角"添加素材"手动添加'}</p>
                   </div>
                 ) : (
                   <div className="materials-grid">
                     {filteredMaterials.map(m => (
-                      <div key={m.id} className="material-card">
+                      <div key={m.id} className={`material-card ${m.starred ? 'starred' : ''} ${selectedMaterials.includes(m.id) ? 'selected' : ''}`}>
                         <div className="material-header">
                           <span className={`material-type-badge type-${m.type}`}>{MATERIAL_TYPES[m.type] || m.type}</span>
-                          <button className="material-remove" onClick={() => removeMaterial(m.id)}>{ICONS.x}</button>
+                          <div className="material-header-actions">
+                            <button className="material-star" onClick={() => toggleMaterialStar(m.id)} title={m.starred ? '取消星标' : '添加星标'}>
+                              {m.starred ? '★' : '☆'}
+                            </button>
+                            <button className="material-remove" onClick={() => removeMaterial(m.id)} title="删除素材">{ICONS.x}</button>
+                          </div>
                         </div>
+                        <div className="material-checkbox-row">
+                          <label className="material-checkbox-label">
+                            <input 
+                              type="checkbox" 
+                              checked={selectedMaterials.includes(m.id)} 
+                              onChange={() => toggleMaterialSelection(m.id)} 
+                            />
+                            <span className="checkbox-custom"></span>
+                          </label>
+                        </div>
+                        {m.title && <p className="material-title">{m.title}</p>}
                         <p className="material-content">{m.content}</p>
                         {m.note && <p className="material-note">{m.note}</p>}
                         <div className="material-meta">
                           <span className="material-source">{m.source}</span>
                           {m.tags && m.tags.length > 0 && (
-                            <span className="material-tags">{m.tags.slice(0, 3).join(', ')}</span>
+                            <span className="material-tags">{m.tags.map(t => `#${t}`).join(' ')}</span>
+                          )}
+                          {materialRefCounts[m.id] && (
+                            <span className="material-ref-count" title={`被 ${materialRefCounts[m.id]} 篇文章引用`}>
+                              引用 {materialRefCounts[m.id]}
+                            </span>
                           )}
                           <span className="material-date">{new Date(m.createdAt).toLocaleDateString('zh-CN')}</span>
                         </div>
@@ -1833,6 +2175,100 @@ function App() {
                   </div>
                 )}
               </section>
+            </div>
+          )}
+
+          {showSpaceForm && (
+            <div className="modal-backdrop" onClick={() => setShowSpaceForm(false)}>
+              <div className="modal-content modal-small" onClick={e => e.stopPropagation()}>
+                <div className="modal-header">
+                  <h3>新建素材空间</h3>
+                  <button className="modal-close" onClick={() => setShowSpaceForm(false)}>{ICONS.x}</button>
+                </div>
+                <form className="add-material-form" onSubmit={e => { e.preventDefault(); createMaterialSpace(); }}>
+                  <div className="form-group">
+                    <label>空间名称</label>
+                    <input 
+                      name="spaceName" 
+                      type="text" 
+                      placeholder="如：AI 素材、技术趋势、产品灵感" 
+                      value={newSpaceName}
+                      onChange={e => setNewSpaceName(e.target.value)}
+                      autoFocus
+                      required
+                    />
+                  </div>
+                  <div className="form-actions">
+                    <button type="button" className="btn-modal-cancel" onClick={() => setShowSpaceForm(false)}>取消</button>
+                    <button type="submit" className="btn-modal-submit">创建</button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+
+          {showAddMaterial && (
+            <div className="modal-backdrop" onClick={() => setShowAddMaterial(false)}>
+              <div className="modal-content" onClick={e => e.stopPropagation()}>
+                <div className="modal-header">
+                  <h3>添加素材</h3>
+                  <button className="modal-close" onClick={() => setShowAddMaterial(false)}>{ICONS.x}</button>
+                </div>
+                <form className="add-material-form" onSubmit={e => {
+                  e.preventDefault();
+                  const fd = new FormData(e.target);
+                  addManualMaterial({
+                    title: fd.get('title') || '',
+                    content: fd.get('content') || '',
+                    type: fd.get('type') || 'quote',
+                    source: fd.get('source') || '',
+                    url: fd.get('url') || '',
+                    tags: fd.get('tags') || '',
+                    note: fd.get('note') || ''
+                  });
+                }}>
+                  <div className="form-group">
+                    <label>类型</label>
+                    <select name="type" defaultValue="quote">
+                      <option value="quote">金句</option>
+                      <option value="data">数据</option>
+                      <option value="case">案例</option>
+                      <option value="viewpoint">观点</option>
+                      <option value="chart">图表</option>
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label>标题（可选）</label>
+                    <input name="title" type="text" placeholder="素材标题" />
+                  </div>
+                  <div className="form-group">
+                    <label>内容 *</label>
+                    <textarea name="content" required placeholder="素材内容..." rows="4" />
+                  </div>
+                  <div className="form-row">
+                    <div className="form-group">
+                      <label>来源</label>
+                      <input name="source" type="text" placeholder="来源名称" />
+                    </div>
+                    <div className="form-group">
+                      <label>链接</label>
+                      <input name="url" type="url" placeholder="https://..." />
+                    </div>
+                  </div>
+                  <div className="form-group">
+                    <label>标签（逗号分隔）</label>
+                    <input name="tags" type="text" placeholder="AI, 大模型, 趋势" />
+                  </div>
+                  <div className="form-group">
+                    <label>备注</label>
+                    <input name="note" type="text" placeholder="个人备注..." />
+                  </div>
+                  <div className="form-actions">
+                    <button type="button" className="btn-modal-cancel" onClick={() => setShowAddMaterial(false)}>取消</button>
+                    <button type="submit" className="btn-modal-submit">添加</button>
+                  </div>
+                </form>
+              </div>
             </div>
           )}
 
@@ -1852,7 +2288,11 @@ function App() {
                     <button className="btn-back-list" onClick={() => setCurrentArticleId(null)}>← 返回列表</button>
                     <div className="article-actions">
                       <button className="btn-save-article" onClick={() => {
-                        alert('文章已保存');
+                        const toast = document.createElement('div');
+                        toast.className = 'material-toast';
+                        toast.textContent = '✓ 文章已保存';
+                        document.body.appendChild(toast);
+                        setTimeout(() => toast.remove(), 2000);
                       }}>保存</button>
                     </div>
                   </div>
@@ -1884,106 +2324,81 @@ function App() {
                           <span className="article-updated">更新于 {new Date(article.updatedAt).toLocaleString('zh-CN')}</span>
                         </div>
 
-                        <textarea
-                          className="article-content-editor"
-                          value={article.content}
-                          onChange={e => updateArticle(article.id, { content: e.target.value })}
-                          placeholder="开始写作...&#10;&#10;支持 Markdown 格式&#10;可以使用 ## 标题、**粗体**、*斜体* 等语法"
-                        />
+                        <div className="editor-split-view">
+                          <div className="editor-pane">
+                            <textarea
+                              className="article-content-editor"
+                              value={article.content}
+                              onChange={e => updateArticle(article.id, { content: e.target.value })}
+                              placeholder="开始写作...&#10;&#10;支持 Markdown 格式&#10;可以使用 ## 标题、**粗体**、*斜体* 等语法"
+                            />
+                          </div>
+                          <div className="preview-pane">
+                            <div className="preview-header">预览</div>
+                            <div 
+                              className="markdown-preview" 
+                              dangerouslySetInnerHTML={{ __html: renderMarkdown(article.content) }}
+                            />
+                          </div>
+                        </div>
 
                         <div className="article-ai-toolbar">
                           <span className="ai-toolbar-label">AI 辅助:</span>
-                          <button className="ai-toolbar-btn" onClick={async () => {
-                            if (!llmConfig.baseUrl || !llmConfig.selectedModel) { alert('请先配置大模型'); return; }
+                          <button className="ai-toolbar-btn" onClick={() => {
                             const selected = window.getSelection().toString();
                             if (!selected) { alert('请先选择要处理的文本'); return; }
-                            const res = await fetch('/api/ai-generate', {
-                              method: 'POST',
-                              headers: { 'Content-Type': 'application/json' },
-                              body: JSON.stringify({ baseUrl: llmConfig.baseUrl, apiKey: llmConfig.apiKey, model: llmConfig.selectedModel, action: 'continue', content: selected })
-                            });
-                            const data = await res.json();
-                            if (data.ok) {
-                              updateArticle(article.id, { content: article.content.replace(selected, selected + '\n\n' + data.content) });
-                            } else {
-                              alert('AI 续写失败：' + data.error);
-                            }
-                          }}>续写</button>
-                          <button className="ai-toolbar-btn" onClick={async () => {
-                            if (!llmConfig.baseUrl || !llmConfig.selectedModel) { alert('请先配置大模型'); return; }
+                            aiAction(article, 'continue', selected);
+                          }}>{aiResult.loading && aiResult.action === 'continue' ? '...' : '续写'}</button>
+                          <button className="ai-toolbar-btn" onClick={() => {
                             const selected = window.getSelection().toString();
                             if (!selected) { alert('请先选择要处理的文本'); return; }
-                            const res = await fetch('/api/ai-generate', {
-                              method: 'POST',
-                              headers: { 'Content-Type': 'application/json' },
-                              body: JSON.stringify({ baseUrl: llmConfig.baseUrl, apiKey: llmConfig.apiKey, model: llmConfig.selectedModel, action: 'rewrite', content: selected })
-                            });
-                            const data = await res.json();
-                            if (data.ok) {
-                              updateArticle(article.id, { content: article.content.replace(selected, data.content) });
-                            } else {
-                              alert('AI 改写失败：' + data.error);
-                            }
-                          }}>改写</button>
-                          <button className="ai-toolbar-btn" onClick={async () => {
-                            if (!llmConfig.baseUrl || !llmConfig.selectedModel) { alert('请先配置大模型'); return; }
+                            aiAction(article, 'rewrite', selected);
+                          }}>{aiResult.loading && aiResult.action === 'rewrite' ? '...' : '改写'}</button>
+                          <button className="ai-toolbar-btn" onClick={() => {
                             const selected = window.getSelection().toString();
                             if (!selected) { alert('请先选择要处理的文本'); return; }
-                            const res = await fetch('/api/ai-generate', {
-                              method: 'POST',
-                              headers: { 'Content-Type': 'application/json' },
-                              body: JSON.stringify({ baseUrl: llmConfig.baseUrl, apiKey: llmConfig.apiKey, model: llmConfig.selectedModel, action: 'translate_zh', content: selected })
-                            });
-                            const data = await res.json();
-                            if (data.ok) {
-                              updateArticle(article.id, { content: article.content.replace(selected, selected + '\n\n' + data.content) });
-                            } else {
-                              alert('AI 翻译失败：' + data.error);
-                            }
-                          }}>翻译</button>
-                          <button className="ai-toolbar-btn" onClick={async () => {
-                            if (!llmConfig.baseUrl || !llmConfig.selectedModel) { alert('请先配置大模型'); return; }
-                            const res = await fetch('/api/ai-generate', {
-                              method: 'POST',
-                              headers: { 'Content-Type': 'application/json' },
-                              body: JSON.stringify({ baseUrl: llmConfig.baseUrl, apiKey: llmConfig.apiKey, model: llmConfig.selectedModel, action: 'title', content: article.content })
-                            });
-                            const data = await res.json();
-                            if (data.ok) {
-                              alert('AI 生成标题：\n' + data.content);
-                            } else {
-                              alert('AI 生成标题失败：' + data.error);
-                            }
-                          }}>生成标题</button>
+                            aiAction(article, 'translate_zh', selected);
+                          }}>{aiResult.loading && aiResult.action === 'translate_zh' ? '...' : '翻译'}</button>
+                          <button className="ai-toolbar-btn" onClick={() => aiAction(article, 'title', article.content)}>
+                            {aiResult.loading && aiResult.action === 'title' ? '...' : '生成标题'}
+                          </button>
+                          {aiResult.content && (
+                            <div className="ai-result-inline">
+                              <div className="ai-result-actions">
+                                <button className="btn-ai-insert" onClick={() => insertAiResult(article)}>插入</button>
+                                <button className="btn-ai-copy" onClick={() => { navigator.clipboard.writeText(aiResult.content); }}>复制</button>
+                                <button className="btn-ai-clear" onClick={clearAiResult}>清除</button>
+                              </div>
+                              <pre className="ai-result-content">{aiResult.content}</pre>
+                            </div>
+                          )}
+                          {aiResult.error && (
+                            <div className="ai-result-error">
+                              <span>{aiResult.error}</span>
+                              <button onClick={clearAiResult}>{ICONS.x}</button>
+                            </div>
+                          )}
                         </div>
 
                         <div className="article-materials-panel">
-                          <h4>关联素材</h4>
-                          <div className="materials-picker">
-                            {materials.length === 0 ? (
-                              <p className="hint">素材库为空，浏览资讯时点击收藏按钮添加素材</p>
-                            ) : (
-                              <div className="materials-picker-list">
-                                {materials.slice(0, 20).map(m => {
-                                  const isSelected = (article.materials || []).includes(m.id);
-                                  return (
-                                    <button
-                                      key={m.id}
-                                      className={`material-picker-item ${isSelected ? 'selected' : ''}`}
-                                      onClick={() => {
-                                        const current = article.materials || [];
-                                        const updated = isSelected ? current.filter(id => id !== m.id) : [...current, m.id];
-                                        updateArticle(article.id, { materials: updated });
-                                      }}
-                                    >
-                                      <span className={`material-type-badge type-${m.type}`}>{MATERIAL_TYPES[m.type]}</span>
-                                      <span className="material-picker-content">{m.content.slice(0, 30)}...</span>
-                                    </button>
-                                  );
-                                })}
-                              </div>
-                            )}
-                          </div>
+                          <h4>关联素材 <span className="material-hint">（点击素材插入到正文末尾）</span></h4>
+                          {materials.length === 0 ? (
+                            <p className="hint">素材库为空，浏览资讯时点击收藏按钮或手动添加素材</p>
+                          ) : (
+                            <div className="materials-picker-list">
+                              {materials.slice(0, 30).map(m => (
+                                <div
+                                  key={m.id}
+                                  className="material-picker-item"
+                                  onClick={() => insertMaterialToArticle(article, m)}
+                                  title={m.content}
+                                >
+                                  <span className={`material-type-badge type-${m.type}`}>{MATERIAL_TYPES[m.type]}</span>
+                                  <span className="material-picker-content">{m.content.slice(0, 40)}...</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
                         </div>
                       </>
                     );
@@ -1993,7 +2408,8 @@ function App() {
                 <section className="trends-section">
                   {articles.length === 0 ? (
                     <div className="empty-articles">
-                      <p>暂无文章</p>
+                      <div className="empty-icon">{ICONS.edit}</div>
+                      <p className="empty-title">暂无文章</p>
                       <button className="btn-new-article-inline" onClick={() => {
                         const newArticle = createArticle('blank');
                         setCurrentArticleId(newArticle.id);
