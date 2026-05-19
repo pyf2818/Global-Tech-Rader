@@ -329,6 +329,9 @@ function App() {
   const [lastSavedAt, setLastSavedAt] = useState(null);
   const [editorTab, setEditorTab] = useState('edit');
   const [editorCursorPos, setEditorCursorPos] = useState({ start: 0, end: 0 });
+  const [showTemplateMenu, setShowTemplateMenu] = useState(false);
+  const [showAiPanel, setShowAiPanel] = useState(false);
+  const [aiCustomPrompt, setAiCustomPrompt] = useState('');
   const editorTextareaRef = useRef(null);
 
   const feedRef = useRef(null);
@@ -343,6 +346,12 @@ function App() {
   useEffect(() => { saveLS('materials', materials); }, [materials]);
   useEffect(() => { saveLS('materialSpaces', materialSpaces); }, [materialSpaces]);
   useEffect(() => { saveLS('articles', articles); }, [articles]);
+  useEffect(() => {
+    if (!showTemplateMenu) return;
+    const handler = (e) => { if (!e.target.closest('.editor-template-dropdown')) setShowTemplateMenu(false); };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [showTemplateMenu]);
   useEffect(() => { saveLS('summaryCache', summaryCache); }, [summaryCache]);
   useEffect(() => { saveLS('followKeywords', followKeywords); }, [followKeywords]);
   useEffect(() => { saveLS('pinnedKeywords', pinnedKeywords); }, [pinnedKeywords]);
@@ -1185,11 +1194,17 @@ function App() {
     if (!aiResult.content) return;
     if (aiResult.action === 'title') {
       updateArticle(article.id, { title: aiResult.content.trim() });
-    } else if (aiResult.action === 'rewrite') {
+    } else if (aiResult.action === 'rewrite' || aiResult.action === 'translate_zh' || aiResult.action === 'simplify' || aiResult.action === 'expand') {
       const selected = window.getSelection().toString();
       if (selected) {
         updateArticle(article.id, { content: article.content.replace(selected, aiResult.content) });
+      } else {
+        updateArticle(article.id, { content: article.content + '\n\n' + aiResult.content });
       }
+    } else if (aiResult.action === 'summary' || aiResult.action === 'outline') {
+      updateArticle(article.id, { content: `> ${aiResult.action === 'summary' ? '摘要' : '大纲'}\n\n${aiResult.content}\n\n---\n\n` + article.content });
+    } else if (aiResult.action === 'custom') {
+      updateArticle(article.id, { content: article.content + '\n\n' + aiResult.content });
     } else {
       updateArticle(article.id, { content: article.content + '\n\n' + aiResult.content });
     }
@@ -2468,14 +2483,16 @@ function App() {
                 <div className="header-actions">
                   <div className="editor-template-dropdown">
                     <button className="btn-new-article" onClick={() => { const a = createArticle('blank'); setCurrentArticleId(a.id); }}>+ 新建文章</button>
-                    <button className="btn-template-menu" title="从模板创建">{ICONS.chevronDown}</button>
-                    <div className="template-dropdown-menu">
-                      {Object.entries(ARTICLE_TEMPLATES).map(([id, label]) => (
-                        <button key={id} className="template-dropdown-item" onClick={() => { const a = createArticle(id); setCurrentArticleId(a.id); }}>
-                          {label}
-                        </button>
-                      ))}
-                    </div>
+                    <button className="btn-template-menu" title="从模板创建" onClick={() => setShowTemplateMenu(!showTemplateMenu)}>{ICONS.chevronDown}</button>
+                    {showTemplateMenu && (
+                      <div className="template-dropdown-menu">
+                        {Object.entries(ARTICLE_TEMPLATES).map(([id, label]) => (
+                          <button key={id} className="template-dropdown-item" onClick={() => { const a = createArticle(id); setCurrentArticleId(a.id); setShowTemplateMenu(false); }}>
+                            {label}
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -2607,40 +2624,130 @@ function App() {
                           )}
                         </div>
 
-                        <div className="article-ai-toolbar">
-                          <span className="ai-toolbar-label">AI 辅助:</span>
-                          <button className="ai-toolbar-btn" onClick={() => {
-                            const selected = window.getSelection().toString();
-                            if (!selected) { alert('请先选择要处理的文本'); return; }
-                            aiAction(article, 'continue', selected);
-                          }}>{aiResult.loading && aiResult.action === 'continue' ? '...' : '续写'}</button>
-                          <button className="ai-toolbar-btn" onClick={() => {
-                            const selected = window.getSelection().toString();
-                            if (!selected) { alert('请先选择要处理的文本'); return; }
-                            aiAction(article, 'rewrite', selected);
-                          }}>{aiResult.loading && aiResult.action === 'rewrite' ? '...' : '改写'}</button>
-                          <button className="ai-toolbar-btn" onClick={() => {
-                            const selected = window.getSelection().toString();
-                            if (!selected) { alert('请先选择要处理的文本'); return; }
-                            aiAction(article, 'translate_zh', selected);
-                          }}>{aiResult.loading && aiResult.action === 'translate_zh' ? '...' : '翻译'}</button>
-                          <button className="ai-toolbar-btn" onClick={() => aiAction(article, 'title', article.content)}>
-                            {aiResult.loading && aiResult.action === 'title' ? '...' : '生成标题'}
-                          </button>
-                          {aiResult.content && (
-                            <div className="ai-result-inline">
-                              <div className="ai-result-actions">
-                                <button className="btn-ai-insert" onClick={() => insertAiResult(article)}>插入</button>
-                                <button className="btn-ai-copy" onClick={() => { navigator.clipboard.writeText(aiResult.content); }}>复制</button>
-                                <button className="btn-ai-clear" onClick={clearAiResult}>清除</button>
-                              </div>
-                              <pre className="ai-result-content">{aiResult.content}</pre>
+                        <div className="ai-assistant-panel">
+                          <div className="ai-panel-header" onClick={() => setShowAiPanel(!showAiPanel)}>
+                            <div className="ai-panel-title">
+                              {ICONS.sparkles}
+                              <span>AI 写作助手</span>
+                              {llmConfig.baseUrl && <span className="ai-status-dot" title="已配置大模型"></span>}
                             </div>
-                          )}
-                          {aiResult.error && (
-                            <div className="ai-result-error">
-                              <span>{aiResult.error}</span>
-                              <button onClick={clearAiResult}>{ICONS.x}</button>
+                            <span className={`ai-panel-chevron ${showAiPanel ? 'open' : ''}`}>{ICONS.chevronDown}</span>
+                          </div>
+                          {showAiPanel && (
+                            <div className="ai-panel-body">
+                              {!llmConfig.baseUrl ? (
+                                <div className="ai-config-hint">
+                                  <span>请先在设置中配置大模型 API</span>
+                                </div>
+                              ) : (
+                                <>
+                                  <div className="ai-quick-actions">
+                                    <div className="ai-action-group">
+                                      <span className="ai-group-label">文本处理</span>
+                                      <div className="ai-action-grid">
+                                        <button className="ai-action-btn" onClick={() => {
+                                          const selected = window.getSelection().toString();
+                                          if (!selected) { showToast('请先选择要处理的文本', 1500); return; }
+                                          aiAction(article, 'rewrite', selected);
+                                        }}>
+                                          {ICONS.edit}<span>润色改写</span>
+                                        </button>
+                                        <button className="ai-action-btn" onClick={() => {
+                                          const selected = window.getSelection().toString();
+                                          if (!selected) { showToast('请先选择要翻译的文本', 1500); return; }
+                                          aiAction(article, 'translate_zh', selected);
+                                        }}>
+                                          {ICONS.globe}<span>翻译中文</span>
+                                        </button>
+                                        <button className="ai-action-btn" onClick={() => {
+                                          const selected = window.getSelection().toString();
+                                          if (!selected) { showToast('请先选择要简化的文本', 1500); return; }
+                                          aiAction(article, 'simplify', selected);
+                                        }}>
+                                          {ICONS.bolt}<span>精简压缩</span>
+                                        </button>
+                                        <button className="ai-action-btn" onClick={() => {
+                                          const selected = window.getSelection().toString();
+                                          if (!selected) { showToast('请先选择要扩写的文本', 1500); return; }
+                                          aiAction(article, 'expand', selected);
+                                        }}>
+                                          {ICONS.follow}<span>扩写展开</span>
+                                        </button>
+                                      </div>
+                                    </div>
+                                    <div className="ai-action-group">
+                                      <span className="ai-group-label">内容生成</span>
+                                      <div className="ai-action-grid">
+                                        <button className="ai-action-btn" onClick={() => {
+                                          const selected = window.getSelection().toString();
+                                          aiAction(article, 'continue', selected || article.content);
+                                        }}>
+                                          {ICONS.arrowRight}<span>智能续写</span>
+                                        </button>
+                                        <button className="ai-action-btn" onClick={() => aiAction(article, 'title', article.content)}>
+                                          {ICONS.sparkle}<span>生成标题</span>
+                                        </button>
+                                        <button className="ai-action-btn" onClick={() => aiAction(article, 'summary', article.content)}>
+                                          {ICONS.list}<span>生成摘要</span>
+                                        </button>
+                                        <button className="ai-action-btn" onClick={() => aiAction(article, 'outline', article.content)}>
+                                          {ICONS.layers}<span>提取大纲</span>
+                                        </button>
+                                      </div>
+                                    </div>
+                                  </div>
+                                  <div className="ai-custom-prompt">
+                                    <textarea
+                                      className="ai-prompt-input"
+                                      placeholder="输入自定义指令，例如：'将这段文字改写为更口语化的风格'..."
+                                      value={aiCustomPrompt}
+                                      onChange={e => setAiCustomPrompt(e.target.value)}
+                                      rows="2"
+                                    />
+                                    <button className="ai-prompt-send" onClick={() => {
+                                      if (!aiCustomPrompt.trim()) { showToast('请输入自定义指令', 1500); return; }
+                                      const selected = window.getSelection().toString();
+                                      const context = selected || article.content;
+                                      aiAction(article, 'custom', `${aiCustomPrompt}\n\n待处理内容：\n${context}`);
+                                    }}>
+                                      {ICONS.arrowRight}
+                                    </button>
+                                  </div>
+                                </>
+                              )}
+                              {aiResult.loading && (
+                                <div className="ai-loading-state">
+                                  <div className="ai-loading-spinner"></div>
+                                  <span>AI 正在处理中...</span>
+                                </div>
+                              )}
+                              {aiResult.content && (
+                                <div className="ai-result-block">
+                                  <div className="ai-result-header">
+                                    <span className="ai-result-label">{
+                                      aiResult.action === 'continue' ? '续写结果' :
+                                      aiResult.action === 'rewrite' ? '润色改写' :
+                                      aiResult.action === 'translate_zh' ? '翻译结果' :
+                                      aiResult.action === 'title' ? '生成标题' :
+                                      aiResult.action === 'summary' ? '摘要' :
+                                      aiResult.action === 'outline' ? '大纲' :
+                                      aiResult.action === 'custom' ? '自定义结果' : 'AI 结果'
+                                    }</span>
+                                    <div className="ai-result-actions">
+                                      <button className="btn-ai-insert" onClick={() => insertAiResult(article)}>插入正文</button>
+                                      <button className="btn-ai-copy" onClick={() => { navigator.clipboard.writeText(aiResult.content); showToast('已复制到剪贴板', 1500); }}>复制</button>
+                                      <button className="btn-ai-clear" onClick={clearAiResult}>{ICONS.x}</button>
+                                    </div>
+                                  </div>
+                                  <pre className="ai-result-content">{aiResult.content}</pre>
+                                </div>
+                              )}
+                              {aiResult.error && (
+                                <div className="ai-result-error">
+                                  <span>{aiResult.error}</span>
+                                  <button onClick={clearAiResult}>{ICONS.x}</button>
+                                </div>
+                              )}
                             </div>
                           )}
                         </div>
