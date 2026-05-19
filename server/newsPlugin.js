@@ -85,18 +85,39 @@ const DEFAULT_SOURCES = [
   { name: 'Dark Reading', url: 'https://www.darkreading.com/rss.xml', region: 'overseas', defaultCategory: 'cybersecurity' }
 ];
 
+const RSSHUB_BASE = 'https://rsshub.rssforever.com';
+
 const TRENDING_SOURCES = [
-  { name: '量子位', url: 'https://www.qbitai.com/feed', region: 'domestic', platform: '量子位' },
-  { name: '机器之心', url: 'https://www.jiqizhixin.com/rss', region: 'domestic', platform: '机器之心' },
+  // === 国内平台 ===
+  // 科技媒体热门
   { name: '36氪', url: 'https://36kr.com/feed', region: 'domestic', platform: '36氪' },
-  { name: '爱范儿', url: 'https://www.ifanr.com/feed', region: 'domestic', platform: '爱范儿' },
+  { name: '36氪快讯', url: `${RSSHUB_BASE}/36kr/newsflashes`, region: 'domestic', platform: '36氪' },
   { name: '少数派', url: 'https://sspai.com/feed', region: 'domestic', platform: '少数派' },
-  { name: 'InfoQ CN AI', url: 'https://www.infoq.cn/feed', region: 'domestic', platform: 'InfoQ' },
+  { name: '爱范儿', url: 'https://www.ifanr.com/feed', region: 'domestic', platform: '爱范儿' },
+  { name: '品玩', url: 'https://www.pingwest.com/feed', region: 'domestic', platform: '品玩' },
+  { name: '虎扑', url: 'https://bbs.hupu.com/feed', region: 'domestic', platform: '虎扑' },
+  // 热门排行榜
+  { name: 'IT之家 24h 热榜', url: `${RSSHUB_BASE}/ithome/ranking/24h`, region: 'domestic', platform: 'IT之家' },
+  
+  // === 国际平台 ===
+  // 技术社区热榜
   { name: 'Hacker News Top', url: 'https://hnrss.org/frontpage', region: 'global', platform: 'Hacker News' },
-  { name: 'ArXiv AI', url: 'https://export.arxiv.org/rss/cs.AI', region: 'global', platform: 'ArXiv' },
-  { name: 'OpenAI Blog', url: 'https://openai.com/blog/rss.xml', region: 'overseas', platform: 'OpenAI' },
-  { name: 'DeepMind Blog', url: 'https://deepmind.google/discover/blog/rss/', region: 'overseas', platform: 'DeepMind' },
-  { name: 'TechCrunch AI', url: 'https://techcrunch.com/tag/artificial-intelligence/feed/', region: 'overseas', platform: 'TechCrunch' }
+  { name: 'Hacker News Best', url: 'https://hnrss.org/best', region: 'global', platform: 'Hacker News' },
+  { name: 'Dev.to', url: 'https://dev.to/feed', region: 'global', platform: 'Dev.to' },
+  { name: 'Lobsters', url: 'https://lobste.rs/rss', region: 'global', platform: 'Lobsters' },
+  // 新产品/项目发现
+  { name: 'Product Hunt', url: 'https://www.producthunt.com/feed', region: 'global', platform: 'Product Hunt' },
+  { name: 'GitHub Blog', url: 'https://github.blog/feed/', region: 'global', platform: 'GitHub' },
+  // 顶级科技媒体
+  { name: 'TechCrunch', url: 'https://techcrunch.com/feed/', region: 'global', platform: 'TechCrunch' },
+  { name: 'The Verge', url: 'https://www.theverge.com/rss/index.xml', region: 'global', platform: 'The Verge' },
+  { name: 'Ars Technica', url: 'https://arstechnica.com/feed/', region: 'global', platform: 'Ars Technica' },
+  { name: 'Wired', url: 'https://www.wired.com/feed/rss', region: 'global', platform: 'Wired' },
+  { name: 'MIT Technology Review', url: 'https://www.technologyreview.com/feed/', region: 'global', platform: 'MIT Review' },
+  // 综合科技/极客
+  { name: 'Engadget', url: 'https://www.engadget.com/rss.xml', region: 'global', platform: 'Engadget' },
+  { name: 'Slashdot', url: 'https://rss.slashdot.org/Slashdot/slashdotMain', region: 'global', platform: 'Slashdot' },
+  { name: 'Smashing Magazine', url: 'https://www.smashingmagazine.com/feed/', region: 'global', platform: 'Smashing Mag' },
 ];
 
 const CATEGORY_GROUPS = [
@@ -268,7 +289,10 @@ export function newsPlugin() {
         }
 
         if (requestUrl.pathname === '/api/trending') {
-          const payload = await getTrending();
+          const platform = requestUrl.searchParams.get('platform') || 'all';
+          const page = parseInt(requestUrl.searchParams.get('page') || '0', 10);
+          const pageSize = parseInt(requestUrl.searchParams.get('pageSize') || '60', 10);
+          const payload = await getTrending(platform, page, pageSize);
           return sendJson(res, payload);
         }
 
@@ -371,12 +395,16 @@ if (requestUrl.pathname === '/api/ai-insights') {
 {"trends":["趋势 1","趋势 2","趋势 3"],"correlations":["关联 1","关联 2"],"signals":["信号 1","信号 2","信号 3"]}
 
 资讯列表：
-${items.map((i, idx) => `${idx + 1}. ${i.title}`).join('\n')}
+${items.map((i, idx) => {
+  const summaryLine = i.summary ? ` | 摘要: ${i.summary}` : '';
+  const tagsLine = i.tags ? ` | 标签: ${i.tags}` : '';
+  return `${idx + 1}. [${i.category || '未分类'}] ${i.title} - ${i.source || '未知'}${summaryLine}${tagsLine}`;
+}).join('\n')}
 
 要求：
-- trends：3 条技术趋势
-- correlations：2 条跨领域关联
-- signals：3 条早期信号
+- trends：基于当前资讯内容，提炼 3 条最显著的技术趋势
+- correlations：发现不同领域/赛道之间的关联或共同主题
+- signals：指出值得关注的早期信号或潜在变化
 - 每条**不超过 30 字**，简洁明了
 - 只输出 JSON，不要其他文字`;
 
@@ -388,7 +416,7 @@ ${items.map((i, idx) => `${idx + 1}. ${i.title}`).join('\n')}
               body: JSON.stringify({
                 model,
                 messages: [{ role: 'user', content: prompt }],
-                max_tokens: 800,
+                max_tokens: 1000,
                 temperature: 0.7
               }),
               signal: controller.signal
@@ -440,6 +468,55 @@ ${items.map((i, idx) => `${idx + 1}. ${i.title}`).join('\n')}
               return sendJson(res, { error: e.message });
             }
           }
+
+        // AI 辅助写作
+        if (requestUrl.pathname === '/api/ai-generate') {
+          const body = await parseBody(req);
+          const { baseUrl = '', apiKey = '', model = '', action = '', content = '', context = '' } = body;
+          if (!baseUrl || !model) return sendJson(res, { error: 'baseUrl and model are required' }, 400);
+          try {
+            const apiUrl = baseUrl.replace(/\/+$/, '') + '/v1/chat/completions';
+            const headers = { 'Content-Type': 'application/json' };
+            if (apiKey) headers['Authorization'] = `Bearer ${apiKey}`;
+
+            const prompts = {
+              continue: `请继续以下文章的内容，保持相同的风格和语气：\n\n${content}`,
+              rewrite: `请改写以下段落，使其更清晰、更专业，但保持原意不变：\n\n${content}`,
+              expand: `请扩展以下内容，添加更多细节和论据，使其更丰富：\n\n${content}`,
+              simplify: `请简化以下段落，使其更简洁易懂：\n\n${content}`,
+              translate_zh: `请将以下内容翻译成中文：\n\n${content}`,
+              translate_en: `请将以下内容翻译成英文：\n\n${content}`,
+              title: `请为以下文章生成 5 个吸引人的标题，每个标题不超过 30 字：\n\n${content}`,
+              summary: `请为以下文章生成一段简洁的摘要（不超过 100 字）：\n\n${content}`
+            };
+
+            const prompt = prompts[action] || `请根据以下要求处理内容：\n要求：${action}\n内容：${content}`;
+
+            const controller = new AbortController();
+            const timeout = setTimeout(() => controller.abort(), 30000);
+            const response = await fetch(apiUrl, {
+              method: 'POST',
+              headers,
+              body: JSON.stringify({
+                model,
+                messages: [{ role: 'user', content: prompt }],
+                max_tokens: 1500,
+                temperature: 0.7
+              }),
+              signal: controller.signal
+            });
+            clearTimeout(timeout);
+            if (!response.ok) {
+              const errText = await response.text().catch(() => '');
+              return sendJson(res, { error: `API responded ${response.status}: ${errText.slice(0, 200)}` });
+            }
+            const data = await response.json();
+            const generated = data.choices?.[0]?.message?.content || '';
+            return sendJson(res, { ok: true, content: generated });
+          } catch (e) {
+            return sendJson(res, { error: e.message });
+          }
+        }
 
         if (requestUrl.pathname.startsWith('/api/ai/') || requestUrl.pathname.startsWith('/api/translate') || requestUrl.pathname.startsWith('/api/subscriptions') || requestUrl.pathname.startsWith('/api/bookmarks')) {
           return sendJson(res, { ok: false, message: 'Reserved extension endpoint.' }, 501);
@@ -618,27 +695,48 @@ async function resolveImageFromArticle(articleUrl) {
   }
 }
 
-async function getTrending() {
+async function getTrending(platformFilter = 'all', page = 0, pageSize = 60) {
   const now = Date.now();
-  if (trendingCache.data && trendingCache.expiresAt > now) {
-    return trendingCache.data;
+  
+  // 获取所有数据（从缓存或重新获取）
+  let allItems = [];
+  if (trendingCache.data && trendingCache.expiresAt > now && trendingCache.data.items?.length > 0) {
+    allItems = trendingCache.data.items;
+  } else {
+    const settled = await Promise.allSettled(TRENDING_SOURCES.map(fetchTrendingSource));
+    const results = settled.flatMap(result => (result.status === 'fulfilled' ? result.value : []));
+    allItems = results.flatMap(r => r.items || []);
+    
+    // 按时间排序
+    allItems.sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime());
+    
+    // 更新缓存（存储所有数据）
+    trendingCache = { data: { items: allItems }, expiresAt: now + 1000 * 60 * 10 };
   }
+  
+  // 按平台筛选
+  let items = allItems;
+  if (platformFilter !== 'all') {
+    items = items.filter(item => item.platform === platformFilter);
+  }
+  
+  // 分页
+  const start = page * pageSize;
+  const end = start + pageSize;
+  const pagedItems = items.slice(start, end);
 
-  const settled = await Promise.allSettled(TRENDING_SOURCES.map(fetchTrendingSource));
-  const items = settled.flatMap(result => (result.status === 'fulfilled' ? result.value.items : []));
-  const filtered = items
-    .filter(item => /\b(ai|llm|gpt|model|大模型|人工智能|deep|neural|transformer|agent|chat|machine learning|nlp|diffusion)\b/i.test(`${item.title} ${item.summary}`))
-    .sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime())
-    .slice(0, 60);
-
-  const payload = { updatedAt: new Date().toISOString(), items: filtered };
-  trendingCache = { data: payload, expiresAt: now + 1000 * 60 * 10 };
+  const payload = { 
+    updatedAt: new Date().toISOString(), 
+    items: pagedItems,
+    sourcesCount: TRENDING_SOURCES.length,
+    hasMore: end < items.length
+  };
   return payload;
 }
 
 async function fetchTrendingSource(source) {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 8000);
+  const timeout = setTimeout(() => controller.abort(), 12000);
 
   try {
     const response = await fetch(source.url, {
@@ -649,8 +747,11 @@ async function fetchTrendingSource(source) {
     if (!response.ok) throw new Error(`${source.name} responded ${response.status}`);
 
     const xml = await response.text();
-    const items = parseFeed(xml, { ...source, defaultCategory: 'ai-models' }).slice(0, 15);
+    const items = parseFeed(xml, source).slice(0, 15);
     return { source: source.name, items: items.map(item => ({ ...item, platform: source.platform })) };
+  } catch (e) {
+    console.warn(`[Trending] Failed to fetch ${source.name}: ${e.message}`);
+    return { source: source.name, items: [], error: e.message };
   } finally {
     clearTimeout(timeout);
   }

@@ -1,20 +1,37 @@
+const RSSHUB_BASE = 'https://rsshub.rssforever.com';
+
 const TRENDING_SOURCES = [
-  { name: '量子位', url: 'https://www.qbitai.com/feed', region: 'domestic', platform: '量子位' },
-  { name: '机器之心', url: 'https://www.jiqizhixin.com/rss', region: 'domestic', platform: '机器之心' },
+  // === 国内平台 ===
   { name: '36氪', url: 'https://36kr.com/feed', region: 'domestic', platform: '36氪' },
-  { name: '爱范儿', url: 'https://www.ifanr.com/feed', region: 'domestic', platform: '爱范儿' },
+  { name: '36氪快讯', url: `${RSSHUB_BASE}/36kr/newsflashes`, region: 'domestic', platform: '36氪' },
   { name: '少数派', url: 'https://sspai.com/feed', region: 'domestic', platform: '少数派' },
+  { name: '爱范儿', url: 'https://www.ifanr.com/feed', region: 'domestic', platform: '爱范儿' },
+  { name: '品玩', url: 'https://www.pingwest.com/feed', region: 'domestic', platform: '品玩' },
+  { name: '虎扑', url: 'https://bbs.hupu.com/feed', region: 'domestic', platform: '虎扑' },
+  { name: 'IT之家 24h 热榜', url: `${RSSHUB_BASE}/ithome/ranking/24h`, region: 'domestic', platform: 'IT之家' },
+  
+  // === 国际平台 ===
   { name: 'Hacker News Top', url: 'https://hnrss.org/frontpage', region: 'global', platform: 'Hacker News' },
-  { name: 'ArXiv AI', url: 'https://export.arxiv.org/rss/cs.AI', region: 'global', platform: 'ArXiv' },
-  { name: 'OpenAI Blog', url: 'https://openai.com/blog/rss.xml', region: 'overseas', platform: 'OpenAI' },
-  { name: 'DeepMind Blog', url: 'https://deepmind.google/discover/blog/rss/', region: 'overseas', platform: 'DeepMind' }
+  { name: 'Hacker News Best', url: 'https://hnrss.org/best', region: 'global', platform: 'Hacker News' },
+  { name: 'Dev.to', url: 'https://dev.to/feed', region: 'global', platform: 'Dev.to' },
+  { name: 'Lobsters', url: 'https://lobste.rs/rss', region: 'global', platform: 'Lobsters' },
+  { name: 'Product Hunt', url: 'https://www.producthunt.com/feed', region: 'global', platform: 'Product Hunt' },
+  { name: 'GitHub Blog', url: 'https://github.blog/feed/', region: 'global', platform: 'GitHub' },
+  { name: 'TechCrunch', url: 'https://techcrunch.com/feed/', region: 'global', platform: 'TechCrunch' },
+  { name: 'The Verge', url: 'https://www.theverge.com/rss/index.xml', region: 'global', platform: 'The Verge' },
+  { name: 'Ars Technica', url: 'https://arstechnica.com/feed/', region: 'global', platform: 'Ars Technica' },
+  { name: 'Wired', url: 'https://www.wired.com/feed/rss', region: 'global', platform: 'Wired' },
+  { name: 'MIT Technology Review', url: 'https://www.technologyreview.com/feed/', region: 'global', platform: 'MIT Review' },
+  { name: 'Engadget', url: 'https://www.engadget.com/rss.xml', region: 'global', platform: 'Engadget' },
+  { name: 'Slashdot', url: 'https://rss.slashdot.org/Slashdot/slashdotMain', region: 'global', platform: 'Slashdot' },
+  { name: 'Smashing Magazine', url: 'https://www.smashingmagazine.com/feed/', region: 'global', platform: 'Smashing Mag' },
 ];
 
 let cache = { data: null, expiresAt: 0 };
 
 async function fetchTrendingSource(source) {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 8000);
+  const timeout = setTimeout(() => controller.abort(), 12000);
 
   try {
     const response = await fetch(source.url, {

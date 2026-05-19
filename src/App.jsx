@@ -5,19 +5,22 @@ const NAV_ITEMS = [
   { id: 'recommendations', label: '智能推荐', icon: 'sparkle' },
   { id: 'briefing', label: '每日简报', icon: 'document' },
   { id: 'tracker', label: '公司追踪', icon: 'follow' },
-  { id: 'trending', label: '爆款 AI 文章', icon: 'fire' },
+  { id: 'trending', label: '热门榜单', icon: 'fire' },
   { id: 'github', label: 'GitHub 热门', icon: 'github' },
+  { id: 'materials', label: '素材库', icon: 'layers' },
+  { id: 'editor', label: '创作中心', icon: 'edit' },
   { id: 'calendar', label: '日历管理', icon: 'calendar' },
   { id: 'reading-list', label: '阅读列表', icon: 'bookmark' },
   { id: 'trends', label: '趋势分析', icon: 'chart' },
   { id: 'reading-stats', label: '阅读统计', icon: 'rows' },
-  { id: 'knowledge-export', label: '知识导出', icon: 'link' }
+  { id: 'knowledge-export', label: '导出发布', icon: 'link' }
 ];
 
 const NAV_GROUPS = [
   { id: 'core', label: '资讯中心', items: ['all', 'recommendations', 'trending', 'github'] },
   { id: 'insight', label: '洞察分析', items: ['briefing', 'tracker', 'trends', 'reading-stats'] },
-  { id: 'manage', label: '管理与沉淀', items: ['calendar', 'reading-list', 'knowledge-export'] }
+  { id: 'create', label: '素材创作', items: ['materials', 'editor'] },
+  { id: 'manage', label: '管理沉淀', items: ['calendar', 'reading-list', 'knowledge-export'] }
 ];
 
 const CATEGORIES = [
@@ -95,6 +98,9 @@ const GITHUB_PERIODS = [
 
 const REGION_MAP = { domestic: '国内', overseas: '海外', global: '全球' };
 const MODE_MAP = { flash: '快讯', deep: '深度', technical: '干货' };
+const MATERIAL_TYPES = { quote: '金句', data: '数据', case: '案例', viewpoint: '观点', chart: '图表' };
+const ARTICLE_STATUS = { draft: '草稿', published: '已发布', archived: '已归档' };
+const ARTICLE_TEMPLATES = { blank: '空白', briefing: '每日简报', analysis: '深度分析', tech: '技术解读' };
 const WEEKDAYS = ['日', '一', '二', '三', '四', '五', '六'];
 const MONTHS = ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月'];
 
@@ -143,6 +149,8 @@ const ICONS = {
   eventCard: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="2" y="3" width="20" height="18" rx="2"/><line x1="2" y1="9" x2="22" y2="9"/><line x1="10" y1="3" x2="10" y2="9"/><line x1="14" y1="3" x2="14" y2="9"/></svg>,
   list: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>,
   rows: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="3" y="3" width="18" height="6" rx="1"/><rect x="3" y="15" width="18" height="6" rx="1"/></svg>,
+  layers: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>,
+  edit: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>,
   grid3: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>,
   chart: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>,
   menu: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>,
@@ -229,6 +237,10 @@ function App() {
   const [allSources, setAllSources] = useState([]);
   const [trendingItems, setTrendingItems] = useState([]);
   const [trendingLoading, setTrendingLoading] = useState(false);
+  const [trendingPlatform, setTrendingPlatform] = useState('all');
+  const [trendingPage, setTrendingPage] = useState(0);
+  const [trendingHasMore, setTrendingHasMore] = useState(true);
+  const [trendingLoadingMore, setTrendingLoadingMore] = useState(false);
   const [githubRepos, setGithubRepos] = useState([]);
   const [githubLoading, setGithubLoading] = useState(false);
   const [githubLang, setGithubLang] = useState('');
@@ -240,6 +252,8 @@ function App() {
   const [showEventForm, setShowEventForm] = useState(false);
 
   const [bookmarks, setBookmarks] = useState(() => loadLS('bookmarks', []));
+  const [materials, setMaterials] = useState(() => loadLS('materials', []));
+  const [articles, setArticles] = useState(() => loadLS('articles', []));
   const [expandedSummary, setExpandedSummary] = useState({});
   const [summaryCache, setSummaryCache] = useState(() => loadLS('summaryCache', {}));
   const [followKeywords, setFollowKeywords] = useState(() => loadLS('followKeywords', []));
@@ -266,6 +280,9 @@ function App() {
   const [aiInsights, setAiInsights] = useState({ loading: false, data: null, error: '' });
   const [translationOpen, setTranslationOpen] = useState({});
   const [navGroupOpen, setNavGroupOpen] = useState({ core: true, insight: true, manage: false });
+  const [currentArticleId, setCurrentArticleId] = useState(null);
+  const [materialFilter, setMaterialFilter] = useState('all');
+  const [articleExportFilter, setArticleExportFilter] = useState('all');
 
   const feedRef = useRef(null);
   const searchInputRef = useRef(null);
@@ -276,6 +293,8 @@ function App() {
   useEffect(() => { saveLS('customSources', customSources); }, [customSources]);
   useEffect(() => { saveLS('calendarEvents', events); }, [events]);
   useEffect(() => { saveLS('bookmarks', bookmarks); }, [bookmarks]);
+  useEffect(() => { saveLS('materials', materials); }, [materials]);
+  useEffect(() => { saveLS('articles', articles); }, [articles]);
   useEffect(() => { saveLS('summaryCache', summaryCache); }, [summaryCache]);
   useEffect(() => { saveLS('followKeywords', followKeywords); }, [followKeywords]);
   useEffect(() => { saveLS('pinnedKeywords', pinnedKeywords); }, [pinnedKeywords]);
@@ -294,7 +313,13 @@ function App() {
     }
     setAiInsights(p => ({ ...p, loading: true, error: '' }));
     try {
-      const topItems = items.slice(0, 30).map(i => ({ title: i.title, category: i.category, source: i.source }));
+      const topItems = items.slice(0, 30).map(i => ({
+        title: i.title,
+        category: i.category,
+        source: i.source,
+        summary: i.summary || '',
+        tags: (i.tags || []).join(', ')
+      }));
       const res = await fetch('/api/ai-insights', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -728,9 +753,38 @@ function App() {
     loadNews(blocked, true, debouncedQuery);
   }
 
-  function loadTrending() {
-    setTrendingLoading(true);
-    fetch('/api/trending').then(r => r.json()).then(d => setTrendingItems(d.items || [])).catch(() => {}).finally(() => setTrendingLoading(false));
+  function loadTrending(append = false, platform = trendingPlatform) {
+    if (!append) {
+      setTrendingLoading(true);
+      setTrendingPage(0);
+      setTrendingHasMore(true);
+    } else {
+      setTrendingLoadingMore(true);
+    }
+    const params = new URLSearchParams();
+    if (platform !== 'all') params.set('platform', platform);
+    const page = append ? trendingPage + 1 : 0;
+    params.set('page', page);
+    params.set('pageSize', 20);
+    const url = `/api/trending?${params}`;
+    console.log('[Trending] Fetching:', url);
+    fetch(url).then(r => r.json()).then(d => {
+      console.log('[Trending] Received:', d.items?.length || 0, 'items, hasMore:', d.hasMore);
+      if (append) {
+        setTrendingItems(prev => [...prev, ...(d.items || [])]);
+        setTrendingHasMore(d.hasMore ?? false);
+        setTrendingPage(page);
+      } else {
+        setTrendingItems(d.items || []);
+        setTrendingHasMore(d.hasMore ?? true);
+        setTrendingPage(page);
+      }
+    }).catch(e => {
+      console.error('[Trending] Error:', e);
+    }).finally(() => {
+      setTrendingLoading(false);
+      setTrendingLoadingMore(false);
+    });
   }
 
   function loadGithub(lang = githubLang, since = githubSince) {
@@ -753,6 +807,76 @@ function App() {
 
   function toggleRead(bookmarkId) {
     setBookmarks(prev => prev.map(b => b.id === bookmarkId ? { ...b, isRead: !b.isRead, readAt: !b.isRead ? new Date().toISOString() : null } : b));
+  }
+
+  // 素材库操作
+  function addMaterial(item, type = 'quote', note = '') {
+    const newMaterial = {
+      id: Date.now(),
+      type, // quote / data / case / viewpoint / chart
+      content: item.summary || item.title,
+      source: item.source,
+      url: item.url,
+      tags: item.tags || [],
+      originalItemId: item.id,
+      note,
+      createdAt: new Date().toISOString()
+    };
+    setMaterials(prev => [...prev, newMaterial]);
+    // 显示成功提示
+    const toast = document.createElement('div');
+    toast.className = 'material-toast';
+    toast.textContent = '✓ 已添加到素材库';
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 2000);
+  }
+
+  function removeMaterial(id) {
+    setMaterials(prev => prev.filter(m => m.id !== id));
+  }
+
+  function updateMaterialNote(id, note) {
+    setMaterials(prev => prev.map(m => m.id === id ? { ...m, note } : m));
+  }
+
+  // 文章操作
+  function createArticle(template = 'blank') {
+    const newArticle = {
+      id: Date.now(),
+      title: '未命名文章',
+      content: '',
+      template,
+      materials: [],
+      tags: [],
+      status: 'draft', // draft / published / archived
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      version: 1
+    };
+    setArticles(prev => [...prev, newArticle]);
+    return newArticle;
+  }
+
+  function updateArticle(id, updates) {
+    setArticles(prev => prev.map(a => a.id === id ? { ...a, ...updates, updatedAt: new Date().toISOString() } : a));
+  }
+
+  function deleteArticle(id) {
+    setArticles(prev => prev.filter(a => a.id !== id));
+  }
+
+  function duplicateArticle(id) {
+    const original = articles.find(a => a.id === id);
+    if (!original) return;
+    const copy = {
+      ...original,
+      id: Date.now(),
+      title: `${original.title} (副本)`,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      version: 1
+    };
+    setArticles(prev => [...prev, copy]);
   }
 
   const readingStatsData = useMemo(() => {
@@ -785,6 +909,55 @@ function App() {
       return byCategory && byRange;
     });
   }, [bookmarks, exportCategory, exportRange]);
+
+  const filteredMaterials = useMemo(() => {
+    if (materialFilter === 'all') return materials;
+    return materials.filter(m => m.type === materialFilter);
+  }, [materials, materialFilter]);
+
+  const filteredExportArticles = useMemo(() => {
+    if (articleExportFilter === 'all') return articles;
+    return articles.filter(a => a.status === articleExportFilter);
+  }, [articles, articleExportFilter]);
+
+  function exportArticle(article, format) {
+    const dateStr = new Date().toISOString().slice(0, 10);
+    const filename = `${article.title.replace(/[^\w\s]/g, '')}-${dateStr}`;
+
+    if (format === 'md') {
+      const md = `# ${article.title}\n\n${article.content}`;
+      const blob = new Blob([md], { type: 'text/markdown;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${filename}.md`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } else if (format === 'html') {
+      const html = `<!doctype html><html><head><meta charset="utf-8"><title>${article.title}</title><style>body{font-family:Arial,sans-serif;max-width:800px;margin:0 auto;padding:24px;color:#333;line-height:1.6}h1{border-bottom:2px solid #eee;padding-bottom:12px}pre{background:#f5f5f5;padding:12px;border-radius:4px;overflow-x:auto}code{font-family:monospace}blockquote{border-left:4px solid #ddd;padding-left:16px;color:#666}</style></head><body><h1>${article.title}</h1><div>${article.content.replace(/\n/g, '<br>')}</div></body></html>`;
+      const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${filename}.html`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } else if (format === 'wechat') {
+      const html = `<!doctype html><html><head><meta charset="utf-8"><title>${article.title}</title><style>body{font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue","PingFang SC","Microsoft YaHei",sans-serif;max-width:677px;margin:0 auto;padding:16px;color:#333;line-height:1.8;font-size:16px}h1{font-size:24px;text-align:center;margin-bottom:8px}.meta{text-align:center;color:#999;font-size:14px;margin-bottom:24px}p{margin-bottom:16px;text-align:justify}blockquote{background:#f7f7f7;border-left:none;padding:16px;margin:16px 0;border-radius:8px}pre{background:#f7f7f7;padding:16px;border-radius:8px;overflow-x:auto;font-size:14px}</style></head><body><h1>${article.title}</h1><div class="meta">Tech Radar · ${dateStr}</div><div>${article.content.replace(/\n/g, '<br>')}</div></body></html>`;
+      const w = window.open('', '_blank');
+      if (!w) return;
+      w.document.write(html);
+      w.document.close();
+      w.focus();
+    } else if (format === 'zhihu') {
+      const html = `<!doctype html><html><head><meta charset="utf-8"><title>${article.title}</title><style>body{font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue","PingFang SC","Microsoft YaHei",sans-serif;max-width:700px;margin:0 auto;padding:20px;color:#1a1a1a;line-height:1.75;font-size:16px}h1{font-size:26px;font-weight:700;margin-bottom:16px}p{margin-bottom:16px}blockquote{border-left:4px solid #0066ff;padding-left:16px;color:#666;margin:16px 0}pre{background:#f6f6f6;padding:16px;border-radius:4px;overflow-x:auto}</style></head><body><h1>${article.title}</h1><div>${article.content.replace(/\n/g, '<br>')}</div></body></html>`;
+      const w = window.open('', '_blank');
+      if (!w) return;
+      w.document.write(html);
+      w.document.close();
+      w.focus();
+    }
+  }
 
   function generateSummary(item) {
     if (summaryCache[item.id]) return summaryCache[item.id];
@@ -1130,7 +1303,7 @@ function App() {
                   </div>
                 </div>
               )}
-              {(nav === 'all' || nav === 'trending' || nav === 'reading-list' || nav === 'recommendations') && (
+              {(nav === 'all' || nav === 'trending' || nav === 'reading-list' || nav === 'recommendations' || nav === 'materials' || nav === 'editor') && (
                 <>
                   <div className="mode-tabs">
                     {MODES.map(m => <button key={m.id} className={`mode-tab ${mode === m.id ? 'active' : ''}`} onClick={() => setMode(m.id)}>{m.label}</button>)}
@@ -1153,13 +1326,47 @@ function App() {
                   {ICONS.refresh}
                 </button>
               )}
+              {nav === 'trending' && (
+                <div className="trending-platform-topbar">
+                  <select 
+                    className="platform-dropdown-topbar"
+                    value={trendingPlatform} 
+                    onChange={(e) => { setTrendingPlatform(e.target.value); loadTrending(false, e.target.value); }}
+                  >
+                    <option value="all">全部平台</option>
+                    <optgroup label="国内平台">
+                      <option value="36氪">36氪</option>
+                      <option value="少数派">少数派</option>
+                      <option value="爱范儿">爱范儿</option>
+                      <option value="品玩">品玩</option>
+                      <option value="虎扑">虎扑</option>
+                      <option value="IT之家">IT之家</option>
+                    </optgroup>
+                    <optgroup label="国际平台">
+                      <option value="Hacker News">Hacker News</option>
+                      <option value="Product Hunt">Product Hunt</option>
+                      <option value="Dev.to">Dev.to</option>
+                      <option value="GitHub">GitHub</option>
+                      <option value="TechCrunch">TechCrunch</option>
+                      <option value="The Verge">The Verge</option>
+                      <option value="Ars Technica">Ars Technica</option>
+                      <option value="Wired">Wired</option>
+                      <option value="MIT Review">MIT Review</option>
+                      <option value="Engadget">Engadget</option>
+                      <option value="Slashdot">Slashdot</option>
+                      <option value="Smashing Mag">Smashing Mag</option>
+                      <option value="Lobsters">Lobsters</option>
+                    </optgroup>
+                  </select>
+                </div>
+              )}
             </div>
           </div>
         </header>
 
         <div className="stats-bar">
           {nav === 'all' && <><div className="stat-item"><span className="stat-value">{items.length}</span><span className="stat-label">资讯总数</span></div><div className="stat-item"><span className="stat-value highlight">{filtered.length}</span><span className="stat-label">筛选结果</span></div><div className="stat-item"><span className="stat-value live">{stats.sourceCount - stats.failedSources}</span><span className="stat-label">活跃源</span></div></>}
-          {nav === 'trending' && <><div className="stat-item"><span className="stat-value highlight">{trendingItems.length}</span><span className="stat-label">爆款文章</span></div><div className="stat-item"><span className="stat-value live">AI</span><span className="stat-label">专题聚焦</span></div></>}
+          {nav === 'trending' && <><div className="stat-item"><span className="stat-value highlight">{trendingItems.length}</span><span className="stat-label">热门榜单</span></div><div className="stat-item"><span className="stat-value live">热门</span><span className="stat-label">全网热搜</span></div></>}
           {nav === 'github' && <><div className="stat-item"><span className="stat-value highlight">{githubRepos.length}</span><span className="stat-label">热门项目</span></div><div className="stat-item"><span className="stat-value live">{GITHUB_PERIODS.find(p => p.id === githubSince)?.label || '周榜'}</span><span className="stat-label">当前榜单</span></div></>}
           {nav === 'reading-list' && <><div className="stat-item"><span className="stat-value highlight">{bookmarks.length}</span><span className="stat-label">收藏总数</span></div><div className="stat-item"><span className="stat-value live">{bookmarks.filter(b => !b.isRead).length}</span><span className="stat-label">未读</span></div></>}
           {nav === 'calendar' && <><div className="stat-item"><span className="stat-value highlight">{events.length}</span><span className="stat-label">日程事件</span></div></>}
@@ -1184,7 +1391,7 @@ function App() {
                       </div>
                       {expandedEvents[cluster.id] && (
                         <div className="cluster-items">
-                          {cluster.items.map((item, ci) => <NewsItem key={item.id} item={item} index={ci} viewMode={viewMode} isFocused={focusedIndex === filtered.indexOf(item)} isBookmarked={isBookmarked(item.id)} onBookmark={() => toggleBookmark(item)} onSummary={() => setExpandedSummary(p => ({ ...p, [item.id]: !p[item.id] }))} isSummaryOpen={expandedSummary[item.id]} summaryText={generateSummary(item)} isFollowed={followKeywords.some(kw => `${item.title} ${item.summary}`.toLowerCase().includes(kw.toLowerCase()))} onOpenLightbox={(src, title) => setLightbox({ open: true, src, title })} />)}
+                          {cluster.items.map((item, ci) => <NewsItem key={item.id} item={item} index={ci} viewMode={viewMode} isFocused={focusedIndex === filtered.indexOf(item)} isBookmarked={isBookmarked(item.id)} onBookmark={() => toggleBookmark(item)} onAddMaterial={() => addMaterial(item)} onSummary={() => setExpandedSummary(p => ({ ...p, [item.id]: !p[item.id] }))} isSummaryOpen={expandedSummary[item.id]} summaryText={generateSummary(item)} isFollowed={followKeywords.some(kw => `${item.title} ${item.summary}`.toLowerCase().includes(kw.toLowerCase()))} onOpenLightbox={(src, title) => setLightbox({ open: true, src, title })} />)}
                         </div>
                       )}
                     </div>
@@ -1196,7 +1403,7 @@ function App() {
               {error && <div className="error-state"><p>加载失败: {error}</p><button onClick={() => loadNews()}>重试</button></div>}
               {!loading && !error && filtered.length === 0 && <div className="empty-state"><p>没有匹配的资讯</p><button onClick={() => { setQuery(''); setCategory('all'); setMode('all'); setSourceFilter('all'); }}>重置筛选</button></div>}
               <div className={`feed-list view-${viewMode} ${viewMode === 'card' ? 'card-grid' : ''}`}>
-                {filtered.map((item, i) => <NewsItem key={item.id} item={item} index={i} viewMode={viewMode} isFocused={focusedIndex === i} isBookmarked={isBookmarked(item.id)} onBookmark={() => toggleBookmark(item)} onSummary={() => setExpandedSummary(p => ({ ...p, [item.id]: !p[item.id] }))} isSummaryOpen={expandedSummary[item.id]} summaryText={generateSummary(item)} isFollowed={followKeywords.some(kw => `${item.title} ${item.summary}`.toLowerCase().includes(kw.toLowerCase()))} onRead={() => recordReading(item)} showTranslation={translationOpen[item.id]} onToggleTranslation={() => setTranslationOpen(p => ({ ...p, [item.id]: !p[item.id] }))} translation={getTranslation(item)} onOpenLightbox={(src, title) => setLightbox({ open: true, src, title })} />)}
+                {filtered.map((item, i) => <NewsItem key={item.id} item={item} index={i} viewMode={viewMode} isFocused={focusedIndex === i} isBookmarked={isBookmarked(item.id)} onBookmark={() => toggleBookmark(item)} onAddMaterial={() => addMaterial(item)} onSummary={() => setExpandedSummary(p => ({ ...p, [item.id]: !p[item.id] }))} isSummaryOpen={expandedSummary[item.id]} summaryText={generateSummary(item)} isFollowed={followKeywords.some(kw => `${item.title} ${item.summary}`.toLowerCase().includes(kw.toLowerCase()))} onRead={() => recordReading(item)} showTranslation={translationOpen[item.id]} onToggleTranslation={() => setTranslationOpen(p => ({ ...p, [item.id]: !p[item.id] }))} translation={getTranslation(item)} onOpenLightbox={(src, title) => setLightbox({ open: true, src, title })} />)}
               </div>
               {nav === 'all' && newsHasMore && (
                 <div id="load-more-sentinel" className="load-more-area">
@@ -1214,11 +1421,22 @@ function App() {
           {nav === 'trending' && (
             <>
               <div className="section-header">
-                <h2 className="section-title">{ICONS.fire} 爆款 AI 文章</h2>
-                <p className="section-desc">来自 InfoQ、量子位、机器之心、ArXiv、Hacker News、TechCrunch 等平台的热门 AI 文章</p>
+                <h2 className="section-title">{ICONS.fire} 热门榜单</h2>
+                <p className="section-desc">聚合 36氪、少数派、爱范儿、品玩、IT之家、Hacker News、TechCrunch、The Verge、Ars Technica、Wired 等 20+ 高质量平台热门内容</p>
               </div>
+
               {trendingLoading && <div className={`feed-list view-${viewMode} ${viewMode === 'card' ? 'card-grid' : ''}`}>{Array.from({ length: 4 }).map((_, i) => <SkeletonCard key={i} viewMode={viewMode} />)}</div>}
-              <div className={`feed-list view-${viewMode} ${viewMode === 'card' ? 'card-grid' : ''}`}>{trendingItems.map((item, i) => <NewsItem key={item.id} item={item} index={i} viewMode={viewMode} isBookmarked={isBookmarked(item.id)} onBookmark={() => toggleBookmark(item)} isFollowed={false} onOpenLightbox={(src, title) => setLightbox({ open: true, src, title })} />)}</div>
+              {!trendingLoading && <div className={`feed-list view-${viewMode} ${viewMode === 'card' ? 'card-grid' : ''}`}>{trendingItems.map((item, i) => <NewsItem key={item.id} item={item} index={i} viewMode={viewMode} isBookmarked={isBookmarked(item.id)} onBookmark={() => toggleBookmark(item)} onAddMaterial={() => addMaterial(item)} isFollowed={false} onOpenLightbox={(src, title) => setLightbox({ open: true, src, title })} />)}</div>}
+
+              {!trendingLoading && trendingItems.length > 0 && (
+                <div className="load-more-area">
+                  {trendingLoadingMore && <div className="load-more-spinner"><div className="spinner" /><span>加载中...</span></div>}
+                  {!trendingLoadingMore && trendingHasMore && (
+                    <button className="btn-load-more" onClick={() => loadTrending(true)}>加载更多</button>
+                  )}
+                  {!trendingHasMore && <span className="load-more-done">已全部加载</span>}
+                </div>
+              )}
             </>
           )}
 
@@ -1241,7 +1459,7 @@ function App() {
               )}
               <div className={`feed-list view-${viewMode} ${viewMode === 'card' ? 'card-grid' : ''}`}>
                 {smartRecommendations.map((item, i) => (
-                  <NewsItem key={item.id} item={item} index={i} viewMode={viewMode} isBookmarked={isBookmarked(item.id)} onBookmark={() => toggleBookmark(item)} onSummary={() => setExpandedSummary(p => ({ ...p, [item.id]: !p[item.id] }))} isSummaryOpen={expandedSummary[item.id]} summaryText={generateSummary(item)} isFollowed={followKeywords.some(kw => `${item.title} ${item.summary}`.toLowerCase().includes(kw.toLowerCase()))} onRead={() => recordReading(item)} onOpenLightbox={(src, title) => setLightbox({ open: true, src, title })} />
+                  <NewsItem key={item.id} item={item} index={i} viewMode={viewMode} isBookmarked={isBookmarked(item.id)} onBookmark={() => toggleBookmark(item)} onAddMaterial={() => addMaterial(item)} onSummary={() => setExpandedSummary(p => ({ ...p, [item.id]: !p[item.id] }))} isSummaryOpen={expandedSummary[item.id]} summaryText={generateSummary(item)} isFollowed={followKeywords.some(kw => `${item.title} ${item.summary}`.toLowerCase().includes(kw.toLowerCase()))} onRead={() => recordReading(item)} onOpenLightbox={(src, title) => setLightbox({ open: true, src, title })} />
                 ))}
               </div>
             </>
@@ -1568,11 +1786,284 @@ function App() {
             </div>
           )}
 
+          {nav === 'materials' && (
+            <div className="trends-dashboard">
+              <div className="trends-header">
+                <h2>{ICONS.layers}<span>素材库</span></h2>
+                <p className="trends-desc">从资讯中收集的素材，共 {materials.length} 条</p>
+              </div>
+
+              <section className="trends-section">
+                <div className="materials-filters">
+                  <select className="material-filter" value={materialFilter} onChange={e => setMaterialFilter(e.target.value)}>
+                    <option value="all">全部类型</option>
+                    <option value="quote">金句</option>
+                    <option value="data">数据</option>
+                    <option value="case">案例</option>
+                    <option value="viewpoint">观点</option>
+                    <option value="chart">图表</option>
+                  </select>
+                  <span className="material-count">筛选结果: {filteredMaterials.length} 条</span>
+                </div>
+
+                {filteredMaterials.length === 0 ? (
+                  <div className="empty-materials">
+                    <p>暂无素材</p>
+                    <p className="hint">浏览资讯时点击收藏即可添加素材</p>
+                  </div>
+                ) : (
+                  <div className="materials-grid">
+                    {filteredMaterials.map(m => (
+                      <div key={m.id} className="material-card">
+                        <div className="material-header">
+                          <span className={`material-type-badge type-${m.type}`}>{MATERIAL_TYPES[m.type] || m.type}</span>
+                          <button className="material-remove" onClick={() => removeMaterial(m.id)}>{ICONS.x}</button>
+                        </div>
+                        <p className="material-content">{m.content}</p>
+                        {m.note && <p className="material-note">{m.note}</p>}
+                        <div className="material-meta">
+                          <span className="material-source">{m.source}</span>
+                          {m.tags && m.tags.length > 0 && (
+                            <span className="material-tags">{m.tags.slice(0, 3).join(', ')}</span>
+                          )}
+                          <span className="material-date">{new Date(m.createdAt).toLocaleDateString('zh-CN')}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </section>
+            </div>
+          )}
+
+          {nav === 'editor' && (
+            <div className="trends-dashboard">
+              <div className="trends-header">
+                <h2>{ICONS.edit}<span>创作中心</span></h2>
+                <button className="btn-new-article" onClick={() => {
+                  const newArticle = createArticle('blank');
+                  setCurrentArticleId(newArticle.id);
+                }}>+ 新建文章</button>
+              </div>
+
+              {currentArticleId ? (
+                <section className="trends-section article-editor">
+                  <div className="article-toolbar">
+                    <button className="btn-back-list" onClick={() => setCurrentArticleId(null)}>← 返回列表</button>
+                    <div className="article-actions">
+                      <button className="btn-save-article" onClick={() => {
+                        alert('文章已保存');
+                      }}>保存</button>
+                    </div>
+                  </div>
+
+                  {(() => {
+                    const article = articles.find(a => a.id === currentArticleId);
+                    if (!article) return null;
+                    return (
+                      <>
+                        <input
+                          className="article-title-input"
+                          value={article.title}
+                          onChange={e => updateArticle(article.id, { title: e.target.value })}
+                          placeholder="文章标题"
+                        />
+
+                        <div className="article-meta-bar">
+                          <select
+                            className="article-template-select"
+                            value={article.template}
+                            onChange={e => updateArticle(article.id, { template: e.target.value })}
+                          >
+                            <option value="blank">空白</option>
+                            <option value="briefing">每日简报</option>
+                            <option value="analysis">深度分析</option>
+                            <option value="tech">技术解读</option>
+                          </select>
+                          <span className="article-status">状态: {ARTICLE_STATUS[article.status] || article.status}</span>
+                          <span className="article-updated">更新于 {new Date(article.updatedAt).toLocaleString('zh-CN')}</span>
+                        </div>
+
+                        <textarea
+                          className="article-content-editor"
+                          value={article.content}
+                          onChange={e => updateArticle(article.id, { content: e.target.value })}
+                          placeholder="开始写作...&#10;&#10;支持 Markdown 格式&#10;可以使用 ## 标题、**粗体**、*斜体* 等语法"
+                        />
+
+                        <div className="article-ai-toolbar">
+                          <span className="ai-toolbar-label">AI 辅助:</span>
+                          <button className="ai-toolbar-btn" onClick={async () => {
+                            if (!llmConfig.baseUrl || !llmConfig.selectedModel) { alert('请先配置大模型'); return; }
+                            const selected = window.getSelection().toString();
+                            if (!selected) { alert('请先选择要处理的文本'); return; }
+                            const res = await fetch('/api/ai-generate', {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ baseUrl: llmConfig.baseUrl, apiKey: llmConfig.apiKey, model: llmConfig.selectedModel, action: 'continue', content: selected })
+                            });
+                            const data = await res.json();
+                            if (data.ok) {
+                              updateArticle(article.id, { content: article.content.replace(selected, selected + '\n\n' + data.content) });
+                            } else {
+                              alert('AI 续写失败：' + data.error);
+                            }
+                          }}>续写</button>
+                          <button className="ai-toolbar-btn" onClick={async () => {
+                            if (!llmConfig.baseUrl || !llmConfig.selectedModel) { alert('请先配置大模型'); return; }
+                            const selected = window.getSelection().toString();
+                            if (!selected) { alert('请先选择要处理的文本'); return; }
+                            const res = await fetch('/api/ai-generate', {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ baseUrl: llmConfig.baseUrl, apiKey: llmConfig.apiKey, model: llmConfig.selectedModel, action: 'rewrite', content: selected })
+                            });
+                            const data = await res.json();
+                            if (data.ok) {
+                              updateArticle(article.id, { content: article.content.replace(selected, data.content) });
+                            } else {
+                              alert('AI 改写失败：' + data.error);
+                            }
+                          }}>改写</button>
+                          <button className="ai-toolbar-btn" onClick={async () => {
+                            if (!llmConfig.baseUrl || !llmConfig.selectedModel) { alert('请先配置大模型'); return; }
+                            const selected = window.getSelection().toString();
+                            if (!selected) { alert('请先选择要处理的文本'); return; }
+                            const res = await fetch('/api/ai-generate', {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ baseUrl: llmConfig.baseUrl, apiKey: llmConfig.apiKey, model: llmConfig.selectedModel, action: 'translate_zh', content: selected })
+                            });
+                            const data = await res.json();
+                            if (data.ok) {
+                              updateArticle(article.id, { content: article.content.replace(selected, selected + '\n\n' + data.content) });
+                            } else {
+                              alert('AI 翻译失败：' + data.error);
+                            }
+                          }}>翻译</button>
+                          <button className="ai-toolbar-btn" onClick={async () => {
+                            if (!llmConfig.baseUrl || !llmConfig.selectedModel) { alert('请先配置大模型'); return; }
+                            const res = await fetch('/api/ai-generate', {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ baseUrl: llmConfig.baseUrl, apiKey: llmConfig.apiKey, model: llmConfig.selectedModel, action: 'title', content: article.content })
+                            });
+                            const data = await res.json();
+                            if (data.ok) {
+                              alert('AI 生成标题：\n' + data.content);
+                            } else {
+                              alert('AI 生成标题失败：' + data.error);
+                            }
+                          }}>生成标题</button>
+                        </div>
+
+                        <div className="article-materials-panel">
+                          <h4>关联素材</h4>
+                          <div className="materials-picker">
+                            {materials.length === 0 ? (
+                              <p className="hint">素材库为空，浏览资讯时点击收藏按钮添加素材</p>
+                            ) : (
+                              <div className="materials-picker-list">
+                                {materials.slice(0, 20).map(m => {
+                                  const isSelected = (article.materials || []).includes(m.id);
+                                  return (
+                                    <button
+                                      key={m.id}
+                                      className={`material-picker-item ${isSelected ? 'selected' : ''}`}
+                                      onClick={() => {
+                                        const current = article.materials || [];
+                                        const updated = isSelected ? current.filter(id => id !== m.id) : [...current, m.id];
+                                        updateArticle(article.id, { materials: updated });
+                                      }}
+                                    >
+                                      <span className={`material-type-badge type-${m.type}`}>{MATERIAL_TYPES[m.type]}</span>
+                                      <span className="material-picker-content">{m.content.slice(0, 30)}...</span>
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </>
+                    );
+                  })()}
+                </section>
+              ) : (
+                <section className="trends-section">
+                  {articles.length === 0 ? (
+                    <div className="empty-articles">
+                      <p>暂无文章</p>
+                      <button className="btn-new-article-inline" onClick={() => {
+                        const newArticle = createArticle('blank');
+                        setCurrentArticleId(newArticle.id);
+                      }}>+ 创建第一篇文章</button>
+                    </div>
+                  ) : (
+                    <div className="articles-list">
+                      {articles.sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt)).map(a => (
+                        <div key={a.id} className="article-item">
+                          <div className="article-item-main" onClick={() => setCurrentArticleId(a.id)}>
+                            <h3 className="article-item-title">{a.title}</h3>
+                            <div className="article-item-meta">
+                              <span className={`article-status-badge status-${a.status}`}>{ARTICLE_STATUS[a.status]}</span>
+                              <span>{ARTICLE_TEMPLATES[a.template] || a.template}</span>
+                              <span>{new Date(a.updatedAt).toLocaleDateString('zh-CN')}</span>
+                            </div>
+                          </div>
+                          <div className="article-item-actions">
+                            <button className="btn-duplicate" onClick={() => duplicateArticle(a.id)} title="复制">{ICONS.layers}</button>
+                            <button className="btn-delete-article" onClick={() => {
+                              if (confirm('确定删除？')) deleteArticle(a.id);
+                            }} title="删除">{ICONS.trash}</button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </section>
+              )}
+            </div>
+          )}
+
           {nav === 'knowledge-export' && (
             <div className="trends-dashboard">
-              <div className="trends-header"><h2>{ICONS.link}<span>知识导出</span></h2><p className="trends-desc">将阅读清单导出为知识资产</p></div>
+              <div className="trends-header"><h2>{ICONS.link}<span>导出发布</span></h2><p className="trends-desc">将阅读清单和文章导出为知识资产</p></div>
+
               <section className="trends-section">
-                <h3 className="trends-section-title">一键导出</h3>
+                <h3 className="trends-section-title">我的文章导出</h3>
+                <div className="export-filters">
+                  <select value={articleExportFilter} onChange={e => setArticleExportFilter(e.target.value)}>
+                    <option value="all">全部文章</option>
+                    <option value="draft">草稿</option>
+                    <option value="published">已发布</option>
+                  </select>
+                  <span className="export-count">共 {filteredExportArticles.length} 篇</span>
+                </div>
+                {filteredExportArticles.length > 0 ? (
+                  <div className="article-export-list">
+                    {filteredExportArticles.map(a => (
+                      <div key={a.id} className="article-export-item">
+                        <div className="article-export-info">
+                          <span className={`article-status-badge status-${a.status}`}>{ARTICLE_STATUS[a.status]}</span>
+                          <span className="article-export-title">{a.title}</span>
+                        </div>
+                        <div className="article-export-actions">
+                          <button className="btn-export-md" onClick={() => exportArticle(a, 'md')}>Markdown</button>
+                          <button className="btn-export-html" onClick={() => exportArticle(a, 'html')}>HTML</button>
+                          <button className="btn-export-wechat" onClick={() => exportArticle(a, 'wechat')}>公众号</button>
+                          <button className="btn-export-zhihu" onClick={() => exportArticle(a, 'zhihu')}>知乎</button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="empty-hint">暂无文章可导出</p>
+                )}
+              </section>
+
+              <section className="trends-section">
+                <h3 className="trends-section-title">阅读收藏导出</h3>
                 <div className="export-filters">
                   <select value={exportCategory} onChange={(e) => setExportCategory(e.target.value)}>
                     <option value="all">全部赛道</option>
@@ -2075,7 +2566,7 @@ function SkeletonCard({ viewMode = 'standard' }) {
   );
 }
 
-function NewsItem({ item, index, viewMode = 'standard', isFocused = false, isBookmarked = false, onBookmark, onSummary, isSummaryOpen, summaryText, isFollowed = false, onRead, showTranslation, onToggleTranslation, translation, onOpenLightbox }) {
+function NewsItem({ item, index, viewMode = 'standard', isFocused = false, isBookmarked = false, onBookmark, onSummary, isSummaryOpen, summaryText, isFollowed = false, onRead, showTranslation, onToggleTranslation, translation, onOpenLightbox, onAddMaterial }) {
   const isCompact = viewMode === 'compact';
   const isCard = viewMode === 'card';
   const hasMedia = item.imageUrl || item.videoUrl;
@@ -2093,6 +2584,7 @@ function NewsItem({ item, index, viewMode = 'standard', isFocused = false, isBoo
         <div className="item-time">{formatRelative(item.publishedAt)}</div>
         <div className="item-actions-left">
           {onBookmark && <button className={`bookmark-btn ${isBookmarked ? 'active' : ''}`} onClick={onBookmark} title={isBookmarked ? '取消收藏' : '收藏'}>{isBookmarked ? ICONS.bookmarkFill : ICONS.bookmark}</button>}
+          {onAddMaterial && <button className="add-material-btn" onClick={() => onAddMaterial(item)} title="收藏为素材">{ICONS.layers}</button>}
           {onSummary && <button className="summary-btn" onClick={onSummary} title="AI 摘要">{ICONS.sparkle}</button>}
           {isEnglish && onToggleTranslation && <button className={`translate-btn ${showTranslation ? 'active' : ''}`} onClick={onToggleTranslation} title="中英对照">{ICONS.globe}</button>}
         </div>
