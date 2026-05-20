@@ -2157,9 +2157,9 @@ function App() {
                   <span className="intel-metric-sub">变化 &gt;50%</span>
                 </div>
                 <div className="intel-metric-card">
-                  <span className="intel-metric-value">{regionPct.domestic}%</span>
+                  <span className="intel-metric-value">{insightData.regionPct.domestic}%</span>
                   <span className="intel-metric-label">国内占比</span>
-                  <span className="intel-metric-sub">海外 {regionPct.overseas}%</span>
+                  <span className="intel-metric-sub">海外 {insightData.regionPct.overseas}%</span>
                 </div>
               </div>
 

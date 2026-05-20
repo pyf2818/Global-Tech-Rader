@@ -907,6 +907,7 @@ body {
 .intel-summary-badge { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; color: var(--accent-cyan); }
 .intel-summary-badge svg { width: 16px; height: 16px; }
 .intel-summary-time { font-size: 11px; color: var(--text-muted); }
+.intel-summary-content { margin-bottom: 0; }
 .intel-summary-text { font-size: 13px; color: var(--text-secondary); line-height: 1.6; }
 .intel-summary-text strong { color: var(--text-primary); font-weight: 700; }
 .text-up { color: var(--accent-emerald); font-weight: 600; }
@@ -993,7 +994,8 @@ body {
 .insight-ranking-row.rank-first { padding: 10px 0; }
 .insight-rank-num { width: 28px; height: 28px; display: grid; place-items: center; background: var(--bg-hover); border-radius: 8px; font-size: 12px; font-weight: 700; color: var(--text-muted); }
 .rank-first .insight-rank-num { background: var(--gradient-primary); color: white; }
-.insight-rank-name { font-size: 13px; font-weight: 600; color: var(--text-primary); }
+.insight-rank-main { min-width: 0; }
+.insight-rank-name { font-size: 13px; font-weight: 600; color: var(--text-primary); display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .insight-rank-bar-wrap { height: 6px; background: var(--bg-hover); border-radius: 3px; overflow: hidden; margin-top: 4px; }
 .insight-rank-bar { height: 100%; background: linear-gradient(90deg, var(--accent-cyan), var(--accent-violet)); border-radius: 3px; transition: width 0.5s ease; }
 .insight-rank-metrics { display: flex; gap: 8px; justify-content: flex-end; }
@@ -1544,3 +1546,28 @@ body {
 .material-hint { font-size: 11px; color: var(--text-muted); font-weight: 400; }
 .material-picker-item { cursor: pointer; transition: all 0.15s; }
 .material-picker-item:hover { border-color: var(--accent-violet); background: rgba(167, 139, 250, 0.05); }
+
+/* Responsive Layout */
+@media (max-width: 768px) {
+  .intel-metrics-row,
+  .insight-overview-row,
+  .reading-overview-row { grid-template-columns: repeat(2, 1fr); }
+  .intel-growth-row { grid-template-columns: 80px 1fr 60px; }
+  .intel-growth-detail { display: none; }
+  .insight-region-row { grid-template-columns: 50px 1fr 40px; }
+  .insight-region-count { display: none; }
+  .reading-interest-row { grid-template-columns: 28px 60px 1fr 40px; }
+  .reading-interest-pct { display: none; }
+}
+
+@media (max-width: 480px) {
+  .intel-metrics-row,
+  .insight-overview-row,
+  .reading-overview-row { grid-template-columns: 1fr 1fr; gap: 8px; }
+  .intel-metric-card,
+  .insight-overview-card,
+  .reading-metric-card { padding: 12px; }
+  .intel-metric-value,
+  .reading-metric-value { font-size: 18px; }
+  .insight-overview-icon { font-size: 22px; }
+}
