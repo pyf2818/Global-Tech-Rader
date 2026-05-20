@@ -3,16 +3,16 @@ import { useEffect, useMemo, useState, useRef, useCallback } from 'react';
 const NAV_ITEMS = [
   { id: 'all', label: '全部动态', icon: 'grid' },
   { id: 'recommendations', label: '智能推荐', icon: 'sparkle' },
-  { id: 'briefing', label: '每日简报', icon: 'document' },
-  { id: 'tracker', label: '公司追踪', icon: 'follow' },
+  { id: 'briefing', label: '今日态势', icon: 'document' },
+  { id: 'tracker', label: '我的追踪', icon: 'follow' },
   { id: 'trending', label: '热门榜单', icon: 'fire' },
   { id: 'github', label: 'GitHub 热门', icon: 'github' },
   { id: 'materials', label: '素材库', icon: 'layers' },
   { id: 'editor', label: '创作中心', icon: 'edit' },
   { id: 'calendar', label: '日历管理', icon: 'calendar' },
   { id: 'reading-list', label: '阅读列表', icon: 'bookmark' },
-  { id: 'trends', label: '趋势分析', icon: 'chart' },
-  { id: 'reading-stats', label: '阅读统计', icon: 'rows' },
+  { id: 'trends', label: '赛道矩阵', icon: 'chart' },
+  { id: 'reading-stats', label: '阅读画像', icon: 'rows' },
   { id: 'knowledge-export', label: '导出发布', icon: 'link' }
 ];
 
@@ -191,6 +191,7 @@ const ICONS = {
   hr: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="2" y1="12" x2="22" y2="12"/></svg>,
   image: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>,
   copy: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>,
+  download: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>,
 };
 
 function loadLS(key, fallback) {
@@ -1602,6 +1603,46 @@ ${signals}
     setTimeout(() => toast.remove(), 2000);
   }
 
+  // 导出简报为本地文件
+  function exportBriefToFile() {
+    if (!aiBrief.content) return;
+    const title = `AI简报_${new Date(aiBrief.generatedAt).toLocaleDateString('zh-CN').replace(/\//g, '-')}`;
+    const blob = new Blob([aiBrief.content], { type: 'text/markdown;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${title}.md`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    const toast = document.createElement('div');
+    toast.className = 'material-toast';
+    toast.textContent = '已下载为 markdown 文件';
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 2000);
+  }
+
+  // 导出文章为本地文件
+  function exportArticleToFile(article) {
+    const title = (article.title || '未命名').replace(/[\\/:*?"<>|]/g, '_');
+    const content = `# ${article.title || '未命名'}\n\n> 创建时间: ${new Date(article.createdAt).toLocaleString('zh-CN')}\n> 更新时间: ${new Date(article.updatedAt).toLocaleString('zh-CN')}\n> 模板: ${ARTICLE_TEMPLATES[article.template] || article.template}\n> 状态: ${ARTICLE_STATUS[article.status] || article.status}\n${article.tags.length > 0 ? `> 标签: ${article.tags.join(', ')}\n` : ''}\n---\n\n${article.content}`;
+    const blob = new Blob([content], { type: 'text/markdown;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${title}.md`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    const toast = document.createElement('div');
+    toast.className = 'material-toast';
+    toast.textContent = '已下载为 markdown 文件';
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 2000);
+  }
+
   // 导出简报到创作中心
   function exportBriefToEditor() {
     if (!aiBrief.content) return;
@@ -2406,7 +2447,8 @@ ${signals}
                             {aiBrief.content && (
                               <>
                                 <button className="ai-brief-action-btn" onClick={saveBriefToMaterials} title="保存到素材库">存素材</button>
-                                <button className="ai-brief-action-btn primary" onClick={exportBriefToEditor" title="导出到创作中心">导出</button>
+                                <button className="ai-brief-action-btn" onClick={exportBriefToFile} title="导出为文件">下载</button>
+                                <button className="ai-brief-action-btn primary" onClick={exportBriefToEditor} title="导出到创作中心">导出</button>
                               </>
                             )}
                             <button className="ai-brief-generate" onClick={generateAiBrief} disabled={aiBrief.loading}>
@@ -2439,21 +2481,21 @@ ${signals}
                     {/* 赛道态势矩阵 */}
                     <section className="insight-section">
                       <h3 className="insight-section-title">赛道态势</h3>
-                      <div className="insight-sector-list">
+                      <div className="sector-grid">
                         {insightData.categoryGrowth.map(c => {
                           const status = getSectorStatus(c);
-                          const maxCount = Math.max(...insightData.categoryGrowth.map(x => x.recent), 1);
                           return (
-                            <div key={c.id} className="insight-sector-row" onClick={() => { setCategory(c.id); setNav('all'); }}>
-                              <span className="insight-sector-name">{c.label}</span>
-                              <div className="insight-sector-bar-wrap">
-                                <div className="insight-sector-bar" style={{ width: `${(c.recent / maxCount) * 100}%` }} />
+                            <div key={c.id} className="sector-card" onClick={() => { setCategory(c.id); setNav('all'); }}>
+                              <div className="sector-card-header">
+                                <span className="sector-card-name">{c.label}</span>
+                                <span className="sector-card-status" style={{ color: status.color }}>{status.label}</span>
                               </div>
-                              <span className="insight-sector-count">{c.recent}条</span>
-                              <span className={`insight-sector-change ${c.growth > 0 ? 'up' : c.growth < 0 ? 'down' : ''}`}>
-                                {c.growth > 0 ? '+' : ''}{c.growth}%
-                              </span>
-                              <span className="insight-sector-status" style={{ color: status.color }}>{status.label}</span>
+                              <div className="sector-card-body">
+                                <span className="sector-card-count">{c.recent}条</span>
+                                <span className={`sector-card-change ${c.growth > 0 ? 'up' : c.growth < 0 ? 'down' : ''}`}>
+                                  {c.growth > 0 ? '+' : ''}{c.growth}%
+                                </span>
+                              </div>
                             </div>
                           );
                         })}
@@ -3093,6 +3135,7 @@ ${signals}
                               <option value="published">已发布</option>
                               <option value="archived">已归档</option>
                             </select>
+                            <button className="btn-copy-article" onClick={() => exportArticleToFile(article)} title="导出为文件">{ICONS.download}</button>
                             <button className="btn-copy-article" onClick={() => copyArticleAsRichText(article)} title="复制全文">{ICONS.copy}</button>
                           </div>
                         </div>
