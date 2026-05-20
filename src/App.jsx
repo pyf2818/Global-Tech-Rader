@@ -2104,124 +2104,327 @@ function App() {
             </>
           )}
 
-          {/* DAILY BRIEFING */}
-          {nav === 'briefing' && (
-            <>
-              <div className="section-header">
-                <h2 className="section-title">{ICONS.sparkle} AI 每日情报</h2>
-                <p className="section-desc">基于 {items.length} 条资讯的自动分析与信号提取</p>
-              </div>
+          {/* 洞察分析 - 统一仪表盘 */}
+          {(nav === 'briefing' || nav === 'tracker' || nav === 'trends' || nav === 'reading-stats') && (() => {
+            const insightTab = nav === 'trends' ? 'trends' : nav === 'tracker' ? 'tracker' : nav === 'reading-stats' ? 'profile' : 'overview';
+            const setInsightTab = (t) => {
+              const map = { overview: 'briefing', trends: 'trends', tracker: 'tracker', profile: 'reading-stats' };
+              setNav(map[t]);
+            };
 
-              {/* 执行摘要卡片 */}
-              <div className="intel-summary-card">
-                <div className="intel-summary-header">
-                  <span className="intel-summary-badge">{ICONS.sparkle} 执行摘要</span>
-                  <span className="intel-summary-time">{new Date().toLocaleDateString('zh-CN', { month: 'long', day: 'numeric', weekday: 'long' })}</span>
-                </div>
-                <div className="intel-summary-content">
-                  <p className="intel-summary-text">
-                    今日共收录 <strong>{insightData.todayCount}</strong> 条资讯，
-                    较昨日{insightData.dailyChange > 0 ? <span className="text-up">增长 {insightData.dailyChange}%</span> : insightData.dailyChange < 0 ? <span className="text-down">下降 {Math.abs(insightData.dailyChange)}%</span> : <span className="text-muted">持平</span>}。
-                    {insightData.anomalies.length > 0 && `${insightData.anomalies[0].label}赛道${insightData.anomalies[0].type === 'surge' ? '显著升温' : '明显降温'}（${insightData.anomalies[0].growth > 0 ? '+' : ''}${insightData.anomalies[0].growth}%），${insightData.categoryRanking[0]?.label}为当前最活跃赛道。`}
-                  </p>
-                </div>
-                <div className="intel-summary-signals">
-                  {insightData.anomalies.length > 0 && <div className={`signal-badge signal-${insightData.anomalies[0].type === 'surge' ? 'surge' : 'drop'}`}>
-                    {insightData.anomalies[0].type === 'surge' ? '🔥 升温信号' : '❄️ 降温信号'}
-                    <span>{insightData.anomalies[0].label} {insightData.anomalies[0].growth > 0 ? '+' : ''}{insightData.anomalies[0].growth}%</span>
-                  </div>}
-                  <div className="signal-badge signal-info">
-                    📊 赛道覆盖 <span>{Object.keys(dailyBriefing.categoryGroups).length}/{CATEGORIES.length}</span>
-                  </div>
-                  <div className="signal-badge signal-info">
-                    🔑 活跃关键词 <span>{insightData.risingKeywords.length}</span>
-                  </div>
-                </div>
-              </div>
+            // 态势等级
+            const severityLevel = insightData.anomalies.length >= 3 ? { label: '爆发', color: '#ef4444', icon: '🔴' }
+              : insightData.anomalies.length >= 1 || insightData.todayCount > insightData.yesterdayCount * 1.5 ? { label: '活跃', color: '#f59e0b', icon: '🟡' }
+              : { label: '正常', color: '#10b981', icon: '🟢' };
 
-              {/* 今日关键指标 */}
-              <div className="intel-metrics-row">
-                <div className="intel-metric-card">
-                  <span className="intel-metric-value">{insightData.todayCount}</span>
-                  <span className="intel-metric-label">今日资讯</span>
-                  {insightData.dailyChange !== 0 && <span className={`intel-metric-change ${insightData.dailyChange > 0 ? 'up' : 'down'}`}>{insightData.dailyChange > 0 ? '↑' : '↓'}{Math.abs(insightData.dailyChange)}%</span>}
-                </div>
-                <div className="intel-metric-card">
-                  <span className="intel-metric-value">{insightData.categoryRanking[0]?.label || '-'}</span>
-                  <span className="intel-metric-label">最活跃赛道</span>
-                  <span className="intel-metric-sub">{insightData.categoryRanking[0]?.recent || 0} 条</span>
-                </div>
-                <div className="intel-metric-card">
-                  <span className="intel-metric-value">{insightData.anomalies.length}</span>
-                  <span className="intel-metric-label">异常信号</span>
-                  <span className="intel-metric-sub">变化 &gt;50%</span>
-                </div>
-                <div className="intel-metric-card">
-                  <span className="intel-metric-value">{insightData.regionPct.domestic}%</span>
-                  <span className="intel-metric-label">国内占比</span>
-                  <span className="intel-metric-sub">海外 {insightData.regionPct.overseas}%</span>
-                </div>
-              </div>
+            // 赛道态势标签
+            const getSectorStatus = (c) => {
+              if (c.growth > 80) return { label: '突增信号', icon: '⚡', color: '#f59e0b' };
+              if (c.growth > 30) return { label: '持续升温', icon: '🔥', color: '#10b981' };
+              if (c.growth > 5) return { label: '稳步增长', icon: '↗', color: '#22d3ee' };
+              if (c.growth > -5) return { label: '持平', icon: '—', color: '#6b7280' };
+              if (c.growth > -30) return { label: '小幅降温', icon: '↘', color: '#f87171' };
+              return { label: '显著降温', icon: '❄️', color: '#ef4444' };
+            };
 
-              {/* 赛道增长率排行 */}
-              <div className="intel-section">
-                <h3 className="intel-section-title">{ICONS.trend} 赛道增长率排行</h3>
-                <div className="intel-growth-list">
-                  {insightData.categoryGrowth.map(c => (
-                    <div key={c.id} className="intel-growth-row">
-                      <span className="intel-growth-name">{c.label}</span>
-                      <div className="intel-growth-bar-wrap">
-                        <div className="intel-growth-bar" style={{ width: `${Math.min(Math.abs(c.growth), 100)}%`, background: c.growth > 0 ? 'var(--accent-emerald)' : 'var(--accent-rose)' }} />
-                      </div>
-                      <span className={`intel-growth-value ${c.growth > 0 ? 'up' : c.growth < 0 ? 'down' : ''}`}>
-                        {c.growth > 0 ? '+' : ''}{c.growth}%
-                      </span>
-                      <span className="intel-growth-detail">{c.recent} → {c.prev}</span>
-                    </div>
+            // 追踪目标信号
+            const getTrackerStatus = (target) => {
+              const data = trackerData[target.id] || { weekly: 0 };
+              const day7 = Array.from({ length: 7 }).map((_, idx) => {
+                const d = new Date(); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - (6 - idx));
+                return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+              });
+              const counts = day7.map(d => items.filter(i => {
+                const text = `${i.title} ${i.summary}`.toLowerCase();
+                return (text.includes(target.keyword.toLowerCase()) || target.aliases?.some(a => text.includes(a.toLowerCase()))) && i.publishedAt?.slice(0, 10) === d;
+              }).length);
+              const recent3 = counts.slice(4).reduce((a, b) => a + b, 0);
+              const prev4 = counts.slice(0, 4).reduce((a, b) => a + b, 0);
+              const growth = prev4 === 0 ? (recent3 > 0 ? 100 : 0) : Math.round(((recent3 - prev4) / prev4) * 100);
+              const isSurge = growth > 50 && recent3 > 0;
+              const isDrop = growth < -50;
+              const isStreak = recent3 > 0 && counts[5] > 0 && counts[6] > 0;
+              return { counts, growth, isSurge, isDrop, isStreak, weekly: data.weekly };
+            };
+
+            return (
+              <div className="insight-dashboard">
+                {/* 洞察子导航 */}
+                <div className="insight-tabs">
+                  {[
+                    { id: 'overview', label: '今日态势', icon: '📊' },
+                    { id: 'trends', label: '赛道矩阵', icon: '📈' },
+                    { id: 'tracker', label: '我的追踪', icon: '👁️' },
+                    { id: 'profile', label: '阅读画像', icon: '📖' }
+                  ].map(tab => (
+                    <button key={tab.id} className={`insight-tab ${insightTab === tab.id ? 'active' : ''}`} onClick={() => setInsightTab(tab.id)}>
+                      <span className="insight-tab-icon">{tab.icon}</span>
+                      <span className="insight-tab-label">{tab.label}</span>
+                    </button>
                   ))}
                 </div>
-              </div>
 
-              {/* 头条要闻 */}
-              <div className="intel-section">
-                <h3 className="intel-section-title">{ICONS.fire} 头条要闻</h3>
-                <div className="intel-top-news">
-                  {dailyBriefing.topNews.slice(0, 5).map((item, i) => (
-                    <div key={item.id} className="intel-news-item" onClick={() => window.open(item.url, '_blank')}>
-                      <span className="intel-news-rank">{i + 1}</span>
-                      <div className="intel-news-content">
-                        <h4 className="intel-news-title">{item.title}</h4>
-                        <p className="intel-news-meta">{item.source} · {formatRelative(item.publishedAt)} · {CATEGORIES.find(c => c.id === item.category)?.label || item.category}</p>
+                {/* ====== 概览页 ====== */}
+                {insightTab === 'overview' && (
+                  <>
+                    {/* 态势总览条 */}
+                    <div className="insight-status-bar" style={{ borderLeft: `4px solid ${severityLevel.color}` }}>
+                      <div className="insight-status-main">
+                        <span className="insight-status-icon">{severityLevel.icon}</span>
+                        <span className="insight-status-text">科技资讯态势<strong style={{ color: severityLevel.color }}> {severityLevel.label} </strong>今日收录 <strong>{insightData.todayCount}</strong> 条
+                          {insightData.dailyChange !== 0 && <span className={insightData.dailyChange > 0 ? 'text-up' : 'text-down'}> {insightData.dailyChange > 0 ? '↑' : '↓'}{Math.abs(insightData.dailyChange)}% vs 昨日</span>}
+                        </span>
+                      </div>
+                      <div className="insight-status-meta">
+                        {insightData.categoryRanking[0] && <span>🔥 {insightData.categoryRanking[0].label} ({insightData.categoryRanking[0].recent}条)</span>}
+                        {insightData.anomalies.length > 0 && <span>⚡ {insightData.anomalies.length} 个信号</span>}
+                        {readingProfile.streak > 0 && <span>📖 连续{readingProfile.streak}天</span>}
                       </div>
                     </div>
-                  ))}
-                </div>
-              </div>
 
-              {/* 赛道动态 */}
-              {Object.keys(dailyBriefing.categoryGroups).length > 0 && (
-                <div className="intel-section">
-                  <h3 className="intel-section-title">{ICONS.grid} 赛道动态</h3>
-                  <div className="intel-category-grid">
-                    {Object.entries(dailyBriefing.categoryGroups).slice(0, 6).map(([cat, catItems]) => (
-                      <div key={cat} className="intel-category-card">
-                        <div className="intel-category-header">
-                          <h4 className="intel-category-title">{CATEGORIES.find(c => c.id === cat)?.label || cat}</h4>
-                          <span className="intel-category-count">{catItems.length} 条</span>
-                        </div>
-                        <div className="intel-category-items">
-                          {catItems.slice(0, 3).map(item => (
-                            <div key={item.id} className="intel-category-item" onClick={() => window.open(item.url, '_blank')}>
-                              <span className="intel-category-item-title">{item.title}</span>
-                              <span className="intel-category-item-source">{item.source}</span>
+                    {/* 赛道态势矩阵 */}
+                    <section className="insight-section">
+                      <h3 className="insight-section-title">赛道态势</h3>
+                      <div className="insight-sector-list">
+                        {insightData.categoryGrowth.map(c => {
+                          const status = getSectorStatus(c);
+                          const maxCount = Math.max(...insightData.categoryGrowth.map(x => x.recent), 1);
+                          return (
+                            <div key={c.id} className="insight-sector-row" onClick={() => { setCategory(c.id); setNav('all'); }}>
+                              <span className="insight-sector-name">{c.label}</span>
+                              <div className="insight-sector-bar-wrap">
+                                <div className="insight-sector-bar" style={{ width: `${(c.recent / maxCount) * 100}%` }} />
+                              </div>
+                              <span className="insight-sector-count">{c.recent}条</span>
+                              <span className={`insight-sector-change ${c.growth > 0 ? 'up' : c.growth < 0 ? 'down' : ''}`}>
+                                {c.growth > 0 ? '+' : ''}{c.growth}%
+                              </span>
+                              <span className="insight-sector-status" style={{ color: status.color }}>{status.icon} {status.label}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </section>
+
+                    {/* 信号中心 */}
+                    {insightData.anomalies.length > 0 && (
+                      <section className="insight-section">
+                        <h3 className="insight-section-title">信号中心 <span className="insight-signal-count">{insightData.anomalies.length}</span></h3>
+                        <div className="insight-signals">
+                          {insightData.anomalies.map(a => (
+                            <div key={a.id} className={`insight-signal-card ${a.type}`}>
+                              <div className="insight-signal-accent" style={{ background: a.type === 'surge' ? '#10b981' : '#ef4444' }} />
+                              <span className="insight-signal-icon">{a.type === 'surge' ? '🔥' : '❄️'}</span>
+                              <div className="insight-signal-body">
+                                <span className="insight-signal-name">{a.label} {a.type === 'surge' ? '升温' : '降温'}</span>
+                                <span className="insight-signal-desc">前7天 {a.prev}条 → 近7天 {a.recent}条</span>
+                              </div>
+                              <span className={`insight-signal-pct ${a.type === 'surge' ? 'up' : 'down'}`}>{a.growth > 0 ? '+' : ''}{a.growth}%</span>
                             </div>
                           ))}
                         </div>
+                      </section>
+                    )}
+
+                    {/* 头条要闻 */}
+                    <section className="insight-section">
+                      <h3 className="insight-section-title">头条要闻</h3>
+                      <div className="insight-top-news">
+                        {dailyBriefing.topNews.slice(0, 5).map((item, i) => (
+                          <div key={item.id} className="insight-news-item" onClick={() => window.open(item.url, '_blank')}>
+                            <span className="insight-news-num">{i + 1}</span>
+                            <div className="insight-news-body">
+                              <span className="insight-news-title">{item.title}</span>
+                              <span className="insight-news-meta">{item.source} · {formatRelative(item.publishedAt)}</span>
+                            </div>
+                          </div>
+                        ))}
                       </div>
-                    ))}
-                  </div>
-                </div>
-              )}
+                    </section>
+                  </>
+                )}
+
+                {/* ====== 趋势页 ====== */}
+                {insightTab === 'trends' && (
+                  <>
+                    <section className="insight-section">
+                      <h3 className="insight-section-title">赛道热力矩阵（7日）</h3>
+                      <div className="insight-heatmap">
+                        <div className="heatmap-header">
+                          <span className="heatmap-label" />
+                          {insightData.day7.map(d => <span key={d} className="heatmap-day">{d.slice(5)}</span>)}
+                        </div>
+                        {CATEGORIES.map(cat => {
+                          const maxVal = Math.max(...insightData.day7.map(d => items.filter(i => i.category === cat.id && i.publishedAt?.slice(0, 10) === d).length), 1);
+                          return (
+                            <div key={cat.id} className="heatmap-row">
+                              <span className="heatmap-label">{cat.label}</span>
+                              {insightData.day7.map(d => {
+                                const count = items.filter(i => i.category === cat.id && i.publishedAt?.slice(0, 10) === d).length;
+                                const intensity = count / maxVal;
+                                return <span key={d} className="heatmap-cell" style={{ background: intensity > 0.7 ? 'rgba(34, 211, 238, 0.6)' : intensity > 0.4 ? 'rgba(34, 211, 238, 0.35)' : intensity > 0.1 ? 'rgba(34, 211, 238, 0.15)' : 'rgba(34, 211, 238, 0.04)' }} title={`${cat.label} ${d}: ${count}条`}>{count}</span>;
+                              })}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </section>
+
+                    <section className="insight-section">
+                      <h3 className="insight-section-title">区域分布</h3>
+                      <div className="insight-region-bars">
+                        {[
+                          { key: 'domestic', label: '国内', pct: insightData.regionPct.domestic, count: insightData.regionDistribution.domestic, color: '#ef4444' },
+                          { key: 'overseas', label: '海外', pct: insightData.regionPct.overseas, count: insightData.regionDistribution.overseas, color: '#3b82f6' },
+                          { key: 'global', label: '全球', pct: insightData.regionPct.global, count: insightData.regionDistribution.global, color: '#10b981' }
+                        ].map(r => (
+                          <div key={r.key} className="insight-region-row">
+                            <span className="insight-region-label" style={{ color: r.color }}>{r.label}</span>
+                            <div className="insight-region-bar-wrap">
+                              <div className="insight-region-bar" style={{ width: `${r.pct}%`, background: r.color }} />
+                            </div>
+                            <span className="insight-region-pct">{r.pct}%</span>
+                          </div>
+                        ))}
+                      </div>
+                    </section>
+
+                    {trendData.topKeywords.length > 0 && (
+                      <section className="insight-section">
+                        <h3 className="insight-section-title">活跃关键词</h3>
+                        <div className="insight-keywords">
+                          {trendData.topKeywords.slice(0, 20).map(([kw, count]) => {
+                            const maxC = trendData.topKeywords[0]?.[1] || 1;
+                            const size = 12 + (count / maxC) * 14;
+                            return <button key={kw} className="insight-kw" style={{ fontSize: `${size}px` }} onClick={() => executeSearch(kw)}>{kw}</button>;
+                          })}
+                        </div>
+                      </section>
+                    )}
+                  </>
+                )}
+
+                {/* ====== 追踪页 ====== */}
+                {insightTab === 'tracker' && (
+                  <>
+                    <div className="tracker-form">
+                      <input type="text" placeholder="输入公司名或技术关键词" value={newTrackTarget} onChange={e => setNewTrackTarget(e.target.value)} onKeyDown={e => e.key === 'Enter' && addTrackTarget()} />
+                      <button className="tracker-form-btn" onClick={addTrackTarget}>{ICONS.plus} 添加</button>
+                    </div>
+                    <div className="tracker-presets">
+                      {['OpenAI', 'Google', '字节跳动', '华为', 'React', 'LLM', 'RISC-V'].map(name => (
+                        <button key={name} className="tracker-preset" onClick={() => { setNewTrackTarget(name); }}>{name}</button>
+                      ))}
+                    </div>
+
+                    {trackTargets.length === 0 && <div className="empty-state"><p>暂无追踪目标，添加你想关注的公司或技术</p></div>}
+
+                    <div className="insight-watchlist">
+                      {trackTargets.map(target => {
+                        const st = getTrackerStatus(target);
+                        let statusLabel = '—', statusColor = '#6b7280', statusIcon = '';
+                        if (st.isSurge) { statusLabel = '今日突增'; statusColor = '#f59e0b'; statusIcon = '⚡'; }
+                        else if (st.isStreak) { statusLabel = '连续增长'; statusColor = '#10b981'; statusIcon = '🔥'; }
+                        else if (st.isDrop) { statusLabel = '显著降温'; statusColor = '#ef4444'; statusIcon = '❄️'; }
+                        else if (st.growth > 0) { statusLabel = '小幅增长'; statusColor = '#22d3ee'; statusIcon = '↗'; }
+                        else if (st.growth < 0) { statusLabel = '小幅下降'; statusColor = '#f87171'; statusIcon = '↘'; }
+
+                        const maxC = Math.max(...st.counts, 1);
+                        return (
+                          <div key={target.id} className="insight-watch-card">
+                            <div className="insight-watch-header">
+                              <span className="insight-watch-name">{target.keyword}</span>
+                              <button className="insight-watch-remove" onClick={() => setTrackTargets(prev => prev.filter(t => t.id !== target.id))}>{ICONS.x}</button>
+                            </div>
+                            <div className="insight-watch-stats">
+                              <span className="insight-watch-val">{st.weekly}<sub>周</sub></span>
+                              <span className={`insight-watch-change ${st.growth > 0 ? 'up' : st.growth < 0 ? 'down' : ''}`}>{st.growth > 0 ? '+' : ''}{st.growth}%</span>
+                              <span className="insight-watch-status" style={{ color: statusColor }}>{statusIcon} {statusLabel}</span>
+                            </div>
+                            <div className="insight-watch-sparkline">
+                              {st.counts.map((c, idx) => (
+                                <div key={idx} className="spark-bar" style={{ height: `${Math.max((c / maxC) * 32, 3)}px`, opacity: c > 0 ? 0.3 + (c / maxC) * 0.7 : 0.15 }} />
+                              ))}
+                            </div>
+                            <div className="insight-watch-spark-labels">
+                              {Array.from({ length: 7 }).map((_, idx) => {
+                                const d = new Date(); d.setDate(d.getDate() - (6 - idx));
+                                return <span key={idx}>{d.getMonth() + 1}/{d.getDate()}</span>;
+                              })}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </>
+                )}
+
+                {/* ====== 阅读画像页 ====== */}
+                {insightTab === 'profile' && (
+                  <>
+                    {/* 核心指标 */}
+                    <div className="reading-metrics">
+                      <div className="reading-metric">
+                        <span className="reading-metric-icon">🔥</span>
+                        <span className="reading-metric-value">{readingProfile.streak}</span>
+                        <span className="reading-metric-label">连续天数</span>
+                      </div>
+                      <div className="reading-metric">
+                        <span className="reading-metric-icon">📖</span>
+                        <span className="reading-metric-value">{readingProfile.avgDailyRead}</span>
+                        <span className="reading-metric-label">日均阅读</span>
+                      </div>
+                      <div className="reading-metric">
+                        <span className="reading-metric-icon">✅</span>
+                        <span className="reading-metric-value">{readingProfile.readRate}%</span>
+                        <span className="reading-metric-label">读完率</span>
+                      </div>
+                      <div className="reading-metric">
+                        <span className="reading-metric-icon">🕐</span>
+                        <span className="reading-metric-value">{String(readingProfile.peakHour).padStart(2, '0')}:00</span>
+                        <span className="reading-metric-label">阅读高峰</span>
+                      </div>
+                    </div>
+
+                    {/* 7日阅读热力 */}
+                    <section className="insight-section">
+                      <h3 className="insight-section-title">近7日阅读热力</h3>
+                      <div className="reading-heat-row">
+                        {readingProfile.day7.map((d, idx) => {
+                          const count = readingProfile.heatData[idx];
+                          const intensity = count / readingProfile.maxHeat;
+                          return (
+                            <div key={d} className="reading-heat-cell">
+                              <div className="reading-heat-block" style={{ background: intensity > 0.7 ? 'rgba(167, 139, 250, 0.7)' : intensity > 0.4 ? 'rgba(167, 139, 250, 0.4)' : intensity > 0.1 ? 'rgba(167, 139, 250, 0.18)' : 'rgba(167, 139, 250, 0.05)', height: `${Math.max(intensity * 50, 4)}px` }} />
+                              <span className="reading-heat-day">{d.slice(5)}</span>
+                              <span className="reading-heat-count">{count}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </section>
+
+                    {/* 兴趣分布 */}
+                    <section className="insight-section">
+                      <h3 className="insight-section-title">兴趣分布</h3>
+                      <div className="reading-interests">
+                        {readingProfile.topInterests.map((interest, idx) => (
+                          <div key={interest.id} className="reading-interest-row">
+                            <span className="reading-interest-rank">{idx + 1}</span>
+                            <span className="reading-interest-name">{interest.label}</span>
+                            <div className="reading-interest-bar-wrap">
+                              <div className="reading-interest-bar" style={{ width: `${readingProfile.topInterests[0]?.count > 0 ? (interest.count / readingProfile.topInterests[0].count * 100) : 0}%` }} />
+                            </div>
+                            <span className="reading-interest-pct">{interest.pct}%</span>
+                          </div>
+                        ))}
+                      </div>
+                    </section>
+                  </>
+                )}
+              </div>
+            );
+          })()}
 
               {/* 活跃关键词 */}
               {insightData.risingKeywords.length > 0 && (
