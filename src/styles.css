@@ -939,15 +939,43 @@ body {
 .insight-section-title { font-size: 15px; font-weight: 700; color: var(--text-primary); margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
 .insight-signal-count { display: inline-flex; align-items: center; justify-content: center; min-width: 20px; height: 20px; padding: 0 6px; background: var(--accent-rose); color: white; border-radius: 10px; font-size: 11px; font-weight: 700; }
 
+/* 概览页顶部双栏 */
+.overview-top-row { display: grid; grid-template-columns: 1fr 280px; gap: 12px; align-items: start; }
+
+/* 头条要闻 - 紧凑模块 */
+.top-news-compact { border: 1px solid var(--border-color); }
+.top-news-compact .insight-section-title { margin-bottom: 10px; font-size: 13px; }
+.top-news-list { display: flex; flex-direction: column; gap: 4px; }
+.top-news-item { display: flex; align-items: baseline; gap: 8px; padding: 5px 6px; border-radius: 4px; cursor: pointer; transition: background 0.15s; }
+.top-news-item:hover { background: var(--bg-hover); }
+.top-news-num { width: 18px; height: 18px; display: grid; place-items: center; background: var(--gradient-primary); border-radius: 4px; color: var(--bg-primary); font-size: 10px; font-weight: 700; flex-shrink: 0; }
+.top-news-title { font-size: 12px; font-weight: 500; color: var(--text-primary); line-height: 1.4; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
 /* 赛道态势统一图表 */
+.sector-stats-panel { background: var(--bg-hover); border: 1px solid var(--border-color); border-radius: 8px; padding: 10px 14px; margin-bottom: 10px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+.sector-stats-left { display: flex; align-items: center; gap: 8px; }
+.sector-stats-name { font-size: 14px; font-weight: 700; color: var(--text-primary); }
+.sector-stats-status { font-size: 12px; font-weight: 600; }
+.sector-stats-right { display: flex; align-items: center; gap: 12px; }
+.sector-stats-val { font-size: 18px; font-weight: 700; color: var(--text-primary); }
+.sector-stats-val sub { font-size: 10px; font-weight: 400; color: var(--text-muted); }
+.sector-stats-growth { font-size: 16px; font-weight: 700; }
+.sector-stats-growth.up { color: #10b981; }
+.sector-stats-growth.down { color: #ef4444; }
+.sector-daily-breakdown { display: flex; gap: 10px; width: 100%; padding-top: 6px; border-top: 1px solid var(--border-color); }
+.sector-daily-item { flex: 1; text-align: center; }
+.sector-daily-date { display: block; font-size: 9px; color: var(--text-muted); }
+.sector-daily-val { display: block; font-size: 13px; font-weight: 700; color: var(--text-primary); }
+
 .sector-chart { display: flex; flex-direction: column; gap: 8px; }
-.sector-chart-legend { display: flex; flex-wrap: wrap; gap: 6px; }
-.sector-legend-item { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border: 1px solid transparent; border-radius: 4px; background: transparent; color: var(--text-secondary); font-size: 11px; cursor: pointer; transition: all 0.15s; }
-.sector-legend-item:hover { border-color: var(--border-color); }
-.sector-legend-item.active { background: rgba(34, 211, 238, 0.1); border-color: rgba(34, 211, 238, 0.3); color: var(--accent-cyan); }
+.sector-chart-legend { display: flex; flex-wrap: wrap; gap: 4px; }
+.sector-legend-item { display: inline-flex; align-items: center; gap: 3px; padding: 3px 8px; border: 1px solid transparent; border-radius: 4px; background: transparent; color: var(--text-secondary); font-size: 11px; cursor: pointer; transition: all 0.15s; }
+.sector-legend-item:hover { border-color: var(--border-color); background: var(--bg-hover); }
+.sector-legend-item.active { background: rgba(34, 211, 238, 0.12); border-color: rgba(34, 211, 238, 0.3); color: #22d3ee; font-weight: 600; }
 .legend-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
 .legend-label { white-space: nowrap; }
-.sector-line-chart { width: 100%; height: auto; max-height: 130px; background: var(--bg-hover); border-radius: 8px; padding: 4px; }
+.legend-val { font-size: 10px; color: var(--text-muted); font-weight: 600; margin-left: 2px; }
+.sector-line-chart { width: 100%; height: auto; max-height: 160px; background: var(--bg-primary); border-radius: 8px; border: 1px solid var(--border-color); padding: 4px; }
 
 /* 信号中心 */
 .signal-center-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; flex-wrap: wrap; gap: 8px; }
@@ -1098,6 +1126,8 @@ body {
 
 /* 响应式 */
 @media (max-width: 768px) {
+  .overview-top-row { grid-template-columns: 1fr; }
+  .top-news-compact { order: -1; }
   .reading-metrics { grid-template-columns: repeat(2, 1fr); }
   .insight-watchlist { grid-template-columns: 1fr; }
   .insight-status-meta { flex-wrap: wrap; gap: 8px; }

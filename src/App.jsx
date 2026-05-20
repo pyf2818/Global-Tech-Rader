@@ -325,6 +325,7 @@ function App() {
   const [aiResult, setAiResult] = useState({ loading: false, content: '', error: '', action: '' });
   const [aiBrief, setAiBrief] = useState({ loading: false, content: '', error: '', generatedAt: null });
   const [signalFilter, setSignalFilter] = useState('all');
+  const [activeSector, setActiveSector] = useState(null);
   const [articleExportFilter, setArticleExportFilter] = useState('all');
   const [articleSearch, setArticleSearch] = useState('');
   const [articleStatusFilter, setArticleStatusFilter] = useState('all');
@@ -2415,18 +2416,33 @@ ${signals}
                 {/* ====== 概览页 ====== */}
                 {insightTab === 'overview' && (
                   <>
-                    {/* 态势总览条 */}
-                    <div className="insight-status-bar" style={{ borderLeft: `4px solid ${severityLevel.color}` }}>
-                      <div className="insight-status-main">
-                        <span className="insight-status-text">科技资讯态势<strong style={{ color: severityLevel.color }}> {severityLevel.label} </strong>今日收录 <strong>{insightData.todayCount}</strong> 条
-                          {insightData.dailyChange !== 0 && <span className={insightData.dailyChange > 0 ? 'text-up' : 'text-down'}> {insightData.dailyChange > 0 ? '↑' : '↓'}{Math.abs(insightData.dailyChange)}% vs 昨日</span>}
-                        </span>
+                    <div className="overview-top-row">
+                      {/* 态势总览条 */}
+                      <div className="insight-status-bar" style={{ borderLeft: `4px solid ${severityLevel.color}` }}>
+                        <div className="insight-status-main">
+                          <span className="insight-status-text">科技资讯态势<strong style={{ color: severityLevel.color }}> {severityLevel.label} </strong>今日收录 <strong>{insightData.todayCount}</strong> 条
+                            {insightData.dailyChange !== 0 && <span className={insightData.dailyChange > 0 ? 'text-up' : 'text-down'}> {insightData.dailyChange > 0 ? '↑' : '↓'}{Math.abs(insightData.dailyChange)}% vs 昨日</span>}
+                          </span>
+                        </div>
+                        <div className="insight-status-meta">
+                          {insightData.categoryRanking[0] && <span className="status-tag hot">热 {insightData.categoryRanking[0].label} ({insightData.categoryRanking[0].recent}条)</span>}
+                          {insightData.anomalies.length > 0 && <span className="status-tag signal">信号 {insightData.anomalies.length} 个</span>}
+                          {readingProfile.streak > 0 && <span className="status-tag streak">连续 {readingProfile.streak} 天</span>}
+                        </div>
                       </div>
-                      <div className="insight-status-meta">
-                        {insightData.categoryRanking[0] && <span className="status-tag hot">热 {insightData.categoryRanking[0].label} ({insightData.categoryRanking[0].recent}条)</span>}
-                        {insightData.anomalies.length > 0 && <span className="status-tag signal">信号 {insightData.anomalies.length} 个</span>}
-                        {readingProfile.streak > 0 && <span className="status-tag streak">连续 {readingProfile.streak} 天</span>}
-                      </div>
+
+                      {/* 头条要闻 - 右上角小模块 */}
+                      <section className="insight-section top-news-compact">
+                        <h3 className="insight-section-title">头条要闻</h3>
+                        <div className="top-news-list">
+                          {dailyBriefing.topNews.slice(0, 5).map((item, i) => (
+                            <div key={item.id} className="top-news-item" onClick={() => window.open(item.url, '_blank')}>
+                              <span className="top-news-num">{i + 1}</span>
+                              <span className="top-news-title">{item.title}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </section>
                     </div>
 
                     {/* AI 每日简报 */}
@@ -2469,36 +2485,75 @@ ${signals}
                       </div>
                     </section>
 
-                    {/* 赛道态势矩阵 */}
+                    {/* 赛道态势 - 统一折线图 */}
                     <section className="insight-section">
                       <h3 className="insight-section-title">赛道态势（近7日）</h3>
+                      {activeSector && (() => {
+                        const c = insightData.categoryGrowth.find(x => x.id === activeSector);
+                        if (!c) return null;
+                        const statusLabel = c.growth > 80 ? '突增信号' : c.growth > 30 ? '持续升温' : c.growth > 5 ? '稳步增长' : c.growth > -5 ? '持平' : c.growth > -30 ? '小幅降温' : '显著降温';
+                        return (
+                          <div className="sector-stats-panel">
+                            <div className="sector-stats-left">
+                              <span className="sector-stats-name">{c.label}</span>
+                              <span className="sector-stats-status" style={{ color: c.growth > 0 ? '#10b981' : '#ef4444' }}>{statusLabel}</span>
+                            </div>
+                            <div className="sector-stats-right">
+                              <span className="sector-stats-val">{c.recent}<sub>近7日</sub></span>
+                              <span className={`sector-stats-growth ${c.growth > 0 ? 'up' : c.growth < 0 ? 'down' : ''}`}>{c.growth > 0 ? '+' : ''}{c.growth}%</span>
+                            </div>
+                            <div className="sector-daily-breakdown">
+                              {insightData.day7.map((d, i) => (
+                                <span key={d} className="sector-daily-item">
+                                  <span className="sector-daily-date">{d.slice(5)}</span>
+                                  <span className="sector-daily-val">{c.daily7[i]}</span>
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      })()}
                       <div className="sector-chart">
                         <div className="sector-chart-legend">
                           {insightData.categoryGrowth.slice(0, 12).map(c => {
-                            const color = c.growth > 0 ? '#10b981' : c.growth < 0 ? '#ef4444' : '#6b7280';
+                            const active = c.id === activeSector;
                             return (
-                              <button key={c.id} className={`sector-legend-item ${c.id === category ? 'active' : ''}`} onClick={() => setCategory(c.id === category ? 'all' : c.id)}>
-                                <span className="legend-dot" style={{ background: color }} />
+                              <button key={c.id} className={`sector-legend-item ${active ? 'active' : ''}`} onClick={() => setActiveSector(active ? null : c.id)}>
+                                <span className="legend-dot" style={{ background: active ? '#22d3ee' : c.growth > 0 ? '#10b981' : c.growth < 0 ? '#ef4444' : '#6b7280' }} />
                                 <span className="legend-label">{c.label}</span>
+                                <span className="legend-val">{c.recent}</span>
                               </button>
                             );
                           })}
                         </div>
-                        <svg className="sector-line-chart" viewBox="0 0 400 120" preserveAspectRatio="xMidYMid meet">
+                        <svg className="sector-line-chart" viewBox="0 0 400 140" preserveAspectRatio="xMidYMid meet">
                           {insightData.day7.map((d, i) => (
-                            <line key={`g${i}`} x1={30 + i * 55} y1={10} x2={30 + i * 55} y2={108} stroke="var(--border-color)" strokeWidth="0.5" opacity="0.4" />
+                            <line key={`g${i}`} x1={35 + i * 55} y1={10} x2={35 + i * 55} y2={118} stroke="var(--border-color)" strokeWidth="0.5" opacity="0.3" />
                           ))}
                           {[0, 25, 50, 75, 100].map(pct => (
-                            <line key={`h${pct}`} x1={30} y1={10 + (pct / 100) * 98} x2={380} y2={10 + (pct / 100) * 98} stroke="var(--border-color)" strokeWidth="0.5" opacity="0.3" />
+                            <line key={`h${pct}`} x1={35} y1={10 + (pct / 100) * 108} x2={385} y2={10 + (pct / 100) * 108} stroke="var(--border-color)" strokeWidth="0.5" opacity="0.2" />
                           ))}
                           {insightData.categoryGrowth.slice(0, 12).map(c => {
+                            const active = c.id === activeSector;
                             const maxDay = Math.max(...c.daily7, 1);
-                            const pts = c.daily7.map((v, i) => `${30 + i * 55},${108 - (v / maxDay) * 98}`).join(' ');
-                            const color = c.growth > 0 ? '#10b981' : c.growth < 0 ? '#ef4444' : '#6b7280';
-                            return <polyline key={c.id} points={pts} fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" opacity={category === 'all' || category === c.id ? 1 : 0.15} />;
+                            const pts = c.daily7.map((v, i) => `${35 + i * 55},${118 - (v / maxDay) * 108}`).join(' ');
+                            const areaPts = `35,118 ${pts} ${385},118`;
+                            const color = active ? '#22d3ee' : c.growth > 0 ? '#10b981' : c.growth < 0 ? '#ef4444' : '#6b7280';
+                            return (
+                              <g key={c.id}>
+                                {active && <polygon points={areaPts} fill={color} opacity="0.08" />}
+                                <polyline points={pts} fill="none" stroke={color} strokeWidth={active ? 3 : 1} strokeLinecap="round" strokeLinejoin="round" opacity={active ? 1 : 0.12} />
+                                {active && c.daily7.map((v, i) => (
+                                  <g key={i}>
+                                    <circle cx={35 + i * 55} cy={118 - (v / maxDay) * 108} r="4" fill={color} opacity="0.9" />
+                                    <text x={35 + i * 55} y={118 - (v / maxDay) * 108 - 8} textAnchor="middle" fill={color} fontSize="9" fontWeight="600">{v}</text>
+                                  </g>
+                                ))}
+                              </g>
+                            );
                           })}
                           {insightData.day7.map((d, i) => (
-                            <text key={`d${i}`} x={30 + i * 55} y={118} textAnchor="middle" fill="var(--text-muted)" fontSize="8">{d.slice(5)}</text>
+                            <text key={`d${i}`} x={35 + i * 55} y={135} textAnchor="middle" fill="var(--text-muted)" fontSize="8">{d.slice(5)}</text>
                           ))}
                         </svg>
                       </div>
@@ -2559,25 +2614,7 @@ ${signals}
                       </div>
                     </section>
 
-                    {/* 头条要闻 */}
-                    <section className="insight-section">
-                      <h3 className="insight-section-title">头条要闻</h3>
-                      <div className="insight-top-news">
-                        {dailyBriefing.topNews.slice(0, 5).map((item, i) => (
-                          <div key={item.id} className="insight-news-item" onClick={() => window.open(item.url, '_blank')}>
-                            <span className="insight-news-num">{i + 1}</span>
-                            <div className="insight-news-body">
-                              <span className="insight-news-title">{item.title}</span>
-                              <span className="insight-news-meta">{item.source} · {formatRelative(item.publishedAt)}</span>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </section>
-                  </>
-                )}
-
-                {/* ====== 趋势页 ====== */}
+                    {/* ====== 趋势页 ====== */}
                 {insightTab === 'trends' && (
                   <>
                     <section className="insight-section">
