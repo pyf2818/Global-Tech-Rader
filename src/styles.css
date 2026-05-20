@@ -924,6 +924,7 @@ body {
 .insight-signal-card { display: flex; align-items: center; gap: 12px; padding: 14px; background: var(--bg-hover); border-radius: 10px; border-left: 3px solid; position: relative; overflow: hidden; }
 .insight-signal-card.surge { border-left-color: #10b981; }
 .insight-signal-card.drop { border-left-color: #ef4444; }
+.insight-signal-card.cross-source { border-left-color: #3b82f6; }
 .insight-signal-accent { position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0.03; }
 .insight-signal-icon { font-size: 22px; flex-shrink: 0; }
 .insight-signal-body { flex: 1; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
@@ -932,6 +933,14 @@ body {
 .insight-signal-pct { font-size: 16px; font-weight: 700; flex-shrink: 0; }
 .insight-signal-pct.up { color: #10b981; }
 .insight-signal-pct.down { color: #ef4444; }
+.insight-signal-pct.cross-source { font-size: 13px; }
+
+/* 技术关键词 TF-IDF */
+.insight-tech-keywords { display: flex; flex-wrap: wrap; gap: 8px; }
+.insight-tech-kw { display: inline-flex; flex-direction: column; align-items: center; gap: 2px; padding: 6px 12px; background: var(--bg-hover); border: 1px solid var(--border-color); border-radius: 8px; cursor: pointer; transition: all 0.15s; text-align: center; }
+.insight-tech-kw:hover { border-color: var(--accent-cyan); background: rgba(34, 211, 238, 0.08); }
+.tech-kw-word { font-size: 12px; font-weight: 600; color: var(--text-primary); }
+.tech-kw-meta { font-size: 9px; color: var(--text-muted); }
 
 /* 头条要闻 */
 .insight-top-news { display: flex; flex-direction: column; gap: 6px; }

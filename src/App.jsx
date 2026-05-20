@@ -716,6 +716,72 @@ function App() {
     });
     const risingKeywords = [...keywordMomentum.entries()].sort((a, b) => b[1] - a[1]).slice(0, 15);
 
+    // TF-IDF 词频分析：提取标题+摘要中的高频技术词
+    const stopWords = new Set(['the', 'a', 'an', 'is', 'are', 'was', 'were', 'be', 'been', 'being', 'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'could', 'should', 'may', 'might', 'shall', 'can', 'need', 'dare', 'ought', 'used', 'to', 'of', 'in', 'for', 'on', 'with', 'at', 'by', 'from', 'as', 'into', 'through', 'during', 'before', 'after', 'above', 'below', 'between', 'out', 'off', 'over', 'under', 'again', 'further', 'then', 'once', 'here', 'there', 'when', 'where', 'why', 'how', 'all', 'both', 'each', 'few', 'more', 'most', 'other', 'some', 'such', 'no', 'nor', 'not', 'only', 'own', 'same', 'so', 'than', 'too', 'very', 'just', 'because', 'but', 'and', 'or', 'if', 'while', 'that', 'this', 'these', 'those', 'it', 'its', 'they', 'them', 'their', 'what', 'which', 'who', 'whom', 'whose', 'about', 'up', 'new', 'one', 'two', 'three', 'first', 'also', 'more', 'say', 'says', 'said', 'make', 'made', 'take', 'get', 'got', 'use', 'used', 'find', 'found', 'come', 'came', 'go', 'went', 'know', 'think', 'see', 'give', 'want', 'work', 'try', 'ask', 'seem', 'feel', 'leave', 'call', 'keep', 'let', 'begin', 'show', 'hear', 'play', 'run', 'move', 'live', 'believe', 'bring', 'happen', 'write', 'provide', 'sit', 'stand', 'lose', 'pay', 'meet', 'include', 'continue', 'set', 'learn', 'change', 'lead', 'understand', 'watch', 'follow', 'stop', 'create', 'speak', 'read', 'allow', 'add', 'spend', 'grow', 'open', 'walk', 'win', 'offer', 'remember', 'love', 'consider', 'appear', 'buy', 'wait', 'serve', 'die', 'send', 'expect', 'build', 'stay', 'fall', 'cut', 'reach', 'kill', 'remain', 'suggest', 'raise', 'pass', 'sell', 'require', 'report', 'decide', 'pull']);
+    const wordFreq = new Map();
+    const wordSources = new Map(); // 每个词被多少不同来源报道
+    items.forEach(item => {
+      const text = `${item.title} ${item.summary || ''}`.toLowerCase();
+      const words = text.match(/\b[a-z]{4,}\b/g) || [];
+      const seenInItem = new Set();
+      words.forEach(w => {
+        if (!stopWords.has(w) && !/^(this|that|with|from|have|been|were|they|their|what|when|more|some|time|very|just|know|take|come|made|could|after|also|than|them|other|into|your|about|over|such|only|then|most|would|which|there|these|being|will|each|does|did|into|many|through|back|much|well|where|because|before|those|even|around|between|while|still|during|without|however|people|thing|things|think|like|things|thing|says|said|says|make|made|take|get|got|find|found|come|came|go|went|see|seen|give|gave|want|work|try|ask|keep|kept|let|show|showed|hear|heard|play|played|run|ran|move|moved|live|lived|believe|believed|bring|brought|seem|seemed|feel|felt|leave|left|call|called|need|needed|become|became|becomes|turn|turned|put|puts|means|mean|meant|help|helped|helps|high|low|big|small|long|short|old|young|good|bad|new|right|wrong|real|true|false|last|next|early|late|soon|far|near|here|there|every|any|some|none|all|both|few|many|most|other|another|such|only|own|same|so|than|too|very|just|because|but|and|or|if|while|yet|since|until|whether|although|though|unless|whereas|whilst|provided|assuming|given|supposing|considering|regarding|concerning|including|excluding|except|besides|apart|along|across|behind|beneath|beside|beyond|inside|outside|upon|within|without|among|amid|amongst|against|towards|unto|underneath|notwithstanding)$/.test(w)) {
+          wordFreq.set(w, (wordFreq.get(w) || 0) + 1);
+          if (!seenInItem.has(w)) {
+            seenInItem.add(w);
+            wordSources.set(w, (wordSources.get(w) || 0) + 1);
+          }
+        }
+      });
+    });
+    // TF-IDF 简化：freq * log(source_count + 1)
+    const techKeywords = [...wordFreq.entries()]
+      .filter(([w]) => w.length >= 4)
+      .map(([word, freq]) => ({
+        word,
+        freq,
+        sourceCount: wordSources.get(word) || 1,
+        score: freq * Math.log((wordSources.get(word) || 1) + 1)
+      }))
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 30);
+
+    // 跨源交叉验证：同一关键词被≥3个不同来源报道 = 高置信度
+    const crossSourceSignals = techKeywords
+      .filter(k => k.sourceCount >= 3)
+      .slice(0, 10)
+      .map(k => ({
+        keyword: k.word,
+        sourceCount: k.sourceCount,
+        freq: k.freq,
+        confidence: k.sourceCount >= 5 ? 'high' : k.sourceCount >= 3 ? 'medium' : 'low'
+      }));
+
+    // 技术雷达四象限数据
+    // 采用(Adopt): 高频 + 高源覆盖 + 成熟赛道
+    // 试验(Trial): 中高频 + 增长快
+    // 评估(Assess): 低频但增长极快（新兴）
+    // 暂缓(Hold): 低频 + 负增长或持平
+    const techRadar = CATEGORIES.map(cat => {
+      const growth = categoryGrowth.find(c => c.id === cat.id)?.growth || 0;
+      const recent = categoryGrowth.find(c => c.id === cat.id)?.recent || 0;
+      const sources = trendData.categoryStats.find(([id]) => id === cat.id)?.[1]?.sources?.size || 0;
+      let quadrant = 'hold';
+      if (recent >= 10 && sources >= 5 && growth >= -10) quadrant = 'adopt';
+      else if (recent >= 5 && growth > 20) quadrant = 'trial';
+      else if (growth > 50 || (recent >= 3 && growth > 30)) quadrant = 'assess';
+      return { id: cat.id, label: cat.label, quadrant, recent, growth, sources };
+    });
+
+    // 源质量评分
+    const sourceQuality = trendData.sourceStats.map(([name, data]) => {
+      const srcItems = items.filter(i => i.source === name);
+      const avgLen = srcItems.reduce((s, i) => s + (i.summary || '').length + (i.title || '').length, 0) / (srcItems.length || 1);
+      const updateFreq = srcItems.length;
+      const qualityScore = Math.min(100, Math.round(updateFreq * 5 + avgLen / 10));
+      return { name, count: data.count, categories: data.categories.size, avgLen: Math.round(avgLen), qualityScore };
+    }).sort((a, b) => b.qualityScore - a.qualityScore);
+
     return {
       categoryGrowth,
       categoryMomentum,
@@ -727,6 +793,10 @@ function App() {
       yesterdayCount,
       dailyChange,
       risingKeywords,
+      techKeywords,
+      crossSourceSignals,
+      techRadar,
+      sourceQuality,
       day7,
       day7prev,
       day3,
@@ -2207,24 +2277,33 @@ function App() {
                     </section>
 
                     {/* 信号中心 */}
-                    {insightData.anomalies.length > 0 && (
-                      <section className="insight-section">
-                        <h3 className="insight-section-title">信号中心 <span className="insight-signal-count">{insightData.anomalies.length}</span></h3>
-                        <div className="insight-signals">
-                          {insightData.anomalies.map(a => (
-                            <div key={a.id} className={`insight-signal-card ${a.type}`}>
-                              <div className="insight-signal-accent" style={{ background: a.type === 'surge' ? '#10b981' : '#ef4444' }} />
-                              <span className="insight-signal-icon">{a.type === 'surge' ? '🔥' : '❄️'}</span>
-                              <div className="insight-signal-body">
-                                <span className="insight-signal-name">{a.label} {a.type === 'surge' ? '升温' : '降温'}</span>
-                                <span className="insight-signal-desc">前7天 {a.prev}条 → 近7天 {a.recent}条</span>
-                              </div>
-                              <span className={`insight-signal-pct ${a.type === 'surge' ? 'up' : 'down'}`}>{a.growth > 0 ? '+' : ''}{a.growth}%</span>
+                    <section className="insight-section">
+                      <h3 className="insight-section-title">信号中心 <span className="insight-signal-count">{insightData.anomalies.length + insightData.crossSourceSignals.length}</span></h3>
+                      <div className="insight-signals">
+                        {insightData.anomalies.map(a => (
+                          <div key={a.id} className={`insight-signal-card ${a.type}`}>
+                            <div className="insight-signal-accent" style={{ background: a.type === 'surge' ? '#10b981' : '#ef4444' }} />
+                            <span className="insight-signal-icon">{a.type === 'surge' ? '🔥' : '❄️'}</span>
+                            <div className="insight-signal-body">
+                              <span className="insight-signal-name">{a.label} {a.type === 'surge' ? '升温' : '降温'}</span>
+                              <span className="insight-signal-desc">前7天 {a.prev}条 → 近7天 {a.recent}条</span>
                             </div>
-                          ))}
-                        </div>
-                      </section>
-                    )}
+                            <span className={`insight-signal-pct ${a.type === 'surge' ? 'up' : 'down'}`}>{a.growth > 0 ? '+' : ''}{a.growth}%</span>
+                          </div>
+                        ))}
+                        {insightData.crossSourceSignals.slice(0, 5).map(s => (
+                          <div key={s.keyword} className="insight-signal-card cross-source">
+                            <div className="insight-signal-accent" style={{ background: s.confidence === 'high' ? '#3b82f6' : '#6366f1' }} />
+                            <span className="insight-signal-icon">🔗</span>
+                            <div className="insight-signal-body">
+                              <span className="insight-signal-name">{s.keyword} 跨源验证</span>
+                              <span className="insight-signal-desc">{s.sourceCount} 个来源报道 · {s.freq} 次提及 · 置信度{s.confidence === 'high' ? '高' : '中'}</span>
+                            </div>
+                            <span className="insight-signal-pct cross-source" style={{ color: s.confidence === 'high' ? '#3b82f6' : '#6366f1' }}>{s.sourceCount}源</span>
+                          </div>
+                        ))}
+                      </div>
+                    </section>
 
                     {/* 头条要闻 */}
                     <section className="insight-section">
@@ -2289,15 +2368,17 @@ function App() {
                       </div>
                     </section>
 
-                    {trendData.topKeywords.length > 0 && (
+                    {/* 技术关键词 TF-IDF */}
+                    {insightData.techKeywords.length > 0 && (
                       <section className="insight-section">
-                        <h3 className="insight-section-title">活跃关键词</h3>
-                        <div className="insight-keywords">
-                          {trendData.topKeywords.slice(0, 20).map(([kw, count]) => {
-                            const maxC = trendData.topKeywords[0]?.[1] || 1;
-                            const size = 12 + (count / maxC) * 14;
-                            return <button key={kw} className="insight-kw" style={{ fontSize: `${size}px` }} onClick={() => executeSearch(kw)}>{kw}</button>;
-                          })}
+                        <h3 className="insight-section-title">技术关键词（TF-IDF）</h3>
+                        <div className="insight-tech-keywords">
+                          {insightData.techKeywords.slice(0, 20).map(k => (
+                            <button key={k.word} className="insight-tech-kw" onClick={() => executeSearch(k.word)}>
+                              <span className="tech-kw-word">{k.word}</span>
+                              <span className="tech-kw-meta">{k.freq}次 · {k.sourceCount}源</span>
+                            </button>
+                          ))}
                         </div>
                       </section>
                     )}
