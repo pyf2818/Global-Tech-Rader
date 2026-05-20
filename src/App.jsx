@@ -2376,16 +2376,6 @@ ${signals}
               : insightData.anomalies.length >= 1 || insightData.todayCount > insightData.yesterdayCount * 1.5 ? { label: '活跃', color: '#f59e0b' }
               : { label: '正常', color: '#10b981' };
 
-            // 赛道态势标签
-            const getSectorStatus = (c) => {
-              if (c.growth > 80) return { label: '突增信号', color: '#f59e0b' };
-              if (c.growth > 30) return { label: '持续升温', color: '#10b981' };
-              if (c.growth > 5) return { label: '稳步增长', color: '#22d3ee' };
-              if (c.growth > -5) return { label: '持平', color: '#6b7280' };
-              if (c.growth > -30) return { label: '小幅降温', color: '#f87171' };
-              return { label: '显著降温', color: '#ef4444' };
-            };
-
             // 追踪目标信号
             const getTrackerStatus = (target) => {
               const data = trackerData[target.id] || { weekly: 0 };
@@ -2481,38 +2471,36 @@ ${signals}
 
                     {/* 赛道态势矩阵 */}
                     <section className="insight-section">
-                      <h3 className="insight-section-title">赛道态势</h3>
-                      <div className="sector-grid">
-                        {insightData.categoryGrowth.map(c => {
-                          const status = getSectorStatus(c);
-                          const maxVal = Math.max(...c.daily7, 1);
-                          const sparkH = 24;
-                          const sparkW = 56;
-                          const pts = c.daily7.map((v, i) => `${(i / 6) * sparkW},${sparkH - (v / maxVal) * (sparkH - 2) - 1}`).join(' ');
-                          const areaPts = `0,${sparkH} ${pts} ${sparkW},${sparkH}`;
-                          const sparkColor = c.growth > 0 ? '#10b981' : c.growth < 0 ? '#ef4444' : '#6b7280';
-                          return (
-                            <div key={c.id} className="sector-card" onClick={() => { setCategory(c.id); setNav('all'); }}>
-                              <div className="sector-card-header">
-                                <span className="sector-card-name">{c.label}</span>
-                                <span className="sector-card-status" style={{ color: status.color }}>{status.label}</span>
-                              </div>
-                              <svg className="sector-sparkline" width={sparkW} height={sparkH} viewBox={`0 0 ${sparkW} ${sparkH}`}>
-                                <polygon points={areaPts} fill={sparkColor} opacity="0.12" />
-                                <polyline points={pts} fill="none" stroke={sparkColor} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                                {c.daily7.map((v, i) => (
-                                  <circle key={i} cx={(i / 6) * sparkW} cy={sparkH - (v / maxVal) * (sparkH - 2) - 1} r={v > 0 ? 1.5 : 0} fill={sparkColor} opacity="0.6" />
-                                ))}
-                              </svg>
-                              <div className="sector-card-body">
-                                <span className="sector-card-count">{c.recent}条</span>
-                                <span className={`sector-card-change ${c.growth > 0 ? 'up' : c.growth < 0 ? 'down' : ''}`}>
-                                  {c.growth > 0 ? '+' : ''}{c.growth}%
-                                </span>
-                              </div>
-                            </div>
-                          );
-                        })}
+                      <h3 className="insight-section-title">赛道态势（近7日）</h3>
+                      <div className="sector-chart">
+                        <div className="sector-chart-legend">
+                          {insightData.categoryGrowth.slice(0, 12).map(c => {
+                            const color = c.growth > 0 ? '#10b981' : c.growth < 0 ? '#ef4444' : '#6b7280';
+                            return (
+                              <button key={c.id} className={`sector-legend-item ${c.id === category ? 'active' : ''}`} onClick={() => setCategory(c.id === category ? 'all' : c.id)}>
+                                <span className="legend-dot" style={{ background: color }} />
+                                <span className="legend-label">{c.label}</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                        <svg className="sector-line-chart" viewBox="0 0 400 120" preserveAspectRatio="xMidYMid meet">
+                          {insightData.day7.map((d, i) => (
+                            <line key={`g${i}`} x1={30 + i * 55} y1={10} x2={30 + i * 55} y2={108} stroke="var(--border-color)" strokeWidth="0.5" opacity="0.4" />
+                          ))}
+                          {[0, 25, 50, 75, 100].map(pct => (
+                            <line key={`h${pct}`} x1={30} y1={10 + (pct / 100) * 98} x2={380} y2={10 + (pct / 100) * 98} stroke="var(--border-color)" strokeWidth="0.5" opacity="0.3" />
+                          ))}
+                          {insightData.categoryGrowth.slice(0, 12).map(c => {
+                            const maxDay = Math.max(...c.daily7, 1);
+                            const pts = c.daily7.map((v, i) => `${30 + i * 55},${108 - (v / maxDay) * 98}`).join(' ');
+                            const color = c.growth > 0 ? '#10b981' : c.growth < 0 ? '#ef4444' : '#6b7280';
+                            return <polyline key={c.id} points={pts} fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" opacity={category === 'all' || category === c.id ? 1 : 0.15} />;
+                          })}
+                          {insightData.day7.map((d, i) => (
+                            <text key={`d${i}`} x={30 + i * 55} y={118} textAnchor="middle" fill="var(--text-muted)" fontSize="8">{d.slice(5)}</text>
+                          ))}
+                        </svg>
                       </div>
                     </section>
 
