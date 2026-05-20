@@ -661,12 +661,13 @@ function App() {
     const day7 = day14.slice(7);
     const day7prev = day14.slice(0, 7);
 
-    // 赛道增长率（近7天 vs 前7天）
+    // 赛道增长率（近7天 vs 前7天）+ 7日趋势线
     const categoryGrowth = CATEGORIES.map(cat => {
-      const recent = day7.map(d => items.filter(i => i.category === cat.id && i.publishedAt?.slice(0, 10) === d).length).reduce((a, b) => a + b, 0);
+      const daily7 = day7.map(d => items.filter(i => i.category === cat.id && i.publishedAt?.slice(0, 10) === d).length);
+      const recent = daily7.reduce((a, b) => a + b, 0);
       const prev = day7prev.map(d => items.filter(i => i.category === cat.id && i.publishedAt?.slice(0, 10) === d).length).reduce((a, b) => a + b, 0);
       const growth = prev === 0 ? (recent > 0 ? 100 : 0) : Math.round(((recent - prev) / prev) * 100);
-      return { id: cat.id, label: cat.label, recent, prev, growth };
+      return { id: cat.id, label: cat.label, recent, prev, growth, daily7 };
     }).sort((a, b) => b.growth - a.growth);
 
     // 赛道动量分数（近3天加权）
@@ -2484,12 +2485,25 @@ ${signals}
                       <div className="sector-grid">
                         {insightData.categoryGrowth.map(c => {
                           const status = getSectorStatus(c);
+                          const maxVal = Math.max(...c.daily7, 1);
+                          const sparkH = 24;
+                          const sparkW = 56;
+                          const pts = c.daily7.map((v, i) => `${(i / 6) * sparkW},${sparkH - (v / maxVal) * (sparkH - 2) - 1}`).join(' ');
+                          const areaPts = `0,${sparkH} ${pts} ${sparkW},${sparkH}`;
+                          const sparkColor = c.growth > 0 ? '#10b981' : c.growth < 0 ? '#ef4444' : '#6b7280';
                           return (
                             <div key={c.id} className="sector-card" onClick={() => { setCategory(c.id); setNav('all'); }}>
                               <div className="sector-card-header">
                                 <span className="sector-card-name">{c.label}</span>
                                 <span className="sector-card-status" style={{ color: status.color }}>{status.label}</span>
                               </div>
+                              <svg className="sector-sparkline" width={sparkW} height={sparkH} viewBox={`0 0 ${sparkW} ${sparkH}`}>
+                                <polygon points={areaPts} fill={sparkColor} opacity="0.12" />
+                                <polyline points={pts} fill="none" stroke={sparkColor} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                                {c.daily7.map((v, i) => (
+                                  <circle key={i} cx={(i / 6) * sparkW} cy={sparkH - (v / maxVal) * (sparkH - 2) - 1} r={v > 0 ? 1.5 : 0} fill={sparkColor} opacity="0.6" />
+                                ))}
+                              </svg>
                               <div className="sector-card-body">
                                 <span className="sector-card-count">{c.recent}条</span>
                                 <span className={`sector-card-change ${c.growth > 0 ? 'up' : c.growth < 0 ? 'down' : ''}`}>
