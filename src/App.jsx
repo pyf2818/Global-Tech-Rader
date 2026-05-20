@@ -2426,22 +2426,6 @@ function App() {
             );
           })()}
 
-              {/* 活跃关键词 */}
-              {insightData.risingKeywords.length > 0 && (
-                <div className="intel-section">
-                  <h3 className="intel-section-title">{ICONS.sparkle} 活跃关键词</h3>
-                  <div className="intel-keyword-cloud">
-                    {insightData.risingKeywords.map(([kw, count]) => {
-                      const maxC = insightData.risingKeywords[0]?.[1] || 1;
-                      const size = 12 + (count / maxC) * 14;
-                      return <button key={kw} className="intel-keyword" style={{ fontSize: `${size}px` }} onClick={() => executeSearch(kw)}>{kw} <span className="intel-keyword-count">{count}</span></button>;
-                    })}
-                  </div>
-                </div>
-              )}
-            </>
-          )}
-
           {nav === 'materials' && (
             <div className="trends-dashboard">
               <div className="trends-header">
