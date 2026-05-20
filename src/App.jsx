@@ -1531,6 +1531,104 @@ ${signals}
     }
   }
 
+  // Markdown 简化渲染（支持标题、粗体、列表）
+  function renderMarkdown(text) {
+    const lines = text.split('\n');
+    const elements = [];
+    let inList = false;
+    let listItems = [];
+
+    const flushList = () => {
+      if (listItems.length > 0) {
+        elements.push(<ul key={`list-${elements.length}`} className="brief-list">{listItems.map((item, i) => <li key={i}>{item}</li>)}</ul>);
+        listItems = [];
+        inList = false;
+      }
+    };
+
+    lines.forEach((line, idx) => {
+      const trimmed = line.trim();
+      if (!trimmed) {
+        flushList();
+        return;
+      }
+      // 标题
+      if (trimmed.startsWith('## ')) {
+        flushList();
+        elements.push(<h4 key={idx} className="brief-h2">{renderInline(trimmed.slice(3))}</h4>);
+      } else if (trimmed.startsWith('# ')) {
+        flushList();
+        elements.push(<h3 key={idx} className="brief-h1">{renderInline(trimmed.slice(2))}</h3>);
+      } else if (trimmed.startsWith('- ') || trimmed.startsWith('1. ') || /^\d+\.\s/.test(trimmed)) {
+        inList = true;
+        const content = trimmed.replace(/^[-\d]+\.\s|^- /, '');
+        listItems.push(renderInline(content));
+      } else {
+        flushList();
+        elements.push(<p key={idx} className="brief-p">{renderInline(trimmed)}</p>);
+      }
+    });
+    flushList();
+    return elements;
+  }
+
+  function renderInline(text) {
+    // 粗体 **text**
+    const parts = text.split(/\*\*(.*?)\*\*/g);
+    if (parts.length === 1) return text;
+    return parts.map((part, i) => i % 2 === 1 ? <strong key={i}>{part}</strong> : part);
+  }
+
+  // 保存简报到素材库
+  function saveBriefToMaterials() {
+    if (!aiBrief.content) return;
+    const title = `AI简报 · ${new Date(aiBrief.generatedAt).toLocaleDateString('zh-CN')}`;
+    const newMaterial = {
+      id: Date.now(),
+      type: 'viewpoint',
+      title,
+      content: aiBrief.content,
+      source: 'AI 每日简报',
+      url: '',
+      tags: ['AI简报'],
+      note: '',
+      createdAt: new Date().toISOString()
+    };
+    setMaterials(prev => [...prev, newMaterial]);
+    const toast = document.createElement('div');
+    toast.className = 'material-toast';
+    toast.textContent = '已保存到素材库';
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 2000);
+  }
+
+  // 导出简报到创作中心
+  function exportBriefToEditor() {
+    if (!aiBrief.content) return;
+    const title = `AI简报 · ${new Date(aiBrief.generatedAt).toLocaleDateString('zh-CN')}`;
+    const newArticle = {
+      id: Date.now(),
+      title,
+      content: aiBrief.content,
+      template: 'blank',
+      materials: [],
+      tags: ['AI简报'],
+      status: 'draft',
+      spaceId: null,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      version: 1
+    };
+    setArticles(prev => [...prev, newArticle]);
+    setCurrentArticleId(newArticle.id);
+    setNav('editor');
+    const toast = document.createElement('div');
+    toast.className = 'material-toast';
+    toast.textContent = '已导出到创作中心';
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 2000);
+  }
+
   const readingStatsData = useMemo(() => {
     const buildDayKeys = (days) => Array.from({ length: days }).map((_, idx) => {
       const d = new Date();
@@ -2232,18 +2330,18 @@ ${signals}
             };
 
             // 态势等级
-            const severityLevel = insightData.anomalies.length >= 3 ? { label: '爆发', color: '#ef4444', icon: '🔴' }
-              : insightData.anomalies.length >= 1 || insightData.todayCount > insightData.yesterdayCount * 1.5 ? { label: '活跃', color: '#f59e0b', icon: '🟡' }
-              : { label: '正常', color: '#10b981', icon: '🟢' };
+            const severityLevel = insightData.anomalies.length >= 3 ? { label: '爆发', color: '#ef4444' }
+              : insightData.anomalies.length >= 1 || insightData.todayCount > insightData.yesterdayCount * 1.5 ? { label: '活跃', color: '#f59e0b' }
+              : { label: '正常', color: '#10b981' };
 
             // 赛道态势标签
             const getSectorStatus = (c) => {
-              if (c.growth > 80) return { label: '突增信号', icon: '⚡', color: '#f59e0b' };
-              if (c.growth > 30) return { label: '持续升温', icon: '🔥', color: '#10b981' };
-              if (c.growth > 5) return { label: '稳步增长', icon: '↗', color: '#22d3ee' };
-              if (c.growth > -5) return { label: '持平', icon: '—', color: '#6b7280' };
-              if (c.growth > -30) return { label: '小幅降温', icon: '↘', color: '#f87171' };
-              return { label: '显著降温', icon: '❄️', color: '#ef4444' };
+              if (c.growth > 80) return { label: '突增信号', color: '#f59e0b' };
+              if (c.growth > 30) return { label: '持续升温', color: '#10b981' };
+              if (c.growth > 5) return { label: '稳步增长', color: '#22d3ee' };
+              if (c.growth > -5) return { label: '持平', color: '#6b7280' };
+              if (c.growth > -30) return { label: '小幅降温', color: '#f87171' };
+              return { label: '显著降温', color: '#ef4444' };
             };
 
             // 追踪目标信号
@@ -2271,13 +2369,12 @@ ${signals}
                 {/* 洞察子导航 */}
                 <div className="insight-tabs">
                   {[
-                    { id: 'overview', label: '今日态势', icon: '📊' },
-                    { id: 'trends', label: '赛道矩阵', icon: '📈' },
-                    { id: 'tracker', label: '我的追踪', icon: '👁️' },
-                    { id: 'profile', label: '阅读画像', icon: '📖' }
+                    { id: 'overview', label: '今日态势' },
+                    { id: 'trends', label: '赛道矩阵' },
+                    { id: 'tracker', label: '我的追踪' },
+                    { id: 'profile', label: '阅读画像' }
                   ].map(tab => (
                     <button key={tab.id} className={`insight-tab ${insightTab === tab.id ? 'active' : ''}`} onClick={() => setInsightTab(tab.id)}>
-                      <span className="insight-tab-icon">{tab.icon}</span>
                       <span className="insight-tab-label">{tab.label}</span>
                     </button>
                   ))}
@@ -2289,15 +2386,14 @@ ${signals}
                     {/* 态势总览条 */}
                     <div className="insight-status-bar" style={{ borderLeft: `4px solid ${severityLevel.color}` }}>
                       <div className="insight-status-main">
-                        <span className="insight-status-icon">{severityLevel.icon}</span>
                         <span className="insight-status-text">科技资讯态势<strong style={{ color: severityLevel.color }}> {severityLevel.label} </strong>今日收录 <strong>{insightData.todayCount}</strong> 条
                           {insightData.dailyChange !== 0 && <span className={insightData.dailyChange > 0 ? 'text-up' : 'text-down'}> {insightData.dailyChange > 0 ? '↑' : '↓'}{Math.abs(insightData.dailyChange)}% vs 昨日</span>}
                         </span>
                       </div>
                       <div className="insight-status-meta">
-                        {insightData.categoryRanking[0] && <span>🔥 {insightData.categoryRanking[0].label} ({insightData.categoryRanking[0].recent}条)</span>}
-                        {insightData.anomalies.length > 0 && <span>⚡ {insightData.anomalies.length} 个信号</span>}
-                        {readingProfile.streak > 0 && <span>📖 连续{readingProfile.streak}天</span>}
+                        {insightData.categoryRanking[0] && <span className="status-tag hot">热 {insightData.categoryRanking[0].label} ({insightData.categoryRanking[0].recent}条)</span>}
+                        {insightData.anomalies.length > 0 && <span className="status-tag signal">信号 {insightData.anomalies.length} 个</span>}
+                        {readingProfile.streak > 0 && <span className="status-tag streak">连续 {readingProfile.streak} 天</span>}
                       </div>
                     </div>
 
@@ -2306,14 +2402,22 @@ ${signals}
                       <div className="ai-brief-card">
                         <div className="ai-brief-header">
                           <h3 className="ai-brief-title">AI 每日简报</h3>
-                          <button className="ai-brief-generate" onClick={generateAiBrief} disabled={aiBrief.loading}>
-                            {aiBrief.loading ? '生成中...' : aiBrief.content ? '重新生成' : '生成简报'}
-                          </button>
+                          <div className="ai-brief-actions">
+                            {aiBrief.content && (
+                              <>
+                                <button className="ai-brief-action-btn" onClick={saveBriefToMaterials} title="保存到素材库">存素材</button>
+                                <button className="ai-brief-action-btn primary" onClick={exportBriefToEditor" title="导出到创作中心">导出</button>
+                              </>
+                            )}
+                            <button className="ai-brief-generate" onClick={generateAiBrief} disabled={aiBrief.loading}>
+                              {aiBrief.loading ? '生成中...' : aiBrief.content ? '重新生成' : '生成简报'}
+                            </button>
+                          </div>
                         </div>
                         {aiBrief.error && <div className="ai-brief-error">{aiBrief.error}</div>}
                         {aiBrief.content && (
                           <div className="ai-brief-content">
-                            <pre>{aiBrief.content}</pre>
+                            {renderMarkdown(aiBrief.content)}
                             <div className="ai-brief-time">生成于 {new Date(aiBrief.generatedAt).toLocaleTimeString('zh-CN')}</div>
                           </div>
                         )}
@@ -2349,7 +2453,7 @@ ${signals}
                               <span className={`insight-sector-change ${c.growth > 0 ? 'up' : c.growth < 0 ? 'down' : ''}`}>
                                 {c.growth > 0 ? '+' : ''}{c.growth}%
                               </span>
-                              <span className="insight-sector-status" style={{ color: status.color }}>{status.icon} {status.label}</span>
+                              <span className="insight-sector-status" style={{ color: status.color }}>{status.label}</span>
                             </div>
                           );
                         })}
@@ -2375,7 +2479,6 @@ ${signals}
                         {(signalFilter === 'all' || signalFilter === 'surge') && insightData.anomalies.filter(a => a.type === 'surge').map(a => (
                           <div key={a.id} className={`insight-signal-card ${a.type}`}>
                             <div className="insight-signal-accent" style={{ background: '#10b981' }} />
-                            <span className="insight-signal-icon">🔥</span>
                             <div className="insight-signal-body">
                               <span className="insight-signal-name">{a.label} 升温</span>
                               <span className="insight-signal-desc">前7天 {a.prev}条 → 近7天 {a.recent}条</span>
@@ -2386,7 +2489,6 @@ ${signals}
                         {(signalFilter === 'all' || signalFilter === 'drop') && insightData.anomalies.filter(a => a.type === 'drop').map(a => (
                           <div key={a.id} className={`insight-signal-card ${a.type}`}>
                             <div className="insight-signal-accent" style={{ background: '#ef4444' }} />
-                            <span className="insight-signal-icon">❄️</span>
                             <div className="insight-signal-body">
                               <span className="insight-signal-name">{a.label} 降温</span>
                               <span className="insight-signal-desc">前7天 {a.prev}条 → 近7天 {a.recent}条</span>
@@ -2397,7 +2499,6 @@ ${signals}
                         {(signalFilter === 'all' || signalFilter === 'cross-source') && insightData.crossSourceSignals.slice(0, 5).map(s => (
                           <div key={s.keyword} className="insight-signal-card cross-source">
                             <div className="insight-signal-accent" style={{ background: s.confidence === 'high' ? '#3b82f6' : '#6366f1' }} />
-                            <span className="insight-signal-icon">🔗</span>
                             <div className="insight-signal-body">
                               <span className="insight-signal-name">{s.keyword} 跨源验证</span>
                               <span className="insight-signal-desc">{s.sourceCount} 个来源报道 · {s.freq} 次提及 · 置信度{s.confidence === 'high' ? '高' : '中'}</span>
@@ -2578,11 +2679,11 @@ ${signals}
                       {trackTargets.map(target => {
                         const st = getTrackerStatus(target);
                         let statusLabel = '—', statusColor = '#6b7280', statusIcon = '';
-                        if (st.isSurge) { statusLabel = '今日突增'; statusColor = '#f59e0b'; statusIcon = '⚡'; }
-                        else if (st.isStreak) { statusLabel = '连续增长'; statusColor = '#10b981'; statusIcon = '🔥'; }
-                        else if (st.isDrop) { statusLabel = '显著降温'; statusColor = '#ef4444'; statusIcon = '❄️'; }
-                        else if (st.growth > 0) { statusLabel = '小幅增长'; statusColor = '#22d3ee'; statusIcon = '↗'; }
-                        else if (st.growth < 0) { statusLabel = '小幅下降'; statusColor = '#f87171'; statusIcon = '↘'; }
+                        if (st.isSurge) { statusLabel = '今日突增'; statusColor = '#f59e0b'; statusIcon = '!'; }
+                        else if (st.isStreak) { statusLabel = '连续增长'; statusColor = '#10b981'; statusIcon = '+'; }
+                        else if (st.isDrop) { statusLabel = '显著降温'; statusColor = '#ef4444'; statusIcon = '-'; }
+                        else if (st.growth > 0) { statusLabel = '小幅增长'; statusColor = '#22d3ee'; statusIcon = '↑'; }
+                        else if (st.growth < 0) { statusLabel = '小幅下降'; statusColor = '#f87171'; statusIcon = '↓'; }
 
                         const maxC = Math.max(...st.counts, 1);
                         return (
@@ -2620,22 +2721,18 @@ ${signals}
                     {/* 核心指标 */}
                     <div className="reading-metrics">
                       <div className="reading-metric">
-                        <span className="reading-metric-icon">🔥</span>
                         <span className="reading-metric-value">{readingProfile.streak}</span>
                         <span className="reading-metric-label">连续天数</span>
                       </div>
                       <div className="reading-metric">
-                        <span className="reading-metric-icon">📖</span>
                         <span className="reading-metric-value">{readingProfile.avgDailyRead}</span>
                         <span className="reading-metric-label">日均阅读</span>
                       </div>
                       <div className="reading-metric">
-                        <span className="reading-metric-icon">✅</span>
                         <span className="reading-metric-value">{readingProfile.readRate}%</span>
                         <span className="reading-metric-label">读完率</span>
                       </div>
                       <div className="reading-metric">
-                        <span className="reading-metric-icon">🕐</span>
                         <span className="reading-metric-value">{String(readingProfile.peakHour).padStart(2, '0')}:00</span>
                         <span className="reading-metric-label">阅读高峰</span>
                       </div>
