@@ -322,6 +322,8 @@ function App() {
   const [selectedMaterials, setSelectedMaterials] = useState([]);
   const [showAddMaterial, setShowAddMaterial] = useState(false);
   const [aiResult, setAiResult] = useState({ loading: false, content: '', error: '', action: '' });
+  const [aiBrief, setAiBrief] = useState({ loading: false, content: '', error: '', generatedAt: null });
+  const [signalFilter, setSignalFilter] = useState('all');
   const [articleExportFilter, setArticleExportFilter] = useState('all');
   const [articleSearch, setArticleSearch] = useState('');
   const [articleStatusFilter, setArticleStatusFilter] = useState('all');
@@ -1482,6 +1484,53 @@ function App() {
     setAiResult({ loading: false, content: '', error: '', action: '' });
   }
 
+  // AI 每日简报生成
+  async function generateAiBrief() {
+    if (!llmConfig.baseUrl || !llmConfig.selectedModel) {
+      setAiBrief({ loading: false, content: '', error: '请先在设置中配置大模型', generatedAt: null });
+      return;
+    }
+    setAiBrief({ loading: true, content: '', error: '', generatedAt: null });
+    try {
+      const topNews = items.slice(0, 15).map(i => `- ${i.title} (${i.source})`).join('\n');
+      const signals = insightData.anomalies.slice(0, 5).map(a => `- ${a.label}: ${a.type === 'surge' ? '升温' : '降温'} ${a.growth > 0 ? '+' : ''}${a.growth}%`).join('\n');
+      const prompt = `请根据以下今日科技资讯生成一份简洁的中文每日简报（500字以内）：
+
+## 要闻
+${topNews}
+
+## 信号
+${signals}
+
+格式要求：
+1. 【今日焦点】1-2条最重要新闻及简评
+2. 【赛道观察】2-3个值得关注的趋势
+3. 【明日关注】1-2个前瞻性预测
+
+保持简洁客观，避免冗余。`;
+
+      const res = await fetch('/api/ai-generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          baseUrl: llmConfig.baseUrl,
+          apiKey: llmConfig.apiKey,
+          model: llmConfig.selectedModel,
+          action: 'custom',
+          content: prompt
+        })
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setAiBrief({ loading: false, content: data.content, error: '', generatedAt: new Date().toISOString() });
+      } else {
+        setAiBrief({ loading: false, content: '', error: data.error || '生成失败', generatedAt: null });
+      }
+    } catch (e) {
+      setAiBrief({ loading: false, content: '', error: e.message, generatedAt: null });
+    }
+  }
+
   const readingStatsData = useMemo(() => {
     const buildDayKeys = (days) => Array.from({ length: days }).map((_, idx) => {
       const d = new Date();
@@ -2252,6 +2301,37 @@ function App() {
                       </div>
                     </div>
 
+                    {/* AI 每日简报 */}
+                    <section className="insight-section">
+                      <div className="ai-brief-card">
+                        <div className="ai-brief-header">
+                          <h3 className="ai-brief-title">AI 每日简报</h3>
+                          <button className="ai-brief-generate" onClick={generateAiBrief} disabled={aiBrief.loading}>
+                            {aiBrief.loading ? '生成中...' : aiBrief.content ? '重新生成' : '生成简报'}
+                          </button>
+                        </div>
+                        {aiBrief.error && <div className="ai-brief-error">{aiBrief.error}</div>}
+                        {aiBrief.content && (
+                          <div className="ai-brief-content">
+                            <pre>{aiBrief.content}</pre>
+                            <div className="ai-brief-time">生成于 {new Date(aiBrief.generatedAt).toLocaleTimeString('zh-CN')}</div>
+                          </div>
+                        )}
+                        {!aiBrief.content && !aiBrief.loading && !aiBrief.error && (
+                          <div className="ai-brief-placeholder">
+                            <p>基于今日 {insightData.todayCount} 条资讯自动生成摘要简报</p>
+                            <p className="ai-brief-hint">需要先在设置中配置大模型 API</p>
+                          </div>
+                        )}
+                        {aiBrief.loading && (
+                          <div className="ai-brief-loading">
+                            <div className="ai-brief-spinner" />
+                            <span>正在分析资讯数据，生成简报中...</span>
+                          </div>
+                        )}
+                      </div>
+                    </section>
+
                     {/* 赛道态势矩阵 */}
                     <section className="insight-section">
                       <h3 className="insight-section-title">赛道态势</h3>
@@ -2278,20 +2358,43 @@ function App() {
 
                     {/* 信号中心 */}
                     <section className="insight-section">
-                      <h3 className="insight-section-title">信号中心 <span className="insight-signal-count">{insightData.anomalies.length + insightData.crossSourceSignals.length}</span></h3>
+                      <div className="signal-center-header">
+                        <h3 className="insight-section-title" style={{ marginBottom: 0 }}>信号中心 <span className="insight-signal-count">{insightData.anomalies.length + insightData.crossSourceSignals.length}</span></h3>
+                        <div className="signal-filters">
+                          {[
+                            { id: 'all', label: '全部' },
+                            { id: 'surge', label: '升温' },
+                            { id: 'drop', label: '降温' },
+                            { id: 'cross-source', label: '跨源' }
+                          ].map(f => (
+                            <button key={f.id} className={`signal-filter-btn ${signalFilter === f.id ? 'active' : ''}`} onClick={() => setSignalFilter(f.id)}>{f.label}</button>
+                          ))}
+                        </div>
+                      </div>
                       <div className="insight-signals">
-                        {insightData.anomalies.map(a => (
+                        {(signalFilter === 'all' || signalFilter === 'surge') && insightData.anomalies.filter(a => a.type === 'surge').map(a => (
                           <div key={a.id} className={`insight-signal-card ${a.type}`}>
-                            <div className="insight-signal-accent" style={{ background: a.type === 'surge' ? '#10b981' : '#ef4444' }} />
-                            <span className="insight-signal-icon">{a.type === 'surge' ? '🔥' : '❄️'}</span>
+                            <div className="insight-signal-accent" style={{ background: '#10b981' }} />
+                            <span className="insight-signal-icon">🔥</span>
                             <div className="insight-signal-body">
-                              <span className="insight-signal-name">{a.label} {a.type === 'surge' ? '升温' : '降温'}</span>
+                              <span className="insight-signal-name">{a.label} 升温</span>
                               <span className="insight-signal-desc">前7天 {a.prev}条 → 近7天 {a.recent}条</span>
                             </div>
-                            <span className={`insight-signal-pct ${a.type === 'surge' ? 'up' : 'down'}`}>{a.growth > 0 ? '+' : ''}{a.growth}%</span>
+                            <span className="insight-signal-pct up">+{a.growth}%</span>
                           </div>
                         ))}
-                        {insightData.crossSourceSignals.slice(0, 5).map(s => (
+                        {(signalFilter === 'all' || signalFilter === 'drop') && insightData.anomalies.filter(a => a.type === 'drop').map(a => (
+                          <div key={a.id} className={`insight-signal-card ${a.type}`}>
+                            <div className="insight-signal-accent" style={{ background: '#ef4444' }} />
+                            <span className="insight-signal-icon">❄️</span>
+                            <div className="insight-signal-body">
+                              <span className="insight-signal-name">{a.label} 降温</span>
+                              <span className="insight-signal-desc">前7天 {a.prev}条 → 近7天 {a.recent}条</span>
+                            </div>
+                            <span className="insight-signal-pct down">{a.growth}%</span>
+                          </div>
+                        ))}
+                        {(signalFilter === 'all' || signalFilter === 'cross-source') && insightData.crossSourceSignals.slice(0, 5).map(s => (
                           <div key={s.keyword} className="insight-signal-card cross-source">
                             <div className="insight-signal-accent" style={{ background: s.confidence === 'high' ? '#3b82f6' : '#6366f1' }} />
                             <span className="insight-signal-icon">🔗</span>
@@ -2302,6 +2405,12 @@ function App() {
                             <span className="insight-signal-pct cross-source" style={{ color: s.confidence === 'high' ? '#3b82f6' : '#6366f1' }}>{s.sourceCount}源</span>
                           </div>
                         ))}
+                        {((signalFilter === 'surge' && insightData.anomalies.filter(a => a.type === 'surge').length === 0) ||
+                          (signalFilter === 'drop' && insightData.anomalies.filter(a => a.type === 'drop').length === 0) ||
+                          (signalFilter === 'cross-source' && insightData.crossSourceSignals.length === 0) ||
+                          (insightData.anomalies.length === 0 && insightData.crossSourceSignals.length === 0)) && (
+                          <div className="signal-empty">暂无{signalFilter === 'all' ? '' : signalFilter === 'surge' ? '升温' : signalFilter === 'drop' ? '降温' : '跨源'}信号</div>
+                        )}
                       </div>
                     </section>
 
@@ -2363,6 +2472,71 @@ function App() {
                               <div className="insight-region-bar" style={{ width: `${r.pct}%`, background: r.color }} />
                             </div>
                             <span className="insight-region-pct">{r.pct}%</span>
+                          </div>
+                        ))}
+                      </div>
+                    </section>
+
+                    {/* 技术雷达四象限 */}
+                    <section className="insight-section">
+                      <h3 className="insight-section-title">技术雷达（Gartner 四象限）</h3>
+                      <div className="tech-radar-grid">
+                        <div className="tech-radar-quadrant adopt">
+                          <h4 className="radar-quadrant-title">采用 Adopt</h4>
+                          <span className="radar-quadrant-desc">成熟稳定，高频率，广泛覆盖</span>
+                          <div className="radar-items">
+                            {insightData.techRadar.filter(c => c.quadrant === 'adopt').map(c => (
+                              <span key={c.id} className="radar-item" onClick={() => { setCategory(c.id); setNav('all'); }}>{c.label}</span>
+                            ))}
+                            {insightData.techRadar.filter(c => c.quadrant === 'adopt').length === 0 && <span className="radar-item radar-item-empty">暂无</span>}
+                          </div>
+                        </div>
+                        <div className="tech-radar-quadrant trial">
+                          <h4 className="radar-quadrant-title">试验 Trial</h4>
+                          <span className="radar-quadrant-desc">中高频，增长快速</span>
+                          <div className="radar-items">
+                            {insightData.techRadar.filter(c => c.quadrant === 'trial').map(c => (
+                              <span key={c.id} className="radar-item" onClick={() => { setCategory(c.id); setNav('all'); }}>{c.label}</span>
+                            ))}
+                            {insightData.techRadar.filter(c => c.quadrant === 'trial').length === 0 && <span className="radar-item radar-item-empty">暂无</span>}
+                          </div>
+                        </div>
+                        <div className="tech-radar-quadrant assess">
+                          <h4 className="radar-quadrant-title">评估 Assess</h4>
+                          <span className="radar-quadrant-desc">低频但极速增长（新兴）</span>
+                          <div className="radar-items">
+                            {insightData.techRadar.filter(c => c.quadrant === 'assess').map(c => (
+                              <span key={c.id} className="radar-item" onClick={() => { setCategory(c.id); setNav('all'); }}>{c.label}</span>
+                            ))}
+                            {insightData.techRadar.filter(c => c.quadrant === 'assess').length === 0 && <span className="radar-item radar-item-empty">暂无</span>}
+                          </div>
+                        </div>
+                        <div className="tech-radar-quadrant hold">
+                          <h4 className="radar-quadrant-title">暂缓 Hold</h4>
+                          <span className="radar-quadrant-desc">低频，增长放缓或持平</span>
+                          <div className="radar-items">
+                            {insightData.techRadar.filter(c => c.quadrant === 'hold').map(c => (
+                              <span key={c.id} className="radar-item" onClick={() => { setCategory(c.id); setNav('all'); }}>{c.label}</span>
+                            ))}
+                            {insightData.techRadar.filter(c => c.quadrant === 'hold').length === 0 && <span className="radar-item radar-item-empty">暂无</span>}
+                          </div>
+                        </div>
+                      </div>
+                    </section>
+
+                    {/* 源质量排行 */}
+                    <section className="insight-section">
+                      <h3 className="insight-section-title">源质量排行</h3>
+                      <div className="source-quality-list">
+                        {insightData.sourceQuality.slice(0, 10).map((s, i) => (
+                          <div key={s.name} className="source-quality-row">
+                            <span className="source-quality-rank">{i + 1}</span>
+                            <span className="source-quality-name">{s.name}</span>
+                            <span className="source-quality-meta">{s.count}条 · {s.categories}赛道</span>
+                            <div className="source-quality-bar-wrap">
+                              <div className="source-quality-bar" style={{ width: `${s.qualityScore}%`, background: s.qualityScore > 70 ? '#10b981' : s.qualityScore > 40 ? '#f59e0b' : '#ef4444' }} />
+                            </div>
+                            <span className="source-quality-score">{s.qualityScore}</span>
                           </div>
                         ))}
                       </div>

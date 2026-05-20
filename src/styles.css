@@ -901,6 +901,24 @@ body {
 .insight-status-text strong { color: var(--text-primary); }
 .insight-status-meta { display: flex; gap: 16px; font-size: 12px; color: var(--text-muted); }
 
+/* AI 每日简报 */
+.ai-brief-card { background: linear-gradient(135deg, rgba(34, 211, 238, 0.04), rgba(168, 85, 247, 0.04)); border: 1px solid rgba(34, 211, 238, 0.15); border-radius: 10px; padding: 16px; }
+.ai-brief-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.ai-brief-title { font-size: 14px; font-weight: 700; color: var(--text-primary); margin: 0; }
+.ai-brief-generate { padding: 6px 14px; background: var(--gradient-primary); color: white; border: none; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; transition: opacity 0.15s; }
+.ai-brief-generate:hover:not(:disabled) { opacity: 0.85; }
+.ai-brief-generate:disabled { opacity: 0.6; cursor: wait; }
+.ai-brief-content { background: var(--bg-primary); border-radius: 8px; padding: 14px; border: 1px solid var(--border-color); }
+.ai-brief-content pre { white-space: pre-wrap; word-break: break-word; font-family: inherit; font-size: 13px; line-height: 1.7; color: var(--text-primary); margin: 0; }
+.ai-brief-time { font-size: 10px; color: var(--text-muted); margin-top: 8px; text-align: right; }
+.ai-brief-error { background: rgba(239, 68, 68, 0.08); border: 1px solid rgba(239, 68, 68, 0.2); border-radius: 8px; padding: 10px; font-size: 12px; color: #ef4444; }
+.ai-brief-placeholder { text-align: center; padding: 20px; color: var(--text-muted); font-size: 13px; }
+.ai-brief-placeholder p { margin: 4px 0; }
+.ai-brief-hint { font-size: 11px; color: var(--text-muted); opacity: 0.7; }
+.ai-brief-loading { display: flex; align-items: center; gap: 10px; padding: 20px; color: var(--text-secondary); font-size: 13px; }
+.ai-brief-spinner { width: 18px; height: 18px; border: 2px solid var(--border-color); border-top-color: var(--accent-cyan); border-radius: 50%; animation: spin 0.8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
 /* 洞察通用区块 */
 .insight-section { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; padding: 20px; }
 .insight-section-title { font-size: 15px; font-weight: 700; color: var(--text-primary); margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
@@ -920,7 +938,13 @@ body {
 .insight-sector-status { font-size: 11px; font-weight: 600; text-align: right; white-space: nowrap; }
 
 /* 信号中心 */
+.signal-center-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; flex-wrap: wrap; gap: 8px; }
+.signal-filters { display: flex; gap: 4px; }
+.signal-filter-btn { padding: 4px 10px; border: 1px solid var(--border-color); border-radius: 6px; background: transparent; color: var(--text-secondary); font-size: 11px; font-weight: 500; cursor: pointer; transition: all 0.15s; }
+.signal-filter-btn:hover { border-color: var(--accent-cyan); color: var(--accent-cyan); }
+.signal-filter-btn.active { background: rgba(34, 211, 238, 0.12); border-color: var(--accent-cyan); color: var(--accent-cyan); font-weight: 600; }
 .insight-signals { display: flex; flex-direction: column; gap: 10px; }
+.signal-empty { text-align: center; padding: 20px; color: var(--text-muted); font-size: 12px; }
 .insight-signal-card { display: flex; align-items: center; gap: 12px; padding: 14px; background: var(--bg-hover); border-radius: 10px; border-left: 3px solid; position: relative; overflow: hidden; }
 .insight-signal-card.surge { border-left-color: #10b981; }
 .insight-signal-card.drop { border-left-color: #ef4444; }
@@ -941,6 +965,41 @@ body {
 .insight-tech-kw:hover { border-color: var(--accent-cyan); background: rgba(34, 211, 238, 0.08); }
 .tech-kw-word { font-size: 12px; font-weight: 600; color: var(--text-primary); }
 .tech-kw-meta { font-size: 9px; color: var(--text-muted); }
+
+/* 技术雷达四象限 */
+.tech-radar-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.tech-radar-quadrant { padding: 14px; border-radius: 10px; border: 1px solid var(--border-color); }
+.tech-radar-quadrant.adopt { background: rgba(34, 211, 238, 0.04); border-color: rgba(34, 211, 238, 0.2); }
+.tech-radar-quadrant.trial { background: rgba(168, 85, 247, 0.04); border-color: rgba(168, 85, 247, 0.2); }
+.tech-radar-quadrant.assess { background: rgba(245, 158, 11, 0.04); border-color: rgba(245, 158, 11, 0.2); }
+.tech-radar-quadrant.hold { background: rgba(107, 114, 128, 0.04); border-color: rgba(107, 114, 128, 0.15); }
+.radar-quadrant-title { font-size: 14px; font-weight: 700; margin: 0 0 2px; }
+.adopt .radar-quadrant-title { color: #22d3ee; }
+.trial .radar-quadrant-title { color: #a855f7; }
+.assess .radar-quadrant-title { color: #f59e0b; }
+.hold .radar-quadrant-title { color: #6b7280; }
+.radar-quadrant-desc { display: block; font-size: 10px; color: var(--text-muted); margin-bottom: 10px; }
+.radar-items { display: flex; flex-wrap: wrap; gap: 6px; }
+.radar-item { padding: 4px 10px; border-radius: 6px; font-size: 11px; font-weight: 500; cursor: pointer; transition: all 0.15s; }
+.adopt .radar-item { background: rgba(34, 211, 238, 0.1); color: #22d3ee; }
+.adopt .radar-item:hover { background: rgba(34, 211, 238, 0.2); }
+.trial .radar-item { background: rgba(168, 85, 247, 0.1); color: #a855f7; }
+.trial .radar-item:hover { background: rgba(168, 85, 247, 0.2); }
+.assess .radar-item { background: rgba(245, 158, 11, 0.1); color: #f59e0b; }
+.assess .radar-item:hover { background: rgba(245, 158, 11, 0.2); }
+.hold .radar-item { background: rgba(107, 114, 128, 0.08); color: #6b7280; }
+.hold .radar-item:hover { background: rgba(107, 114, 128, 0.15); }
+.radar-item-empty { opacity: 0.4; cursor: default; }
+
+/* 源质量排行 */
+.source-quality-list { display: flex; flex-direction: column; gap: 8px; }
+.source-quality-row { display: grid; grid-template-columns: 24px 1fr 80px 60px 36px; gap: 8px; align-items: center; padding: 8px 10px; background: var(--bg-hover); border-radius: 8px; }
+.source-quality-rank { font-size: 12px; font-weight: 700; color: var(--text-muted); text-align: center; }
+.source-quality-name { font-size: 12px; font-weight: 600; color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.source-quality-meta { font-size: 10px; color: var(--text-muted); }
+.source-quality-bar-wrap { height: 4px; background: var(--bg-card); border-radius: 2px; overflow: hidden; }
+.source-quality-bar { height: 100%; border-radius: 2px; transition: width 0.3s; }
+.source-quality-score { font-size: 13px; font-weight: 700; color: var(--text-primary); text-align: right; }
 
 /* 头条要闻 */
 .insight-top-news { display: flex; flex-direction: column; gap: 6px; }
