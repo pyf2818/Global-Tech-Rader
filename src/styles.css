@@ -408,7 +408,7 @@ body {
 .github-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 12px; }
 .github-card { padding: 16px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 10px; transition: border-color 0.2s, transform 0.2s; animation: fadeUp 0.4s ease backwards; display: flex; flex-direction: column; gap: 10px; position: relative; }
 .github-card:hover { border-color: var(--border-active); transform: translateY(-2px); }
-.gh-bookmark-wrap { position: absolute; top: 12px; right: 12px; z-index: 10; display: flex; gap: 6px; }
+.gh-card-actions { position: absolute; bottom: 12px; right: 12px; z-index: 10; display: flex; gap: 6px; }
 .gh-bookmark-btn { width: 28px; height: 28px; display: grid; place-items: center; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 6px; color: var(--text-muted); cursor: pointer; transition: all 0.2s; }
 .gh-bookmark-btn:hover { border-color: var(--accent-amber); color: var(--accent-amber); }
 .gh-bookmark-btn.active { color: var(--accent-amber); background: rgba(251, 191, 36, 0.1); }
