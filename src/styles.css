@@ -6,8 +6,8 @@
   --border-color: rgba(255, 255, 255, 0.06);
   --border-active: rgba(56, 189, 248, 0.3);
   --text-primary: #f1f5f9;
-  --text-secondary: #94a3b8;
-  --text-muted: #64748b;
+  --text-secondary: #b0bcc8;
+  --text-muted: #8b9db3;
   --accent-cyan: #22d3ee;
   --accent-blue: #3b82f6;
   --accent-violet: #a78bfa;
@@ -64,10 +64,13 @@ body {
 .sidebar { position: fixed; left: 0; top: 0; bottom: 0; width: var(--sidebar-w); background: var(--bg-secondary); border-right: 1px solid var(--border-color); display: flex; flex-direction: column; z-index: 100; transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1); overflow: hidden; }
 .sidebar.collapsed { width: var(--sidebar-collapsed-w); }
 .sidebar-header { padding: 16px 12px; border-bottom: 1px solid var(--border-color); display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.sidebar.collapsed .sidebar-header { flex-direction: column; padding: 12px 4px; gap: 4px; }
 .logo { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; }
-.logo-icon { width: 32px; height: 32px; flex-shrink: 0; display: grid; place-items: center; background: var(--gradient-primary); border-radius: 8px; color: var(--bg-primary); }
-.logo-icon svg { width: 18px; height: 18px; }
-.logo-text { font-size: 14px; font-weight: 700; color: var(--text-primary); white-space: nowrap; transition: opacity 0.2s; }
+.logo-icon { width: 48px; height: 48px; flex-shrink: 0; display: grid; place-items: center; background: transparent; border-radius: 12px; position: relative; }
+.logo-icon svg { width: 44px; height: 44px; }
+.sidebar.collapsed .logo-icon { width: 32px; height: 32px; }
+.sidebar.collapsed .logo-icon svg { width: 28px; height: 28px; }
+.logo-text { font-size: 20px; font-weight: 700; background: linear-gradient(135deg, #22d3ee 0%, #3b82f6 50%, #a78bfa 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; white-space: nowrap; transition: opacity 0.2s; letter-spacing: 0.5px; text-shadow: 0 0 20px rgba(34, 211, 238, 0.3); max-width: 140px; overflow: hidden; text-overflow: ellipsis; }
 .sidebar.collapsed .logo-text { opacity: 0; pointer-events: none; }
 .collapse-btn { width: 28px; height: 28px; flex-shrink: 0; display: grid; place-items: center; background: transparent; border: 1px solid var(--border-color); border-radius: 6px; color: var(--text-muted); cursor: pointer; transition: all 0.2s; }
 .collapse-btn:hover { border-color: var(--border-active); color: var(--accent-cyan); }
@@ -940,16 +943,11 @@ body {
 .insight-signal-count { display: inline-flex; align-items: center; justify-content: center; min-width: 20px; height: 20px; padding: 0 6px; background: var(--accent-rose); color: white; border-radius: 10px; font-size: 11px; font-weight: 700; }
 
 /* 概览页顶部双栏 */
-.overview-top-row { display: grid; grid-template-columns: 1fr 280px; gap: 12px; align-items: start; }
+.overview-top-row { display: block; margin-bottom: 12px; }
 
 /* 头条要闻 - 紧凑模块 */
-.top-news-compact { border: 1px solid var(--border-color); }
-.top-news-compact .insight-section-title { margin-bottom: 10px; font-size: 13px; }
-.top-news-list { display: flex; flex-direction: column; gap: 4px; }
-.top-news-item { display: flex; align-items: baseline; gap: 8px; padding: 5px 6px; border-radius: 4px; cursor: pointer; transition: background 0.15s; }
-.top-news-item:hover { background: var(--bg-hover); }
-.top-news-num { width: 18px; height: 18px; display: grid; place-items: center; background: var(--gradient-primary); border-radius: 4px; color: var(--bg-primary); font-size: 10px; font-weight: 700; flex-shrink: 0; }
-.top-news-title { font-size: 12px; font-weight: 500; color: var(--text-primary); line-height: 1.4; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+
 
 /* 赛道态势统一图表 */
 .sector-stats-panel { background: var(--bg-hover); border: 1px solid var(--border-color); border-radius: 8px; padding: 10px 14px; margin-bottom: 10px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
@@ -1156,8 +1154,7 @@ body {
 
 /* 响应式 */
 @media (max-width: 768px) {
-  .overview-top-row { grid-template-columns: 1fr; }
-  .top-news-compact { order: -1; }
+  .overview-top-row { margin-bottom: 12px; }
   .reading-metrics { grid-template-columns: repeat(2, 1fr); }
   .insight-watchlist { grid-template-columns: 1fr; }
   .insight-status-meta { flex-wrap: wrap; gap: 8px; }
@@ -1655,4 +1652,42 @@ body {
 @media (max-width: 768px) {
   .insight-watchlist { grid-template-columns: 1fr; }
   .reading-metrics { grid-template-columns: repeat(2, 1fr); }
+}
+
+/* Logo Animations */
+.logo-core-glow { animation: coreGlowPulse 3s ease-in-out infinite; }
+.logo-rings { animation: ringsRotate 12s linear infinite; transform-origin: 24px 24px; }
+.logo-core { animation: coreFloat 4s ease-in-out infinite; }
+.logo-data-flow { animation: dataFlow 2s ease-in-out infinite; }
+.logo-nodes { animation: nodesPulse 3s ease-in-out infinite; }
+.logo-particles { animation: particlesOrbit 8s linear infinite; transform-origin: 24px 24px; }
+
+@keyframes coreGlowPulse {
+  0%, 100% { opacity: 0.8; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.15); }
+}
+
+@keyframes ringsRotate {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes coreFloat {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-2px); }
+}
+
+@keyframes dataFlow {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 1; }
+}
+
+@keyframes nodesPulse {
+  0%, 100% { opacity: 0.7; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.1); }
+}
+
+@keyframes particlesOrbit {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }

@@ -1,5 +1,38 @@
 import { useEffect, useMemo, useState, useRef, useCallback } from 'react';
 
+const MOTIVATIONAL_QUOTES = [
+  '保持饥饿',
+  '保持愚蠢',
+  '立刻行动',
+  '突破边界',
+  '构建未来',
+  '学无止境',
+  '创新为王',
+  '快速迭代',
+  '使命必达',
+  '持续构建',
+  '颠覆创新',
+  '少说多做',
+  '代码至上',
+  '敢于试错',
+  '完成优先',
+  '保持好奇',
+  '聚焦影响',
+  '解决真问',
+  '小步快跑',
+  '立刻行动',
+  '快速交付',
+  '用户第一',
+  '数据驱动',
+  '拥抱变化',
+  '精益求精',
+  '团队协作',
+  '结果导向',
+  '持续改进',
+  '追求卓越',
+  '永不放弃'
+];
+
 const NAV_ITEMS = [
   { id: 'all', label: '全部动态', icon: 'grid' },
   { id: 'recommendations', label: '智能推荐', icon: 'sparkle' },
@@ -249,6 +282,10 @@ function App() {
   const [showSettings, setShowSettings] = useState(false);
   const [stats, setStats] = useState({ sourceCount: 40, failedSources: 0, updatedAt: '', blockedCount: 0 });
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => localStorage.getItem('sidebarCollapsed') === 'true');
+  const motivationalQuote = useMemo(() => {
+    const idx = Math.floor(Math.random() * MOTIVATIONAL_QUOTES.length);
+    return MOTIVATIONAL_QUOTES[idx];
+  }, []);
   const [panelCollapsed, setPanelCollapsed] = useState(() => localStorage.getItem('panelCollapsed') === 'true');
   const [customSources, setCustomSources] = useState(() => loadLS('customSources', []));
   const [newSource, setNewSource] = useState({ name: '', url: '', region: 'overseas' });
@@ -2001,10 +2038,78 @@ ${signals}
       <aside className={`sidebar ${sidebarCollapsed ? 'collapsed' : ''} ${mobileMenuOpen ? 'mobile-open' : ''}`}>
         <div className="sidebar-header">
           <div className="logo">
-            <div className="logo-icon">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="8" strokeDasharray="4 2"/><line x1="12" y1="2" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="22"/><line x1="2" y1="12" x2="5" y2="12"/><line x1="19" y1="12" x2="22" y2="12"/></svg>
+<div className="logo-icon">
+              <svg viewBox="0 0 48 48" fill="none" className="logo-svg">
+                <defs>
+                  <linearGradient id="coreGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stopColor="#00f2ff"/>
+                    <stop offset="50%" stopColor="#00a8ff"/>
+                    <stop offset="100%" stopColor="#7c00ff"/>
+                  </linearGradient>
+                  <linearGradient id="ringGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stopColor="#00f2ff"/>
+                    <stop offset="100%" stopColor="#7c00ff"/>
+                  </linearGradient>
+                  <filter id="techGlow" x="-50%" y="-50%" width="200%" height="200%">
+                    <feGaussianBlur stdDeviation="2.5" result="blur"/>
+                    <feMerge>
+                      <feMergeNode in="blur"/>
+                      <feMergeNode in="blur"/>
+                      <feMergeNode in="SourceGraphic"/>
+                    </feMerge>
+                  </filter>
+                  <filter id="techGlowStrong" x="-100%" y="-100%" width="300%" height="300%">
+                    <feGaussianBlur stdDeviation="3" result="blur1"/>
+                    <feGaussianBlur stdDeviation="6" result="blur2"/>
+                    <feMerge>
+                      <feMergeNode in="blur2"/>
+                      <feMergeNode in="blur1"/>
+                      <feMergeNode in="SourceGraphic"/>
+                    </feMerge>
+                  </filter>
+                </defs>
+                <g className="logo-core-glow">
+                  <circle cx="24" cy="24" r="14" fill="url(#coreGrad)" opacity="0.15" filter="url(#techGlow)"/>
+                </g>
+                <g className="logo-rings">
+                  <circle cx="24" cy="24" r="20" stroke="url(#ringGrad)" strokeWidth="0.5" fill="none" opacity="0.4" strokeDasharray="3 2"/>
+                  <circle cx="24" cy="24" r="16" stroke="url(#ringGrad)" strokeWidth="1" fill="none" opacity="0.6"/>
+                  <circle cx="24" cy="24" r="12" stroke="url(#ringGrad)" strokeWidth="0.5" fill="none" opacity="0.5" strokeDasharray="2 3"/>
+                </g>
+                <g className="logo-core">
+                  <polygon points="24,10 31,13.5 31,20.5 31,27.5 24,31 17,27.5 17,20.5 17,13.5" stroke="url(#coreGrad)" strokeWidth="1.5" fill="rgba(0,242,255,0.1)"/>
+                  <polygon points="24,14 27,16 27,19 27,22 24,24 21,22 21,19 21,16" stroke="#00f2ff" strokeWidth="1" fill="rgba(0,242,255,0.2)" filter="url(#techGlow)"/>
+                  <circle cx="24" cy="19" r="1.5" fill="#00f2ff" filter="url(#techGlowStrong)"/>
+                </g>
+                <g className="logo-data-flow">
+                  <line x1="24" y1="5" x2="24" y2="8" stroke="#00f2ff" strokeWidth="1.5" opacity="0.9"/>
+                  <line x1="24" y1="31" x2="24" y2="34" stroke="#00f2ff" strokeWidth="1.5" opacity="0.9"/>
+                  <line x1="5" y1="19" x2="8" y2="19" stroke="#7c00ff" strokeWidth="1.5" opacity="0.9"/>
+                  <line x1="40" y1="19" x2="43" y2="19" stroke="#7c00ff" strokeWidth="1.5" opacity="0.9"/>
+                  <line x1="10" y1="10" x2="12.5" y2="12.5" stroke="#00a8ff" strokeWidth="1.5" opacity="0.9"/>
+                  <line x1="38" y1="10" x2="35.5" y2="12.5" stroke="#00a8ff" strokeWidth="1.5" opacity="0.9"/>
+                  <line x1="10" y1="28" x2="12.5" y2="25.5" stroke="#00a8ff" strokeWidth="1.5" opacity="0.9"/>
+                  <line x1="38" y1="28" x2="35.5" y2="25.5" stroke="#00a8ff" strokeWidth="1.5" opacity="0.9"/>
+                </g>
+                <g className="logo-nodes" filter="url(#techGlow)">
+                  <circle cx="24" cy="5" r="2" fill="#00f2ff"/>
+                  <circle cx="24" cy="43" r="2" fill="#00f2ff"/>
+                  <circle cx="5" cy="19" r="2" fill="#7c00ff"/>
+                  <circle cx="43" cy="19" r="2" fill="#7c00ff"/>
+                  <circle cx="10" cy="10" r="1.5" fill="#00a8ff"/>
+                  <circle cx="38" cy="10" r="1.5" fill="#00a8ff"/>
+                  <circle cx="10" cy="28" r="1.5" fill="#00a8ff"/>
+                  <circle cx="38" cy="28" r="1.5" fill="#00a8ff"/>
+                </g>
+                <g className="logo-particles">
+                  <circle cx="24" cy="2" r="0.8" fill="#00f2ff" opacity="0.8"/>
+                  <circle cx="46" cy="19" r="0.8" fill="#7c00ff" opacity="0.8"/>
+                  <circle cx="24" cy="46" r="0.8" fill="#00f2ff" opacity="0.8"/>
+                  <circle cx="2" cy="19" r="0.8" fill="#7c00ff" opacity="0.8"/>
+                </g>
+              </svg>
             </div>
-            <span className="logo-text">Tech Radar</span>
+            <span className="logo-text">{motivationalQuote}</span>
           </div>
           <button className="collapse-btn" onClick={() => setSidebarCollapsed(c => !c)} title={sidebarCollapsed ? '展开' : '收起'}>
             {sidebarCollapsed ? ICONS.chevronRight : ICONS.chevronLeft}
@@ -2429,19 +2534,6 @@ ${signals}
                           {readingProfile.streak > 0 && <span className="status-tag streak">连续 {readingProfile.streak} 天</span>}
                         </div>
                       </div>
-
-                      {/* 头条要闻 - 右上角小模块 */}
-                      <section className="insight-section top-news-compact">
-                        <h3 className="insight-section-title">头条要闻</h3>
-                        <div className="top-news-list">
-                          {dailyBriefing.topNews.slice(0, 5).map((item, i) => (
-                            <div key={item.id} className="top-news-item" onClick={() => window.open(item.url, '_blank')}>
-                              <span className="top-news-num">{i + 1}</span>
-                              <span className="top-news-title">{item.title}</span>
-                            </div>
-                          ))}
-                        </div>
-                      </section>
                     </div>
 
                     {/* AI 每日简报 */}
@@ -2483,6 +2575,8 @@ ${signals}
                         )}
                       </div>
                     </section>
+                  </>
+                )}
 
                     {/* ====== 趋势页 ====== */}
                 {insightTab === 'trends' && (
