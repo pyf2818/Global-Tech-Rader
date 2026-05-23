@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, useRef, useCallback } from 'react';
+import GlobeView from './GlobeView.jsx';
 
 const MOTIVATIONAL_QUOTES = [
   '保持饥饿',
@@ -378,10 +379,12 @@ function App() {
   const [aiCustomPrompt, setAiCustomPrompt] = useState('');
   const [articleSpaces, setArticleSpaces] = useState(() => loadLS('articleSpaces', []));
   const [articleSpaceFilter, setArticleSpaceFilter] = useState('all');
+  const [articleMaterialSpaceFilter, setArticleMaterialSpaceFilter] = useState('all');
   const [articleSpaceFormOpen, setArticleSpaceFormOpen] = useState(false);
   const [newArticleSpaceName, setNewArticleSpaceName] = useState('');
   const [articleSpaceForNewArticle, setArticleSpaceForNewArticle] = useState('all');
   const editorTextareaRef = useRef(null);
+  const imageInputRef = useRef(null);
 
   const feedRef = useRef(null);
   const searchInputRef = useRef(null);
@@ -1085,7 +1088,12 @@ function App() {
 
   function renderMarkdown(text) {
     if (!text) return '';
-    let html = text;
+    // 确保 text 是字符串
+    let str = text;
+    if (typeof str === 'object') {
+      str = str.content || str.text || JSON.stringify(str);
+    }
+    let html = typeof str === 'string' ? str : String(str);
     // Escape HTML (but preserve existing markdown syntax)
     html = html.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     // Fenced code blocks
@@ -1139,6 +1147,21 @@ function App() {
     html = html.replace(/\n/g, '<br>');
     return `<p>${html}</p>`;
   }
+
+  function renderMarkdownWithImages(text, images = []) {
+  if (!text) return '';
+  
+  // 将图片占位符替换为实际的 Base64 数据
+  let processedText = text;
+  if (images && images.length > 0) {
+    images.forEach(img => {
+      const placeholder = new RegExp(`!\\[(${img.alt})\\]\\(\\#${img.id}\\)`, 'g');
+      processedText = processedText.replace(placeholder, `![${img.alt}](${img.base64})`);
+    });
+  }
+  
+  return renderMarkdown(processedText);
+}
 
   function loadTrending(append = false, platform = trendingPlatform) {
     if (!append) {
@@ -1197,8 +1220,24 @@ function App() {
     setBookmarks(prev => prev.map(b => b.id === bookmarkId ? { ...b, isRead: !b.isRead, readAt: !b.isRead ? new Date().toISOString() : null } : b));
   }
 
+  // 根据内容智能判断素材类型
+  function detectMaterialType(item) {
+    if (item.category) {
+      const catMap = {
+        'ai-models': 'data', 'ai-apps': 'data', 'ai-tools': 'data',
+        'open-source': 'case', 'developer': 'case',
+        'funding': 'data', 'ipo': 'data', 'mergers-acquisitions': 'data',
+        'policy': 'viewpoint', 'regulation': 'viewpoint',
+        'industry-trends': 'viewpoint', 'emerging-tech': 'viewpoint',
+        'product-launch': 'case', 'partnership': 'case',
+      };
+      return catMap[item.category] || 'quote';
+    }
+    return 'quote';
+  }
+
   // 素材库操作
-  function toggleMaterial(item, type = 'quote', note = '') {
+  function toggleMaterial(item, type = null, note = '') {
     if (isInMaterials(item.id)) {
       setMaterials(prev => prev.filter(m => m.originalItemId !== item.id));
       const toast = document.createElement('div');
@@ -1207,10 +1246,13 @@ function App() {
       document.body.appendChild(toast);
       setTimeout(() => toast.remove(), 2000);
     } else {
+      const detectedType = type || detectMaterialType(item);
       const newMaterial = {
         id: Date.now(),
-        type,
+        type: detectedType,
+        title: item.title,
         content: item.summary || item.title,
+        fullContent: item.content || item.summary || item.title,
         source: item.source,
         url: item.url,
         tags: item.tags || [],
@@ -1227,7 +1269,7 @@ function App() {
     }
   }
 
-  function addManualMaterial({ title, content, type, source, url, tags, note }) {
+  function addManualMaterial({ title, content, type, source, url, tags, note, spaceId }) {
     const newMaterial = {
       id: Date.now(),
       type,
@@ -1237,6 +1279,7 @@ function App() {
       url: url || '',
       tags: tags ? tags.split(',').map(t => t.trim()).filter(Boolean) : [],
       note,
+      spaceId: spaceId ? Number(spaceId) : null,
       createdAt: new Date().toISOString()
     };
     setMaterials(prev => [...prev, newMaterial]);
@@ -1342,7 +1385,8 @@ function App() {
       spaceId: spaceId || null,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
-      version: 1
+      version: 1,
+      images: []
     };
     setArticles(prev => [...prev, newArticle]);
     return newArticle;
@@ -1444,6 +1488,54 @@ function App() {
     setArticles(prev => prev.map(a => a.id === article.id ? { ...a, materials: a.materials.filter(id => id !== materialId) } : a));
   }
 
+  // 处理图片上传
+  function handleImageUpload(article, file) {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const base64 = e.target.result;
+      const alt = file.name.replace(/\.[^/.]+$/, '');
+      const imageId = `img-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      
+      // 将图片数据保存到文章中
+      const imageData = {
+        id: imageId,
+        base64: base64,
+        alt: alt
+      };
+      
+      // 更新文章，添加图片数据
+      const existingImages = article.images || [];
+      const updatedImages = [...existingImages, imageData];
+      updateArticle(article.id, { images: updatedImages });
+      
+      // 在编辑器中插入占位符
+      const markdown = `
+![${alt}](#${imageId})
+
+`;
+      insertAtCursor(article, markdown, '', '');
+    };
+    reader.readAsDataURL(file);
+  }
+
+  // 处理粘贴图片
+  function handlePaste(e, article) {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      if (item.type.indexOf('image') !== -1) {
+        e.preventDefault();
+        const file = item.getAsFile();
+        if (file) {
+          handleImageUpload(article, file);
+        }
+        break;
+      }
+    }
+  }
+
   // 创作空间管理
   function createArticleSpace(name) {
     const trimmed = name.trim();
@@ -1489,7 +1581,7 @@ function App() {
       });
       const data = await res.json();
       if (data.ok) {
-        setAiResult({ loading: false, content: data.content, error: '', action });
+        setAiResult({ loading: false, content: typeof data.content === 'string' ? data.content : JSON.stringify(data.content), error: '', action });
       } else {
         setAiResult({ loading: false, content: '', error: data.error || '请求失败', action });
       }
@@ -1570,8 +1662,8 @@ ${signals}
     }
   }
 
-  // Markdown 简化渲染（支持标题、粗体、列表）
-  function renderMarkdown(text) {
+  // Markdown 简化渲染（支持标题、粗体、列表）- 用于 AI 简报
+  function renderBriefMarkdown(text) {
     const lines = text.split('\n');
     const elements = [];
     let inList = false;
@@ -1664,7 +1756,17 @@ ${signals}
   // 导出文章为本地文件
   function exportArticleToFile(article) {
     const title = (article.title || '未命名').replace(/[\\/:*?"<>|]/g, '_');
-    const content = `# ${article.title || '未命名'}\n\n> 创建时间: ${new Date(article.createdAt).toLocaleString('zh-CN')}\n> 更新时间: ${new Date(article.updatedAt).toLocaleString('zh-CN')}\n> 模板: ${ARTICLE_TEMPLATES[article.template] || article.template}\n> 状态: ${ARTICLE_STATUS[article.status] || article.status}\n${article.tags.length > 0 ? `> 标签: ${article.tags.join(', ')}\n` : ''}\n---\n\n${article.content}`;
+    
+    // 处理图片占位符
+    let exportContent = article.content;
+    if (article.images && article.images.length > 0) {
+      article.images.forEach(img => {
+        const placeholder = new RegExp(`!\\[(${img.alt})\\]\\(\\#${img.id}\\)`, 'g');
+        exportContent = exportContent.replace(placeholder, `![${img.alt}](${img.base64})`);
+      });
+    }
+    
+    const content = `# ${article.title || '未命名'}\n\n> 创建时间: ${new Date(article.createdAt).toLocaleString('zh-CN')}\n> 更新时间: ${new Date(article.updatedAt).toLocaleString('zh-CN')}\n> 模板: ${ARTICLE_TEMPLATES[article.template] || article.template}\n> 状态: ${ARTICLE_STATUS[article.status] || article.status}\n${article.tags.length > 0 ? `> 标签: ${article.tags.join(', ')}\n` : ''}\n---\n\n${exportContent}`;
     const blob = new Blob([content], { type: 'text/markdown;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -2536,6 +2638,11 @@ ${signals}
                       </div>
                     </div>
 
+                    {/* 3D 全球热点地球 */}
+                    <section className="insight-section globe-section">
+                      <GlobeView items={items} />
+                    </section>
+
                     {/* AI 每日简报 */}
                     <section className="insight-section">
                       <div className="ai-brief-card">
@@ -2557,7 +2664,7 @@ ${signals}
                         {aiBrief.error && <div className="ai-brief-error">{aiBrief.error}</div>}
                         {aiBrief.content && (
                           <div className="ai-brief-content">
-                            {renderMarkdown(aiBrief.content)}
+                            {renderBriefMarkdown(aiBrief.content)}
                             <div className="ai-brief-time">生成于 {new Date(aiBrief.generatedAt).toLocaleTimeString('zh-CN')}</div>
                           </div>
                         )}
@@ -2968,7 +3075,12 @@ ${signals}
                           </label>
                         </div>
                         {m.title && <p className="material-title">{m.title}</p>}
-                        <p className="material-content">{m.content}</p>
+                        <p className="material-content">{m.fullContent || m.content}</p>
+                        {m.url && (
+                          <a className="material-link" href={m.url} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}>
+                            查看原文
+                          </a>
+                        )}
                         {m.note && <p className="material-note">{m.note}</p>}
                         <div className="material-meta">
                           <span className="material-source">{m.source}</span>
@@ -3036,7 +3148,8 @@ ${signals}
                     source: fd.get('source') || '',
                     url: fd.get('url') || '',
                     tags: fd.get('tags') || '',
-                    note: fd.get('note') || ''
+                    note: fd.get('note') || '',
+                    spaceId: fd.get('spaceId') || null
                   });
                 }}>
                   <div className="form-group">
@@ -3048,6 +3161,15 @@ ${signals}
                       <option value="viewpoint">观点</option>
                       <option value="chart">图表</option>
                     </select>
+                  </div>
+                  <div className="form-row">
+                    <div className="form-group" style={{ flex: 1 }}>
+                      <label>所属空间</label>
+                      <select name="spaceId" defaultValue="">
+                        <option value="">默认空间</option>
+                        {materialSpaces.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                      </select>
+                    </div>
                   </div>
                   <div className="form-group">
                     <label>标题（可选）</label>
@@ -3199,7 +3321,18 @@ ${signals}
                           </div>
                           <div className="editor-toolbar-group">
                             <button className="editor-tool-btn" title="链接" onClick={() => insertAtCursor(article, '', '[链接文本](url)', '')}>{ICONS.link}</button>
-                            <button className="editor-tool-btn" title="图片" onClick={() => insertAtCursor(article, '', '![描述](图片URL)', '')}>{ICONS.image}</button>
+                            <button className="editor-tool-btn" title="上传图片" onClick={() => imageInputRef.current?.click()}>{ICONS.image}</button>
+                            <input
+                              type="file"
+                              ref={imageInputRef}
+                              style={{ display: 'none' }}
+                              accept="image/*"
+                              onChange={e => {
+                                const file = e.target.files?.[0];
+                                if (file) handleImageUpload(article, file);
+                                e.target.value = '';
+                              }}
+                            />
                           </div>
                           <div className="editor-toolbar-group editor-tab-group">
                             <button className={`editor-tab-btn ${editorTab === 'edit' ? 'active' : ''}`} onClick={() => setEditorTab('edit')}>编辑</button>
@@ -3216,7 +3349,7 @@ ${signals}
                                 className="article-content-editor"
                                 value={article.content}
                                 onChange={e => handleContentChange(article, e.target.value)}
-                                placeholder="开始写作...&#10;&#10;支持 Markdown 格式：&#10;# 标题&#10;**粗体** *斜体*&#10;- 列表&#10;> 引用&#10;`代码`&#10;![图片](url)"
+                                placeholder="开始写作...&#10;&#10;支持 Markdown 格式：&#10;# 标题&#10;**粗体** *斜体*&#10;- 列表&#10;> 引用&#10;`代码`&#10;![图片](url)&#10;&#10;支持拖拽上传图片、粘贴图片、插入素材"
                                 onDragOver={e => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; }}
                                 onDrop={e => {
                                   e.preventDefault();
@@ -3228,6 +3361,7 @@ ${signals}
                                     }
                                   } catch {}
                                 }}
+                                onPaste={e => handlePaste(e, article)}
                               />
                             </div>
                           )}
@@ -3239,7 +3373,7 @@ ${signals}
                               </div>
                               <div
                                 className="markdown-preview"
-                                dangerouslySetInnerHTML={{ __html: renderMarkdown(article.content) }}
+                                dangerouslySetInnerHTML={{ __html: renderMarkdownWithImages(article.content, article.images) }}
                               />
                             </div>
                           )}
@@ -3380,6 +3514,17 @@ ${signals}
                               <span className="linked-material-count">{linkedMaterials.length} 篇已引用</span>
                             )}
                           </div>
+                          <div className="material-space-filter">
+                            <select
+                              value={articleMaterialSpaceFilter}
+                              onChange={e => setArticleMaterialSpaceFilter(e.target.value)}
+                            >
+                              <option value="all">全部空间</option>
+                              {materialSpaces.map(s => (
+                                <option key={s.id} value={s.id}>{s.name}</option>
+                              ))}
+                            </select>
+                          </div>
                           {linkedMaterials.length > 0 && (
                             <div className="linked-materials-list">
                               {linkedMaterials.map(m => (
@@ -3393,19 +3538,23 @@ ${signals}
                           )}
                           {materials.length > 0 && (
                             <div className="materials-picker-list">
-                              {materials.filter(m => !article.materials.includes(m.id)).slice(0, 20).map(m => (
-                                <div
-                                  key={m.id}
-                                  className="material-picker-item"
-                                  onClick={() => insertMaterialAtCursor(article, m)}
-                                  draggable
-                                  onDragStart={e => { e.dataTransfer.setData('text/plain', JSON.stringify({ materialId: m.id })); e.dataTransfer.effectAllowed = 'copy'; }}
-                                  title={m.content}
-                                >
-                                  <span className={`material-type-badge type-${m.type}`}>{MATERIAL_TYPES[m.type]}</span>
-                                  <span className="material-picker-content">{m.content.slice(0, 40)}...</span>
-                                </div>
-                              ))}
+                              {materials
+                                .filter(m => !article.materials.includes(m.id))
+                                .filter(m => articleMaterialSpaceFilter === 'all' || m.spaceId === Number(articleMaterialSpaceFilter))
+                                .slice(0, 20)
+                                .map(m => (
+                                  <div
+                                    key={m.id}
+                                    className="material-picker-item"
+                                    onClick={() => insertMaterialAtCursor(article, m)}
+                                    draggable
+                                    onDragStart={e => { e.dataTransfer.setData('text/plain', JSON.stringify({ materialId: m.id })); e.dataTransfer.effectAllowed = 'copy'; }}
+                                    title={m.content}
+                                  >
+                                    <span className={`material-type-badge type-${m.type}`}>{MATERIAL_TYPES[m.type]}</span>
+                                    <span className="material-picker-content">{m.content.slice(0, 40)}...</span>
+                                  </div>
+                                ))}
                             </div>
                           )}
                           {materials.length === 0 && (
