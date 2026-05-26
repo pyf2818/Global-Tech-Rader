@@ -23,7 +23,11 @@ const CATEGORIES = [
   { id: 'education-tech', label: '教育科技' },
   { id: 'agriculture-tech', label: '农业科技' },
   { id: 'cloud', label: '云计算' },
-  { id: 'automotive', label: '智能汽车' }
+  { id: 'automotive', label: '智能汽车' },
+  { id: 'economy-stock', label: '经济股市' },
+  { id: 'game-entertain', label: '游戏娱乐' },
+  { id: 'showbiz', label: '影视娱乐圈' },
+  { id: 'anime-acg', label: '动漫二次元' }
 ];
 
 const MODES = [

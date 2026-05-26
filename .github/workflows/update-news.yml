@@ -1,0 +1,33 @@
+name: Update News Cache
+
+on:
+  schedule:
+    # Run every hour to keep the news cache fresh
+    - cron: '0 * * * *'
+  workflow_dispatch:
+
+jobs:
+  update-cache:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Warm news cache
+        run: |
+          # Fetch the main news endpoint to warm the cache
+          curl -sS -m 60 "https://globaltechradar.vercel.app/api/news" > /dev/null || echo "News cache warm-up attempted"
+          
+          # Also warm trending and meta endpoints
+          curl -sS -m 30 "https://globaltechradar.vercel.app/api/trending" > /dev/null || echo "Trending cache warm-up attempted"
+          curl -sS -m 30 "https://globaltechradar.vercel.app/api/meta" > /dev/null || echo "Meta cache warm-up attempted"
+        env:
+          CI: true

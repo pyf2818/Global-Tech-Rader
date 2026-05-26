@@ -1,0 +1,60 @@
+name: Verify RSS Sources
+
+on:
+  schedule:
+    # Run daily to check for broken RSS sources
+    - cron: '0 6 * * *'
+  workflow_dispatch:
+
+jobs:
+  verify-sources:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify RSS source health
+        run: |
+          node -e "
+            const { DEFAULT_SOURCES } = require('./server/newsPlugin.js');
+            const fetch = require('node-fetch');
+            
+            async function checkSource(source) {
+              try {
+                const response = await fetch(source.url, { 
+                  headers: { 'User-Agent': 'GlobalTechRadar/0.1' },
+                  timeout: 10000 
+                });
+                if (!response.ok) return { name: source.name, status: 'HTTP ' + response.status };
+                const text = await response.text();
+                const isXml = text.includes('<?xml') || text.includes('<rss') || text.includes('<feed');
+                return { name: source.name, status: isXml ? 'OK' : 'INVALID' };
+              } catch (e) {
+                return { name: source.name, status: 'ERROR: ' + e.message };
+              }
+            }
+            
+            async function main() {
+              const checks = await Promise.all(DEFAULT_SOURCES.map(checkSource));
+              const broken = checks.filter(c => c.status !== 'OK');
+              if (broken.length > 0) {
+                console.log('BROKEN SOURCES:');
+                broken.forEach(b => console.log('  - ' + b.name + ': ' + b.status));
+                process.exit(1);
+              } else {
+                console.log('All ' + checks.length + ' sources are healthy.');
+              }
+            }
+            
+            main();
+          "
+        env:
+          CI: true

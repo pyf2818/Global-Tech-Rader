@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, useRef, useCallback } from 'react';
 import GlobeView from './GlobeView.jsx';
+import AiElf from './AiElf.jsx';
 
 const MOTIVATIONAL_QUOTES = [
   '保持饥饿',
@@ -81,15 +82,19 @@ const CATEGORIES = [
   { id: 'education-tech', label: '教育科技', icon: 'edu' },
   { id: 'agriculture-tech', label: '农业科技', icon: 'agriculture' },
   { id: 'cloud', label: '云计算', icon: 'cloud' },
-  { id: 'automotive', label: '智能汽车', icon: 'auto' }
+  { id: 'automotive', label: '智能汽车', icon: 'auto' },
+  { id: 'economy-stock', label: '经济股市', icon: 'trendingUp' },
+  { id: 'game-entertain', label: '游戏娱乐', icon: 'gamepad' },
+  { id: 'showbiz', label: '影视娱乐圈', icon: 'film' },
+  { id: 'anime-acg', label: '动漫二次元', icon: 'star' }
 ];
 
 const CATEGORY_GROUPS = [
-  { id: 'tech-frontier', label: '科技前沿', icon: 'flask', categories: ['ai-models', 'research', 'open-source', 'data-science', 'quantum', 'cybersecurity'] },
-  { id: 'hardware-compute', label: '计算硬件', icon: 'chip', categories: ['chips-compute', 'devices', 'robotics', 'iot-5g'] },
-  { id: 'industry-economy', label: '产业经济', icon: 'building', categories: ['silicon-valley', 'china-tech', 'policy-finance', 'fintech'] },
-  { id: 'emerging-fields', label: '新兴领域', icon: 'rocket', categories: ['space', 'new-energy', 'climate-esg', 'gaming', 'metaverse-xr'] },
-  { id: 'industry-apps', label: '行业应用', icon: 'globe', categories: ['healthcare', 'education-tech', 'agriculture-tech', 'cloud', 'automotive'] }
+  { id: 'tech-ai', label: '科技前沿', icon: 'flask', categories: ['ai-models', 'research', 'open-source', 'data-science', 'quantum', 'cybersecurity', 'chips-compute'] },
+  { id: 'hardware-consumer', label: '消费电子', icon: 'device', categories: ['devices', 'robotics', 'iot-5g', 'metaverse-xr', 'automotive'] },
+  { id: 'industry-economy', label: '产业经济', icon: 'building', categories: ['silicon-valley', 'china-tech', 'policy-finance', 'fintech', 'economy-stock'] },
+  { id: 'entertainment', label: '娱乐文化', icon: 'star', categories: ['gaming', 'game-entertain', 'showbiz', 'anime-acg'] },
+  { id: 'lifestyle-health', label: '生活健康', icon: 'heart', categories: ['space', 'new-energy', 'climate-esg', 'healthcare', 'education-tech'] }
 ];
 
 const LLM_PRESETS = [
@@ -99,6 +104,99 @@ const LLM_PRESETS = [
   { id: 'zhipu', name: '智谱 AI', baseUrl: 'https://open.bigmodel.cn/api/paas/v4', models: ['glm-4', 'glm-4-flash', 'glm-4-air'], icon: '🟣', placeholder: '请输入 API Key' },
   { id: 'custom', name: '自定义', baseUrl: '', models: [], icon: '⚙️', placeholder: 'https://...' }
 ];
+
+const DEFAULT_AGENTS = [
+  {
+    id: 'analyst',
+    name: '资讯分析师',
+    description: '对资讯进行结构化分析，提炼核心要点',
+    icon: 'chart',
+    avatar: '',
+    tags: ['资讯分析', '结构化思维'],
+    systemPrompt: '你是一位资深资讯分析师。你的任务是对用户提供的信息进行结构化分析，输出格式清晰、内容精炼的分析报告。概述部分控制在100字以内，影响分析适当展开。',
+    category: '分析',
+    isDefault: true
+  },
+  {
+    id: 'tech-advisor',
+    name: '技术顾问',
+    description: '深入解读技术趋势，评估技术价值',
+    icon: 'cpu',
+    avatar: '',
+    tags: ['技术趋势', '技术评估'],
+    systemPrompt: '你是一位技术领域资深顾问。擅长解读最新技术动态，评估技术价值和落地可行性。输出简洁有力，技术判断精准，避免空话套话。请用技术人的视角，快速提炼核心技术点、技术原理、优劣势对比。',
+    category: '技术',
+    isDefault: true
+  },
+  {
+    id: 'business-analyst',
+    name: '商业分析师',
+    description: '分析商业模式、市场机会和竞争格局',
+    icon: 'trend',
+    avatar: '',
+    tags: ['商业模式', '市场分析'],
+    systemPrompt: '你是一位资深商业分析师。擅长从商业视角分析资讯，评估市场机会、竞争格局和商业模式。输出数据驱动，观点明确，直接给出actionable insights。',
+    category: '商业',
+    isDefault: true
+  },
+  {
+    id: 'writer',
+    name: '写作助手',
+    description: '帮助润色、改写、创作各类文案',
+    icon: 'document',
+    avatar: '',
+    tags: ['文案创作', '润色改写'],
+    systemPrompt: '你是一位专业写作助手。擅长帮助用户润色文章、改写文案、生成创意内容。根据用户输入的风格和语气要求，提供高质量的写作建议和输出。保持原文风格的同时提升表达质量。',
+    category: '创作',
+    isDefault: true
+  },
+  {
+    id: 'translator',
+    name: '翻译专家',
+    description: '专业级翻译，保持原文语义和风格',
+    icon: 'globe',
+    avatar: '',
+    tags: ['翻译', '语言'],
+    systemPrompt: '你是一位资深翻译专家。擅长中英文互译，注重语义准确性和表达地道性。翻译时保持原文的专业术语准确，同时让译文读起来自然流畅。遇到专业术语请保留原文并附注。',
+    category: '语言',
+    isDefault: true
+  },
+  {
+    id: 'code-reviewer',
+    name: '代码审查员',
+    description: '审查代码质量，提供优化建议',
+    icon: 'code',
+    avatar: '',
+    tags: ['代码审查', '技术'],
+    systemPrompt: '你是一位资深代码审查员。擅长审查代码质量，发现潜在问题，提供优化建议。输出简洁专业，一针见血，不重复显而易见的点。关注代码可读性、性能、安全性和最佳实践。',
+    category: '技术',
+    isDefault: true
+  },
+  {
+    id: 'learning-coach',
+    name: '学习教练',
+    description: '拆解复杂知识，帮助高效学习',
+    icon: 'star',
+    avatar: '',
+    tags: ['知识拆解', '学习方法'],
+    systemPrompt: '你是一位学习教练。擅长将复杂的知识拆解成易于理解的部分，帮助用户建立知识体系。输出结构清晰，重点突出，善于用类比和例子帮助理解。推荐学习路径和资源。',
+    category: '教育',
+    isDefault: true
+  },
+  {
+    id: 'debate-master',
+    name: '辩论大师',
+    description: '多角度分析问题，提供正反观点',
+    icon: 'alert',
+    avatar: '',
+    tags: ['思辨', '多角度分析'],
+    systemPrompt: '你是一位辩论大师。擅长从不同角度分析问题，提供正反两面的观点和论据。输出逻辑严密，论据充分，帮助用户全面理解议题。每个观点都要有事实依据支撑。',
+    category: '思辨',
+    isDefault: true
+  }
+];
+
+const AGENT_CATEGORIES = ['全部', '分析', '技术', '商业', '创作', '语言', '教育', '思辨'];
 
 const MODES = [
   { id: 'all', label: '全部' },
@@ -194,6 +292,7 @@ const ICONS = {
   list: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>,
   rows: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="3" y="3" width="18" height="6" rx="1"/><rect x="3" y="15" width="18" height="6" rx="1"/></svg>,
   layers: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>,
+  spinner: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="12" cy="12" r="10" opacity="0.25"/><path d="M12 2a10 10 0 0 1 10 10" strokeLinecap="round"/></svg>,
   edit: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>,
   grid3: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>,
   chart: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>,
@@ -212,6 +311,9 @@ const ICONS = {
   edu: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>,
   agriculture: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M12 22V8"/><path d="M5 12c0-3.87 3.13-7 7-7s7 3.13 7 7"/><path d="M3 22h18"/><path d="M7 16c0-2.76 2.24-5 5-5s5 2.24 5 5"/></svg>,
   auto: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M5 17h14M5 17a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h1l2-3h8l2 3h1a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2M5 17l-1 2h16l-1-2"/><circle cx="7.5" cy="17" r="1.5"/><circle cx="16.5" cy="17" r="1.5"/></svg>,
+  trendingUp: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>,
+  gamepad: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><line x1="6" y1="12" x2="10" y2="12"/><line x1="8" y1="10" x2="8" y2="14"/><circle cx="15" cy="13" r="1"/><circle cx="18" cy="11" r="1"/><rect x="2" y="6" width="20" height="12" rx="2"/></svg>,
+  film: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="2" y="2" width="20" height="20" rx="2.18"/><line x1="2" y1="10" x2="22" y2="10"/><line x1="6" y1="2" x2="6" y2="10"/><line x1="18" y1="2" x2="18" y2="10"/></svg>,
   sparkles: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M12 3l-1.5 4.5L6 9l4.5 1.5L12 15l1.5-4.5L18 9l-4.5-1.5L12 3z"/><path d="M6 18l-1 3 3-1 1 3-3 1-1-3-3 1 1-3 3-1z"/><path d="M18 18l-1 3 3-1 1 3-3 1-1-3-3 1 1-3 3-1z"/></svg>,
   bell: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>,
   bold: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 4h8a4 4 0 0 1 4 4 4 4 0 0 1-4 4H6z"/><path d="M6 12h9a4 4 0 0 1 4 4 4 4 0 0 1-4 4H6z"/></svg>,
@@ -281,6 +383,54 @@ function App() {
   const [error, setError] = useState('');
   const [blocked, setBlocked] = useState('');
   const [showSettings, setShowSettings] = useState(false);
+  const [settingsTab, setSettingsTab] = useState('general');
+  const [elfAvatar, setElfAvatar] = useState(() => {
+    try {
+      return localStorage.getItem('elfAvatar') || '';
+    } catch {
+      return '';
+    }
+  });
+  const [elfAvatarHistory, setElfAvatarHistory] = useState(() => {
+    try {
+      const saved = localStorage.getItem('elfAvatarHistory');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+  const [elfName, setElfName] = useState(() => {
+    try {
+      return localStorage.getItem('elfName') || 'AI精灵';
+    } catch {
+      return 'AI精灵';
+    }
+  });
+  const [agents, setAgents] = useState(() => {
+    try {
+      const saved = localStorage.getItem('elfAgents');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        const customAgents = parsed.filter(a => a.isCustom);
+        return [...DEFAULT_AGENTS, ...customAgents];
+      }
+      return DEFAULT_AGENTS;
+    } catch {
+      return DEFAULT_AGENTS;
+    }
+  });
+  const [currentAgent, setCurrentAgent] = useState(() => {
+    try {
+      return localStorage.getItem('elfCurrentAgent') || 'analyst';
+    } catch {
+      return 'analyst';
+    }
+  });
+  const [showAgentForm, setShowAgentForm] = useState(false);
+  const [editingAgent, setEditingAgent] = useState(null);
+  const [newAgent, setNewAgent] = useState({ name: '', description: '', systemPrompt: '', category: '分析', avatar: '' });
+  const [agentFilter, setAgentFilter] = useState('全部');
+  const [agentPromptRefining, setAgentPromptRefining] = useState(false);
   const [stats, setStats] = useState({ sourceCount: 40, failedSources: 0, updatedAt: '', blockedCount: 0 });
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => localStorage.getItem('sidebarCollapsed') === 'true');
   const motivationalQuote = useMemo(() => {
@@ -289,6 +439,7 @@ function App() {
   }, []);
   const [panelCollapsed, setPanelCollapsed] = useState(() => localStorage.getItem('panelCollapsed') === 'true');
   const [customSources, setCustomSources] = useState(() => loadLS('customSources', []));
+  const [disabledSources, setDisabledSources] = useState(() => loadLS('disabledSources', []));
   const [newSource, setNewSource] = useState({ name: '', url: '', region: 'overseas' });
   const [sourceVerifyResult, setSourceVerifyResult] = useState(null);
   const [sourceVerifying, setSourceVerifying] = useState(false);
@@ -347,6 +498,7 @@ function App() {
   const [translations, setTranslations] = useState(() => loadLS('translations', {}));
   const [aiInsights, setAiInsights] = useState({ loading: false, data: null, error: '' });
   const [translationOpen, setTranslationOpen] = useState({});
+  const [translatingItems, setTranslatingItems] = useState({});
   const [navGroupOpen, setNavGroupOpen] = useState({ core: true, insight: true, manage: false });
   const [currentArticleId, setCurrentArticleId] = useState(null);
   const [materialFilter, setMaterialFilter] = useState('all');
@@ -376,6 +528,7 @@ function App() {
   const [editorCursorPos, setEditorCursorPos] = useState({ start: 0, end: 0 });
   const [showTemplateMenu, setShowTemplateMenu] = useState(false);
   const [showAiPanel, setShowAiPanel] = useState(false);
+  const [showImagePanel, setShowImagePanel] = useState(false);
   const [aiCustomPrompt, setAiCustomPrompt] = useState('');
   const [articleSpaces, setArticleSpaces] = useState(() => loadLS('articleSpaces', []));
   const [articleSpaceFilter, setArticleSpaceFilter] = useState('all');
@@ -393,6 +546,7 @@ function App() {
   useEffect(() => { localStorage.setItem('sidebarCollapsed', String(sidebarCollapsed)); }, [sidebarCollapsed]);
   useEffect(() => { localStorage.setItem('panelCollapsed', String(panelCollapsed)); }, [panelCollapsed]);
   useEffect(() => { saveLS('customSources', customSources); }, [customSources]);
+  useEffect(() => { saveLS('disabledSources', disabledSources); }, [disabledSources]);
   useEffect(() => { saveLS('calendarEvents', events); }, [events]);
   useEffect(() => { saveLS('bookmarks', bookmarks); }, [bookmarks]);
   useEffect(() => { saveLS('materials', materials); }, [materials]);
@@ -416,6 +570,17 @@ function App() {
   useEffect(() => { saveLS('readingHistory', readingHistory); }, [readingHistory]);
   useEffect(() => { saveLS('translations', translations); }, [translations]);
   useEffect(() => { saveLS('llmConfig', llmConfig); }, [llmConfig]);
+  useEffect(() => {
+    if (elfAvatar) localStorage.setItem('elfAvatar', elfAvatar);
+    else localStorage.removeItem('elfAvatar');
+  }, [elfAvatar]);
+  useEffect(() => { localStorage.setItem('elfAvatarHistory', JSON.stringify(elfAvatarHistory)); }, [elfAvatarHistory]);
+  useEffect(() => { localStorage.setItem('elfName', elfName); }, [elfName]);
+  useEffect(() => {
+    const customAgents = agents.filter(a => a.isCustom);
+    localStorage.setItem('elfAgents', JSON.stringify(customAgents));
+  }, [agents]);
+  useEffect(() => { localStorage.setItem('elfCurrentAgent', currentAgent); }, [currentAgent]);
 
   const fetchAiInsights = async () => {
     if (!llmConfig.baseUrl || !llmConfig.selectedModel || items.length === 0) {
@@ -700,6 +865,35 @@ function App() {
     const day14 = buildDayKeys(14);
     const day7 = day14.slice(7);
     const day7prev = day14.slice(0, 7);
+    const day30 = buildDayKeys(30);
+
+    // 近30天赛道趋势数据（用于趋势对比图）
+    const categoryTrend30 = CATEGORIES.map(cat => {
+      const daily30 = day30.map(d => items.filter(i => i.category === cat.id && i.publishedAt?.slice(0, 10) === d).length);
+      return { id: cat.id, label: cat.label, daily30 };
+    }).filter(c => c.daily30.some(v => v > 0));
+
+    // 赛道关联分析：统计同一篇文章中同时出现的赛道对
+    const categoryCorrelations = [];
+    const catPairCounts = new Map();
+    items.forEach(item => {
+      const itemCats = new Set([item.category]);
+      // 查找同一来源同一天的其他文章
+      const sameDayItems = items.filter(i => i.source === item.source && i.publishedAt?.slice(0, 10) === item.publishedAt?.slice(0, 10) && i.id !== item.id);
+      sameDayItems.forEach(other => {
+        if (other.category !== item.category) {
+          const pair = [item.category, other.category].sort().join('::');
+          catPairCounts.set(pair, (catPairCounts.get(pair) || 0) + 1);
+        }
+      });
+    });
+    catPairCounts.forEach((count, pair) => {
+      const [cat1, cat2] = pair.split('::');
+      const label1 = CATEGORIES.find(c => c.id === cat1)?.label || cat1;
+      const label2 = CATEGORIES.find(c => c.id === cat2)?.label || cat2;
+      categoryCorrelations.push({ cat1, cat2, label1, label2, count });
+    });
+    categoryCorrelations.sort((a, b) => b.count - a.count);
 
     // 赛道增长率（近7天 vs 前7天）+ 7日趋势线
     const categoryGrowth = CATEGORIES.map(cat => {
@@ -844,7 +1038,10 @@ function App() {
       day7,
       day7prev,
       day3,
-      day14
+      day14,
+      day30,
+      categoryTrend30,
+      categoryCorrelations
     };
   }, [items]);
 
@@ -869,7 +1066,7 @@ function App() {
       if (readDates.has(ds)) { streak++; checkDate = new Date(checkDate.getTime() - 86400000); } else break;
     }
 
-    // 阅读时段分布
+    // 阅读时段分布（24小时）
     const hourDist = Array(24).fill(0);
     sorted.filter(b => b.readAt).forEach(b => {
       const h = new Date(b.readAt).getHours();
@@ -900,6 +1097,41 @@ function App() {
     const heatData = day7.map(d => sorted.filter(b => (b.readAt || '').slice(0, 10) === d).length);
     const maxHeat = Math.max(...heatData, 1);
 
+    // 来源偏好分析
+    const sourceDist = {};
+    bookmarks.forEach(b => {
+      const source = b.source || '未知来源';
+      sourceDist[source] = (sourceDist[source] || 0) + 1;
+    });
+    const topSources = Object.entries(sourceDist).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([name, count]) => ({
+      name, count,
+      pct: bookmarks.length ? Math.round(count / bookmarks.length * 100) : 0
+    }));
+
+    // 近30天阅读趋势
+    const day30 = buildDayKeys(30);
+    const trendData = day30.map(d => sorted.filter(b => (b.readAt || '').slice(0, 10) === d).length);
+    const maxTrend = Math.max(...trendData, 1);
+
+    // 阅读深度分析（基于摘要长度估算）
+    const avgSummaryLength = bookmarks.length 
+      ? Math.round(bookmarks.reduce((sum, b) => sum + (b.summary?.length || 0), 0) / bookmarks.length)
+      : 0;
+    const deepReads = bookmarks.filter(b => (b.summary?.length || 0) > 200).length;
+    const shallowReads = bookmarks.filter(b => (b.summary?.length || 0) <= 100).length;
+
+    // 标签偏好
+    const tagDist = {};
+    bookmarks.forEach(b => {
+      (b.tags || []).forEach(tag => {
+        tagDist[tag] = (tagDist[tag] || 0) + 1;
+      });
+    });
+    const topTags = Object.entries(tagDist).sort((a, b) => b[1] - a[1]).slice(0, 8).map(([name, count]) => ({
+      name, count,
+      pct: Object.values(tagDist).reduce((a, b) => a + b, 0) ? Math.round(count / Object.values(tagDist).reduce((a, b) => a + b, 0) * 100) : 0
+    }));
+
     return {
       streak,
       peakHour,
@@ -909,7 +1141,16 @@ function App() {
       readRate,
       heatData,
       maxHeat,
-      day7
+      day7,
+      topSources,
+      trendData,
+      maxTrend,
+      day30,
+      avgSummaryLength,
+      deepReads,
+      shallowReads,
+      topTags,
+      totalBookmarks: bookmarks.length
     };
   }, [bookmarks]);
 
@@ -1063,8 +1304,9 @@ function App() {
     if (!append) { setLoading(true); setError(''); setNewsPage(0); setNewsHasMore(true); }
     const page = append ? newsPage + 1 : 0;
     const customParams = customSources.map(s => `custom=${encodeURIComponent(JSON.stringify(s))}`).join('&');
+    const disabledParam = disabledSources.length > 0 ? `&disabledSources=${encodeURIComponent(disabledSources.join(','))}` : '';
     const searchParam = searchQuery ? `&search=${encodeURIComponent(searchQuery)}` : '';
-    fetch(`/api/news?blocked=${encodeURIComponent(b)}&page=${page}&pageSize=40${searchParam}${customParams ? '&' + customParams : ''}`)
+    fetch(`/api/news?blocked=${encodeURIComponent(b)}&page=${page}&pageSize=40${searchParam}${disabledParam}${customParams ? '&' + customParams : ''}`)
       .then(r => r.json())
       .then(d => {
         if (append) {
@@ -1149,19 +1391,41 @@ function App() {
   }
 
   function renderMarkdownWithImages(text, images = []) {
-  if (!text) return '';
-  
-  // 将图片占位符替换为实际的 Base64 数据
-  let processedText = text;
-  if (images && images.length > 0) {
-    images.forEach(img => {
-      const placeholder = new RegExp(`!\\[(${img.alt})\\]\\(\\#${img.id}\\)`, 'g');
-      processedText = processedText.replace(placeholder, `![${img.alt}](${img.base64})`);
-    });
+    if (!text) return '';
+    
+    // 将图片占位符替换为实际的 Base64 数据，支持大小参数
+    // 格式: ![alt](#img-id|w=300|h=200) 或 ![alt](#img-id|w=300)
+    let processedText = text;
+    if (images && images.length > 0) {
+      images.forEach(img => {
+        // 支持多种占位符格式
+        // 1. ![alt](#img-id) - 默认尺寸
+        // 2. ![alt](#img-id|w=300) - 指定宽度，高度自适应
+        // 3. ![alt](#img-id|w=300|h=200) - 指定宽高
+        const placeholderPattern = new RegExp(`!\\[([^\\]]*)\\]\\(\\#${img.id}(?:\\|[^)]+)?\\)`, 'g');
+        
+        processedText = processedText.replace(placeholderPattern, (match, alt) => {
+          // 解析大小参数
+          const sizeMatch = match.match(/\|w=(\d+)(?:\|h=(\d+))?/);
+          let sizeAttrs = '';
+          if (sizeMatch) {
+            const width = sizeMatch[1];
+            const height = sizeMatch[2];
+            sizeAttrs = ` width="${width}"`;
+            if (height) {
+              sizeAttrs += ` height="${height}"`;
+            }
+          } else {
+            // 如果没有指定大小，使用图片的原始尺寸但限制最大宽度
+            sizeAttrs = ` style="max-width:100%;height:auto;"`;
+          }
+          return `<img src="${img.base64}" alt="${alt || img.alt}"${sizeAttrs} />`;
+        });
+      });
+    }
+    
+    return renderMarkdown(processedText);
   }
-  
-  return renderMarkdown(processedText);
-}
 
   function loadTrending(append = false, platform = trendingPlatform) {
     if (!append) {
@@ -1496,24 +1760,27 @@ function App() {
       const alt = file.name.replace(/\.[^/.]+$/, '');
       const imageId = `img-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
       
-      // 将图片数据保存到文章中
-      const imageData = {
-        id: imageId,
-        base64: base64,
-        alt: alt
+      // 获取图片原始尺寸
+      const img = new Image();
+      img.onload = () => {
+        const imageData = {
+          id: imageId,
+          base64: base64,
+          alt: alt,
+          width: img.width,
+          height: img.height
+        };
+        
+        // 更新文章，添加图片数据
+        const existingImages = article.images || [];
+        const updatedImages = [...existingImages, imageData];
+        updateArticle(article.id, { images: updatedImages });
+        
+        // 在编辑器中插入占位符（默认使用原始尺寸，但允许后续调整）
+        const markdown = `\n![${alt}](#${imageId})\n`;
+        insertAtCursor(article, markdown, '', '');
       };
-      
-      // 更新文章，添加图片数据
-      const existingImages = article.images || [];
-      const updatedImages = [...existingImages, imageData];
-      updateArticle(article.id, { images: updatedImages });
-      
-      // 在编辑器中插入占位符
-      const markdown = `
-![${alt}](#${imageId})
-
-`;
-      insertAtCursor(article, markdown, '', '');
+      img.src = base64;
     };
     reader.readAsDataURL(file);
   }
@@ -1757,12 +2024,24 @@ ${signals}
   function exportArticleToFile(article) {
     const title = (article.title || '未命名').replace(/[\\/:*?"<>|]/g, '_');
     
-    // 处理图片占位符
+    // 处理图片占位符（支持大小参数）
     let exportContent = article.content;
     if (article.images && article.images.length > 0) {
       article.images.forEach(img => {
-        const placeholder = new RegExp(`!\\[(${img.alt})\\]\\(\\#${img.id}\\)`, 'g');
-        exportContent = exportContent.replace(placeholder, `![${img.alt}](${img.base64})`);
+        // 支持带大小参数的占位符
+        const placeholderPattern = new RegExp(`!\\[([^\\]]*)\\]\\(\\#${img.id}(?:\\|[^)]+)?\\)`, 'g');
+        exportContent = exportContent.replace(placeholderPattern, (match, alt) => {
+          // 解析大小参数
+          const sizeMatch = match.match(/\|w=(\d+)(?:\|h=(\d+))?/);
+          let sizeAttrs = '';
+          if (sizeMatch) {
+            sizeAttrs = ` width="${sizeMatch[1]}"`;
+            if (sizeMatch[2]) {
+              sizeAttrs += ` height="${sizeMatch[2]}"`;
+            }
+          }
+          return `<img src="${img.base64}" alt="${alt || img.alt}"${sizeAttrs} />`;
+        });
       });
     }
     
@@ -2051,31 +2330,110 @@ ${signals}
     });
   }
 
-  function translateText(text) {
-    const dict = {
-      'AI': '人工智能', 'LLM': '大语言模型', 'GPT': 'GPT', 'Model': '模型', 'Training': '训练', 'Inference': '推理',
-      'Open Source': '开源', 'Startup': '创业公司', 'Funding': '融资', 'Investment': '投资', 'IPO': '上市',
-      'Chip': '芯片', 'GPU': '图形处理器', 'Cloud': '云计算', 'API': '接口', 'Release': '发布',
-      'announces': '宣布', 'launches': '推出', 'introduces': '引入', 'reports': '报告', 'says': '称',
-      'technology': '技术', 'company': '公司', 'platform': '平台', 'users': '用户', 'developers': '开发者'
-    };
-    let result = text;
-    Object.entries(dict).forEach(([en, zh]) => {
-      result = result.replace(new RegExp(en, 'gi'), zh);
-    });
-    return result;
+  async function requestTranslation(item) {
+    console.log('[Translation] Called for item:', item.id, item.title);
+
+    const existing = translations[item.id];
+    // 如果存在旧翻译且格式正确（有 summary 字段），直接返回；否则重新翻译
+    if (existing && existing.title && existing.title !== item.title && existing.summary !== undefined) {
+      console.log('[Translation] Using existing translation:', existing);
+      return existing;
+    }
+    if (translatingItems[item.id]) {
+      console.log('[Translation] Already translating, skipping');
+      return null;
+    }
+
+    const isEnglish = /^[a-zA-Z0-9\s\-.,!?"'():;&%$#@*+\[\]{}|\\\/<>`~+=]+$/.test(item.title) && !/^[\u4e00-\u9fff]/.test(item.title);
+    console.log('[Translation] isEnglish check:', isEnglish, 'title:', item.title);
+    if (!isEnglish) {
+      console.log('[Translation] Not English content, skipping');
+      return null;
+    }
+
+    console.log('[Translation] llmConfig:', { baseUrl: llmConfig.baseUrl, selectedModel: llmConfig.selectedModel });
+    if (!llmConfig.baseUrl || !llmConfig.selectedModel) {
+      console.log('[Translation] LLM config missing');
+      showToast('请先在设置中配置大模型 API');
+      return null;
+    }
+
+    console.log('[Translation] Starting translation request...');
+    setTranslatingItems(prev => ({ ...prev, [item.id]: true }));
+
+    try {
+      const content = `title: ${item.title}\nsummary: ${item.summary || ''}`;
+      const response = await fetch('/api/ai-generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          baseUrl: llmConfig.baseUrl,
+          apiKey: llmConfig.apiKey,
+          model: llmConfig.selectedModel,
+          action: 'translate_zh',
+          content
+        })
+      });
+
+      const data = await response.json();
+      console.log('[Translation] API response:', data);
+
+      if (data.error) {
+        showToast(`翻译失败: ${data.error}`);
+        return null;
+      }
+
+      const lines = (data.content || '')
+        .replace(/\r/g, '')
+        .split('\n')
+        .map(line => line.trim())
+        .filter(line => line.length > 0);
+
+      // 跳过 LLM 添加的说明文字前缀
+      const skipPrefixes = ['以下是', 'Here is', 'Translation:', '翻译：', 'Translated:', '翻译结果', '以下是翻译结果'];
+      const filteredLines = lines.filter(line => !skipPrefixes.some(prefix => line.toLowerCase().startsWith(prefix.toLowerCase())));
+      const finalLines = filteredLines.length > 0 ? filteredLines : lines;
+
+      console.log('[Translation] Parsed lines:', finalLines);
+
+      if (finalLines.length === 0) {
+        showToast('翻译返回空内容');
+        return null;
+      }
+
+      // 第一行作为标题，其余作为摘要
+      const title = finalLines[0] || item.title;
+      const summary = finalLines.slice(1).join('\n') || '';
+
+      console.log('[Translation] Translated:', { title, summary });
+
+      if (!title || title === item.title) {
+        showToast('翻译失败：无法获取翻译结果');
+        return null;
+      }
+
+      // 检查标题是否包含中文（简单判断）
+      const hasChinese = /[\u4e00-\u9fff]/.test(title);
+      if (!hasChinese) {
+        showToast('翻译结果不包含中文，请重试');
+        return null;
+      }
+
+      const translated = { title, summary };
+      setTranslations(prev => ({ ...prev, [item.id]: translated }));
+      console.log('[Translation] Saved to state:', translated);
+      return translated;
+    } catch (e) {
+      console.error('[Translation] Error:', e);
+      showToast(`翻译失败: ${e.message}`);
+      return null;
+    } finally {
+      setTranslatingItems(prev => ({ ...prev, [item.id]: false }));
+    }
   }
 
   function getTranslation(item) {
-    if (translations[item.id]) return translations[item.id];
-    const isEnglish = /^[a-zA-Z0-9\s\-.,!?'"():]+$/.test(item.title);
-    if (!isEnglish) return null;
-    const translated = {
-      title: translateText(item.title),
-      summary: translateText(item.summary || '')
-    };
-    setTranslations(prev => ({ ...prev, [item.id]: translated }));
-    return translated;
+    return translations[item.id] || null;
   }
 
   function executeSearch(q) {
@@ -2499,7 +2857,7 @@ ${signals}
               {error && <div className="error-state"><p>加载失败: {error}</p><button onClick={() => loadNews()}>重试</button></div>}
               {!loading && !error && filtered.length === 0 && <div className="empty-state"><p>没有匹配的资讯</p><button onClick={() => { setQuery(''); setCategory('all'); setMode('all'); setSourceFilter('all'); }}>重置筛选</button></div>}
               <div className={`feed-list view-${viewMode} ${viewMode === 'card' ? 'card-grid' : ''}`}>
-                {filtered.map((item, i) => <NewsItem key={item.id} item={item} index={i} viewMode={viewMode} isFocused={focusedIndex === i} isBookmarked={isBookmarked(item.id)} isInMaterials={isInMaterials(item.id)} onBookmark={() => toggleBookmark(item)} onAddMaterial={() => toggleMaterial(item)} onSummary={() => setExpandedSummary(p => ({ ...p, [item.id]: !p[item.id] }))} isSummaryOpen={expandedSummary[item.id]} summaryText={generateSummary(item)} isFollowed={followKeywords.some(kw => `${item.title} ${item.summary}`.toLowerCase().includes(kw.toLowerCase()))} onRead={() => recordReading(item)} showTranslation={translationOpen[item.id]} onToggleTranslation={() => setTranslationOpen(p => ({ ...p, [item.id]: !p[item.id] }))} translation={getTranslation(item)} onOpenLightbox={(src, title) => setLightbox({ open: true, src, title })} />)}
+                {filtered.map((item, i) => <NewsItem key={item.id} item={item} index={i} viewMode={viewMode} isFocused={focusedIndex === i} isBookmarked={isBookmarked(item.id)} isInMaterials={isInMaterials(item.id)} onBookmark={() => toggleBookmark(item)} onAddMaterial={() => toggleMaterial(item)} onSummary={() => setExpandedSummary(p => ({ ...p, [item.id]: !p[item.id] }))} isSummaryOpen={expandedSummary[item.id]} summaryText={generateSummary(item)} isFollowed={followKeywords.some(kw => `${item.title} ${item.summary}`.toLowerCase().includes(kw.toLowerCase()))} onRead={() => recordReading(item)} showTranslation={translationOpen[item.id]} onToggleTranslation={() => setTranslationOpen(p => ({ ...p, [item.id]: !p[item.id] }))} onRequestTranslation={() => requestTranslation(item)} isTranslating={translatingItems[item.id]} translation={getTranslation(item)} onOpenLightbox={(src, title) => setLightbox({ open: true, src, title })} />)}
               </div>
               {nav === 'all' && newsHasMore && (
                 <div id="load-more-sentinel" className="load-more-area">
@@ -2688,6 +3046,94 @@ ${signals}
                     {/* ====== 趋势页 ====== */}
                 {insightTab === 'trends' && (
                   <>
+                    {/* 赛道热度排行 */}
+                    <section className="insight-section">
+                      <h3 className="insight-section-title">赛道热度排行</h3>
+                      <div className="category-ranking-list">
+                        {insightData.categoryRanking.slice(0, 8).map((cat, idx) => (
+                          <div key={cat.id} className="category-rank-row" onClick={() => { setCategory(cat.id); setNav('all'); }}>
+                            <span className="category-rank-num">{idx + 1}</span>
+                            <span className="category-rank-name">{cat.label}</span>
+                            <div className="category-rank-bar-wrap">
+                              <div className="category-rank-bar" style={{ width: `${insightData.categoryRanking[0]?.heatScore > 0 ? (cat.heatScore / insightData.categoryRanking[0].heatScore * 100) : 0}%` }} />
+                            </div>
+                            <span className={`category-rank-growth ${cat.growth > 0 ? 'up' : cat.growth < 0 ? 'down' : ''}`}>
+                              {cat.growth > 0 ? '+' : ''}{cat.growth}%
+                            </span>
+                            <span className="category-rank-count">{cat.recent}条</span>
+                          </div>
+                        ))}
+                      </div>
+                    </section>
+
+                    {/* 赛道趋势对比（近30日） */}
+                    {insightData.categoryTrend30.length > 0 && (
+                      <section className="insight-section">
+                        <h3 className="insight-section-title">赛道趋势对比（近30日）</h3>
+                        <div className="trend-comparison-chart">
+                          <div className="trend-comparison-bars">
+                            {insightData.day30.map((d, dayIdx) => (
+                              <div key={d} className="trend-comparison-col" title={d}>
+                                {insightData.categoryTrend30.slice(0, 5).map((cat, catIdx) => {
+                                  const count = cat.daily30[dayIdx];
+                                  const maxVal = Math.max(...cat.daily30);
+                                  const height = maxVal > 0 ? Math.max((count / maxVal) * 100, 4) : 4;
+                                  const colors = ['#22d3ee', '#a78bfa', '#34d399', '#fbbf24', '#f87171'];
+                                  return (
+                                    <div
+                                      key={cat.id}
+                                      className="trend-comparison-bar"
+                                      style={{ height: `${height}%`, background: colors[catIdx % colors.length] }}
+                                      title={`${cat.label} ${d}: ${count}条`}
+                                    />
+                                  );
+                                })}
+                              </div>
+                            ))}
+                          </div>
+                          <div className="trend-comparison-legend">
+                            {insightData.categoryTrend30.slice(0, 5).map((cat, idx) => {
+                              const colors = ['#22d3ee', '#a78bfa', '#34d399', '#fbbf24', '#f87171'];
+                              return (
+                                <span key={cat.id} className="trend-legend-item">
+                                  <span className="trend-legend-dot" style={{ background: colors[idx % colors.length] }} />
+                                  {cat.label}
+                                </span>
+                              );
+                            })}
+                          </div>
+                          <div className="trend-comparison-labels">
+                            <span>{insightData.day30[0]?.slice(5)}</span>
+                            <span>{insightData.day30[14]?.slice(5)}</span>
+                            <span>{insightData.day30[29]?.slice(5)}</span>
+                          </div>
+                        </div>
+                      </section>
+                    )}
+
+                    {/* 赛道关联分析 */}
+                    {insightData.categoryCorrelations.length > 0 && (
+                      <section className="insight-section">
+                        <h3 className="insight-section-title">赛道关联分析</h3>
+                        <div className="correlation-list">
+                          {insightData.categoryCorrelations.slice(0, 8).map((corr, idx) => (
+                            <div key={`${corr.cat1}-${corr.cat2}`} className="correlation-row">
+                              <span className="correlation-rank">{idx + 1}</span>
+                              <div className="correlation-pair">
+                                <span className="correlation-cat">{corr.label1}</span>
+                                <span className="correlation-arrow">↔</span>
+                                <span className="correlation-cat">{corr.label2}</span>
+                              </div>
+                              <div className="correlation-bar-wrap">
+                                <div className="correlation-bar" style={{ width: `${Math.min(corr.count / (insightData.categoryCorrelations[0]?.count || 1) * 100, 100)}%` }} />
+                              </div>
+                              <span className="correlation-count">{corr.count}次</span>
+                            </div>
+                          ))}
+                        </div>
+                      </section>
+                    )}
+
                     <section className="insight-section">
                       <h3 className="insight-section-title">赛道热力矩阵（7日）</h3>
                       <div className="insight-heatmap">
@@ -2837,6 +3283,36 @@ ${signals}
                         else if (st.growth > 0) { statusLabel = '小幅增长'; statusColor = '#22d3ee'; statusIcon = '↑'; }
                         else if (st.growth < 0) { statusLabel = '小幅下降'; statusColor = '#f87171'; statusIcon = '↓'; }
 
+                        // 获取相关新闻
+                        const relatedNews = items.filter(i => {
+                          const text = `${i.title} ${i.summary}`.toLowerCase();
+                          return text.includes(target.keyword.toLowerCase()) || target.aliases?.some(a => text.includes(a.toLowerCase()));
+                        }).slice(0, 5);
+
+                        // 获取来源分布
+                        const sourceDist = {};
+                        items.filter(i => {
+                          const text = `${i.title} ${i.summary}`.toLowerCase();
+                          return text.includes(target.keyword.toLowerCase()) || target.aliases?.some(a => text.includes(a.toLowerCase()));
+                        }).forEach(i => {
+                          sourceDist[i.source] = (sourceDist[i.source] || 0) + 1;
+                        });
+                        const topSources = Object.entries(sourceDist).sort((a, b) => b[1] - a[1]).slice(0, 3);
+
+                        // 获取关联关键词
+                        const keywordDist = {};
+                        items.filter(i => {
+                          const text = `${i.title} ${i.summary}`.toLowerCase();
+                          return text.includes(target.keyword.toLowerCase()) || target.aliases?.some(a => text.includes(a.toLowerCase()));
+                        }).forEach(i => {
+                          (i.tags || []).forEach(tag => {
+                            if (!target.keyword.toLowerCase().includes(tag.toLowerCase()) && !target.aliases?.some(a => a.toLowerCase().includes(tag.toLowerCase()))) {
+                              keywordDist[tag] = (keywordDist[tag] || 0) + 1;
+                            }
+                          });
+                        });
+                        const relatedKeywords = Object.entries(keywordDist).sort((a, b) => b[1] - a[1]).slice(0, 5);
+
                         const maxC = Math.max(...st.counts, 1);
                         return (
                           <div key={target.id} className="insight-watch-card">
@@ -2860,6 +3336,51 @@ ${signals}
                                 return <span key={idx}>{d.getMonth() + 1}/{d.getDate()}</span>;
                               })}
                             </div>
+
+                            {/* 来源分布 */}
+                            {topSources.length > 0 && (
+                              <div className="tracker-source-distribution">
+                                <span className="tracker-section-label">来源分布</span>
+                                <div className="tracker-source-bars">
+                                  {topSources.map(([name, count]) => (
+                                    <div key={name} className="tracker-source-bar-item">
+                                      <span className="tracker-source-name">{name}</span>
+                                      <div className="tracker-source-bar-wrap">
+                                        <div className="tracker-source-bar" style={{ width: `${count / topSources[0][1] * 100}%` }} />
+                                      </div>
+                                      <span className="tracker-source-count">{count}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+
+                            {/* 关联关键词 */}
+                            {relatedKeywords.length > 0 && (
+                              <div className="tracker-related-keywords">
+                                <span className="tracker-section-label">关联关键词</span>
+                                <div className="tracker-keyword-tags">
+                                  {relatedKeywords.map(([kw, count]) => (
+                                    <span key={kw} className="tracker-keyword-tag" onClick={() => executeSearch(kw)}>{kw} ({count})</span>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+
+                            {/* 相关新闻 */}
+                            {relatedNews.length > 0 && (
+                              <div className="tracker-related-news">
+                                <span className="tracker-section-label">相关新闻</span>
+                                <div className="tracker-news-list">
+                                  {relatedNews.map(news => (
+                                    <div key={news.id} className="tracker-news-item" onClick={() => window.open(news.link, '_blank')}>
+                                      <span className="tracker-news-title">{news.title}</span>
+                                      <span className="tracker-news-source">{news.source}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
                           </div>
                         );
                       })}
@@ -2890,21 +3411,98 @@ ${signals}
                       </div>
                     </div>
 
-                    {/* 7日阅读热力 */}
+                    {/* 近30天阅读趋势 */}
                     <section className="insight-section">
-                      <h3 className="insight-section-title">近7日阅读热力</h3>
-                      <div className="reading-heat-row">
-                        {readingProfile.day7.map((d, idx) => {
-                          const count = readingProfile.heatData[idx];
-                          const intensity = count / readingProfile.maxHeat;
-                          return (
-                            <div key={d} className="reading-heat-cell">
-                              <div className="reading-heat-block" style={{ background: intensity > 0.7 ? 'rgba(167, 139, 250, 0.7)' : intensity > 0.4 ? 'rgba(167, 139, 250, 0.4)' : intensity > 0.1 ? 'rgba(167, 139, 250, 0.18)' : 'rgba(167, 139, 250, 0.05)', height: `${Math.max(intensity * 50, 4)}px` }} />
-                              <span className="reading-heat-day">{d.slice(5)}</span>
-                              <span className="reading-heat-count">{count}</span>
+                      <h3 className="insight-section-title">近30天阅读趋势</h3>
+                      <div className="profile-trend-chart">
+                        <div className="trend-chart-bars">
+                          {readingProfile.trendData.map((count, idx) => {
+                            const height = readingProfile.maxTrend > 0 ? Math.max((count / readingProfile.maxTrend) * 100, 4) : 4;
+                            return (
+                              <div key={idx} className="trend-chart-bar-wrapper" title={`${readingProfile.day30[idx]}: ${count}篇`}>
+                                <div className="trend-chart-bar" style={{ height: `${height}%` }} />
+                              </div>
+                            );
+                          })}
+                        </div>
+                        <div className="trend-chart-labels">
+                          <span>{readingProfile.day30[0]?.slice(5)}</span>
+                          <span>{readingProfile.day30[14]?.slice(5)}</span>
+                          <span>{readingProfile.day30[29]?.slice(5)}</span>
+                        </div>
+                      </div>
+                    </section>
+
+                    {/* 24小时阅读时段分布 */}
+                    <section className="insight-section">
+                      <h3 className="insight-section-title">24小时阅读时段分布</h3>
+                      <div className="profile-hour-chart">
+                        <div className="hour-chart-bars">
+                          {readingProfile.hourDist.map((count, idx) => {
+                            const maxCount = Math.max(...readingProfile.hourDist, 1);
+                            const height = Math.max((count / maxCount) * 100, 4);
+                            return (
+                              <div key={idx} className="hour-chart-bar-wrapper" title={`${String(idx).padStart(2, '0')}:00 - ${count}篇`}>
+                                <div className="hour-chart-bar" style={{ height: `${height}%` }} />
+                                {idx % 4 === 0 && <span className="hour-chart-label">{idx}</span>}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </section>
+
+                    <div className="profile-two-col">
+                      {/* 来源偏好 */}
+                      <section className="insight-section">
+                        <h3 className="insight-section-title">来源偏好 TOP5</h3>
+                        <div className="profile-sources">
+                          {readingProfile.topSources.length > 0 ? readingProfile.topSources.map((source, idx) => (
+                            <div key={source.name} className="profile-source-row">
+                              <span className="profile-source-rank">{idx + 1}</span>
+                              <span className="profile-source-name">{source.name}</span>
+                              <div className="profile-source-bar-wrap">
+                                <div className="profile-source-bar" style={{ width: `${readingProfile.topSources[0]?.count > 0 ? (source.count / readingProfile.topSources[0].count * 100) : 0}%` }} />
+                              </div>
+                              <span className="profile-source-count">{source.count}篇</span>
                             </div>
-                          );
-                        })}
+                          )) : <div className="empty-state">暂无阅读数据</div>}
+                        </div>
+                      </section>
+
+                      {/* 标签偏好 */}
+                      <section className="insight-section">
+                        <h3 className="insight-section-title">标签偏好 TOP8</h3>
+                        <div className="profile-tags-cloud">
+                          {readingProfile.topTags.length > 0 ? readingProfile.topTags.map(tag => (
+                            <span key={tag.name} className="profile-tag-item" style={{ fontSize: `${11 + tag.pct / 5}px` }}>
+                              {tag.name} <small>({tag.count})</small>
+                            </span>
+                          )) : <div className="empty-state">暂无标签数据</div>}
+                        </div>
+                      </section>
+                    </div>
+
+                    {/* 阅读深度分析 */}
+                    <section className="insight-section">
+                      <h3 className="insight-section-title">阅读深度分析</h3>
+                      <div className="profile-depth-metrics">
+                        <div className="profile-depth-card">
+                          <span className="profile-depth-value">{readingProfile.avgSummaryLength}</span>
+                          <span className="profile-depth-label">平均摘要长度（字符）</span>
+                        </div>
+                        <div className="profile-depth-card">
+                          <span className="profile-depth-value">{readingProfile.deepReads}</span>
+                          <span className="profile-depth-label">深度阅读（长文）</span>
+                        </div>
+                        <div className="profile-depth-card">
+                          <span className="profile-depth-value">{readingProfile.shallowReads}</span>
+                          <span className="profile-depth-label">快速浏览（短文）</span>
+                        </div>
+                        <div className="profile-depth-card">
+                          <span className="profile-depth-value">{readingProfile.totalBookmarks}</span>
+                          <span className="profile-depth-label">总收藏数</span>
+                        </div>
                       </div>
                     </section>
 
@@ -3378,6 +3976,109 @@ ${signals}
                             </div>
                           )}
                         </div>
+
+                        {/* 图片管理面板 */}
+                        {article.images && article.images.length > 0 && (
+                          <div className="image-manager-panel">
+                            <div className="image-manager-header" onClick={() => setShowImagePanel(!showImagePanel)}>
+                              <div className="image-manager-title">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+                                <span>图片管理 ({article.images.length}张)</span>
+                              </div>
+                              <span className={`ai-panel-chevron ${showImagePanel ? 'open' : ''}`}>{ICONS.chevronDown}</span>
+                            </div>
+                            {showImagePanel && (
+                              <div className="image-manager-body">
+                                <div className="image-manager-list">
+                                  {article.images.map(img => {
+                                    // 查找当前图片在文章中的占位符，解析大小参数
+                                    const placeholderRegex = new RegExp(`!\\[[^\\]]*\\]\\(\\#${img.id}(?:\\|[^)]+)?\\)`, 'g');
+                                    const match = article.content.match(placeholderRegex);
+                                    let currentWidth = '', currentHeight = '';
+                                    if (match) {
+                                      const sizeMatch = match[0].match(/\|w=(\d+)(?:\|h=(\d+))?/);
+                                      if (sizeMatch) {
+                                        currentWidth = sizeMatch[1];
+                                        currentHeight = sizeMatch[2] || '';
+                                      }
+                                    }
+                                    return (
+                                      <div key={img.id} className="image-manager-item">
+                                        <img src={img.base64} alt={img.alt} className="image-manager-thumb" />
+                                        <div className="image-manager-controls">
+                                          <span className="image-manager-name">{img.alt}</span>
+                                          <span className="image-manager-dims">原始: {img.width}×{img.height}</span>
+                                          <div className="image-manager-size-inputs">
+                                            <div className="image-manager-input-group">
+                                              <label>宽度</label>
+                                              <input
+                                                type="number"
+                                                value={currentWidth}
+                                                placeholder="自动"
+                                                onChange={e => {
+                                                  const newWidth = e.target.value;
+                                                  const newHeight = currentHeight;
+                                                  let newPlaceholder = `![${img.alt}](#${img.id}`;
+                                                  if (newWidth) {
+                                                    newPlaceholder += `|w=${newWidth}`;
+                                                    if (newHeight) newPlaceholder += `|h=${newHeight}`;
+                                                  }
+                                                  newPlaceholder += ')';
+                                                  // 替换文章中的占位符
+                                                  const oldRegex = new RegExp(`!\\[[^\\]]*\\]\\(\\#${img.id}(?:\\|[^)]+)?\\)`, 'g');
+                                                  const newContent = article.content.replace(oldRegex, newPlaceholder);
+                                                  updateArticle(article.id, { content: newContent });
+                                                }}
+                                              />
+                                              <span>px</span>
+                                            </div>
+                                            <div className="image-manager-input-group">
+                                              <label>高度</label>
+                                              <input
+                                                type="number"
+                                                value={currentHeight}
+                                                placeholder="自动"
+                                                onChange={e => {
+                                                  const newWidth = currentWidth;
+                                                  const newHeight = e.target.value;
+                                                  let newPlaceholder = `![${img.alt}](#${img.id}`;
+                                                  if (newWidth || newHeight) {
+                                                    newPlaceholder += `|w=${newWidth || img.width}`;
+                                                    if (newHeight) newPlaceholder += `|h=${newHeight}`;
+                                                  }
+                                                  newPlaceholder += ')';
+                                                  const oldRegex = new RegExp(`!\\[[^\\]]*\\]\\(\\#${img.id}(?:\\|[^)]+)?\\)`, 'g');
+                                                  const newContent = article.content.replace(oldRegex, newPlaceholder);
+                                                  updateArticle(article.id, { content: newContent });
+                                                }}
+                                              />
+                                              <span>px</span>
+                                            </div>
+                                          </div>
+                                        </div>
+                                        <button
+                                          className="image-manager-remove"
+                                          onClick={() => {
+                                            // 从文章中移除占位符
+                                            const oldRegex = new RegExp(`!\\[[^\\]]*\\]\\(\\#${img.id}(?:\\|[^)]+)?\\)\\n?`, 'g');
+                                            const newContent = article.content.replace(oldRegex, '');
+                                            updateArticle(article.id, {
+                                              content: newContent,
+                                              images: article.images.filter(i => i.id !== img.id)
+                                            });
+                                          }}
+                                          title="删除图片"
+                                        >
+                                          {ICONS.trash}
+                                        </button>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        )}
 
                         <div className="ai-assistant-panel">
                           <div className="ai-panel-header" onClick={() => setShowAiPanel(!showAiPanel)}>
@@ -3934,63 +4635,394 @@ ${signals}
 
       {showSettings && (
         <div className="modal-overlay" onClick={() => setShowSettings(false)}>
-          <div className="modal modal-lg" onClick={e => e.stopPropagation()}>
+          <div className="modal modal-lg settings-modal" onClick={e => e.stopPropagation()}>
             <div className="modal-header"><h3>设置</h3><button className="modal-close" onClick={() => setShowSettings(false)}>{ICONS.x}</button></div>
-            <div className="modal-body">
-              <div className="setting-item"><label>关键词屏蔽</label><textarea value={blocked} onChange={e => setBlocked(e.target.value)} placeholder="输入屏蔽词，逗号分隔" /><p className="setting-note">已过滤 {stats.blockedCount} 条资讯</p></div>
-
-              <div className="setting-item">
-                <label>自定义信息源</label>
-                <p className="setting-desc">添加 RSS/Atom 订阅源，可验证连接有效性</p>
-                <div className="custom-sources-list">{customSources.map(source => <div key={source.id} className="custom-source-item"><div className="custom-source-info"><span className="custom-source-name">{source.name}</span><span className="custom-source-region">{REGION_MAP[source.region] || source.region}</span></div><button className="remove-source-btn" onClick={() => removeCustomSource(source.id)}>{ICONS.x}</button></div>)}</div>
-                <div className="add-source-form">
-                  <input type="text" placeholder="名称" value={newSource.name} onChange={e => setNewSource(prev => ({ ...prev, name: e.target.value }))} />
-                  <input type="text" placeholder="RSS/Atom URL" value={newSource.url} onChange={e => { setNewSource(prev => ({ ...prev, url: e.target.value })); setSourceVerifyResult(null); }} className="url-input" />
-                  <select value={newSource.region} onChange={e => setNewSource(prev => ({ ...prev, region: e.target.value }))}><option value="overseas">海外</option><option value="domestic">国内</option><option value="global">全球</option></select>
-                  <button className="verify-source-btn" onClick={verifySource} disabled={sourceVerifying || !newSource.url} title="验证连接">{sourceVerifying ? '...' : '验证'}</button>
-                  <button className="add-source-btn" onClick={addCustomSource}>{ICONS.plus}</button>
-                </div>
-                {sourceVerifyResult && (
-                  <div className={`source-verify-result ${sourceVerifyResult.ok ? 'verify-ok' : 'verify-fail'}`}>
-                    {sourceVerifyResult.ok ? <>{ICONS.check} 有效: {sourceVerifyResult.title} ({sourceVerifyResult.itemCount} 条内容)</> : <>无效: {sourceVerifyResult.message}</>}
-                  </div>
-                )}
-                <div className="builtin-sources"><p className="builtin-title">内置信息源 ({allSources.length})</p><div className="builtin-list">{allSources.slice(0, 8).map((s, i) => <span key={i} className="builtin-source">{s.name}</span>)}{allSources.length > 8 && <span className="builtin-more">+{allSources.length - 8} 更多</span>}</div></div>
+            <div className="modal-body settings-sidebar-body">
+              <div className="settings-sidebar">
+                <button className={`settings-nav-item ${settingsTab === 'general' ? 'active' : ''}`} onClick={() => setSettingsTab('general')}>通用设置</button>
+                <button className={`settings-nav-item ${settingsTab === 'sources' ? 'active' : ''}`} onClick={() => setSettingsTab('sources')}>信息源</button>
+                <button className={`settings-nav-item ${settingsTab === 'llm' ? 'active' : ''}`} onClick={() => setSettingsTab('llm')}>大模型</button>
+                <button className={`settings-nav-item ${settingsTab === 'agents' ? 'active' : ''}`} onClick={() => setSettingsTab('agents')}>Agent管理</button>
               </div>
+              <div className="settings-content">
+              {settingsTab === 'general' && (
+                <div className="setting-item"><label>关键词屏蔽</label><textarea value={blocked} onChange={e => setBlocked(e.target.value)} placeholder="输入屏蔽词，逗号分隔" /><p className="setting-note">已过滤 {stats.blockedCount} 条资讯</p></div>
+              )}
 
-              <div className="setting-item">
-                <label>大模型配置</label>
-                <p className="setting-desc">配置 OpenAI 兼容 API，自动拉取或手动输入模型</p>
-                <div className="llm-config-form">
-                  <div className="llm-config-row">
-                    <input type="text" placeholder="API Base URL (如 https://api.openai.com)" value={llmConfig.baseUrl} onChange={e => setLlmConfig(prev => ({ ...prev, baseUrl: e.target.value }))} className="llm-input url-input" />
-                    <input type="password" placeholder="API Key (可选)" value={llmConfig.apiKey} onChange={e => setLlmConfig(prev => ({ ...prev, apiKey: e.target.value }))} className="llm-input" />
-                    <button className="fetch-models-btn" onClick={fetchLlmModels} disabled={llmFetching || !llmConfig.baseUrl}>{llmFetching ? '拉取中...' : '拉取模型'}</button>
+              {settingsTab === 'sources' && (
+                <>
+                  <div className="setting-item">
+                    <label>自定义信息源</label>
+                    <p className="setting-desc">添加 RSS/Atom 订阅源，可验证连接有效性</p>
+                    <div className="custom-sources-list">{customSources.map(source => <div key={source.id} className="custom-source-item"><div className="custom-source-info"><span className="custom-source-name">{source.name}</span><span className="custom-source-region">{REGION_MAP[source.region] || source.region}</span></div><button className="remove-source-btn" onClick={() => removeCustomSource(source.id)}>{ICONS.x}</button></div>)}</div>
+                    <div className="add-source-form">
+                      <input type="text" placeholder="名称" value={newSource.name} onChange={e => setNewSource(prev => ({ ...prev, name: e.target.value }))} />
+                      <input type="text" placeholder="RSS/Atom URL" value={newSource.url} onChange={e => { setNewSource(prev => ({ ...prev, url: e.target.value })); setSourceVerifyResult(null); }} className="url-input" />
+                      <select value={newSource.region} onChange={e => setNewSource(prev => ({ ...prev, region: e.target.value }))}><option value="overseas">海外</option><option value="domestic">国内</option><option value="global">全球</option></select>
+                      <button className="verify-source-btn" onClick={verifySource} disabled={sourceVerifying || !newSource.url} title="验证连接">{sourceVerifying ? '...' : '验证'}</button>
+                      <button className="add-source-btn" onClick={addCustomSource}>{ICONS.plus}</button>
+                    </div>
+                    {sourceVerifyResult && (
+                      <div className={`source-verify-result ${sourceVerifyResult.ok ? 'verify-ok' : 'verify-fail'}`}>
+                        {sourceVerifyResult.ok ? <>{ICONS.check} 有效: {sourceVerifyResult.title} ({sourceVerifyResult.itemCount} 条内容)</> : <>无效: {sourceVerifyResult.message}</>}
+                      </div>
+                    )}
                   </div>
-                  {llmFetchError && <div className="llm-fetch-error">{llmFetchError}</div>}
-                  <div className="llm-config-row">
-                    <select className="llm-model-select" value={llmConfig.selectedModel} onChange={e => setLlmConfig(prev => ({ ...prev, selectedModel: e.target.value }))}>
-                      <option value="">选择模型</option>
-                      {allLlmModels.map(m => <option key={m.id} value={m.id}>{m.name}{m.owned_by ? ` (${m.owned_by})` : ''}</option>)}
-                    </select>
-                    <input type="text" placeholder="手动输入模型名称" value={llmManualInput} onChange={e => setLlmManualInput(e.target.value)} className="llm-input" />
-                    <button className="add-source-btn" onClick={addManualModel} disabled={!llmManualInput.trim()}>{ICONS.plus}</button>
+                  <div className="setting-item">
+                    <label>内置信息源</label>
+                    <div className="builtin-sources">
+                      <div className="builtin-header">
+                        <p className="builtin-title">内置信息源 ({allSources.length} 个，已启用 {allSources.length - disabledSources.length} 个)</p>
+                        <div className="builtin-actions">
+                          <button className="builtin-action-btn" onClick={() => setDisabledSources([])}>全部启用</button>
+                          <button className="builtin-action-btn" onClick={() => setDisabledSources(allSources.map(s => s.name))}>全部禁用</button>
+                          <button className="builtin-action-btn" onClick={() => { const overseas = allSources.filter(s => s.region === 'overseas').map(s => s.name); const domestic = allSources.filter(s => s.region !== 'overseas').map(s => s.name); setDisabledSources(prev => [...new Set([...prev.filter(n => !overseas.includes(n)), ...domestic])]); }}>仅海外</button>
+                          <button className="builtin-action-btn" onClick={() => { const domestic = allSources.filter(s => s.region !== 'overseas').map(s => s.name); const overseas = allSources.filter(s => s.region === 'overseas').map(s => s.name); setDisabledSources(prev => [...new Set([...prev.filter(n => !domestic.includes(n)), ...overseas])]); }}>仅国内</button>
+                        </div>
+                      </div>
+                      <input type="text" placeholder="搜索信息源..." className="builtin-search" onChange={e => { const q = e.target.value.toLowerCase(); document.querySelectorAll('.builtin-source-checkbox').forEach(el => { el.style.display = el.textContent.toLowerCase().includes(q) ? 'flex' : 'none'; }); }} />
+                      <div className="builtin-list">{allSources.map((s, i) => (<label key={i} className="builtin-source builtin-source-checkbox" title={s.name}><input type="checkbox" checked={!disabledSources.includes(s.name)} onChange={e => { if (e.target.checked) { setDisabledSources(prev => prev.filter(name => name !== s.name)); } else { setDisabledSources(prev => [...prev, s.name]); } }} />{s.name}</label>))}</div>
+                    </div>
                   </div>
-                  {(llmConfig.manualModels || []).length > 0 && (
-                    <div className="manual-models-list">
-                      {(llmConfig.manualModels || []).map(m => <div key={m.id} className="custom-source-item"><div className="custom-source-info"><span className="custom-source-name">{m.name}</span><span className="custom-source-region">手动</span></div><button className="remove-source-btn" onClick={() => removeManualModel(m.id)}>{ICONS.x}</button></div>)}
+                </>
+              )}
+
+              {settingsTab === 'llm' && (
+                <div className="setting-item">
+                  <label>大模型配置</label>
+                  <p className="setting-desc">配置 OpenAI 兼容 API，自动拉取或手动输入模型</p>
+                  <div className="llm-config-form">
+                    <div className="llm-config-row">
+                      <input type="text" placeholder="API Base URL (如 https://api.openai.com)" value={llmConfig.baseUrl} onChange={e => setLlmConfig(prev => ({ ...prev, baseUrl: e.target.value }))} className="llm-input url-input" />
+                      <input type="password" placeholder="API Key (可选)" value={llmConfig.apiKey} onChange={e => setLlmConfig(prev => ({ ...prev, apiKey: e.target.value }))} className="llm-input" />
+                      <button className="fetch-models-btn" onClick={fetchLlmModels} disabled={llmFetching || !llmConfig.baseUrl}>{llmFetching ? '拉取中...' : '拉取模型'}</button>
+                    </div>
+                    {llmFetchError && <div className="llm-fetch-error">{llmFetchError}</div>}
+                    <div className="llm-config-row">
+                      <select className="llm-model-select" value={llmConfig.selectedModel} onChange={e => setLlmConfig(prev => ({ ...prev, selectedModel: e.target.value }))}>
+                        <option value="">选择模型</option>
+                        {allLlmModels.map(m => <option key={m.id} value={m.id}>{m.name}{m.owned_by ? ` (${m.owned_by})` : ''}</option>)}
+                      </select>
+                      <input type="text" placeholder="手动输入模型名称" value={llmManualInput} onChange={e => setLlmManualInput(e.target.value)} className="llm-input" />
+                      <button className="add-source-btn" onClick={addManualModel} disabled={!llmManualInput.trim()}>{ICONS.plus}</button>
+                    </div>
+                    {(llmConfig.manualModels || []).length > 0 && (
+                      <div className="manual-models-list">
+                        {(llmConfig.manualModels || []).map(m => <div key={m.id} className="custom-source-item"><div className="custom-source-info"><span className="custom-source-name">{m.name}</span><span className="custom-source-region">手动</span></div><button className="remove-source-btn" onClick={() => removeManualModel(m.id)}>{ICONS.x}</button></div>)}
+                      </div>
+                    )}
+                    <div className="llm-config-row">
+                      <button className="test-llm-btn" onClick={testLlmConnection} disabled={llmTesting || !llmConfig.baseUrl || !llmConfig.selectedModel}>{llmTesting ? '测试中...' : '测试连接'}</button>
+                    </div>
+                    {llmTestResult && (
+                      <div className={`source-verify-result ${llmTestResult.ok ? 'verify-ok' : 'verify-fail'}`}>
+                        {llmTestResult.ok ? <>{ICONS.check} 连接成功 ({llmTestResult.model}): {llmTestResult.reply}</> : <>连接失败: {llmTestResult.message}</>}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {settingsTab === 'agents' && (
+                <>
+                  <div className="setting-item">
+                    <label>AI精灵名称</label>
+                    <p className="setting-desc">自定义AI精灵在聊天窗口中的显示名称</p>
+                    <input 
+                      type="text" 
+                      value={elfName} 
+                      onChange={e => setElfName(e.target.value || 'AI精灵')}
+                      placeholder="AI精灵"
+                      className="elf-name-input"
+                      maxLength={20}
+                    />
+                  </div>
+                  <div className="setting-item">
+                    <label>Agent管理</label>
+                    <p className="setting-desc">选择和管理AI精灵的智能体，每个Agent有不同的专长和提示词</p>
+                    <div className="agent-filter-bar">
+                      {AGENT_CATEGORIES.map(cat => (
+                        <button
+                          key={cat}
+                          className={`agent-filter-btn ${agentFilter === cat ? 'active' : ''}`}
+                          onClick={() => setAgentFilter(cat)}
+                        >
+                          {cat}
+                        </button>
+                      ))}
+                    </div>
+                    <div className="agent-list">
+                      {agents.filter(a => agentFilter === '全部' || a.category === agentFilter).map(agent => (
+                        <div key={agent.id} className={`agent-card ${currentAgent === agent.id ? 'active' : ''}`}>
+                          <div className="agent-card-main">
+                            <img src={agent.avatar || '/ai-elf-avatar.png'} alt={agent.name} className="agent-card-avatar" />
+                            <div className="agent-card-info">
+                              <span className="agent-card-name">{agent.name}</span>
+                            <span className="agent-card-desc">{agent.description}</span>
+                            <div className="agent-card-tags">
+                              <span className="agent-card-category">{agent.category}</span>
+                              {(agent.tags || []).map((tag, i) => (
+                                <span key={i} className="agent-card-tag">{tag}</span>
+                              ))}
+                            </div>
+                            </div>
+                          </div>
+                          <div className="agent-card-actions">
+                            <button
+                              className={`agent-card-select ${currentAgent === agent.id ? 'selected' : ''}`}
+                              onClick={() => setCurrentAgent(agent.id)}
+                            >
+                              {currentAgent === agent.id ? '使用中' : '选择'}
+                            </button>
+                            <button
+                              className="agent-card-detail-btn"
+                              onClick={() => setEditingAgent(agent)}
+                            >
+                              详情
+                            </button>
+                            {agent.isCustom && (
+                              <button className="agent-card-delete" onClick={() => {
+                                if (confirm(`确定删除Agent「${agent.name}」？`)) {
+                                  setAgents(prev => prev.filter(a => a.id !== agent.id));
+                                  if (currentAgent === agent.id) setCurrentAgent('analyst');
+                                }
+                              }}>
+                                {ICONS.x}
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    <button className="agent-create-btn" onClick={() => setShowAgentForm(true)}>
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{width:16,height:16,marginRight:6}}><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                      创建自定义Agent
+                    </button>
+                  </div>
+
+                  {showAgentForm && (
+                    <div className="agent-form-overlay">
+                      <div className="agent-form">
+                        <div className="agent-form-header">
+                          <h4>创建自定义Agent</h4>
+                          <button className="agent-form-close" onClick={() => setShowAgentForm(false)}>{ICONS.x}</button>
+                        </div>
+                        <div className="agent-form-body">
+                          <div className="agent-form-avatar-section">
+                            <img src={newAgent.avatar || '/ai-elf-avatar.png'} alt="预览" className="agent-form-avatar-preview" />
+                            <div className="agent-form-avatar-actions">
+                              <input
+                                type="file"
+                                accept="image/*"
+                                id="agent-avatar-upload-new"
+                                className="elf-avatar-file-input"
+                                onChange={(e) => {
+                                  const file = e.target.files[0];
+                                  if (!file) return;
+                                  const reader = new FileReader();
+                                  reader.onload = (ev) => setNewAgent(prev => ({ ...prev, avatar: ev.target.result }));
+                                  reader.readAsDataURL(file);
+                                }}
+                              />
+                              <label htmlFor="agent-avatar-upload-new" className="elf-avatar-upload-btn">选择图片</label>
+                              {newAgent.avatar && (
+                                <button className="elf-avatar-reset-btn" onClick={() => setNewAgent(prev => ({ ...prev, avatar: '' }))}>恢复默认</button>
+                              )}
+                            </div>
+                          </div>
+                          <label>名称</label>
+                          <input
+                            type="text"
+                            value={newAgent.name}
+                            onChange={e => setNewAgent(prev => ({ ...prev, name: e.target.value }))}
+                            placeholder="如：产品经理助手"
+                            className="agent-form-input"
+                          />
+                          <label>分类</label>
+                          <select
+                            value={newAgent.category}
+                            onChange={e => setNewAgent(prev => ({ ...prev, category: e.target.value }))}
+                            className="agent-form-select"
+                          >
+                            {AGENT_CATEGORIES.filter(c => c !== '全部').map(c => <option key={c} value={c}>{c}</option>)}
+                          </select>
+                          <label>描述</label>
+                          <input
+                            type="text"
+                            value={newAgent.description}
+                            onChange={e => setNewAgent(prev => ({ ...prev, description: e.target.value }))}
+                            placeholder="简短描述这个Agent的用途"
+                            className="agent-form-input"
+                          />
+                          <label>标签（逗号分隔）</label>
+                          <input
+                            type="text"
+                            value={(newAgent.tags || []).join(', ')}
+                            onChange={e => setNewAgent(prev => ({ ...prev, tags: e.target.value.split(',').map(t => t.trim()).filter(Boolean) }))}
+                            placeholder="如：资讯分析, 结构化思维"
+                            className="agent-form-input"
+                          />
+                          <label>系统提示词</label>
+                          <textarea
+                            value={newAgent.systemPrompt}
+                            onChange={e => setNewAgent(prev => ({ ...prev, systemPrompt: e.target.value }))}
+                            placeholder="定义这个Agent的角色、技能和回答风格..."
+                            rows={6}
+                            className="agent-form-textarea"
+                          />
+                          <button
+                            className="agent-refine-btn"
+                            onClick={async () => {
+                              if (!newAgent.systemPrompt.trim() || !llmConfig.baseUrl) return;
+                              setAgentPromptRefining(true);
+                              try {
+                                const res = await fetch('/api/ai-generate', {
+                                  method: 'POST',
+                                  headers: { 'Content-Type': 'application/json' },
+                                  body: JSON.stringify({
+                                    baseUrl: llmConfig.baseUrl,
+                                    apiKey: llmConfig.apiKey,
+                                    model: llmConfig.selectedModel,
+                                    action: 'chat',
+                                    content: `请帮我优化以下AI Agent的系统提示词，使其更加专业、清晰、有效。保持原意，但让提示词更加精炼有力。直接输出优化后的提示词，不要添加额外说明：
+
+${newAgent.systemPrompt}`
+                                  })
+                                });
+                                const data = await res.json();
+                                if (data.content) {
+                                  setNewAgent(prev => ({ ...prev, systemPrompt: data.content.trim() }));
+                                }
+                              } catch (e) {
+                                alert('润色失败: ' + e.message);
+                              } finally {
+                                setAgentPromptRefining(false);
+                              }
+                            }}
+                            disabled={agentPromptRefining || !newAgent.systemPrompt.trim() || !llmConfig.baseUrl}
+                          >
+                            {agentPromptRefining ? '润色中...' : 'AI润色提示词'}
+                          </button>
+                        </div>
+                        <div className="agent-form-footer">
+                          <button className="btn-cancel" onClick={() => setShowAgentForm(false)}>取消</button>
+                          <button
+                            className="btn-save"
+                            onClick={() => {
+                              if (!newAgent.name.trim() || !newAgent.systemPrompt.trim()) return;
+                              const agent = {
+                                id: 'custom-' + Date.now(),
+                                name: newAgent.name.trim(),
+                                description: newAgent.description.trim() || '自定义Agent',
+                                systemPrompt: newAgent.systemPrompt.trim(),
+                                category: newAgent.category,
+                                tags: newAgent.tags || [],
+                                avatar: newAgent.avatar || '',
+                                isDefault: false,
+                                isCustom: true
+                              };
+                              setAgents(prev => [...prev, agent]);
+                               setNewAgent({ name: '', description: '', systemPrompt: '', category: '分析', tags: [], avatar: '' });
+                              setShowAgentForm(false);
+                            }}
+                            disabled={!newAgent.name.trim() || !newAgent.systemPrompt.trim()}
+                          >
+                            创建
+                          </button>
+                        </div>
+                      </div>
                     </div>
                   )}
-                  <div className="llm-config-row">
-                    <button className="test-llm-btn" onClick={testLlmConnection} disabled={llmTesting || !llmConfig.baseUrl || !llmConfig.selectedModel}>{llmTesting ? '测试中...' : '测试连接'}</button>
-                  </div>
-                  {llmTestResult && (
-                    <div className={`source-verify-result ${llmTestResult.ok ? 'verify-ok' : 'verify-fail'}`}>
-                      {llmTestResult.ok ? <>{ICONS.check} 连接成功 ({llmTestResult.model}): {llmTestResult.reply}</> : <>连接失败: {llmTestResult.message}</>}
+
+                  {/* Agent详情编辑 */}
+                  {editingAgent && (
+                    <div className="agent-form-overlay">
+                      <div className="agent-form">
+                        <div className="agent-form-header">
+                          <h4>Agent详情</h4>
+                          <button className="agent-form-close" onClick={() => setEditingAgent(null)}>{ICONS.x}</button>
+                        </div>
+                        <div className="agent-form-body">
+                          <div className="agent-form-avatar-section">
+                            <img src={editingAgent.avatar || '/ai-elf-avatar.png'} alt={editingAgent.name} className="agent-form-avatar-preview" />
+                            <div className="agent-form-avatar-actions">
+                              <input
+                                type="file"
+                                accept="image/*"
+                                id="agent-avatar-upload-edit"
+                                className="elf-avatar-file-input"
+                                onChange={(e) => {
+                                  const file = e.target.files[0];
+                                  if (!file) return;
+                                  const reader = new FileReader();
+                                  reader.onload = (ev) => setEditingAgent(prev => ({ ...prev, avatar: ev.target.result }));
+                                  reader.readAsDataURL(file);
+                                }}
+                              />
+                              <label htmlFor="agent-avatar-upload-edit" className="elf-avatar-upload-btn">选择图片</label>
+                              {editingAgent.avatar && (
+                                <button className="elf-avatar-reset-btn" onClick={() => setEditingAgent(prev => ({ ...prev, avatar: '' }))}>恢复默认</button>
+                              )}
+                            </div>
+                          </div>
+                          <label>ID</label>
+                          <input type="text" value={editingAgent.id} disabled className="agent-form-input" />
+                          <label>名称</label>
+                          <input
+                            type="text"
+                            value={editingAgent.name}
+                            onChange={e => setEditingAgent(prev => ({ ...prev, name: e.target.value }))}
+                            className="agent-form-input"
+                          />
+                          <label>描述</label>
+                          <input
+                            type="text"
+                            value={editingAgent.description}
+                            onChange={e => setEditingAgent(prev => ({ ...prev, description: e.target.value }))}
+                            className="agent-form-input"
+                          />
+                          <label>分类</label>
+                          <select
+                            value={editingAgent.category}
+                            onChange={e => setEditingAgent(prev => ({ ...prev, category: e.target.value }))}
+                            className="agent-form-select"
+                          >
+                            {AGENT_CATEGORIES.filter(c => c !== '全部').map(c => <option key={c} value={c}>{c}</option>)}
+                          </select>
+                          <label>标签（逗号分隔）</label>
+                          <input
+                            type="text"
+                            value={(editingAgent.tags || []).join(', ')}
+                            onChange={e => setEditingAgent(prev => ({ ...prev, tags: e.target.value.split(',').map(t => t.trim()).filter(Boolean) }))}
+                            placeholder="如：资讯分析, 结构化思维"
+                            className="agent-form-input"
+                          />
+                          <label>系统提示词</label>
+                          <textarea
+                            value={editingAgent.systemPrompt}
+                            onChange={e => setEditingAgent(prev => ({ ...prev, systemPrompt: e.target.value }))}
+                            rows={6}
+                            className="agent-form-textarea"
+                          />
+                        </div>
+                        <div className="agent-form-footer">
+                          <button className="btn-cancel" onClick={() => setEditingAgent(null)}>取消</button>
+                          <button
+                            className="btn-save"
+                            onClick={() => {
+                              setAgents(prev => prev.map(a => a.id === editingAgent.id ? editingAgent : a));
+                              setEditingAgent(null);
+                            }}
+                          >
+                            保存修改
+                          </button>
+                        </div>
+                      </div>
                     </div>
                   )}
-                </div>
-              </div>
+                </>
+              )}
+            </div>
             </div>
             <div className="modal-footer"><button className="btn-cancel" onClick={() => setShowSettings(false)}>取消</button><button className="btn-save" onClick={() => { loadNews(); setShowSettings(false); }}>保存并刷新</button></div>
           </div>
@@ -4103,6 +5135,28 @@ ${signals}
       <button className={`back-to-top ${showBackToTop ? 'visible' : ''}`} onClick={scrollToTop} title="回到顶部">
         {ICONS.chevronLeft ? <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="18 15 12 9 6 15"/></svg> : ICONS.chevronUp}
       </button>
+
+      {/* AI精灵助手 */}
+      <AiElf 
+        llmConfig={llmConfig} 
+        avatarImage={elfAvatar} 
+        elfName={elfName} 
+        agents={agents}
+        currentAgent={currentAgent}
+        onChangeAgent={setCurrentAgent}
+        onExportToMaterials={(data) => {
+        const { title, content } = data;
+        addManualMaterial({
+          title: title.slice(0, 100),
+          content: content.slice(0, 5000),
+          type: 'analysis',
+          source: 'AI精灵',
+          url: '',
+          tags: 'AI分析,AI精灵',
+          note: '',
+          spaceId: null
+        });
+      }} />
     </div>
   );
 
@@ -4222,15 +5276,27 @@ function SkeletonCard({ viewMode = 'standard' }) {
   );
 }
 
-function NewsItem({ item, index, viewMode = 'standard', isFocused = false, isBookmarked = false, isInMaterials = false, onBookmark, onSummary, isSummaryOpen, summaryText, isFollowed = false, onRead, showTranslation, onToggleTranslation, translation, onOpenLightbox, onAddMaterial }) {
+function NewsItem({ item, index, viewMode = 'standard', isFocused = false, isBookmarked = false, isInMaterials = false, onBookmark, onSummary, isSummaryOpen, summaryText, isFollowed = false, onRead, showTranslation, onToggleTranslation, onRequestTranslation, isTranslating, translation, onOpenLightbox, onAddMaterial }) {
   const isCompact = viewMode === 'compact';
   const isCard = viewMode === 'card';
   const hasMedia = item.imageUrl || item.videoUrl;
 
-  const isEnglish = /^[a-zA-Z0-9\s\-.,!?'"():]+$/.test(item.title);
+  const isEnglish = /^[a-zA-Z0-9\s\-.,!?"'():;&%$#@*+\[\]{}|\\\/<>`~+=]+$/.test(item.title) && !/^[\u4e00-\u9fff]/.test(item.title);
+
+  // 拖拽开始
+  const handleDragStart = (e) => {
+    e.dataTransfer.setData('application/json', JSON.stringify(item));
+    e.dataTransfer.effectAllowed = 'copy';
+  };
 
   return (
-    <article className={`news-item view-${viewMode} ${isFocused ? 'focused' : ''} ${isFollowed ? 'followed' : ''}`} style={{ animationDelay: `${index * 40}ms` }} data-index={index}>
+    <article
+      className={`news-item view-${viewMode} ${isFocused ? 'focused' : ''} ${isFollowed ? 'followed' : ''}`}
+      style={{ animationDelay: `${index * 40}ms` }}
+      data-index={index}
+      draggable
+      onDragStart={handleDragStart}
+    >
       {isFollowed && <div className="follow-badge">关注</div>}
       <div className="item-left">
         {!isCompact && <div className="item-tags">
@@ -4242,7 +5308,7 @@ function NewsItem({ item, index, viewMode = 'standard', isFocused = false, isBoo
           {onBookmark && <button className={`bookmark-btn ${isBookmarked ? 'active' : ''}`} onClick={onBookmark} title={isBookmarked ? '取消收藏' : '收藏'}>{isBookmarked ? ICONS.bookmarkFill : ICONS.bookmark}</button>}
           {onAddMaterial && <button className={`add-material-btn ${isInMaterials ? 'active' : ''}`} onClick={() => onAddMaterial(item)} title={isInMaterials ? '已在素材库' : '收藏为素材'}>{ICONS.layers}</button>}
           {onSummary && <button className="summary-btn" onClick={onSummary} title="AI 摘要">{ICONS.sparkle}</button>}
-          {isEnglish && onToggleTranslation && <button className={`translate-btn ${showTranslation ? 'active' : ''}`} onClick={onToggleTranslation} title="中英对照">{ICONS.globe}</button>}
+          {isEnglish && onToggleTranslation && <button className={`translate-btn ${showTranslation ? 'active' : ''} ${isTranslating ? 'translating' : ''}`} onClick={() => { console.log('[NewsItem] Translate button clicked:', { isTranslating, translation, onRequestTranslation: !!onRequestTranslation }); if (isTranslating) return; if (!translation && onRequestTranslation) { onRequestTranslation().then(result => { console.log('[NewsItem] Translation result:', result); if (result) onToggleTranslation(); }); } else { onToggleTranslation(); } }} title="中英对照" disabled={isTranslating}>{isTranslating ? ICONS.spinner : ICONS.globe}</button>}
         </div>
       </div>
       <div className="item-main">

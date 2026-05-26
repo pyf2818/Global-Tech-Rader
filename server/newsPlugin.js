@@ -1,38 +1,161 @@
+// ========== 信息源质量权重 ==========
+// 从顶级项目（Horizon/TrendRadar）学到的：给不同质量源设置权重，高权重源优先展示
+const SOURCE_WEIGHTS = {
+  // 顶刊（权重1.0）
+  'Nature': 1.0,
+  'Science Magazine': 1.0,
+  'Nature Machine Intelligence': 1.0,
+  // 学术源（权重0.9）
+  'ArXiv CS AI': 0.9,
+  'ArXiv CS ML': 0.9,
+  'ArXiv CS CL': 0.9,
+  'ArXiv CS CV': 0.9,
+  'MIT News AI': 0.9,
+  'Stanford HAI': 0.9,
+  'Science Daily': 0.85,
+  'IEEE Spectrum': 0.85,
+  'MIT Technology Review': 0.85,
+  // 官方博客（一手信息，权重0.9）
+  'OpenAI Blog': 0.9,
+  'Anthropic News': 0.9,
+  'Google DeepMind': 0.9,
+  'Meta AI Blog': 0.9,
+  'Google AI Blog': 0.9,
+  'Microsoft AI Blog': 0.9,
+  'Apple Machine Learning': 0.9,
+  'Hugging Face Blog': 0.85,
+  // 开发者社区（高信噪比，权重0.8）
+  'Hacker News': 0.8,
+  'GitHub Blog': 0.8,
+  'Dev.to': 0.75,
+  'Lobsters': 0.75,
+  'CoolShell': 0.75,
+  'Slashdot': 0.75,
+  // 顶级科技媒体（权重0.7）
+  'TechCrunch': 0.7,
+  'The Verge': 0.7,
+  'Wired': 0.7,
+  'Ars Technica': 0.7,
+  'CNET': 0.65,
+  'ZDNet': 0.65,
+  'Engadget': 0.65,
+  'VentureBeat': 0.65,
+  // 国内头部（权重0.7）
+  '量子位': 0.75,
+  '机器之心': 0.75,
+  '36氪': 0.7,
+  'InfoQ CN': 0.7,
+  '虎嗅': 0.7,
+  '钛媒体': 0.7,
+  '爱范儿': 0.65,
+  '少数派': 0.65,
+  'IT之家': 0.6,
+  // 垂直领域权威
+  'KrebsOnSecurity': 0.85,
+  'The Hacker News': 0.8,
+  'Reuters Business': 0.8,
+  'Bloomberg Technology': 0.8,
+  'Financial Times Tech': 0.8,
+  '财新网': 0.8,
+  '经济观察网': 0.75,
+  'MarketWatch': 0.8,
+  'Kiplinger': 0.75,
+  'Investing.com': 0.75,
+  '36氪': 0.7,
+  '中国新闻网': 0.75,
+  '人民网财经': 0.75,
+  'IT之家': 0.7,
+  'Nature Medicine': 0.85,
+  'Stat News': 0.8,
+  'Canary Media': 0.75,
+  // 云厂商（权重0.7）
+  'AWS Blog': 0.7,
+  'Google Cloud': 0.7,
+  'Microsoft Azure': 0.7,
+  '腾讯云开发者': 0.65,
+  '阿里云开发者': 0.65,
+  // 游戏娱乐
+  'PC Gamer': 0.75,
+  'Steam News': 0.8,
+  'Ars Technica Gaming': 0.75,
+  'Rock Paper Shotgun': 0.7,
+  'Nintendo Life': 0.7,
+  'TechCrunch Gaming': 0.7,
+  // 影视娱乐
+  'Variety': 0.75,
+  'Hollywood Reporter': 0.75,
+  'TMZ': 0.65,
+  'The Guardian Film': 0.75,
+  'BBC Entertainment': 0.75,
+  'Rolling Stone': 0.75,
+  // 动漫二次元
+  'Crunchyroll News': 0.75,
+  'Anime News Network': 0.75,
+  'MyAnimeList': 0.7,
+  'ComicBook.com': 0.65,
+  // 芯片半导体
+  'Semiconductor Engineering': 0.85,
+  'EE Times': 0.8,
+  'AnandTech': 0.75,
+  // 机器人
+  'TechCrunch Robotics': 0.75,
+  'IEEE Spectrum': 0.85,
+  'Engadget': 0.8,
+  'The Verge': 0.8,
+  'Cointelegraph': 0.75,
+  'Popular Mechanics': 0.7,
+  'Quanta Magazine': 0.85,
+};
+
+// 多源交叉验证阈值：同一URL在多少个源出现才算高可信度
+const CROSS_VERIFY_THRESHOLD = 3;
+
 const DEFAULT_SOURCES = [
-  // 国际权威媒体（优先级最高）
-  { name: 'TechCrunch', url: 'https://techcrunch.com/feed/', region: 'overseas', defaultCategory: 'silicon-valley' },
-  { name: 'MIT Technology Review', url: 'https://www.technologyreview.com/feed/', region: 'overseas', defaultCategory: 'research' },
-  { name: 'The Verge', url: 'https://www.theverge.com/rss/index.xml', region: 'overseas', defaultCategory: 'devices' },
-  { name: 'Wired', url: 'https://www.wired.com/feed/rss', region: 'overseas', defaultCategory: 'silicon-valley' },
-  { name: 'Ars Technica', url: 'https://feeds.arstechnica.com/arstechnica/index', region: 'overseas', defaultCategory: 'silicon-valley' },
+  // 学术权威（最高优先级）
+  { name: 'Nature', url: 'https://www.nature.com/nature.rss', region: 'global', defaultCategory: 'research' },
+  { name: 'Science Magazine', url: 'https://www.science.org/rss/news_current.xml', region: 'global', defaultCategory: 'research' },
+  { name: 'Nature Machine Intelligence', url: 'https://www.nature.com/natmachintell.rss', region: 'global', defaultCategory: 'research' },
+  { name: 'ArXiv CS AI', url: 'https://export.arxiv.org/rss/cs.AI', region: 'global', defaultCategory: 'research' },
+  { name: 'ArXiv CS ML', url: 'https://export.arxiv.org/rss/cs.LG', region: 'global', defaultCategory: 'research' },
+  { name: 'ArXiv CS CL', url: 'https://export.arxiv.org/rss/cs.CL', region: 'global', defaultCategory: 'research' },
+  { name: 'ArXiv CS CV', url: 'https://export.arxiv.org/rss/cs.CV', region: 'global', defaultCategory: 'research' },
+  { name: 'MIT News AI', url: 'https://news.mit.edu/rss/topic/artificial-intelligence2', region: 'overseas', defaultCategory: 'research' },
+  { name: 'Stanford HAI', url: 'https://hai.stanford.edu/news/rss.xml', region: 'overseas', defaultCategory: 'research' },
+  { name: 'Science Daily', url: 'https://www.sciencedaily.com/rss/', region: 'overseas', defaultCategory: 'research' },
   { name: 'IEEE Spectrum', url: 'https://spectrum.ieee.org/rss/fulltext', region: 'overseas', defaultCategory: 'research' },
   
-  // AI/大模型官方博客
+  // AI/大模型官方博客（一手信息）
   { name: 'OpenAI Blog', url: 'https://openai.com/blog/rss.xml', region: 'overseas', defaultCategory: 'ai-models' },
   { name: 'Anthropic News', url: 'https://www.anthropic.com/news/rss', region: 'overseas', defaultCategory: 'ai-models' },
   { name: 'Google DeepMind', url: 'https://deepmind.google/discover/blog/rss/', region: 'overseas', defaultCategory: 'ai-models' },
   { name: 'Meta AI Blog', url: 'https://ai.meta.com/blog/rss/', region: 'overseas', defaultCategory: 'ai-models' },
   { name: 'Google AI Blog', url: 'https://blog.google/technology/ai/rss/', region: 'overseas', defaultCategory: 'ai-models' },
   { name: 'Microsoft AI Blog', url: 'https://blogs.microsoft.com/ai/feed/', region: 'overseas', defaultCategory: 'ai-models' },
+  { name: 'Apple Machine Learning', url: 'https://machinelearning.apple.com/rss.xml', region: 'overseas', defaultCategory: 'ai-models' },
   { name: 'Hugging Face Blog', url: 'https://huggingface.co/blog/feed.xml', region: 'global', defaultCategory: 'ai-models' },
+  { name: 'AI News', url: 'https://www.artificialintelligence-news.com/feed/', region: 'overseas', defaultCategory: 'ai-models' },
   
-  // 学术前沿
-  { name: 'ArXiv CS AI', url: 'https://export.arxiv.org/rss/cs.AI', region: 'global', defaultCategory: 'research' },
-  { name: 'ArXiv CS ML', url: 'https://export.arxiv.org/rss/cs.LG', region: 'global', defaultCategory: 'research' },
-  { name: 'ArXiv CS CL', url: 'https://export.arxiv.org/rss/cs.CL', region: 'global', defaultCategory: 'research' },
-  { name: 'ArXiv CS CV', url: 'https://export.arxiv.org/rss/cs.CV', region: 'global', defaultCategory: 'research' },
-  { name: 'Nature Machine Intelligence', url: 'https://www.nature.com/natmachintell.rss', region: 'global', defaultCategory: 'research' },
-  { name: 'MIT News AI', url: 'https://news.mit.edu/rss/topic/artificial-intelligence2', region: 'overseas', defaultCategory: 'research' },
-  { name: 'Stanford HAI', url: 'https://hai.stanford.edu/news/rss.xml', region: 'overseas', defaultCategory: 'research' },
+  // 国际顶级科技媒体
+  { name: 'TechCrunch', url: 'https://techcrunch.com/feed/', region: 'overseas', defaultCategory: 'silicon-valley' },
+  { name: 'MIT Technology Review', url: 'https://www.technologyreview.com/feed/', region: 'overseas', defaultCategory: 'research' },
+  { name: 'The Verge', url: 'https://www.theverge.com/rss/index.xml', region: 'overseas', defaultCategory: 'devices' },
+  { name: 'Wired', url: 'https://www.wired.com/feed/rss', region: 'overseas', defaultCategory: 'silicon-valley' },
+  { name: 'Ars Technica', url: 'https://feeds.arstechnica.com/arstechnica/index', region: 'overseas', defaultCategory: 'silicon-valley' },
+  { name: 'CNET', url: 'https://www.cnet.com/rss/news/', region: 'overseas', defaultCategory: 'devices' },
+  { name: 'ZDNet', url: 'https://www.zdnet.com/news/rss.xml', region: 'overseas', defaultCategory: 'silicon-valley' },
+  { name: 'Slashdot', url: 'https://rss.slashdot.org/Slashdot/slashdotMain', region: 'overseas', defaultCategory: 'open-source' },
+  { name: 'Engadget', url: 'https://www.engadget.com/rss.xml', region: 'overseas', defaultCategory: 'devices' },
+  { name: 'VentureBeat', url: 'https://venturebeat.com/feed/', region: 'overseas', defaultCategory: 'silicon-valley' },
   
-  // 开源与开发者社区
+  // 开发者社区与开源（高信噪比）
   { name: 'Hacker News', url: 'https://hnrss.org/frontpage', region: 'global', defaultCategory: 'open-source' },
   { name: 'GitHub Blog', url: 'https://github.blog/feed/', region: 'global', defaultCategory: 'open-source' },
   { name: 'Dev.to', url: 'https://dev.to/feed', region: 'global', defaultCategory: 'open-source' },
   { name: 'Reddit Technology', url: 'https://www.reddit.com/r/technology/.rss', region: 'global', defaultCategory: 'silicon-valley' },
   { name: 'Reddit MachineLearning', url: 'https://www.reddit.com/r/MachineLearning/.rss', region: 'global', defaultCategory: 'ai-models' },
+  { name: 'CoolShell', url: 'https://coolshell.cn/feed', region: 'domestic', defaultCategory: 'open-source' },
   
-  // 国内优质
+  // 国内头部科技媒体
   { name: '量子位', url: 'https://www.qbitai.com/feed', region: 'domestic', defaultCategory: 'ai-models' },
   { name: '机器之心', url: 'https://www.jiqizhixin.com/rss', region: 'domestic', defaultCategory: 'ai-models' },
   { name: '36氪', url: 'https://36kr.com/feed', region: 'domestic', defaultCategory: 'china-tech' },
@@ -43,24 +166,22 @@ const DEFAULT_SOURCES = [
   { name: '少数派', url: 'https://sspai.com/feed', region: 'domestic', defaultCategory: 'devices' },
   { name: '虎嗅', url: 'https://www.huxiu.com/rss/0.xml', region: 'domestic', defaultCategory: 'china-tech' },
   { name: '钛媒体', url: 'https://www.tmtpost.com/rss.xml', region: 'domestic', defaultCategory: 'china-tech' },
-  { name: 'CnBeta', url: 'https://www.cnbeta.com/backend.php', region: 'domestic', defaultCategory: 'devices' },
   { name: 'IT之家', url: 'https://www.ithome.com/rss/', region: 'domestic', defaultCategory: 'devices' },
-  { name: '腾讯云开发者', url: 'https://cloud.tencent.com/developer/rss', region: 'domestic', defaultCategory: 'cloud' },
-  { name: '阿里云开发者', url: 'https://developer.aliyun.com/rss', region: 'domestic', defaultCategory: 'cloud' },
-  
-  // 科技媒体
-  { name: 'VentureBeat', url: 'https://venturebeat.com/feed/', region: 'overseas', defaultCategory: 'silicon-valley' },
-  { name: 'Engadget', url: 'https://www.engadget.com/rss.xml', region: 'overseas', defaultCategory: 'devices' },
-  { name: 'AI News', url: 'https://www.artificialintelligence-news.com/feed/', region: 'overseas', defaultCategory: 'ai-models' },
   
   // 云计算
   { name: 'AWS Blog', url: 'https://aws.amazon.com/blogs/aws/feed/', region: 'overseas', defaultCategory: 'cloud' },
   { name: 'Google Cloud', url: 'https://cloud.google.com/blog/feed', region: 'overseas', defaultCategory: 'cloud' },
   { name: 'Microsoft Azure', url: 'https://azure.microsoft.com/en-us/blog/feed/', region: 'overseas', defaultCategory: 'cloud' },
+  { name: '腾讯云开发者', url: 'https://cloud.tencent.com/developer/rss', region: 'domestic', defaultCategory: 'cloud' },
+  { name: '阿里云开发者', url: 'https://developer.aliyun.com/rss', region: 'domestic', defaultCategory: 'cloud' },
   
   // 硬件数码
   { name: "Tom's Hardware", url: 'https://www.tomshardware.com/feeds/all', region: 'overseas', defaultCategory: 'devices' },
   { name: 'AnandTech', url: 'https://www.anandtech.com/rss/newsfeed.aspx', region: 'overseas', defaultCategory: 'devices' },
+  
+  // 前沿科技/未来主义
+  { name: 'Futurism', url: 'https://futurism.com/feed', region: 'overseas', defaultCategory: 'tech-frontier' },
+  { name: 'SingularityHub', url: 'https://singularityhub.com/feed/', region: 'overseas', defaultCategory: 'tech-frontier' },
   
   // 新能源
   { name: 'Canary Media', url: 'https://www.canarymedia.com/feed', region: 'overseas', defaultCategory: 'new-energy' },
@@ -82,7 +203,99 @@ const DEFAULT_SOURCES = [
   // 网络安全
   { name: 'KrebsOnSecurity', url: 'https://krebsonsecurity.com/feed/', region: 'overseas', defaultCategory: 'cybersecurity' },
   { name: 'The Hacker News', url: 'https://feeds.feedburner.com/TheHackersNews', region: 'global', defaultCategory: 'cybersecurity' },
-  { name: 'Dark Reading', url: 'https://www.darkreading.com/rss.xml', region: 'overseas', defaultCategory: 'cybersecurity' }
+  { name: 'Dark Reading', url: 'https://www.darkreading.com/rss.xml', region: 'overseas', defaultCategory: 'cybersecurity' },
+
+  // ========== RSSHub 高价值源（从顶级项目学来）==========
+  // 知乎热榜（社区筛选的高质量内容）
+  { name: '知乎热榜', url: 'https://rsshub.rssforever.com/zhihu/hotlist', region: 'domestic', defaultCategory: 'tech-frontier' },
+  { name: '知乎科技', url: 'https://rsshub.rssforever.com/zhihu/topic/19550517', region: 'domestic', defaultCategory: 'tech-frontier' },
+  { name: '知乎AI', url: 'https://rsshub.rssforever.com/zhihu/topic/19550517', region: 'domestic', defaultCategory: 'ai-models' },
+  // GitHub Trending（开发者社区投票筛选）
+  { name: 'GitHub Trending JS', url: 'https://rsshub.rssforever.com/github/trending/daily/javascript', region: 'global', defaultCategory: 'open-source' },
+  { name: 'GitHub Trending Python', url: 'https://rsshub.rssforever.com/github/trending/daily/python', region: 'global', defaultCategory: 'open-source' },
+  { name: 'GitHub Trending Rust', url: 'https://rsshub.rssforever.com/github/trending/daily/rust', region: 'global', defaultCategory: 'open-source' },
+  { name: 'GitHub Trending TypeScript', url: 'https://rsshub.rssforever.com/github/trending/daily/typescript', region: 'global', defaultCategory: 'open-source' },
+  { name: 'GitHub Trending Go', url: 'https://rsshub.rssforever.com/github/trending/daily/go', region: 'global', defaultCategory: 'open-source' },
+  // 社交媒体热门
+  { name: '微博热搜科技', url: 'https://rsshub.rssforever.com/weibo/search/hot/科技', region: 'domestic', defaultCategory: 'tech-frontier' },
+  { name: '微博热搜AI', url: 'https://rsshub.rssforever.com/weibo/search/hot/AI', region: 'domestic', defaultCategory: 'ai-models' },
+  // 产品发现
+  { name: 'Product Hunt Daily', url: 'https://rsshub.rssforever.com/producthunt/today', region: 'overseas', defaultCategory: 'silicon-valley' },
+  // 开发者社区
+  { name: 'V2EX 技术', url: 'https://rsshub.rssforever.com/v2ex/topics/hot', region: 'domestic', defaultCategory: 'open-source' },
+  { name: 'Segmentfault 热榜', url: 'https://rsshub.rssforever.com/segmentfault/hot', region: 'domestic', defaultCategory: 'open-source' },
+  // 技术博客聚合
+  { name: '掘金热榜', url: 'https://rsshub.rssforever.com/juejin/trending/javascript/7days', region: 'domestic', defaultCategory: 'open-source' },
+  { name: 'CSDN 热榜', url: 'https://rsshub.rssforever.com/csdn/blog/hot', region: 'domestic', defaultCategory: 'open-source' },
+
+  // ========== 经济股市 ==========
+  { name: '财新网', url: 'https://rsshub.rssforever.com/caixin/latest', region: 'domestic', defaultCategory: 'economy-stock' },
+  { name: 'Seeking Alpha', url: 'https://seekingalpha.com/feed/feed.xml', region: 'overseas', defaultCategory: 'economy-stock' },
+  { name: '经济观察网', url: 'https://www.eeo.com.cn/rss.xml', region: 'domestic', defaultCategory: 'economy-stock' },
+  { name: 'MarketWatch', url: 'https://www.marketwatch.com/rss/topstories', region: 'overseas', defaultCategory: 'economy-stock' },
+  { name: 'Kiplinger', url: 'https://www.kiplinger.com/rss/feed', region: 'overseas', defaultCategory: 'economy-stock' },
+  { name: 'Investing.com', url: 'https://www.investing.com/rss/news_25.rss', region: 'overseas', defaultCategory: 'economy-stock' },
+  { name: '36氪', url: 'https://www.36kr.com/feed', region: 'domestic', defaultCategory: 'economy-stock' },
+  { name: '中国新闻网', url: 'https://www.chinanews.com/rss/finance.xml', region: 'domestic', defaultCategory: 'economy-stock' },
+  { name: '人民网财经', url: 'https://www.people.com.cn/rss/finance.xml', region: 'domestic', defaultCategory: 'economy-stock' },
+  { name: 'IT之家', url: 'https://www.ithome.com/rss', region: 'domestic', defaultCategory: 'economy-stock' },
+  { name: 'PC Gamer', url: 'https://www.pcgamer.com/rss/', region: 'overseas', defaultCategory: 'game-entertain' },
+  { name: 'Steam News', url: 'https://store.steampowered.com/feeds/news.xml', region: 'global', defaultCategory: 'game-entertain' },
+  { name: 'Ars Technica Gaming', url: 'https://feeds.arstechnica.com/arstechnica/gaming', region: 'overseas', defaultCategory: 'game-entertain' },
+  { name: 'Rock Paper Shotgun', url: 'https://www.rockpapershotgun.com/feed', region: 'overseas', defaultCategory: 'game-entertain' },
+  { name: 'Nintendo Life', url: 'https://www.nintendolife.com/feeds/news', region: 'overseas', defaultCategory: 'game-entertain' },
+  { name: 'TechCrunch Gaming', url: 'https://techcrunch.com/category/gaming/feed/', region: 'overseas', defaultCategory: 'game-entertain' },
+
+  // ========== 影视娱乐圈 ==========
+  { name: 'Variety', url: 'https://variety.com/feed/', region: 'overseas', defaultCategory: 'showbiz' },
+  { name: 'Hollywood Reporter', url: 'https://www.hollywoodreporter.com/feed/', region: 'overseas', defaultCategory: 'showbiz' },
+  { name: 'TMZ', url: 'https://www.tmz.com/rss.xml', region: 'overseas', defaultCategory: 'showbiz' },
+  { name: 'The Guardian Film', url: 'https://www.theguardian.com/film/rss', region: 'overseas', defaultCategory: 'showbiz' },
+  { name: 'BBC Entertainment', url: 'https://feeds.bbci.co.uk/news/entertainment_and_arts/rss.xml', region: 'overseas', defaultCategory: 'showbiz' },
+  { name: 'Rolling Stone', url: 'https://www.rollingstone.com/feed/', region: 'overseas', defaultCategory: 'showbiz' },
+
+  // ========== 动漫二次元 ==========
+  { name: 'Crunchyroll News', url: 'https://feeds.feedburner.com/crunchyroll/animenews', region: 'overseas', defaultCategory: 'anime-acg' },
+  { name: 'ComicBook.com', url: 'https://comicbook.com/feed/', region: 'overseas', defaultCategory: 'anime-acg' },
+
+  // ========== 芯片半导体 ==========
+  { name: 'Semiconductor Engineering', url: 'https://semiengineering.com/feed/', region: 'overseas', defaultCategory: 'chips-compute' },
+  { name: 'EE Times', url: 'https://www.eetimes.com/feed/', region: 'overseas', defaultCategory: 'chips-compute' },
+  { name: 'AnandTech', url: 'https://www.anandtech.com/rss/newsfeed.aspx', region: 'overseas', defaultCategory: 'chips-compute' },
+
+  // ========== 机器人 ==========
+  { name: 'TechCrunch Robotics', url: 'https://techcrunch.com/category/robotics/feed/', region: 'overseas', defaultCategory: 'robotics' },
+  { name: 'IEEE Spectrum', url: 'https://spectrum.ieee.org/rss', region: 'overseas', defaultCategory: 'robotics' },
+  { name: 'Engadget', url: 'https://www.engadget.com/rss.xml', region: 'overseas', defaultCategory: 'robotics' },
+
+  // ========== 物联网5G ==========
+  { name: 'IoT World Today', url: 'https://www.iotworldtoday.com/feed', region: 'overseas', defaultCategory: 'iot-5g' },
+  { name: 'Light Reading', url: 'https://www.lightreading.com/rss.asp', region: 'overseas', defaultCategory: 'iot-5g' },
+
+  // ========== 太空探索 ==========
+  { name: 'SpaceNews', url: 'https://spacenews.com/feed/', region: 'overseas', defaultCategory: 'space' },
+  { name: 'Space.com', url: 'https://www.space.com/feeds/all', region: 'overseas', defaultCategory: 'space' },
+
+  // ========== 智能汽车 ==========
+  { name: 'CleanTechnica', url: 'https://cleantechnica.com/feed/', region: 'overseas', defaultCategory: 'automotive' },
+  { name: 'Electrek', url: 'https://electrek.co/feed/', region: 'overseas', defaultCategory: 'automotive' },
+  { name: 'The Verge', url: 'https://www.theverge.com/rss/index.xml', region: 'overseas', defaultCategory: 'automotive' },
+
+  // ========== 教育科技 ==========
+  { name: 'EdSurge', url: 'https://www.edsurge.com/rss.xml', region: 'overseas', defaultCategory: 'education-tech' },
+  { name: 'TechCrunch Education', url: 'https://techcrunch.com/category/education/feed/', region: 'overseas', defaultCategory: 'education-tech' },
+
+  // ========== 金融科技 ==========
+  { name: 'Cointelegraph', url: 'https://cointelegraph.com/rss', region: 'overseas', defaultCategory: 'fintech' },
+  { name: 'Popular Mechanics', url: 'https://www.popularmechanics.com/rss/', region: 'overseas', defaultCategory: 'fintech' },
+
+  // ========== 数据科学 ==========
+  { name: 'KDnuggets', url: 'https://www.kdnuggets.com/feed', region: 'overseas', defaultCategory: 'data-science' },
+  { name: 'Towards Data Science', url: 'https://towardsdatascience.com/feed', region: 'overseas', defaultCategory: 'data-science' },
+
+  // ========== 量子计算 ==========
+  { name: 'Quantum Computing Report', url: 'https://quantumcomputingreport.com/feed/', region: 'overseas', defaultCategory: 'quantum' },
+  { name: 'Quanta Magazine', url: 'https://www.quantamagazine.org/feed/', region: 'overseas', defaultCategory: 'quantum' },
 ];
 
 const RSSHUB_BASE = 'https://rsshub.rssforever.com';
@@ -122,34 +335,34 @@ const TRENDING_SOURCES = [
 
 const CATEGORY_GROUPS = [
   {
-    id: 'tech-frontier',
+    id: 'tech-ai',
     label: '科技前沿',
     icon: 'flask',
-    categories: ['ai-models', 'research', 'open-source', 'data-science', 'quantum', 'cybersecurity']
+    categories: ['ai-models', 'research', 'open-source', 'data-science', 'quantum', 'cybersecurity', 'chips-compute']
   },
   {
-    id: 'hardware-compute',
-    label: '计算硬件',
-    icon: 'chip',
-    categories: ['chips-compute', 'devices', 'robotics', 'iot-5g']
+    id: 'hardware-consumer',
+    label: '消费电子',
+    icon: 'device',
+    categories: ['devices', 'robotics', 'iot-5g', 'metaverse-xr', 'automotive']
   },
   {
     id: 'industry-economy',
     label: '产业经济',
     icon: 'building',
-    categories: ['silicon-valley', 'china-tech', 'policy-finance', 'fintech']
+    categories: ['silicon-valley', 'china-tech', 'policy-finance', 'fintech', 'economy-stock']
   },
   {
-    id: 'emerging-fields',
-    label: '新兴领域',
-    icon: 'rocket',
-    categories: ['space', 'new-energy', 'climate-esg', 'gaming', 'metaverse-xr']
+    id: 'entertainment',
+    label: '娱乐文化',
+    icon: 'star',
+    categories: ['gaming', 'game-entertain', 'showbiz', 'anime-acg']
   },
   {
-    id: 'industry-apps',
-    label: '行业应用',
-    icon: 'globe',
-    categories: ['healthcare', 'education-tech', 'agriculture-tech', 'cloud', 'automotive']
+    id: 'lifestyle-health',
+    label: '生活健康',
+    icon: 'heart',
+    categories: ['space', 'new-energy', 'climate-esg', 'healthcare', 'education-tech']
   }
 ];
 
@@ -178,7 +391,11 @@ const CATEGORIES = [
   { id: 'education-tech', label: '教育科技' },
   { id: 'agriculture-tech', label: '农业科技' },
   { id: 'cloud', label: '云计算' },
-  { id: 'automotive', label: '智能汽车' }
+  { id: 'automotive', label: '智能汽车' },
+  { id: 'economy-stock', label: '经济股市' },
+  { id: 'game-entertain', label: '游戏娱乐' },
+  { id: 'showbiz', label: '影视娱乐圈' },
+  { id: 'anime-acg', label: '动漫二次元' }
 ];
 
 const MODES = [
@@ -212,7 +429,11 @@ const CATEGORY_RULES = [
   ['education-tech', /\b(edtech|online learning|e-learning|mooc|education technology|教育科技|在线教育|数字教育|edtech|慕课|教育平台)\b/i],
   ['agriculture-tech', /\b(agtech|precision agriculture|vertical farming|smart farming|agricultural technology|农业科技|精准农业|垂直农场|智慧农业|数字农业)\b/i],
   ['cloud', /\b(cloud|aws|azure|google cloud|serverless|database|云计算|云服务|kubernetes|docker|devops|saas|paas|iaas)\b/i],
-  ['automotive', /\b(automotive|tesla|ev|self-driving|autonomous vehicle|smart car|汽车|电动车|自动驾驶|智能汽车|车载系统|车联网)\b/i]
+  ['automotive', /\b(automotive|tesla|ev|self-driving|autonomous vehicle|smart car|汽车|电动车|自动驾驶|智能汽车|车载系统|车联网)\b/i],
+  ['economy-stock', /\b(stock|market|ipo|trading|investment|earnings|gdp|inflation|fed|央行|融资|股票|股市|财报|利率|宏观经济|证券|基金|期货|港股|美股|a股|债券|汇率|财经|经济)\b/i],
+  ['game-entertain', /\b(game|gaming|esports|playstation|xbox|nintendo|steam|unreal|unity|游戏|电竞|手游|主机|端游|网游|steam|任天堂|索尼|微软|腾讯游戏|网易游戏|米哈游|原神|王者荣耀)\b/i],
+  ['showbiz', /\b(movie|film|tv show|celebrity|actor|actress|director|oscar|grammy|emmy|电影|电视剧|演员|导演|明星|综艺|颁奖|票房|好莱坞|bollywood|netflix|hbo|disney)\b/i],
+  ['anime-acg', /\b(anime|manga|otaku|cosplay|light novel|vtuber|waifu|二次元|动漫|番剧|漫画|轻小说|cosplay|手办|谷子|同人|本子|新番|漫展|acg)\b/i]
 ];
 
 const TAG_RULES = [
@@ -281,10 +502,16 @@ export function newsPlugin() {
             customSources = customParams.map(p => JSON.parse(p)).filter(s => s.name && s.url);
           } catch {}
 
+          const disabledSourcesParam = requestUrl.searchParams.get('disabledSources') || '';
+          const disabledSources = disabledSourcesParam
+            .split(',')
+            .map(s => s.trim())
+            .filter(Boolean);
+
           const page = parseInt(requestUrl.searchParams.get('page') || '0', 10);
           const pageSize = parseInt(requestUrl.searchParams.get('pageSize') || String(PAGE_SIZE), 10);
           const search = requestUrl.searchParams.get('search') || '';
-          const payload = await getNews(blocked, customSources, page, pageSize, search);
+          const payload = await getNews(blocked, customSources, page, pageSize, search, disabledSources);
           return sendJson(res, payload);
         }
 
@@ -355,7 +582,10 @@ export function newsPlugin() {
           const { baseUrl = '', apiKey = '', model = '', prompt = 'Hello' } = body;
           if (!baseUrl || !model) return sendJson(res, { ok: false, message: 'baseUrl and model are required' }, 400);
           try {
-            const apiUrl = baseUrl.replace(/\/+$/, '') + '/v1/chat/completions';
+            const cleanBaseUrl = baseUrl.replace(/\/$/, '');
+            const apiUrl = cleanBaseUrl.endsWith('/v1') || cleanBaseUrl.endsWith('/v2') || cleanBaseUrl.endsWith('/v3') || cleanBaseUrl.endsWith('/v4')
+              ? cleanBaseUrl + '/chat/completions'
+              : cleanBaseUrl + '/v1/chat/completions';
             const headers = { 'Content-Type': 'application/json' };
             if (apiKey) headers['Authorization'] = `Bearer ${apiKey}`;
             const controller = new AbortController();
@@ -386,7 +616,10 @@ if (requestUrl.pathname === '/api/ai-insights') {
           if (!baseUrl || !model) return sendJson(res, { error: 'baseUrl and model are required' }, 400);
           if (items.length === 0) return sendJson(res, { error: 'items required' }, 400);
           try {
-            const apiUrl = baseUrl.replace(/\/+$/, '') + '/v1/chat/completions';
+            const cleanBaseUrl = baseUrl.replace(/\/$/, '');
+            const apiUrl = cleanBaseUrl.endsWith('/v1') || cleanBaseUrl.endsWith('/v2') || cleanBaseUrl.endsWith('/v3') || cleanBaseUrl.endsWith('/v4')
+              ? cleanBaseUrl + '/chat/completions'
+              : cleanBaseUrl + '/v1/chat/completions';
             const headers = { 'Content-Type': 'application/json' };
             if (apiKey) headers['Authorization'] = `Bearer ${apiKey}`;
             console.log('[AI Insights] Calling:', apiUrl, 'model:', model);
@@ -469,13 +702,46 @@ ${items.map((i, idx) => {
             }
           }
 
+        // 获取网页内容
+        if (requestUrl.pathname === '/api/fetch-page') {
+          const url = requestUrl.searchParams.get('url');
+          if (!url) return sendJson(res, { error: 'url is required' }, 400);
+          try {
+            const controller = new AbortController();
+            const timeout = setTimeout(() => controller.abort(), 10000);
+            const response = await fetch(url, {
+              headers: { 'User-Agent': 'GlobalTechRadar/0.1' },
+              signal: controller.signal
+            });
+            clearTimeout(timeout);
+            if (!response.ok) {
+              return sendJson(res, { error: `Failed to fetch: ${response.status}` }, 500);
+            }
+            const html = await response.text();
+            // 提取正文内容
+            const textContent = html
+              .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+              .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+              .replace(/<[^>]+>/g, ' ')
+              .replace(/\s+/g, ' ')
+              .trim()
+              .slice(0, 15000);
+            return sendJson(res, { content: textContent });
+          } catch (e) {
+            return sendJson(res, { error: e.message }, 500);
+          }
+        }
+
         // AI 辅助写作
         if (requestUrl.pathname === '/api/ai-generate') {
           const body = await parseBody(req);
           const { baseUrl = '', apiKey = '', model = '', action = '', content = '', context = '' } = body;
           if (!baseUrl || !model) return sendJson(res, { error: 'baseUrl and model are required' }, 400);
           try {
-            const apiUrl = baseUrl.replace(/\/+$/, '') + '/v1/chat/completions';
+            const cleanBaseUrl = baseUrl.replace(/\/$/, '');
+            const apiUrl = cleanBaseUrl.endsWith('/v1') || cleanBaseUrl.endsWith('/v2') || cleanBaseUrl.endsWith('/v3') || cleanBaseUrl.endsWith('/v4')
+              ? cleanBaseUrl + '/chat/completions'
+              : cleanBaseUrl + '/v1/chat/completions';
             const headers = { 'Content-Type': 'application/json' };
             if (apiKey) headers['Authorization'] = `Bearer ${apiKey}`;
 
@@ -484,7 +750,7 @@ ${items.map((i, idx) => {
               rewrite: `请改写以下段落，使其更清晰、更专业，但保持原意不变：\n\n${content}`,
               expand: `请扩展以下内容，添加更多细节和论据，使其更丰富：\n\n${content}`,
               simplify: `请简化以下段落，使其更简洁易懂：\n\n${content}`,
-              translate_zh: `请将以下内容翻译成中文：\n\n${content}`,
+              translate_zh: `请将以下内容翻译成中文。只输出翻译结果，不要添加任何解释、说明、前缀或后缀：\n\n${content}`,
               translate_en: `请将以下内容翻译成英文：\n\n${content}`,
               title: `请为以下文章生成 5 个吸引人的标题，每个标题不超过 30 字：\n\n${content}`,
               summary: `请为以下文章生成一段简洁的摘要（不超过 100 字）：\n\n${content}`
@@ -528,10 +794,13 @@ ${items.map((i, idx) => {
   };
 }
 
-async function getNews(blocked, customSources, page = 0, pageSize = PAGE_SIZE, search = '') {
+async function getNews(blocked, customSources, page = 0, pageSize = PAGE_SIZE, search = '', disabledSources = []) {
   const now = Date.now();
-  const allSources = [...DEFAULT_SOURCES, ...customSources];
-  const cacheKey = JSON.stringify({ blocked, customSources: customSources.map(s => s.url) });
+  console.log('[getNews] Called with:', { blockedCount: blocked.length, customSourcesCount: customSources.length, disabledSourcesCount: disabledSources.length, page, pageSize });
+  const filteredDefaultSources = DEFAULT_SOURCES.filter(s => !disabledSources.includes(s.name));
+  console.log('[getNews] Filtered sources:', { total: DEFAULT_SOURCES.length, filtered: filteredDefaultSources.length, disabled: disabledSources.length });
+  const allSources = [...filteredDefaultSources, ...customSources];
+  const cacheKey = JSON.stringify({ blocked, customSources: customSources.map(s => s.url), disabledSources });
 
   const cacheValid = newsCache.data && newsCache.expiresAt > now && newsCache.key === cacheKey;
   let fullItems;
@@ -545,18 +814,24 @@ async function getNews(blocked, customSources, page = 0, pageSize = PAGE_SIZE, s
     failedSources = newsCache.data.failedSources;
     blockedCount = newsCache.data.blockedCount;
   } else {
+    console.log('[getNews] Cache invalid, fetching from sources...');
     const settled = await Promise.allSettled(allSources.map(fetchSource));
+    console.log('[getNews] Fetch results:', { total: settled.length, fulfilled: settled.filter(r => r.status === 'fulfilled').length, rejected: settled.filter(r => r.status === 'rejected').length });
     sourceResults = settled
       .filter(result => result.status === 'fulfilled')
       .map(result => result.value);
     const rawItems = sourceResults.flatMap(result => result.items);
+    console.log('[getNews] Raw items:', rawItems.length);
     failedSources = settled.filter(result => result.status === 'rejected').length;
     const cleaned = applyBlockedWords(rawItems, blocked)
       .sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime());
     const deduped = mergeDiverseItems(cleaned, sourceResults, MAX_NEWS_ITEMS, MAX_ITEMS_PER_SOURCE);
     blockedCount = rawItems.length - cleaned.length;
 
-    fullItems = deduped;
+    // 多源交叉验证 + 质量评分
+    fullItems = crossVerifyItems(deduped);
+    // 按综合质量分数降序排列（高分优先）
+    fullItems.sort((a, b) => (b.qualityScore || 0) - (a.qualityScore || 0));
 
     const itemsWithoutImage = fullItems.filter(item => !item.imageUrl && item.url);
     if (itemsWithoutImage.length > 0) {
@@ -923,24 +1198,7 @@ function get30DaysAgo() {
   return d.toISOString().split('T')[0];
 }
 
-async function fetchSource(source) {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 8000);
-
-  try {
-    const response = await fetch(source.url, {
-      headers: { 'User-Agent': 'GlobalTechRadar/0.1 (+https://localhost)' },
-      signal: controller.signal
-    });
-
-    if (!response.ok) throw new Error(`${source.name} responded ${response.status}`);
-
-    const xml = await response.text();
-    return { source: source.name, items: parseFeed(xml, source).slice(0, 20) };
-  } finally {
-    clearTimeout(timeout);
-  }
-}
+// 旧的 fetchSource 已被上面的增强版替换（包含 Jina AI Reader）
 
 function parseFeed(xml, source) {
   const blocks = matchBlocks(xml, 'item').length ? matchBlocks(xml, 'item') : matchBlocks(xml, 'entry');
@@ -1142,6 +1400,103 @@ function sendJson(res, payload, status = 200) {
   res.statusCode = status;
   res.setHeader('Content-Type', 'application/json; charset=utf-8');
   res.end(JSON.stringify(payload));
+}
+
+// ========== Jina AI Reader（绕过反爬虫，获取全文）==========
+// 从顶级项目（AI News Radar/Horizon）学来的技术
+// Jina AI Reader：免费、无需API Key、绕过所有反爬虫机制
+async function jinaFetch(url, timeoutMs = 8000) {
+  try {
+    const jinaUrl = `https://r.jina.ai/http://${url.replace(/^https?:\/\//, '')}`;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), timeoutMs);
+    const response = await fetch(jinaUrl, {
+      headers: { 'User-Agent': 'GlobalTechRadar/0.1' },
+      signal: controller.signal
+    });
+    clearTimeout(timeout);
+    if (!response.ok) return null;
+    const text = await response.text();
+    // Jina returns clean text, extract first 500 chars as summary
+    return text.trim().slice(0, 500);
+  } catch {
+    return null;
+  }
+}
+
+// ========== 多源交叉验证（从 Horizon 学来）==========
+// 同一事件在多个高质量源出现时，标记为高可信度
+function crossVerifyItems(items) {
+  const urlMap = new Map();
+  items.forEach(item => {
+    const normalized = normalizeUrl(item.url);
+    if (!urlMap.has(normalized)) urlMap.set(normalized, []);
+    urlMap.get(normalized).push(item);
+  });
+
+  return items.map(item => {
+    const normalized = normalizeUrl(item.url);
+    const sameUrlItems = urlMap.get(normalized) || [];
+    const sourceCount = sameUrlItems.length;
+    
+    // 计算交叉验证分数
+    let crossVerifyScore = 0;
+    if (sourceCount >= CROSS_VERIFY_THRESHOLD) crossVerifyScore = 3;
+    else if (sourceCount >= 2) crossVerifyScore = 2;
+    else if (sourceCount >= 1) crossVerifyScore = 1;
+
+    // 获取源权重
+    const sourceWeight = SOURCE_WEIGHTS[item.source] || 0.5;
+
+    return {
+      ...item,
+      crossVerifyScore,
+      sourceWeight,
+      // 综合质量分数 = 交叉验证分数 * 源权重 * 10
+      qualityScore: Math.round((crossVerifyScore * sourceWeight) * 10) / 10
+    };
+  });
+}
+
+// ========== 增强的获取源函数（支持 Jina AI Reader 回退）==========
+async function fetchSource(source) {
+  console.log('[fetchSource] Fetching:', source.name, source.url);
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 8000);
+
+  try {
+    const response = await fetch(source.url, {
+      headers: { 'User-Agent': 'GlobalTechRadar/0.1 (+https://localhost)' },
+      signal: controller.signal
+    });
+
+    if (!response.ok) {
+      console.log('[fetchSource] Failed:', source.name, response.status);
+      throw new Error(`${source.name} responded ${response.status}`);
+    }
+
+    const xml = await response.text();
+    const items = parseFeed(xml, source).slice(0, 20);
+    console.log('[fetchSource] Success:', source.name, items.length, 'items');
+    
+    // 尝试用 Jina AI Reader 增强摘要
+    if (items.length > 0) {
+      const topItems = items.slice(0, 3); // 只处理前3条，避免过多请求
+      await Promise.allSettled(topItems.map(async (item) => {
+        if (!item.summary || item.summary.length < 100) {
+          const enhanced = await jinaFetch(item.url, 5000);
+          if (enhanced) {
+            item.summary = trimSummary(enhanced);
+            item.bodyIntro = trimIntro(enhanced);
+          }
+        }
+      }));
+    }
+    
+    return { source: source.name, items };
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 function parseBody(req) {

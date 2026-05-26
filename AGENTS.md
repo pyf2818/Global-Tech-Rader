@@ -4,7 +4,7 @@
 
 ```bash
 npm install                    # Install dependencies
-npm run dev                    # Dev server on 0.0.0.0:5175
+npm run dev                    # Dev server on 0.0.0.0:5175 (port set in vite.config.js)
 npm run build                  # Production build -> dist/
 npm run preview                # Preview production build on 0.0.0.0
 ```
@@ -13,10 +13,12 @@ No test, lint, typecheck, or formatter commands exist. Do not run them.
 
 ## Architecture
 
-- **Single-file frontend**: `src/App.jsx` (~2400 lines) — all state, rendering, and logic. Inline components: `NewsItem`, `GithubRepoCard`, `HexRadarChart`, `Lightbox`. No component splitting.
-- **API is a Vite plugin**: `server/newsPlugin.js` (~1050 lines) is a Vite middleware (`newsPlugin()`) that intercepts `/api/*` during dev. No separate backend server. Production uses `vercel.json` + `api/*.js` serverless functions.
+- **Single-file frontend**: `src/App.jsx` (~4500 lines) — all state, rendering, and logic. Inline components: `NewsItem`, `GithubRepoCard`, `HexRadarChart`, `Lightbox`. No component splitting.
+- **3D Globe component**: `src/GlobeView.jsx` (~880 lines) — `react-globe.gl` based interactive 3D earth visualization with fullscreen dashboard mode. Used within App.jsx.
+- **API is a Vite plugin**: `server/newsPlugin.js` (~1150 lines) is a Vite middleware (`newsPlugin()`) that intercepts `/api/*` during dev. No separate backend server. Production uses `vercel.json` + `api/*.js` serverless functions.
 - **Entrypoint**: `src/main.jsx` mounts `<App />` inside `<ErrorBoundary>` + `<React.StrictMode>`.
-- **Styling**: `src/styles.css` (~900 lines) with CSS custom properties for dark/light themes. Tailwind config only sets `content` paths and `fontFamily.sans` — no Tailwind utility classes in the component; all styling is custom CSS.
+- **Styling**: `src/styles.css` (~2080 lines) with CSS custom properties for dark/light themes. Tailwind config only sets `content` paths and `fontFamily.sans` — no Tailwind utility classes in the component; all styling is custom CSS.
+- **Dev server port**: Fixed to **5175** in `vite.config.js` (`server.port: 5175`).
 
 ## Key Duplication (Must Update Both Files)
 
@@ -80,3 +82,7 @@ Build command: `npm run build`, output: `dist/`.
 - `index.html` has a global `onerror` handler that replaces the page with an error display and a "Clear localStorage & Reload" button.
 - `LLM_PRESETS` must be defined at file scope (top level of App.jsx), not inside a function — putting it inside `generateSummary` caused a `ReferenceError`.
 - `/api/ai-insights` prompts LLM for concise JSON output (max 800 tokens, 30 chars per item). Truncated responses are caught with a retry-friendly error message.
+- **GlobeView**: Uses `react-globe.gl` which renders a Three.js canvas. The fullscreen mode uses `createPortal` to render at `document.body` level. Ensure the canvas has sufficient `min-height` (420px) or the globe won't render.
+- **Globe interaction**: The old `.globe-bg` wrapper blocked mouse events on the fullscreen globe. Always use `.globe-bg-decoration` with `pointer-events: none` for background effects, and render the `Globe` component directly at the root level.
+- **Image upload in editor**: `App.jsx` supports image upload (click image button or paste Ctrl+V) and stores images as Base64 in `article.images` array. The editor uses placeholder syntax `![alt](#{id})` to avoid cluttering the text with long Base64 strings. Use `renderMarkdownWithImages(text, images)` to replace placeholders with actual Base64 data during preview/export.
+- **Editor layout**: A duplicate `.editor-split-view` CSS rule was previously overriding mode-specific grid layouts. Only one rule should exist at line ~1394 in `styles.css`. Ensure split mode uses `grid-template-columns: 1fr 1fr` and both editor/preview panes have `flex: 1` with `min-height: 0` for proper flex behavior.
