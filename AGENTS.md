@@ -13,12 +13,12 @@ No test, lint, typecheck, or formatter commands exist. Do not run them.
 
 ## Architecture
 
-- **Single-file frontend**: `src/App.jsx` (~5600 lines) — all state, rendering, and logic. Inline components: `NewsItem`, `GithubRepoCard`, `HexRadarChart`, `Lightbox`. No component splitting.
+- **Single-file frontend**: `src/App.jsx` (~6800 lines) — all state, rendering, and logic. Inline components: `NewsItem`, `GithubRepoCard`, `HexRadarChart`, `Lightbox`. No component splitting.
 - **AI Elf component**: `src/AiElf.jsx` (~950 lines) — AI assistant with Agent system, supports news analysis via drag-drop, stores conversations per-Agent in localStorage.
 - **3D Globe component**: `src/GlobeView.jsx` (~880 lines) — `react-globe.gl` based interactive 3D earth visualization with fullscreen dashboard mode. Used within App.jsx.
 - **API is a Vite plugin**: `server/newsPlugin.js` (~1300 lines) is a Vite middleware (`newsPlugin()`) that intercepts `/api/*` during dev. No separate backend server. Production uses `vercel.json` + `api/*.js` serverless functions.
 - **Entrypoint**: `src/main.jsx` mounts `<App />` inside `<ErrorBoundary>` + `<React.StrictMode>`.
-- **Styling**: `src/styles.css` (~3150 lines) with CSS custom properties for dark/light themes. Tailwind config only sets `content` paths and `fontFamily.sans` — no Tailwind utility classes in the component; all styling is custom CSS.
+- **Styling**: `src/styles.css` (~5500 lines) with CSS custom properties for dark/light themes. Tailwind config only sets `content` paths and `fontFamily.sans` — no Tailwind utility classes in the component; all styling is custom CSS.
 - **Dev server port**: Fixed to **5175** in `vite.config.js` (`server.port: 5175`).
 
 ## Agent System (AI Elf)
@@ -63,7 +63,7 @@ Additionally, `DEFAULT_SOURCES` and `CATEGORIES` are duplicated between `server/
 
 ## LLM Config
 
-`LLM_PRESETS` in `src/App.jsx` defines 5 providers with built-in base URLs and model lists: OpenAI, DeepSeek, Moonshot, 智谱 AI, 自定义. The quick-config modal lets users pick a preset, enter API key, and select a model in 3 steps. Config persists in `localStorage` as `llmConfig`.
+`LLM_PRESETS` in `src/App.jsx` defines 5 providers with built-in base URLs and model list: OpenAI, DeepSeek, Moonshot, 智谱 AI, 自定义. The quick-config modal lets users pick a preset, enter API key, and select a model in 3 steps. Config persists in `localStorage` as `llmConfig`.
 
 AI insights are triggered on `items` change (auto) or via manual refresh button. They POST to `/api/ai-insights` with the top 30 items and display `{trends, correlations, signals}` in the right panel.
 
@@ -98,7 +98,7 @@ Both workflows use Node.js 20 and `npm ci` for dependency installation.
 - Dev server port is **5175** (changed from default 5173).
 - GitHub API unauthenticated rate limit is 60 requests/hour. When rate-limited, README image/tutorial data will be empty until the limit resets (~1 hour). The 30-minute cache mitigates this.
 - GitHub README images: uses a scoring system (badge/shield/icon/logo keywords = excluded; screenshot/demo/preview alt text or path = +2; `/img/`/`/assets/`/`/media/` paths = +1). Only the top-scoring image is shown.
-- Tutorial extraction (`extractTutorial`): only returns text if ≥2 meaningful lines found in Installation/Usage/Getting Started sections. Otherwise returns empty string and the card hides the tutorial block.
+- Tutorial extraction (`extractTutorial`): only returns text if >=2 meaningful lines found in Installation/Usage/Getting Started sections. Otherwise returns empty string and the card hides the tutorial block.
 - PWA: `public/sw.js` and `public/manifest.json` exist; `index.html` registers the service worker.
 - `index.html` has a global `onerror` handler that replaces the page with an error display and a "Clear localStorage & Reload" button.
 - `LLM_PRESETS` must be defined at file scope (top level of App.jsx), not inside a function — putting it inside `generateSummary` caused a `ReferenceError`.
@@ -111,3 +111,6 @@ Both workflows use Node.js 20 and `npm ci` for dependency installation.
 - **AI Elf chat window**: Adaptive size (520px wide when sidebar collapsed, 720px when expanded; height fixed at 560px). Messages stored per-Agent in `localStorage`. Drag-drop news cards trigger analysis.
 - **Agent history**: Each Agent has independent conversation history, accessible via expand/collapse in AI Elf sidebar. History sessions stored as `{id, title, timestamp, messages}` arrays, max 20 per Agent.
 - **Agent avatars**: Stored as Base64 strings in Agent objects. Default avatar `public/ai-elf-avatar.png`. Avatar upload uses FileReader and stores Base64 in localStorage.
+- **NewsItem translation**: All `NewsItem` instances across the app (main feed, trending, recommendations, event clusters) must pass translation props: `showTranslation`, `onToggleTranslation`, `onRequestTranslation`, `isTranslating`, `translation`.
+- **Image manager panel**: Redesigned as a grid layout (`image-manager-grid`) with card-based items. Each card shows: thumbnail, used/unused badge, filename, dimensions, width/height inputs (vertical layout), and a hover-reveal delete button. Clicking a thumbnail scrolls the editor to the corresponding placeholder.
+- **renderMarkdown**: The function now protects existing `<img>` tags before HTML-escaping, then restores them after processing. This ensures `renderMarkdownWithImages()` outputs valid `<img src="...">` tags that render in the preview pane.
