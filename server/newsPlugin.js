@@ -110,6 +110,57 @@ const SOURCE_WEIGHTS = {
 // 多源交叉验证阈值：同一URL在多少个源出现才算高可信度
 const CROSS_VERIFY_THRESHOLD = 3;
 
+// ========== 用户认证系统 ==========
+const users = new Map(); // 内存用户存储
+const userSessions = new Map(); // 会话存储
+
+async function hashPassword(password) {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(password);
+  const hash = await crypto.subtle.digest('SHA-256', data);
+  return Array.from(new Uint8Array(hash))
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('');
+}
+
+function generateToken() {
+  const array = new Uint8Array(32);
+  crypto.getRandomValues(array);
+  return Array.from(array)
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('');
+}
+
+async function createUser(username, password, email, interests = []) {
+  const id = generateToken();
+  const hashedPassword = await hashPassword(password);
+  const user = {
+    id,
+    username,
+    password: hashedPassword,
+    email,
+    interests,
+    createdAt: new Date().toISOString(),
+    displayName: username,
+    avatar: '',
+    signature: ''
+  };
+  users.set(username, user);
+  return user;
+}
+
+async function verifyUser(username, password) {
+  const user = users.get(username);
+  if (!user) return null;
+  const hashedPassword = await hashPassword(password);
+  if (user.password !== hashedPassword) return null;
+  return user;
+}
+
+function getUserByToken(token) {
+  return userSessions.get(token) || null;
+}
+
 const DEFAULT_SOURCES = [
   // 学术权威（最高优先级）
   { name: 'Nature', url: 'https://www.nature.com/nature.rss', region: 'global', defaultCategory: 'research' },
@@ -296,6 +347,43 @@ const DEFAULT_SOURCES = [
   // ========== 量子计算 ==========
   { name: 'Quantum Computing Report', url: 'https://quantumcomputingreport.com/feed/', region: 'overseas', defaultCategory: 'quantum' },
   { name: 'Quanta Magazine', url: 'https://www.quantamagazine.org/feed/', region: 'overseas', defaultCategory: 'quantum' },
+
+  // ========== 金融股市（高质量专业源）==========
+  { name: 'Wall Street Journal Markets', url: 'https://feeds.a.dj.com/rss/RSSMarketsMain.xml', region: 'overseas', defaultCategory: 'economy-stock' },
+  { name: 'Bloomberg Markets', url: 'https://feeds.bloomberg.com/markets/news.rss', region: 'overseas', defaultCategory: 'economy-stock' },
+  { name: 'Reuters Finance', url: 'https://www.reuters.com/business/finance/feed/', region: 'overseas', defaultCategory: 'economy-stock' },
+  { name: 'CNBC Finance', url: 'https://www.cnbc.com/id/10000664/device/rss/rss.html', region: 'overseas', defaultCategory: 'economy-stock' },
+  { name: 'Barron\'s', url: 'https://www.barrons.com/rss.xml', region: 'overseas', defaultCategory: 'economy-stock' },
+  { name: '第一财经', url: 'https://www.yicai.com/rss/', region: 'domestic', defaultCategory: 'economy-stock' },
+  { name: '财新网', url: 'https://rsshub.rssforever.com/caixin/latest', region: 'domestic', defaultCategory: 'economy-stock' },
+  { name: '证券时报', url: 'https://rsshub.rssforever.com/stcn/xwzx', region: 'domestic', defaultCategory: 'economy-stock' },
+  { name: '东方财富', url: 'https://rsshub.rssforever.com/eastmoney/cyxw', region: 'domestic', defaultCategory: 'economy-stock' },
+  { name: '雪球', url: 'https://rsshub.rssforever.com/xueqiu/user/2588023793', region: 'domestic', defaultCategory: 'economy-stock' },
+
+  // ========== 法律法规 ==========
+  { name: 'Legaltech News', url: 'https://www.law.com/legaltechnews/feed/', region: 'overseas', defaultCategory: 'policy-finance' },
+  { name: 'Law.com', url: 'https://www.law.com/feed/', region: 'overseas', defaultCategory: 'policy-finance' },
+  { name: 'Reuters Legal', url: 'https://www.reuters.com/legal/feed/', region: 'overseas', defaultCategory: 'policy-finance' },
+  { name: '中国法院网', url: 'https://www.chinacourt.org/article/rss.shtml', region: 'domestic', defaultCategory: 'policy-finance' },
+  { name: '法制日报', url: 'https://rsshub.rssforever.com/legaldaily/xwsf', region: 'domestic', defaultCategory: 'policy-finance' },
+  { name: '北大法宝', url: 'https://rsshub.rssforever.com/pkulaw/chl', region: 'domestic', defaultCategory: 'policy-finance' },
+
+  // ========== 医疗健康 ==========
+  { name: 'MedTech', url: 'https://www.medtechdive.com/rss/news/', region: 'overseas', defaultCategory: 'healthcare' },
+  { name: 'HealthTech', url: 'https://www.healthtechzone.com/rss/feed.xml', region: 'overseas', defaultCategory: 'healthcare' },
+  { name: 'Medscape', url: 'https://www.medscape.com/rss/news', region: 'overseas', defaultCategory: 'healthcare' },
+  { name: '丁香园', url: 'https://rsshub.rssforever.com/dxy/dxyc', region: 'domestic', defaultCategory: 'healthcare' },
+  { name: '医学界', url: 'https://rsshub.rssforever.com/yxj/xwzx', region: 'domestic', defaultCategory: 'healthcare' },
+  { name: '健康界', url: 'https://rsshub.rssforever.com/cn-healthcare/news', region: 'domestic', defaultCategory: 'healthcare' },
+  { name: '36氪医疗', url: 'https://rsshub.rssforever.com/36kr/motif/5474', region: 'domestic', defaultCategory: 'healthcare' },
+
+  // ========== 前沿科技 ==========
+  { name: 'IEEE Spectrum', url: 'https://spectrum.ieee.org/rss/fulltext', region: 'overseas', defaultCategory: 'research' },
+  { name: 'ACM TechNews', url: 'https://technews.acm.org/rss', region: 'overseas', defaultCategory: 'research' },
+  { name: 'Nature Biotechnology', url: 'https://www.nature.com/nbt.rss', region: 'overseas', defaultCategory: 'research' },
+  { name: 'Science Advances', url: 'https://www.science.org/rss/advance.xml', region: 'overseas', defaultCategory: 'research' },
+  { name: 'TechRadar', url: 'https://www.techradar.com/rss', region: 'overseas', defaultCategory: 'devices' },
+  { name: 'Gizmodo', url: 'https://gizmodo.com/rss', region: 'overseas', defaultCategory: 'devices' },
 ];
 
 const RSSHUB_BASE = 'https://rsshub.rssforever.com';
@@ -489,6 +577,81 @@ export function newsPlugin() {
           });
         }
 
+        // ========== 认证路由 ==========
+        if (requestUrl.pathname === '/api/auth/register') {
+          const body = await parseBody(req);
+          const { username, password, email, interests = [] } = body;
+          if (!username || !password) {
+            return sendJson(res, { ok: false, message: 'Username and password are required' }, 400);
+          }
+          if (users.has(username)) {
+            return sendJson(res, { ok: false, message: 'Username already exists' }, 400);
+          }
+          const user = await createUser(username, password, email, interests);
+          const token = generateToken();
+          userSessions.set(token, user);
+          return sendJson(res, {
+            ok: true,
+            token,
+            user: { id: user.id, username: user.username, email: user.email, interests: user.interests, displayName: user.displayName, avatar: user.avatar, signature: user.signature }
+          });
+        }
+
+        if (requestUrl.pathname === '/api/auth/login') {
+          const body = await parseBody(req);
+          const { username, password } = body;
+          const user = await verifyUser(username, password);
+          if (!user) {
+            return sendJson(res, { ok: false, message: 'Invalid username or password' }, 401);
+          }
+          const token = generateToken();
+          userSessions.set(token, user);
+          return sendJson(res, {
+            ok: true,
+            token,
+            user: { id: user.id, username: user.username, email: user.email, interests: user.interests, displayName: user.displayName, avatar: user.avatar, signature: user.signature }
+          });
+        }
+
+        if (requestUrl.pathname === '/api/auth/me') {
+          const token = requestUrl.searchParams.get('token') || '';
+          const user = getUserByToken(token);
+          if (!user) {
+            return sendJson(res, { ok: false, message: 'Unauthorized' }, 401);
+          }
+          return sendJson(res, {
+            ok: true,
+            user: { id: user.id, username: user.username, email: user.email, interests: user.interests, displayName: user.displayName, avatar: user.avatar, signature: user.signature }
+          });
+        }
+
+        if (requestUrl.pathname === '/api/user/profile') {
+          const body = await parseBody(req);
+          const { token, displayName, avatar, signature } = body;
+          const user = getUserByToken(token);
+          if (!user) {
+            return sendJson(res, { ok: false, message: 'Unauthorized' }, 401);
+          }
+          if (displayName !== undefined) user.displayName = displayName;
+          if (avatar !== undefined) user.avatar = avatar;
+          if (signature !== undefined) user.signature = signature;
+          return sendJson(res, {
+            ok: true,
+            user: { id: user.id, username: user.username, email: user.email, interests: user.interests, displayName: user.displayName, avatar: user.avatar, signature: user.signature }
+          });
+        }
+
+        if (requestUrl.pathname === '/api/user/interests') {
+          const body = await parseBody(req);
+          const { token, interests } = body;
+          const user = getUserByToken(token);
+          if (!user) {
+            return sendJson(res, { ok: false, message: 'Unauthorized' }, 401);
+          }
+          user.interests = interests;
+          return sendJson(res, { ok: true, interests: user.interests });
+        }
+
         if (requestUrl.pathname === '/api/news') {
           const blocked = requestUrl.searchParams
             .get('blocked')
@@ -511,7 +674,9 @@ export function newsPlugin() {
           const page = parseInt(requestUrl.searchParams.get('page') || '0', 10);
           const pageSize = parseInt(requestUrl.searchParams.get('pageSize') || String(PAGE_SIZE), 10);
           const search = requestUrl.searchParams.get('search') || '';
-          const payload = await getNews(blocked, customSources, page, pageSize, search, disabledSources);
+          const interestsParam = requestUrl.searchParams.get('interests') || '';
+          const interests = interestsParam ? interestsParam.split(',').filter(Boolean) : [];
+          const payload = await getNews(blocked, customSources, page, pageSize, search, disabledSources, interests);
           return sendJson(res, payload);
         }
 
@@ -794,13 +959,13 @@ ${items.map((i, idx) => {
   };
 }
 
-async function getNews(blocked, customSources, page = 0, pageSize = PAGE_SIZE, search = '', disabledSources = []) {
+async function getNews(blocked, customSources, page = 0, pageSize = PAGE_SIZE, search = '', disabledSources = [], interests = []) {
   const now = Date.now();
-  console.log('[getNews] Called with:', { blockedCount: blocked.length, customSourcesCount: customSources.length, disabledSourcesCount: disabledSources.length, page, pageSize });
+  console.log('[getNews] Called with:', { blockedCount: blocked.length, customSourcesCount: customSources.length, disabledSourcesCount: disabledSources.length, page, pageSize, interestsCount: interests.length });
   const filteredDefaultSources = DEFAULT_SOURCES.filter(s => !disabledSources.includes(s.name));
   console.log('[getNews] Filtered sources:', { total: DEFAULT_SOURCES.length, filtered: filteredDefaultSources.length, disabled: disabledSources.length });
   const allSources = [...filteredDefaultSources, ...customSources];
-  const cacheKey = JSON.stringify({ blocked, customSources: customSources.map(s => s.url), disabledSources });
+  const cacheKey = JSON.stringify({ blocked, customSources: customSources.map(s => s.url), disabledSources, interests });
 
   const cacheValid = newsCache.data && newsCache.expiresAt > now && newsCache.key === cacheKey;
   let fullItems;
@@ -855,7 +1020,16 @@ async function getNews(blocked, customSources, page = 0, pageSize = PAGE_SIZE, s
     newsCache = { data: { items: fullItems, sourceResults, failedSources, blockedCount }, expiresAt: now + 1000 * 60 * 5, key: cacheKey };
   }
 
+  // 兴趣过滤
   let filteredItems = fullItems;
+  if (interests.length > 0) {
+    filteredItems = fullItems.filter(item => {
+      if (!item.category) return false;
+      return interests.includes(item.category);
+    });
+    console.log('[getNews] Interest filtering:', { before: fullItems.length, after: filteredItems.length, interests });
+  }
+
   if (search) {
     const q = search.toLowerCase();
     const tokens = q.split(/\s+/).filter(Boolean);
@@ -865,7 +1039,7 @@ async function getNews(blocked, customSources, page = 0, pageSize = PAGE_SIZE, s
       if (parts && parts.length > 1) parts.forEach(p => tokens.push(p));
     }
 
-    filteredItems = fullItems.filter(item => {
+    filteredItems = filteredItems.filter(item => {
       const txt = `${item.title} ${item.summary} ${item.source} ${(item.tags || []).join(' ')}`.toLowerCase();
       if (tokens.length > 1) {
         return tokens.every(t => txt.includes(t));

@@ -329,6 +329,7 @@ const ICONS = {
   copy: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>,
   download: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>,
   power: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M18.36 6.64a9 9 0 1 1-12.72 0"/><line x1="12" y1="2" x2="12" y2="12"/></svg>,
+  user: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>,
 };
 
 function loadLS(key, fallback) {
@@ -469,6 +470,185 @@ function App() {
   const [llmTesting, setLlmTesting] = useState(false);
   const [llmManualInput, setLlmManualInput] = useState('');
   const [showLlmQuickConfig, setShowLlmQuickConfig] = useState(false);
+
+  // ========== 用户系统 ==========
+  const [user, setUser] = useState(() => {
+    try {
+      const saved = localStorage.getItem('user');
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  });
+  const [token, setToken] = useState(() => localStorage.getItem('token') || '');
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [authMode, setAuthMode] = useState('login');
+  const [authForm, setAuthForm] = useState({ username: '', password: '', email: '', confirmPassword: '' });
+  const [authLoading, setAuthLoading] = useState(false);
+  const [authError, setAuthError] = useState('');
+  const [showInterestModal, setShowInterestModal] = useState(false);
+  const [selectedInterests, setSelectedInterests] = useState(() => {
+    try {
+      const saved = localStorage.getItem('selectedInterests');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+  const [showUserMenu, setShowUserMenu] = useState(false);
+  const [showProfileModal, setShowProfileModal] = useState(false);
+  const [profileForm, setProfileForm] = useState({ displayName: '', signature: '' });
+
+  // 打开资料弹窗时预填充表单
+  useEffect(() => {
+    if (showProfileModal && user) {
+      setProfileForm({
+        displayName: user.displayName || '',
+        signature: user.signature || ''
+      });
+    }
+  }, [showProfileModal, user]);
+
+  const isLoggedIn = !!user && !!token;
+
+  // 保存用户数据到 localStorage
+  useEffect(() => {
+    if (user) localStorage.setItem('user', JSON.stringify(user));
+    else localStorage.removeItem('user');
+  }, [user]);
+  useEffect(() => {
+    if (token) localStorage.setItem('token', token);
+    else localStorage.removeItem('token');
+  }, [token]);
+  useEffect(() => {
+    localStorage.setItem('selectedInterests', JSON.stringify(selectedInterests));
+  }, [selectedInterests]);
+
+  // 认证函数
+  const handleRegister = async () => {
+    if (!authForm.username || !authForm.password) {
+      setAuthError('用户名和密码不能为空');
+      return;
+    }
+    if (authForm.password !== authForm.confirmPassword) {
+      setAuthError('两次输入的密码不一致');
+      return;
+    }
+    setAuthLoading(true);
+    setAuthError('');
+    try {
+      const res = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          username: authForm.username,
+          password: authForm.password,
+          email: authForm.email,
+          interests: selectedInterests
+        })
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setUser(data.user);
+        setToken(data.token);
+        setShowAuthModal(false);
+        setAuthForm({ username: '', password: '', email: '', confirmPassword: '' });
+        showToast('注册成功！');
+      } else {
+        setAuthError(data.message || '注册失败');
+      }
+    } catch (e) {
+      setAuthError('网络错误，请重试');
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
+  const handleLogin = async () => {
+    if (!authForm.username || !authForm.password) {
+      setAuthError('用户名和密码不能为空');
+      return;
+    }
+    setAuthLoading(true);
+    setAuthError('');
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          username: authForm.username,
+          password: authForm.password
+        })
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setUser(data.user);
+        setToken(data.token);
+        if (data.user.interests) {
+          setSelectedInterests(data.user.interests);
+        }
+        setShowAuthModal(false);
+        setAuthForm({ username: '', password: '', email: '', confirmPassword: '' });
+        showToast('登录成功！');
+      } else {
+        setAuthError(data.message || '登录失败');
+      }
+    } catch (e) {
+      setAuthError('网络错误，请重试');
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
+  const handleLogout = () => {
+    setUser(null);
+    setToken('');
+    setSelectedInterests([]);
+    localStorage.removeItem('user');
+    localStorage.removeItem('token');
+    localStorage.removeItem('selectedInterests');
+    setShowUserMenu(false);
+    showToast('已退出登录');
+  };
+
+  const updateUserInterests = async (interests) => {
+    if (!token) return;
+    try {
+      await fetch('/api/user/interests', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token, interests })
+      });
+      setSelectedInterests(interests);
+      if (user) {
+        setUser({ ...user, interests });
+      }
+    } catch (e) {
+      console.error('Failed to update interests:', e);
+    }
+  };
+
+  const updateUserProfile = async (updates) => {
+    if (!token) return;
+    try {
+      const res = await fetch('/api/user/profile', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token, ...updates })
+      });
+      const data = await res.json();
+      if (data.ok && data.user) {
+        setUser(data.user);
+      }
+    } catch (e) {
+      console.error('Failed to update profile:', e);
+    }
+  };
+
+  // 获取用户兴趣分类的详细信息
+  const userInterestCategories = useMemo(() => {
+    return CATEGORIES.filter(c => c.id !== 'all' && selectedInterests.includes(c.id));
+  }, [selectedInterests]);
 
   const allLlmModels = useMemo(() => [...llmModels, ...(llmConfig.manualModels || [])], [llmModels, llmConfig.manualModels]);
   const [allSources, setAllSources] = useState([]);
@@ -658,7 +838,7 @@ function App() {
   }, []);
 
   useEffect(() => {
-    if (nav !== 'all') return;
+    if (nav !== 'all' && nav !== 'recommendations') return;
     const el = feedRef.current;
     if (!el || !newsHasMore || loadingMore || loading) return;
     const observer = new IntersectionObserver(
@@ -699,6 +879,7 @@ function App() {
   useEffect(() => {
     if (nav === 'trending' && trendingItems.length === 0) loadTrending();
     if (nav === 'github' && githubRepos.length === 0) loadGithub();
+    if (nav === 'recommendations') loadNews(blocked, false, debouncedQuery);
   }, [nav]);
 
   // 趋势分析数据
@@ -1390,7 +1571,12 @@ function App() {
     const customParams = customSources.map(s => `custom=${encodeURIComponent(JSON.stringify(s))}`).join('&');
     const disabledParam = disabledSources.length > 0 ? `&disabledSources=${encodeURIComponent(disabledSources.join(','))}` : '';
     const searchParam = searchQuery ? `&search=${encodeURIComponent(searchQuery)}` : '';
-    fetch(`/api/news?blocked=${encodeURIComponent(b)}&page=${page}&pageSize=40${searchParam}${disabledParam}${customParams ? '&' + customParams : ''}`)
+    // 兴趣过滤
+    let interestsParam = '';
+    if (nav === 'recommendations' && isLoggedIn && selectedInterests.length > 0) {
+      interestsParam = `&interests=${encodeURIComponent(selectedInterests.join(','))}`;
+    }
+    fetch(`/api/news?blocked=${encodeURIComponent(b)}&page=${page}&pageSize=40${searchParam}${disabledParam}${interestsParam}${customParams ? '&' + customParams : ''}`)
       .then(r => r.json())
       .then(d => {
         if (append) {
@@ -2752,6 +2938,21 @@ ${signals}
         </nav>
 
         <div className="sidebar-footer">
+          {isLoggedIn ? (
+            <button className="sidebar-action" onClick={() => setShowProfileModal(true)}>
+              {user?.avatar ? (
+                <img src={user.avatar} alt="avatar" className="sidebar-user-avatar-btn" />
+              ) : (
+                <span className="sidebar-user-avatar-small">{(user?.displayName || user?.username)?.[0]?.toUpperCase() || 'U'}</span>
+              )}
+              {!sidebarCollapsed && <span>{user?.displayName || user?.username}</span>}
+            </button>
+          ) : (
+            <button className="sidebar-action" onClick={() => { setAuthMode('login'); setShowAuthModal(true); }}>
+              {ICONS.user}
+              {!sidebarCollapsed && <span>登录</span>}
+            </button>
+          )}
           <button className="sidebar-action" onClick={() => setTheme(t => t === 'dark' ? 'light' : 'dark')}>
             {theme === 'dark' ? ICONS.sun : ICONS.moon}
             {!sidebarCollapsed && <span>{theme === 'dark' ? '浅色模式' : '深色模式'}</span>}
@@ -2924,6 +3125,7 @@ ${signals}
           {nav === 'github' && <><div className="stat-item"><span className="stat-value highlight">{githubRepos.length}</span><span className="stat-label">热门项目</span></div><div className="stat-item"><span className="stat-value live">{GITHUB_PERIODS.find(p => p.id === githubSince)?.label || '周榜'}</span><span className="stat-label">当前榜单</span></div></>}
           {nav === 'reading-list' && <><div className="stat-item"><span className="stat-value highlight">{bookmarks.length}</span><span className="stat-label">收藏总数</span></div><div className="stat-item"><span className="stat-value live">{bookmarks.filter(b => !b.isRead).length}</span><span className="stat-label">未读</span></div></>}
           {nav === 'calendar' && <><div className="stat-item"><span className="stat-value highlight">{events.length}</span><span className="stat-label">日程事件</span></div></>}
+          {nav === 'recommendations' && <><div className="stat-item"><span className="stat-value highlight">{filtered.length}</span><span className="stat-label">推荐内容</span></div><div className="stat-item"><span className="stat-value live">{selectedInterests.length}</span><span className="stat-label">兴趣领域</span></div></>}
           <div className="stat-item time">{ICONS.clock}<span>{stats.updatedAt ? formatTime(stats.updatedAt) : '--'}</span></div>
           <button className="panel-toggle" onClick={() => setPanelCollapsed(c => !c)}>{panelCollapsed ? ICONS.chevronLeft : ICONS.chevronRight}</button>
         </div>
@@ -2994,28 +3196,58 @@ ${signals}
             </>
           )}
 
-          {/* SMART RECOMMENDATIONS */}
+          {/* SMART RECOMMENDATIONS - 基于兴趣的个性化推荐 */}
           {nav === 'recommendations' && (
             <>
               <div className="section-header">
                 <h2 className="section-title">{ICONS.sparkle} 智能推荐</h2>
-                <p className="section-desc">基于你的阅读历史，为你推荐可能感兴趣的内容</p>
+                <p className="section-desc">基于你的兴趣领域，为你精准推送相关内容</p>
               </div>
-              {readingHistory.length === 0 && (
+              {!isLoggedIn && (
                 <div className="empty-state">
-                  <p>暂无阅读历史，多阅读一些文章后我们会为你推荐更精准的内容</p>
+                  <p>请先登录并选择感兴趣的领域</p>
+                  <button onClick={() => { setAuthMode('login'); setShowAuthModal(true); }}>去登录</button>
                 </div>
               )}
-              {readingHistory.length > 0 && smartRecommendations.length === 0 && (
+              {isLoggedIn && selectedInterests.length === 0 && (
                 <div className="empty-state">
-                  <p>暂无新的推荐内容，请稍后再来查看</p>
+                  <p>你还没有选择感兴趣的领域</p>
+                  <button onClick={() => setShowInterestModal(true)}>选择兴趣领域</button>
                 </div>
               )}
-              <div className={`feed-list view-${viewMode} ${viewMode === 'card' ? 'card-grid' : ''}`}>
-                {smartRecommendations.map((item, i) => (
-                  <NewsItem key={item.id} item={item} index={i} viewMode={viewMode} isBookmarked={isBookmarked(item.id)} isInMaterials={isInMaterials(item.id)} onBookmark={() => toggleBookmark(item)} onAddMaterial={() => toggleMaterial(item)} onSummary={() => setExpandedSummary(p => ({ ...p, [item.id]: !p[item.id] }))} isSummaryOpen={expandedSummary[item.id]} summaryText={generateSummary(item)} isFollowed={followKeywords.some(kw => `${item.title} ${item.summary}`.toLowerCase().includes(kw.toLowerCase()))} onRead={() => recordReading(item)} onOpenLightbox={(src, title) => setLightbox({ open: true, src, title })} showTranslation={translationOpen[item.id]} onToggleTranslation={() => setTranslationOpen(p => ({ ...p, [item.id]: !p[item.id] }))} onRequestTranslation={() => requestTranslation(item)} isTranslating={translatingItems[item.id]} translation={getTranslation(item)} />
-                ))}
-              </div>
+              {isLoggedIn && selectedInterests.length > 0 && (
+                <>
+                  <div className="interest-tags-bar">
+                    <span className="interest-tags-label">已选领域：</span>
+                    {selectedInterests.map(id => {
+                      const cat = CATEGORIES.find(c => c.id === id);
+                      return cat ? (
+                        <span key={id} className="interest-tag-badge">
+                          {ICONS[cat.icon]} {cat.label}
+                        </span>
+                      ) : null;
+                    })}
+                    <button className="interest-edit-btn" onClick={() => setShowInterestModal(true)}>编辑</button>
+                  </div>
+                  {loading && <div className={`feed-list view-${viewMode} ${viewMode === 'card' ? 'card-grid' : ''}`}>{Array.from({ length: 6 }).map((_, i) => <SkeletonCard key={i} viewMode={viewMode} />)}</div>}
+                  {error && <div className="error-state"><p>加载失败: {error}</p><button onClick={() => loadNews()}>重试</button></div>}
+                  {!loading && !error && filtered.length === 0 && <div className="empty-state"><p>暂无推荐内容</p></div>}
+                  {!loading && !error && filtered.length > 0 && (
+                    <div className={`feed-list view-${viewMode} ${viewMode === 'card' ? 'card-grid' : ''}`}>
+                      {filtered.map((item, i) => <NewsItem key={item.id} item={item} index={i} viewMode={viewMode} isFocused={focusedIndex === i} isBookmarked={isBookmarked(item.id)} isInMaterials={isInMaterials(item.id)} onBookmark={() => toggleBookmark(item)} onAddMaterial={() => toggleMaterial(item)} onSummary={() => setExpandedSummary(p => ({ ...p, [item.id]: !p[item.id] }))} isSummaryOpen={expandedSummary[item.id]} summaryText={generateSummary(item)} isFollowed={followKeywords.some(kw => `${item.title} ${item.summary}`.toLowerCase().includes(kw.toLowerCase()))} onRead={() => recordReading(item)} showTranslation={translationOpen[item.id]} onToggleTranslation={() => setTranslationOpen(p => ({ ...p, [item.id]: !p[item.id] }))} onRequestTranslation={() => requestTranslation(item)} isTranslating={translatingItems[item.id]} translation={getTranslation(item)} onOpenLightbox={(src, title) => setLightbox({ open: true, src, title })} />)}
+                    </div>
+                  )}
+                  {newsHasMore && (
+                    <div id="load-more-sentinel" className="load-more-area">
+                      {loadingMore && <div className="load-more-spinner"><div className="spinner" /><span>加载中...</span></div>}
+                      {!loadingMore && <span className="load-more-hint">滚动加载更多</span>}
+                    </div>
+                  )}
+                  {!newsHasMore && filtered.length > 0 && (
+                    <div className="load-more-area load-more-done">已全部加载</div>
+                  )}
+                </>
+              )}
             </>
           )}
 
@@ -6052,6 +6284,230 @@ ${newAgent.systemPrompt}`
           spaceId: null
         });
       }} />
+
+      {/* 登录/注册弹窗 */}
+      {showAuthModal && (
+        <div className="modal-overlay" onClick={() => setShowAuthModal(false)}>
+          <div className="modal modal-sm" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>{authMode === 'login' ? '登录' : '注册'}</h3>
+              <button className="modal-close" onClick={() => setShowAuthModal(false)}>{ICONS.x}</button>
+            </div>
+            <div className="modal-body auth-modal-body">
+              <div className="auth-tabs">
+                <button className={`auth-tab ${authMode === 'login' ? 'active' : ''}`} onClick={() => { setAuthMode('login'); setAuthError(''); }}>登录</button>
+                <button className={`auth-tab ${authMode === 'register' ? 'active' : ''}`} onClick={() => { setAuthMode('register'); setAuthError(''); }}>注册</button>
+              </div>
+              {authError && <div className="auth-error">{authError}</div>}
+              <div className="auth-form">
+                <div className="auth-field">
+                  <label>用户名</label>
+                  <input
+                    type="text"
+                    value={authForm.username}
+                    onChange={e => setAuthForm(prev => ({ ...prev, username: e.target.value }))}
+                    placeholder="请输入用户名"
+                  />
+                </div>
+                {authMode === 'register' && (
+                  <div className="auth-field">
+                    <label>邮箱</label>
+                    <input
+                      type="email"
+                      value={authForm.email}
+                      onChange={e => setAuthForm(prev => ({ ...prev, email: e.target.value }))}
+                      placeholder="请输入邮箱（选填）"
+                    />
+                  </div>
+                )}
+                <div className="auth-field">
+                  <label>密码</label>
+                  <input
+                    type="password"
+                    value={authForm.password}
+                    onChange={e => setAuthForm(prev => ({ ...prev, password: e.target.value }))}
+                    placeholder="请输入密码"
+                  />
+                </div>
+                {authMode === 'register' && (
+                  <div className="auth-field">
+                    <label>确认密码</label>
+                    <input
+                      type="password"
+                      value={authForm.confirmPassword}
+                      onChange={e => setAuthForm(prev => ({ ...prev, confirmPassword: e.target.value }))}
+                      placeholder="请再次输入密码"
+                    />
+                  </div>
+                )}
+                <button
+                  className="auth-submit-btn"
+                  onClick={authMode === 'login' ? handleLogin : handleRegister}
+                  disabled={authLoading}
+                >
+                  {authLoading ? '处理中...' : (authMode === 'login' ? '登录' : '注册')}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 个人资料弹窗 */}
+      {showProfileModal && (
+        <div className="modal-overlay" onClick={() => setShowProfileModal(false)}>
+          <div className="modal modal-sm" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>个人资料</h3>
+              <button className="modal-close" onClick={() => setShowProfileModal(false)}>{ICONS.x}</button>
+            </div>
+            <div className="modal-body auth-modal-body">
+              <div className="profile-avatar-section">
+                <div className="profile-avatar-preview">
+                  {user?.avatar ? (
+                    <img src={user.avatar} alt="avatar" />
+                  ) : (
+                    <div className="profile-avatar-default">{(user?.displayName || user?.username)?.[0]?.toUpperCase() || 'U'}</div>
+                  )}
+                </div>
+                <label className="profile-avatar-upload-btn">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => {
+                      const file = e.target.files[0];
+                      if (!file) return;
+                      const reader = new FileReader();
+                      reader.onload = (ev) => {
+                        const base64 = ev.target.result;
+                        setUser(prev => ({ ...prev, avatar: base64 }));
+                        updateUserProfile({ avatar: base64 });
+                        showToast('头像已更新');
+                      };
+                      reader.readAsDataURL(file);
+                    }}
+                    style={{ display: 'none' }}
+                  />
+                  更换头像
+                </label>
+              </div>
+              <div className="auth-form">
+                <div className="auth-field">
+                  <label>显示名称</label>
+                  <input
+                    type="text"
+                    value={profileForm.displayName}
+                    onChange={e => setProfileForm(prev => ({ ...prev, displayName: e.target.value }))}
+                    placeholder={user?.displayName || user?.username || '显示名称'}
+                  />
+                </div>
+                <div className="auth-field">
+                  <label>个性签名</label>
+                  <input
+                    type="text"
+                    value={profileForm.signature}
+                    onChange={e => setProfileForm(prev => ({ ...prev, signature: e.target.value }))}
+                    placeholder="写点啥..."
+                  />
+                </div>
+                <div className="profile-interest-section">
+                  <label className="profile-interest-label">兴趣领域</label>
+                  <div className="profile-interest-tags">
+                    {selectedInterests.length === 0 && <span className="profile-interest-empty">暂无</span>}
+                    {selectedInterests.map(id => {
+                      const cat = CATEGORIES.find(c => c.id === id);
+                      return cat ? (
+                        <span key={id} className="profile-interest-tag">
+                          {ICONS[cat.icon]} {cat.label}
+                        </span>
+                      ) : null;
+                    })}
+                  </div>
+                  <button className="profile-interest-edit" onClick={() => { setShowProfileModal(false); setShowInterestModal(true); }}>
+                    {ICONS.edit} 编辑兴趣
+                  </button>
+                </div>
+                <div className="profile-actions">
+                  <button
+                    className="auth-submit-btn"
+                    onClick={() => {
+                      const newDisplayName = profileForm.displayName.trim();
+                      const newSignature = profileForm.signature.trim();
+                      setUser(prev => ({ ...prev, displayName: newDisplayName, signature: newSignature }));
+                      updateUserProfile({ displayName: newDisplayName, signature: newSignature });
+                      setShowProfileModal(false);
+                      setProfileForm({ displayName: '', signature: '' });
+                      showToast('资料已更新');
+                    }}
+                  >
+                    保存
+                  </button>
+                  <button className="profile-logout-btn" onClick={() => { setShowProfileModal(false); handleLogout(); }}>
+                    {ICONS.power} 退出登录
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 兴趣选择弹窗 */}
+      {showInterestModal && (
+        <div className="modal-overlay" onClick={() => setShowInterestModal(false)}>
+          <div className="modal modal-lg interest-modal" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>选择感兴趣的领域</h3>
+              <button className="modal-close" onClick={() => setShowInterestModal(false)}>{ICONS.x}</button>
+            </div>
+            <div className="modal-body interest-modal-body">
+              <p className="interest-desc">选择你感兴趣的领域，我们将为你精准推送相关内容</p>
+              <div className="interest-groups">
+                {CATEGORY_GROUPS.map(group => (
+                  <div key={group.id} className="interest-group">
+                    <div className="interest-group-title">
+                      <span className="interest-group-icon">{ICONS[group.icon]}</span>
+                      <span>{group.label}</span>
+                    </div>
+                    <div className="interest-group-items">
+                      {group.categories.map(catId => {
+                        const cat = CATEGORIES.find(c => c.id === catId);
+                        if (!cat) return null;
+                        const isSelected = selectedInterests.includes(cat.id);
+                        return (
+                          <button
+                            key={cat.id}
+                            className={`interest-item ${isSelected ? 'selected' : ''}`}
+                            onClick={() => {
+                              setSelectedInterests(prev => {
+                                if (isSelected) {
+                                  return prev.filter(id => id !== cat.id);
+                                }
+                                return [...prev, cat.id];
+                              });
+                            }}
+                          >
+                            <span className="interest-item-icon">{ICONS[cat.icon]}</span>
+                            <span className="interest-item-label">{cat.label}</span>
+                            {isSelected && <span className="interest-item-check">{ICONS.check}</span>}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="modal-footer interest-modal-footer">
+              <span className="interest-count">已选择 {selectedInterests.length} 个领域</span>
+              <div className="interest-actions">
+                <button className="btn-cancel" onClick={() => setShowInterestModal(false)}>取消</button>
+                <button className="btn-save" onClick={() => { updateUserInterests(selectedInterests); setShowInterestModal(false); showToast('兴趣领域已保存'); }}>保存</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 全球科技大屏全屏 */}
       {globeFullscreenOpen && (
