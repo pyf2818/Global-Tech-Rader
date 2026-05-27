@@ -423,6 +423,8 @@ ${baseContent}
             timestamp: Date.now()
           }]
         }));
+        // 每次收到 AI 回复后自动保存当前会话
+        saveSession();
       }
     } catch (e) {
       setAgentMessages(prev => ({

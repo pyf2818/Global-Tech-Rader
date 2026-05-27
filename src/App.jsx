@@ -328,6 +328,7 @@ const ICONS = {
   image: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>,
   copy: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>,
   download: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>,
+  power: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M18.36 6.64a9 9 0 1 1-12.72 0"/><line x1="12" y1="2" x2="12" y2="12"/></svg>,
 };
 
 function loadLS(key, fallback) {
@@ -440,9 +441,25 @@ function App() {
   const [panelCollapsed, setPanelCollapsed] = useState(() => localStorage.getItem('panelCollapsed') === 'true');
   const [customSources, setCustomSources] = useState(() => loadLS('customSources', []));
   const [disabledSources, setDisabledSources] = useState(() => loadLS('disabledSources', []));
-  const [newSource, setNewSource] = useState({ name: '', url: '', region: 'overseas' });
+  const [newSource, setNewSource] = useState({ name: '', url: '', region: 'overseas', category: '', tags: '', notes: '' });
   const [sourceVerifyResult, setSourceVerifyResult] = useState(null);
   const [sourceVerifying, setSourceVerifying] = useState(false);
+  const [verifyingAllSources, setVerifyingAllSources] = useState(false);
+  const [allSourcesVerifyResults, setAllSourcesVerifyResults] = useState(null);
+  const [sourceHealth, setSourceHealth] = useState(() => loadLS('sourceHealth', {}));
+  const [editingSource, setEditingSource] = useState(null);
+  const [showSourceForm, setShowSourceForm] = useState(false);
+  const [batchMode, setBatchMode] = useState(false);
+  const [selectedSources, setSelectedSources] = useState(new Set());
+  const [searchQuery, setSearchQuery] = useState('');
+  const [customSourceFilter, setCustomSourceFilter] = useState('all');
+  const [regionFilter, setRegionFilter] = useState('all');
+  const [builtinBatchMode, setBuiltinBatchMode] = useState(false);
+  const [selectedBuiltinSources, setSelectedBuiltinSources] = useState(new Set());
+  const [autoMonitorEnabled, setAutoMonitorEnabled] = useState(() => loadLS('autoMonitorEnabled', false));
+  const [monitorInterval, setMonitorInterval] = useState(() => loadLS('monitorInterval', 60)); // 分钟
+  const [monitorAlerts, setMonitorAlerts] = useState([]);
+  const [showAlertPanel, setShowAlertPanel] = useState(false);
   const [llmConfig, setLlmConfig] = useState(() => loadLS('llmConfig', { baseUrl: '', apiKey: '', selectedModel: '', manualModels: [], provider: '' }));
   const [llmModels, setLlmModels] = useState([]);
   const [llmFetching, setLlmFetching] = useState(false);
@@ -546,6 +563,7 @@ function App() {
   useEffect(() => { localStorage.setItem('sidebarCollapsed', String(sidebarCollapsed)); }, [sidebarCollapsed]);
   useEffect(() => { localStorage.setItem('panelCollapsed', String(panelCollapsed)); }, [panelCollapsed]);
   useEffect(() => { saveLS('customSources', customSources); }, [customSources]);
+  useEffect(() => { saveLS('sourceHealth', sourceHealth); }, [sourceHealth]);
   useEffect(() => { saveLS('disabledSources', disabledSources); }, [disabledSources]);
   useEffect(() => { saveLS('calendarEvents', events); }, [events]);
   useEffect(() => { saveLS('bookmarks', bookmarks); }, [bookmarks]);
@@ -655,7 +673,17 @@ function App() {
     feedRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  useEffect(() => { fetch('/api/meta').then(r => r.json()).then(d => setAllSources(d.sources || [])).catch(() => {}); }, []);
+  useEffect(() => {
+    fetch('/api/meta')
+      .then(r => r.json())
+      .then(d => {
+        console.log('Fetched allSources:', d.sources);
+        setAllSources(d.sources || []);
+      })
+      .catch(e => {
+        console.error('Failed to fetch allSources:', e);
+      });
+  }, []);
   useEffect(() => { loadNews(); }, []);
 
   useEffect(() => {
@@ -3532,7 +3560,7 @@ ${signals}
             <div className="trends-dashboard">
               <div className="trends-header">
                 <h2>{ICONS.layers}<span>素材库</span></h2>
-                <p className="trends-desc">从资讯中收集的素材，共 {materials.length} 条</p>
+                <p className="trends-desc">从资讯中收集的素材，共 {materials?.length || 0} 条</p>
                 <div className="header-actions">
                   <button className="btn-icon" onClick={exportMaterials} title="导出素材">
                     {ICONS.link}
@@ -3560,10 +3588,10 @@ ${signals}
                         className={`space-tab ${materialSpaceFilter === 'all' ? 'active' : ''}`}
                         onClick={() => setMaterialSpaceFilter('all')}
                       >
-                        全部 ({materials.length})
+                        全部 ({materials?.length || 0})
                       </button>
                       {materialSpaces.map(space => {
-                        const count = materials.filter(m => m.spaceId === space.id).length;
+                        const count = (materials || []).filter(m => m.spaceId === space.id).length;
                         return (
                           <button 
                             key={space.id}
@@ -4653,36 +4681,648 @@ ${signals}
                 <>
                   <div className="setting-item">
                     <label>自定义信息源</label>
-                    <p className="setting-desc">添加 RSS/Atom 订阅源，可验证连接有效性</p>
-                    <div className="custom-sources-list">{customSources.map(source => <div key={source.id} className="custom-source-item"><div className="custom-source-info"><span className="custom-source-name">{source.name}</span><span className="custom-source-region">{REGION_MAP[source.region] || source.region}</span></div><button className="remove-source-btn" onClick={() => removeCustomSource(source.id)}>{ICONS.x}</button></div>)}</div>
-                    <div className="add-source-form">
-                      <input type="text" placeholder="名称" value={newSource.name} onChange={e => setNewSource(prev => ({ ...prev, name: e.target.value }))} />
-                      <input type="text" placeholder="RSS/Atom URL" value={newSource.url} onChange={e => { setNewSource(prev => ({ ...prev, url: e.target.value })); setSourceVerifyResult(null); }} className="url-input" />
-                      <select value={newSource.region} onChange={e => setNewSource(prev => ({ ...prev, region: e.target.value }))}><option value="overseas">海外</option><option value="domestic">国内</option><option value="global">全球</option></select>
-                      <button className="verify-source-btn" onClick={verifySource} disabled={sourceVerifying || !newSource.url} title="验证连接">{sourceVerifying ? '...' : '验证'}</button>
-                      <button className="add-source-btn" onClick={addCustomSource}>{ICONS.plus}</button>
+                    <p className="setting-desc">管理 RSS/Atom 订阅源，支持编辑、批量操作和健康监控</p>
+                    
+                    {/* 数据加载状态指示 */}
+                    {(!allSources || allSources.length === 0) && (
+                      <div className="loading-indicator">
+                        <p>正在加载内置信息源...</p>
+                      </div>
+                    )}
+                    
+                    {/* 自动监控控制面板 */}
+                    <div className="monitor-control-panel">
+                      <div className="monitor-toggle">
+                        <label className="monitor-switch">
+                          <input
+                            type="checkbox"
+                            checked={autoMonitorEnabled}
+                            onChange={(e) => setAutoMonitorEnabled(e.target.checked)}
+                          />
+                          <span>自动监控</span>
+                        </label>
+                        <select
+                          value={monitorInterval}
+                          onChange={(e) => setMonitorInterval(Number(e.target.value))}
+                          className="monitor-interval-select"
+                          disabled={!autoMonitorEnabled}
+                        >
+                          <option value="30">每30分钟</option>
+                          <option value="60">每小时</option>
+                          <option value="120">每2小时</option>
+                          <option value="360">每6小时</option>
+                          <option value="720">每12小时</option>
+                        </select>
+                      </div>
+                      
+                      {/* 警告面板 */}
+                      {monitorAlerts.length > 0 && (
+                        <div className="monitor-alerts-panel">
+                          <div className="alerts-header">
+                            <span className="alerts-title">⚠️ 健康警告 ({monitorAlerts.length})</span>
+                            <button className="alerts-clear-btn" onClick={clearAlerts}>清除</button>
+                          </div>
+                          <div className="alerts-list">
+                            {monitorAlerts.map(alert => (
+                              <div key={alert.id} className={`alert-item alert-${alert.type}`}>
+                                <span className="alert-message">{alert.message}</span>
+                                <span className="alert-time">
+                                  {new Date(alert.timestamp).toLocaleString()}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
-                    {sourceVerifyResult && (
-                      <div className={`source-verify-result ${sourceVerifyResult.ok ? 'verify-ok' : 'verify-fail'}`}>
-                        {sourceVerifyResult.ok ? <>{ICONS.check} 有效: {sourceVerifyResult.title} ({sourceVerifyResult.itemCount} 条内容)</> : <>无效: {sourceVerifyResult.message}</>}
+                    
+                    {/* 批量操作栏 */}
+                    <div className="source-batch-actions">
+                      <label className="batch-select-all">
+                        <input
+                          type="checkbox"
+                          checked={selectedSources.size > 0 && selectedSources.size === customSources.length}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setSelectedSources(new Set(customSources.map(s => s.id)));
+                            } else {
+                              setSelectedSources(new Set());
+                            }
+                          }}
+                        />
+                        <span>全选</span>
+                      </label>
+                      <button className="source-action-btn" onClick={() => setBatchMode(!batchMode)} disabled={customSources.length === 0}>
+                        {batchMode ? '退出批量' : '批量操作'}
+                      </button>
+                      {batchMode && (
+                        <>
+                          <button className="source-action-btn" onClick={() => setDisabledSources(prev => {
+                            const selectedIds = Array.from(selectedSources);
+                            const enabledSources = customSources.filter(s => !disabledSources.includes(s.name));
+                            const newlyDisabled = enabledSources.filter(s => selectedIds.includes(s.id));
+                            return [...prev, ...newlyDisabled.map(s => s.name)];
+                          })} disabled={selectedSources.size === 0}>
+                            批量禁用
+                          </button>
+                          <button className="source-action-btn" onClick={() => setDisabledSources(prev => {
+                            const selectedIds = Array.from(selectedSources);
+                            const currentlyDisabled = prev.filter(name => {
+                              const source = customSources.find(s => s.id === selectedIds[0]);
+                              return source && source.name === name;
+                            });
+                            return prev.filter(name => !currentlyDisabled.includes(name));
+                          })} disabled={selectedSources.size === 0}>
+                            批量启用
+                          </button>
+                          <button className="source-action-btn danger" onClick={() => {
+                            if (confirm(`确定删除选中的 ${selectedSources.size} 个源？`)) {
+                              setCustomSources(prev => prev.filter(s => !selectedSources.has(s.id)));
+                              setSelectedSources(new Set());
+                              setBatchMode(false);
+                            }
+                          }} disabled={selectedSources.size === 0}>
+                            批量删除
+                          </button>
+                        </>
+                      )}
+                      <button className="source-action-btn primary" onClick={() => setShowSourceForm(true)}>
+                        {ICONS.plus} 添加源
+                      </button>
+                      <button className="source-action-btn" onClick={verifyAllSources} disabled={verifyingAllSources}>
+                        {verifyingAllSources ? '验证中...' : '验证所有源'}
+                      </button>
+                      <button className="source-action-btn" onClick={exportSources}>
+                        导出配置
+                      </button>
+                      <label className="source-action-btn">
+                        导入配置
+                        <input
+                          type="file"
+                          accept=".json"
+                          onChange={importSources}
+                          style={{ display: 'none' }}
+                        />
+                      </label>
+                    </div>
+
+                    {/* 高级搜索和筛选 */}
+                    <div className="source-filter-bar">
+                      <input
+                        type="text"
+                        placeholder="搜索源名称、URL、标签..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="source-search-input"
+                      />
+                      <select
+                        value={customSourceFilter}
+                        onChange={(e) => setCustomSourceFilter(e.target.value)}
+                        className="source-filter-select"
+                      >
+                        <option value="all">全部状态</option>
+                        <option value="enabled">已启用</option>
+                        <option value="disabled">已禁用</option>
+                        <option value="healthy">健康</option>
+                        <option value="warning">警告</option>
+                        <option value="error">异常</option>
+                      </select>
+                      <select
+                        value={regionFilter}
+                        onChange={(e) => setRegionFilter(e.target.value)}
+                        className="source-filter-select"
+                      >
+                        <option value="all">全部地区</option>
+                        <option value="overseas">仅海外</option>
+                        <option value="domestic">仅国内</option>
+                        <option value="global">全球</option>
+                      </select>
+                    </div>
+
+                    {/* 自定义源列表 */}
+                    <div className="custom-sources-grid">
+                      {customSources.length === 0 ? (
+                        <div className="empty-state">
+                          <p>暂无自定义信息源</p>
+                          <button className="source-action-btn primary" onClick={() => setShowSourceForm(true)}>
+                            {ICONS.plus} 添加第一个源
+                          </button>
+                        </div>
+                      ) : (
+                        (customSources || []).filter(source => {
+                          if (!source || !source.name || !source.url) return false;
+                          
+                          // 搜索匹配
+                          const searchLower = searchQuery.toLowerCase();
+                          const matchesSearch = !searchQuery || 
+                            source.name.toLowerCase().includes(searchLower) ||
+                            source.url.toLowerCase().includes(searchLower) ||
+                            (source.tags && source.tags.some(tag => tag.toLowerCase().includes(searchLower))) ||
+                            (source.category && source.category.toLowerCase().includes(searchLower));
+                          
+                          // 启用状态筛选
+                          const isDisabled = disabledSources.includes(source.name);
+                          const matchesStatus = customSourceFilter === 'all' ||
+                            (customSourceFilter === 'enabled' && !isDisabled) ||
+                            (customSourceFilter === 'disabled' && isDisabled);
+                          
+                          // 地区筛选
+                          const matchesRegion = regionFilter === 'all' || source.region === regionFilter;
+                          
+                          // 健康状态筛选
+                          const health = sourceHealth[source.id];
+                          const matchesHealth = customSourceFilter === 'all' ||
+                            customSourceFilter === 'enabled' ||
+                            customSourceFilter === 'disabled' ||
+                            (customSourceFilter === 'healthy' && health?.status === 'healthy') ||
+                            (customSourceFilter === 'warning' && health?.status === 'warning') ||
+                            (customSourceFilter === 'error' && health?.status === 'error');
+                          
+                          return matchesSearch && matchesStatus && matchesRegion && matchesHealth;
+                        }).map(source => (
+                          <div
+                            key={source.id}
+                            className={`source-card ${selectedSources.has(source.id) ? 'selected' : ''}`}
+                          >
+                            {batchMode && (
+                              <div className="source-select-checkbox">
+                                <input
+                                  type="checkbox"
+                                  checked={selectedSources.has(source.id)}
+                                  onChange={(e) => {
+                                    if (e.target.checked) {
+                                      setSelectedSources(prev => new Set([...prev, source.id]));
+                                    } else {
+                                      setSelectedSources(prev => {
+                                        const newSet = new Set(prev);
+                                        newSet.delete(source.id);
+                                        return newSet;
+                                      });
+                                    }
+                                  }}
+                                />
+                              </div>
+                            )}
+                            <div className="source-card-main">
+                              <div className="source-card-header">
+                                <span className="source-card-name">{source.name}</span>
+                                <div className="source-card-status">
+                                  {getSourceHealthIndicator(source.id, 'custom')}
+                                </div>
+                              </div>
+                              <div className="source-card-info">
+                                <div className="source-card-url" title={source.url}>
+                                  {truncateUrl(source.url, 40)}
+                                </div>
+                                <div className="source-card-meta">
+                                  <span className="source-card-region">{REGION_MAP[source.region] || source.region}</span>
+                                  {source.category && (
+                                    <span className="source-card-category">{source.category}</span>
+                                  )}
+                                  {(source.tags || []).slice(0, 3).map((tag, i) => (
+                                    <span key={i} className="source-card-tag">{tag}</span>
+                                  ))}
+                                </div>
+                                {source.notes && (
+                                  <p className="source-card-notes" title={source.notes}>
+                                    {truncateText(source.notes, 50)}
+                                  </p>
+                                )}
+                              </div>
+                              <div className="source-card-actions">
+                                <button
+                                  className="source-icon-btn"
+                                  title="编辑"
+                                  onClick={() => setEditingSource(source)}
+                                >
+                                  {ICONS.edit || <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0 0-2 2v14a2 2 0 0 0 0 2h7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1 1 4 4z" /></svg>}
+                                </button>
+                                <button
+                                  className="source-icon-btn"
+                                  title="验证"
+                                  onClick={() => verifySingleSource(source)}
+                                >
+                                  {ICONS.check || <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="20 6 9 17 4 4" /><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" /><polyline points="16 6 12 12 20 12" /></svg>}
+                                </button>
+                                <button
+                                  className="source-icon-btn danger"
+                                  title="删除"
+                                  onClick={() => {
+                                    if (confirm(`确定删除「${source.name}」？`)) {
+                                      setCustomSources(prev => prev.filter(s => s.id !== source.id));
+                                      setSourceHealth(prev => {
+                                        const newHealth = { ...prev };
+                                        delete newHealth[source.id];
+                                        return newHealth;
+                                      });
+                                    }
+                                  }}
+                                >
+                                  {ICONS.x || <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>}
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+
+                    {/* 编辑/添加源表单 */}
+                    {showSourceForm && (
+                      <div className="source-form-modal-overlay">
+                        <div className="source-form-modal">
+                          <div className="source-form-header">
+                            <h3>{editingSource ? '编辑信息源' : '添加信息源'}</h3>
+                            <button className="source-form-close" onClick={() => {
+                              setShowSourceForm(false);
+                              setEditingSource(null);
+                              setNewSource({ name: '', url: '', region: 'overseas', category: '', tags: '', notes: '' });
+                            }}>{ICONS.x}</button>
+                          </div>
+                          <div className="source-form-body">
+                            <div className="source-form-group">
+                              <label>名称 *</label>
+                              <input
+                                type="text"
+                                value={editingSource ? editingSource.name : newSource.name}
+                                onChange={e => {
+                                  if (editingSource) {
+                                    setEditingSource(prev => ({ ...prev, name: e.target.value }));
+                                  } else {
+                                    setNewSource(prev => ({ ...prev, name: e.target.value }));
+                                  }
+                                }}
+                                placeholder="如：TechCrunch"
+                                className="source-form-input"
+                              />
+                            </div>
+                            <div className="source-form-group">
+                              <label>RSS/Atom URL *</label>
+                              <input
+                                type="text"
+                                value={editingSource ? editingSource.url : newSource.url}
+                                onChange={e => {
+                                  if (editingSource) {
+                                    setEditingSource(prev => ({ ...prev, url: e.target.value }));
+                                  } else {
+                                    setNewSource(prev => ({ ...prev, url: e.target.value }));
+                                  }
+                                }}
+                                placeholder="https://example.com/feed.xml"
+                                className="source-form-input"
+                              />
+                            </div>
+                            <div className="source-form-group">
+                              <label>地区</label>
+                              <select
+                                value={editingSource ? editingSource.region : newSource.region}
+                                onChange={e => {
+                                  if (editingSource) {
+                                    setEditingSource(prev => ({ ...prev, region: e.target.value }));
+                                  } else {
+                                    setNewSource(prev => ({ ...prev, region: e.target.value }));
+                                  }
+                                }}
+                                className="source-form-select"
+                              >
+                                <option value="overseas">海外</option>
+                                <option value="domestic">国内</option>
+                                <option value="global">全球</option>
+                              </select>
+                            </div>
+                            <div className="source-form-group">
+                              <label>分类</label>
+                              <input
+                                type="text"
+                                value={editingSource ? editingSource.category || '' : newSource.category}
+                                onChange={e => {
+                                  if (editingSource) {
+                                    setEditingSource(prev => ({ ...prev, category: e.target.value }));
+                                  } else {
+                                    setNewSource(prev => ({ ...prev, category: e.target.value }));
+                                  }
+                                }}
+                                placeholder="如：AI、硬件、开源"
+                                className="source-form-input"
+                              />
+                            </div>
+                            <div className="source-form-group">
+                              <label>标签（逗号分隔）</label>
+                              <input
+                                type="text"
+                                value={editingSource ? (editingSource.tags || []).join(', ') : newSource.tags}
+                                onChange={e => {
+                                  const tags = e.target.value.split(',').map(t => t.trim()).filter(Boolean);
+                                  if (editingSource) {
+                                    setEditingSource(prev => ({ ...prev, tags }));
+                                  } else {
+                                    setNewSource(prev => ({ ...prev, tags }));
+                                  }
+                                }}
+                                placeholder="如：科技, AI, 机器学习"
+                                className="source-form-input"
+                              />
+                            </div>
+                            <div className="source-form-group">
+                              <label>备注</label>
+                              <textarea
+                                value={editingSource ? editingSource.notes || '' : newSource.notes}
+                                onChange={e => {
+                                  if (editingSource) {
+                                    setEditingSource(prev => ({ ...prev, notes: e.target.value }));
+                                  } else {
+                                    setNewSource(prev => ({ ...prev, notes: e.target.value }));
+                                  }
+                                }}
+                                rows={3}
+                                placeholder="可选备注信息..."
+                                className="source-form-textarea"
+                              />
+                            </div>
+                          </div>
+                          <div className="source-form-footer">
+                            <button className="btn-cancel" onClick={() => {
+                              setShowSourceForm(false);
+                              setEditingSource(null);
+                              setNewSource({ name: '', url: '', region: 'overseas', category: '', tags: '', notes: '' });
+                            }}>取消</button>
+                            <button
+                              className="btn-save"
+                              onClick={() => {
+                                if (editingSource) {
+                                  setCustomSources(prev => prev.map(s => s.id === editingSource.id ? editingSource : s));
+                                  setEditingSource(null);
+                                } else {
+                                  if (!newSource.name.trim() || !newSource.url.trim()) {
+                                    alert('请填写名称和 URL');
+                                    return;
+                                  }
+                                  const source = {
+                                    ...newSource,
+                                    id: Date.now(),
+                                    tags: newSource.tags ? newSource.tags.split(',').map(t => t.trim()).filter(Boolean) : []
+                                  };
+                                  setCustomSources(prev => [...prev, source]);
+                                  setNewSource({ name: '', url: '', region: 'overseas', category: '', tags: '', notes: '' });
+                                }
+                                setShowSourceForm(false);
+                              }}
+                            >
+                              {editingSource ? '保存修改' : '添加'}
+                            </button>
+                          </div>
+                        </div>
                       </div>
                     )}
                   </div>
                   <div className="setting-item">
                     <label>内置信息源</label>
-                    <div className="builtin-sources">
-                      <div className="builtin-header">
-                        <p className="builtin-title">内置信息源 ({allSources.length} 个，已启用 {allSources.length - disabledSources.length} 个)</p>
-                        <div className="builtin-actions">
-                          <button className="builtin-action-btn" onClick={() => setDisabledSources([])}>全部启用</button>
-                          <button className="builtin-action-btn" onClick={() => setDisabledSources(allSources.map(s => s.name))}>全部禁用</button>
-                          <button className="builtin-action-btn" onClick={() => { const overseas = allSources.filter(s => s.region === 'overseas').map(s => s.name); const domestic = allSources.filter(s => s.region !== 'overseas').map(s => s.name); setDisabledSources(prev => [...new Set([...prev.filter(n => !overseas.includes(n)), ...domestic])]); }}>仅海外</button>
-                          <button className="builtin-action-btn" onClick={() => { const domestic = allSources.filter(s => s.region !== 'overseas').map(s => s.name); const overseas = allSources.filter(s => s.region === 'overseas').map(s => s.name); setDisabledSources(prev => [...new Set([...prev.filter(n => !domestic.includes(n)), ...overseas])]); }}>仅国内</button>
+                    <p className="setting-desc">管理系统预设的信息源，支持批量操作和健康监控</p>
+                    
+                    {/* 内置源工具栏 */}
+                    <div className="source-batch-actions">
+                      <label className="batch-select-all">
+                        <input
+                          type="checkbox"
+                          checked={selectedBuiltinSources.size > 0 && selectedBuiltinSources.size === (allSources?.length || 0)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setSelectedBuiltinSources(new Set((allSources || []).map(s => s.name)));
+                            } else {
+                              setSelectedBuiltinSources(new Set());
+                            }
+                          }}
+                        />
+                        <span>全选</span>
+                      </label>
+                      <button className="source-action-btn" onClick={() => setBuiltinBatchMode(!builtinBatchMode)} disabled={!allSources || allSources.length === 0}>
+                        {builtinBatchMode ? '退出批量' : '批量操作'}
+                      </button>
+                      {builtinBatchMode && (
+                        <>
+                          <button className="source-action-btn" onClick={() => setDisabledSources([])} disabled={selectedBuiltinSources.size === 0}>
+                            批量启用
+                          </button>
+                          <button className="source-action-btn" onClick={() => setDisabledSources(Array.from(selectedBuiltinSources))} disabled={selectedBuiltinSources.size === 0}>
+                            批量禁用
+                          </button>
+                        </>
+                      )}
+                      <button className="source-action-btn" onClick={verifyAllSources} disabled={verifyingAllSources}>
+                        {verifyingAllSources ? '验证中...' : '验证所有源'}
+                      </button>
+                    </div>
+
+                    {/* 搜索和筛选 */}
+                    <div className="source-filter-bar">
+                      <input
+                        type="text"
+                        placeholder="搜索信息源名称..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="source-search-input"
+                      />
+                      <select
+                        value={sourceFilter}
+                        onChange={(e) => setSourceFilter(e.target.value)}
+                        className="source-filter-select"
+                      >
+                        <option value="all">全部地区</option>
+                        <option value="overseas">仅海外</option>
+                        <option value="domestic">仅国内</option>
+                        <option value="healthy">健康</option>
+                        <option value="warning">警告</option>
+                        <option value="error">异常</option>
+                      </select>
+                    </div>
+
+                    {/* 内置源卡片列表 */}
+                    <div className="builtin-sources-grid">
+                      {!allSources || allSources.length === 0 ? (
+                        <div className="empty-state">
+                          <p>暂无内置信息源</p>
+                        </div>
+                      ) : (
+                        (allSources || []).filter(s => {
+                          if (!s || !s.name || !s.url) return false;
+                          
+                          const matchesSearch = !searchQuery || s.name.toLowerCase().includes(searchQuery.toLowerCase());
+                          const matchesFilter = sourceFilter === 'all' || 
+                            (sourceFilter === 'overseas' && s.region === 'overseas') ||
+                            (sourceFilter === 'domestic' && s.region !== 'overseas') ||
+                            (sourceFilter === s.health && sourceHealth[s.name]?.status === sourceFilter);
+                          return matchesSearch && matchesFilter;
+                        }).map(source => {
+                          const isDisabled = disabledSources.includes(source.name);
+                          const health = sourceHealth[source.name];
+                          const isSelected = selectedBuiltinSources.has(source.name);
+                          
+                          return (
+                            <div
+                              key={source.name}
+                              className={`source-card builtin ${isDisabled ? 'disabled' : ''} ${isSelected ? 'selected' : ''} ${health?.status ? `health-${health.status}` : ''}`}
+                            >
+                              {builtinBatchMode && (
+                                <div className="source-select-checkbox">
+                                  <input
+                                    type="checkbox"
+                                    checked={isSelected}
+                                    onChange={(e) => {
+                                      if (e.target.checked) {
+                                        setSelectedBuiltinSources(prev => new Set([...prev, source.name]));
+                                      } else {
+                                        setSelectedBuiltinSources(prev => {
+                                          const newSet = new Set(prev);
+                                          newSet.delete(source.name);
+                                          return newSet;
+                                        });
+                                      }
+                                    }}
+                                  />
+                                </div>
+                              )}
+                              <div className="source-card-main">
+                                <div className="source-card-header">
+                                  <span className="source-card-name">{source.name}</span>
+                                  <div className="source-card-status">
+                                    {getSourceHealthIndicator(source.name, 'builtin')}
+                                    {health && health.responseTime && (
+                                      <span className="response-time">{health.responseTime}ms</span>
+                                    )}
+                                  </div>
+                                </div>
+                                <div className="source-card-info">
+                                  <div className="source-card-url" title={source.url}>
+                                    {truncateUrl(source.url, 40)}
+                                  </div>
+                                  <div className="source-card-meta">
+                                    <span className="source-card-region">{REGION_MAP[source.region] || source.region}</span>
+                                    <span className="source-card-category">{source.defaultCategory}</span>
+                                  </div>
+                                  {health && health.itemCount > 0 && (
+                                    <div className="source-card-stats">
+                                      <span className="stats-item">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="12" height="12"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 4 4" /><line x1="12" y1="3" x2="12" y2="15" /></svg>
+                                        {health.itemCount} 条
+                                      </span>
+                                      {health.lastCheck && (
+                                        <span className="stats-item">
+                                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="12" height="12"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 16 12" /><line x1="12" y1="8" x2="12" y2="12" /></svg>
+                                          {new Date(health.lastCheck).toLocaleDateString()}
+                                        </span>
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
+                                <div className="source-card-actions">
+                                  <button
+                                    className="source-icon-btn"
+                                    title={isDisabled ? '启用' : '禁用'}
+                                    onClick={() => {
+                                      if (isDisabled) {
+                                        setDisabledSources(prev => prev.filter(name => name !== source.name));
+                                      } else {
+                                        setDisabledSources(prev => [...prev, source.name]);
+                                      }
+                                    }}
+                                  >
+                                    {isDisabled ? ICONS.power || <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="1" y="5" width="22" height="14" rx="2" ry="2" /><line x1="1" y1="22" x2="23" y2="22" /></svg> : ICONS.power || <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18.36 6.64a9 9 0 1 1-12.72 0" /><line x1="12" y1="2" x2="12" y2="22" /><path d="M12 2v20" /></svg>}
+                                  </button>
+                                  <button
+                                    className="source-icon-btn"
+                                    title="验证"
+                                    onClick={() => verifySingleSource(source, 'builtin')}
+                                  >
+                                    {ICONS.check || <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="20 6 9 17 4 4 4" /><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" /><polyline points="16 6 12 12 20 12" /></svg>}
+                                  </button>
+                                  <button
+                                    className="source-icon-btn"
+                                    title="复制URL"
+                                    onClick={() => {
+                                      navigator.clipboard.writeText(source.url);
+                                      alert('URL 已复制到剪贴板');
+                                    }}
+                                  >
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="9" y="9" width="6" height="6" /><path d="M7 17.94l3.47-3.47" /><path d="M9 12.94l3.47-3.47" /><path d="M10.5 2H9" /><path d="M9 2L3.5 6" /></svg>
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+
+                    {/* 验证结果面板 */}
+                    {allSourcesVerifyResults && (
+                      <div className="all-sources-verify-results">
+                        <div className="verify-results-header">
+                          <p className="verify-results-title">
+                            {verifyingAllSources ? `验证中... (${allSourcesVerifyResults?.length || 0}/${allSources.length})` : '验证结果'}
+                          </p>
+                          {!verifyingAllSources && allSourcesVerifyResults && (
+                            <button className="verify-results-close" onClick={() => setAllSourcesVerifyResults(null)}>{ICONS.x}</button>
+                          )}
+                        </div>
+                        <div className="verify-results-list">
+                          {allSourcesVerifyResults.map((r, i) => (
+                            <div key={i} className={`verify-result-item ${r.ok ? 'verify-ok' : 'verify-fail'}`}>
+                              <div className="verify-result-main">
+                                <span className="verify-result-name">{r.name}</span>
+                                <span className={`verify-result-status ${r.ok ? 'status-ok' : 'status-fail'}`}>
+                                  {r.ok ? '✓ 有效' : '✗ ' + (r.message || '无效')}
+                                </span>
+                              </div>
+                              {r.itemCount && (
+                                <div className="verify-result-detail">
+                                  {r.itemCount} 条内容
+                                </div>
+                              )}
+                            </div>
+                          ))}
                         </div>
                       </div>
-                      <input type="text" placeholder="搜索信息源..." className="builtin-search" onChange={e => { const q = e.target.value.toLowerCase(); document.querySelectorAll('.builtin-source-checkbox').forEach(el => { el.style.display = el.textContent.toLowerCase().includes(q) ? 'flex' : 'none'; }); }} />
-                      <div className="builtin-list">{allSources.map((s, i) => (<label key={i} className="builtin-source builtin-source-checkbox" title={s.name}><input type="checkbox" checked={!disabledSources.includes(s.name)} onChange={e => { if (e.target.checked) { setDisabledSources(prev => prev.filter(name => name !== s.name)); } else { setDisabledSources(prev => [...prev, s.name]); } }} />{s.name}</label>))}</div>
-                    </div>
+                    )}
                   </div>
                 </>
               )}
@@ -5183,6 +5823,292 @@ ${newAgent.systemPrompt}`
     }).catch(() => {
       setSourceVerifyResult({ ok: false, message: 'Network error' });
     }).finally(() => setSourceVerifying(false));
+  }
+
+  function verifyAllSources() {
+    if (!allSources || !allSources.length) {
+      console.log('verifyAllSources: No sources to verify', allSources);
+      return;
+    }
+    
+    console.log('verifyAllSources: Starting verification for', allSources.length, 'sources');
+    setVerifyingAllSources(true);
+    setAllSourcesVerifyResults(null);
+    
+    const results = [];
+    let completed = 0;
+    
+    allSources.forEach(source => {
+      if (!source.url) {
+        console.warn('Source without URL:', source.name);
+        return;
+      }
+      
+      console.log('Verifying:', source.name, source.url);
+      
+      fetch(`/api/verify-source?url=${encodeURIComponent(source.url)}`)
+        .then(r => r.json())
+        .then(d => {
+          console.log('Verification result for', source.name, ':', d);
+          results.push({ name: source.name, ...d });
+        })
+        .catch(e => {
+          console.error('Verification failed for', source.name, ':', e);
+          results.push({ name: source.name, ok: false, message: 'Network error' });
+        })
+        .finally(() => {
+          completed++;
+          console.log('Verification progress:', completed, '/', allSources.length);
+          if (completed === allSources.length) {
+            console.log('Verification complete, results:', results);
+            setAllSourcesVerifyResults(results);
+            setVerifyingAllSources(false);
+          }
+        });
+    });
+  }
+
+  // 辅助函数：截断 URL
+  function truncateUrl(url, maxLength) {
+    if (!url) return '';
+    return url.length > maxLength ? url.slice(0, maxLength) + '...' : url;
+  }
+
+  // 辅助函数：截断文本
+  function truncateText(text, maxLength) {
+    if (!text) return '';
+    return text.length > maxLength ? text.slice(0, maxLength) + '...' : text;
+  }
+
+  // 辅助函数：获取健康度指示器
+  function getSourceHealthIndicator(sourceId, type) {
+    const health = sourceHealth[sourceId];
+    if (!health) {
+      return <span className="health-indicator health-unknown" title="未验证">?</span>;
+    }
+    
+    if (health.status === 'healthy') {
+      return <span className="health-indicator health-good" title="健康">✓</span>;
+    } else if (health.status === 'warning') {
+      return <span className="health-indicator health-warning" title="警告">!</span>;
+    } else if (health.status === 'error') {
+      return <span className="health-indicator health-bad" title="错误">✗</span>;
+    }
+    return <span className="health-indicator health-unknown" title="未验证">?</span>;
+  }
+
+  // 验证单个源
+  function verifySingleSource(source, isBuiltin = false) {
+    if (!source || !source.url) {
+      console.warn('verifySingleSource: Invalid source', source);
+      return;
+    }
+    
+    const url = source.url;
+    const sourceKey = isBuiltin ? source.name : source.id;
+    const startTime = Date.now();
+    setSourceVerifying(true);
+    
+    console.log('verifySingleSource: Verifying', source.name || sourceKey, url);
+    
+    fetch(`/api/verify-source?url=${encodeURIComponent(url)}`)
+      .then(r => r.json())
+      .then(d => {
+        const responseTime = Date.now() - startTime;
+        console.log('verifySingleSource: Result for', source.name || sourceKey, ':', d);
+        
+        const previousHealth = sourceHealth[sourceKey];
+        const failCount = d.ok ? 0 : (previousHealth?.failCount || 0) + 1;
+        
+        // 健康状态判断逻辑
+        let status = 'healthy';
+        if (!d.ok) {
+          status = 'error';
+        } else if (responseTime > 3000) {
+          // 响应时间超过3秒视为警告
+          status = 'warning';
+        } else if (failCount >= 2) {
+          // 即使验证成功，但之前有失败记录也标记为警告
+          status = 'warning';
+        }
+        
+        setSourceHealth(prev => ({
+          ...prev,
+          [sourceKey]: {
+            status,
+            lastCheck: Date.now(),
+            responseTime,
+            failCount,
+            itemCount: d.itemCount || 0
+          }
+        }));
+      })
+      .catch(e => {
+        console.error('verifySingleSource: Error for', source.name || sourceKey, ':', e);
+        setSourceHealth(prev => ({
+          ...prev,
+          [sourceKey]: {
+            status: 'error',
+            lastCheck: Date.now(),
+            responseTime: 0,
+            failCount: (prev[sourceKey]?.failCount || 0) + 1,
+            itemCount: 0
+          }
+        }));
+      })
+      .finally(() => {
+        setSourceVerifying(false);
+      });
+  }
+
+  // 导出配置
+  function exportSources() {
+    const config = {
+      version: '1.0',
+      exportDate: new Date().toISOString(),
+      customSources: customSources,
+      sourceHealth: sourceHealth,
+      disabledSources: disabledSources
+    };
+    
+    const blob = new Blob([JSON.stringify(config, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `sources-config-${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  // 导入配置
+  function importSources(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const config = JSON.parse(event.target.result);
+        
+        if (config.version && config.customSources) {
+          const confirmed = confirm(
+            `即将导入 ${config.customSources.length} 个自定义源。\n\n` +
+            `注意：这将覆盖现有的自定义源配置。\n\n` +
+            `是否继续？`
+          );
+          
+          if (confirmed) {
+            setCustomSources(config.customSources);
+            if (config.sourceHealth) {
+              setSourceHealth(config.sourceHealth);
+            }
+            if (config.disabledSources) {
+              setDisabledSources(config.disabledSources);
+            }
+            alert('导入成功！');
+          }
+        } else {
+          alert('配置文件格式错误！');
+        }
+      } catch (error) {
+        alert('导入失败：文件解析错误');
+        console.error('Import error:', error);
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = ''; // 重置文件输入
+  }
+
+  // 自动监控相关函数
+  useEffect(() => {
+    if (!autoMonitorEnabled) return;
+    
+    const interval = setInterval(() => {
+      // 自动验证所有启用的源
+      const allEnabledSources = [...(customSources || []).filter(s => !disabledSources.includes(s.name)), ...(allSources || []).filter(s => !disabledSources.includes(s.name))];
+      
+      // 只验证有健康记录的源，避免首次验证所有源
+      const sourcesToMonitor = allEnabledSources.filter(source => {
+        const key = source.id || source.name;
+        return sourceHealth[key] && sourceHealth[key].lastCheck;
+      });
+      
+      if (sourcesToMonitor.length > 0) {
+        sourcesToMonitor.forEach(source => {
+          verifySingleSource(source, !source.id);
+        });
+      }
+    }, monitorInterval * 60 * 1000); // 分钟转换为毫秒
+    
+    return () => clearInterval(interval);
+  }, [autoMonitorEnabled, monitorInterval, customSources, allSources, disabledSources, sourceHealth]);
+
+  // 检查健康状态并发送警告
+  useEffect(() => {
+    const newAlerts = [];
+    
+    // 检查自定义源
+    customSources.forEach(source => {
+      const health = sourceHealth[source.id];
+      if (health && health.failCount >= 3) {
+        newAlerts.push({
+          id: source.id,
+          name: source.name,
+          type: 'error',
+          message: `${source.name} 连续失败 ${health.failCount} 次`,
+          timestamp: health.lastCheck
+        });
+      } else if (health && health.status === 'warning') {
+        newAlerts.push({
+          id: source.id,
+          name: source.name,
+          type: 'warning',
+          message: `${source.name} 响应较慢：${health.responseTime}ms`,
+          timestamp: health.lastCheck
+        });
+      }
+    });
+    
+    // 检查内置源
+    allSources.forEach(source => {
+      const health = sourceHealth[source.name];
+      if (health && health.failCount >= 3) {
+        newAlerts.push({
+          id: source.name,
+          name: source.name,
+          type: 'error',
+          message: `${source.name} 连续失败 ${health.failCount} 次`,
+          timestamp: health.lastCheck
+        });
+      } else if (health && health.status === 'warning') {
+        newAlerts.push({
+          id: source.name,
+          name: source.name,
+          type: 'warning',
+          message: `${source.name} 响应较慢：${health.responseTime}ms`,
+          timestamp: health.lastCheck
+        });
+      }
+    });
+    
+    // 只显示最近10条警告
+    setMonitorAlerts(newAlerts.slice(-10));
+  }, [sourceHealth, customSources, allSources]);
+
+  // 保存监控设置
+  useEffect(() => {
+    saveLS('autoMonitorEnabled', autoMonitorEnabled);
+  }, [autoMonitorEnabled]);
+
+  useEffect(() => {
+    saveLS('monitorInterval', monitorInterval);
+  }, [monitorInterval]);
+
+  // 清除警告
+  function clearAlerts() {
+    setMonitorAlerts([]);
   }
 
   function fetchLlmModels() {

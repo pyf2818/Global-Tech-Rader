@@ -13,12 +13,25 @@ No test, lint, typecheck, or formatter commands exist. Do not run them.
 
 ## Architecture
 
-- **Single-file frontend**: `src/App.jsx` (~4500 lines) — all state, rendering, and logic. Inline components: `NewsItem`, `GithubRepoCard`, `HexRadarChart`, `Lightbox`. No component splitting.
+- **Single-file frontend**: `src/App.jsx` (~5600 lines) — all state, rendering, and logic. Inline components: `NewsItem`, `GithubRepoCard`, `HexRadarChart`, `Lightbox`. No component splitting.
+- **AI Elf component**: `src/AiElf.jsx` (~950 lines) — AI assistant with Agent system, supports news analysis via drag-drop, stores conversations per-Agent in localStorage.
 - **3D Globe component**: `src/GlobeView.jsx` (~880 lines) — `react-globe.gl` based interactive 3D earth visualization with fullscreen dashboard mode. Used within App.jsx.
-- **API is a Vite plugin**: `server/newsPlugin.js` (~1150 lines) is a Vite middleware (`newsPlugin()`) that intercepts `/api/*` during dev. No separate backend server. Production uses `vercel.json` + `api/*.js` serverless functions.
+- **API is a Vite plugin**: `server/newsPlugin.js` (~1300 lines) is a Vite middleware (`newsPlugin()`) that intercepts `/api/*` during dev. No separate backend server. Production uses `vercel.json` + `api/*.js` serverless functions.
 - **Entrypoint**: `src/main.jsx` mounts `<App />` inside `<ErrorBoundary>` + `<React.StrictMode>`.
-- **Styling**: `src/styles.css` (~2080 lines) with CSS custom properties for dark/light themes. Tailwind config only sets `content` paths and `fontFamily.sans` — no Tailwind utility classes in the component; all styling is custom CSS.
+- **Styling**: `src/styles.css` (~3150 lines) with CSS custom properties for dark/light themes. Tailwind config only sets `content` paths and `fontFamily.sans` — no Tailwind utility classes in the component; all styling is custom CSS.
 - **Dev server port**: Fixed to **5175** in `vite.config.js` (`server.port: 5175`).
+
+## Agent System (AI Elf)
+
+The AI Elf component implements a multi-Agent system for news analysis:
+
+- **8 predefined Agents**: Defined in `DEFAULT_AGENTS` array (App.jsx), each with id, name, description, system prompt, category, tags, and avatar.
+- **Agent Categories**: `AGENT_CATEGORIES` = ['全部', '分析', '技术', '商业', '创作', '语言', '教育', '思辨']
+- **Per-Agent Storage**: Messages and history stored in `localStorage` under keys `ai-elf-agent-messages` and `ai-elf-agent-history`, keyed by `agentId`.
+- **Custom Agents**: Users can create custom Agents via settings modal; stored with `isCustom: true` flag.
+- **Analysis Templates**: Each Agent uses `buildAnalysisPrompt()` to generate domain-specific prompts (e.g., `analyst` uses 5-dimension template, `tech-advisor` uses tech-focused template).
+- **Export to Materials**: AI Elf analysis can be saved to the materials library via `onExportToMaterials` callback.
+- **Settings Integration**: Agent management merged into "Agent管理" settings tab with independent avatar upload, prompt editing, and AI prompt refinement.
 
 ## Key Duplication (Must Update Both Files)
 
@@ -45,6 +58,7 @@ Additionally, `DEFAULT_SOURCES` and `CATEGORIES` are duplicated between `server/
 | `/api/llm-models` | GET | `baseUrl`, `apiKey` | Fetches available models from LLM provider |
 | `/api/llm-test` | POST | `baseUrl`, `model`, `apiKey` | Tests LLM API connectivity |
 | `/api/ai-insights` | POST | `baseUrl`, `apiKey`, `model`, `items[]` | Analyzes top 30 news items via LLM, returns `{trends, correlations, signals}` |
+| `/api/ai-generate` | POST | `baseUrl`, `apiKey`, `model`, `action`, `content` | LLM content generation (continue, rewrite, expand, simplify, translate, title, summary) |
 | `/api/ai/*`, `/api/translate/*`, `/api/subscriptions/*`, `/api/bookmarks/*` | — | — | Stub endpoints returning 501 |
 
 ## LLM Config
@@ -65,9 +79,16 @@ All RSS/Atom sources live in `DEFAULT_SOURCES` and `TRENDING_SOURCES` arrays at 
 
 ## Deployment
 
-`vercel.json` maps `/api/*` to itself. The `api/` directory contains serverless function files (`news.js`, `meta.js`, `trending.js`, `github-trending.js`) that are a **partial copy** of `newsPlugin.js` logic. If you change API logic in `newsPlugin.js`, check whether `api/*.js` also needs updating.
+`vercel.json` maps `/api/*` to itself. The `api/` directory contains serverless function files (`news.js`, `meta.js`, `trending.js`, `github-trending.js`, `ai-generate.js`) that are a **partial copy** of `newsPlugin.js` logic. If you change API logic in `newsPlugin.js`, check whether `api/*.js` also needs updating.
 
 Build command: `npm run build`, output: `dist/`.
+
+## CI/CD Workflows
+
+- **verify-sources.yml**: Daily (6:00 UTC) cron job verifies RSS source health by fetching and validating XML. Fails workflow if any sources are broken.
+- **update-news.yml**: Hourly cron job warms production cache by fetching `/api/news`, `/api/trending`, and `/api/meta` endpoints.
+
+Both workflows use Node.js 20 and `npm ci` for dependency installation.
 
 ## Gotchas
 
@@ -86,3 +107,7 @@ Build command: `npm run build`, output: `dist/`.
 - **Globe interaction**: The old `.globe-bg` wrapper blocked mouse events on the fullscreen globe. Always use `.globe-bg-decoration` with `pointer-events: none` for background effects, and render the `Globe` component directly at the root level.
 - **Image upload in editor**: `App.jsx` supports image upload (click image button or paste Ctrl+V) and stores images as Base64 in `article.images` array. The editor uses placeholder syntax `![alt](#{id})` to avoid cluttering the text with long Base64 strings. Use `renderMarkdownWithImages(text, images)` to replace placeholders with actual Base64 data during preview/export.
 - **Editor layout**: A duplicate `.editor-split-view` CSS rule was previously overriding mode-specific grid layouts. Only one rule should exist at line ~1394 in `styles.css`. Ensure split mode uses `grid-template-columns: 1fr 1fr` and both editor/preview panes have `flex: 1` with `min-height: 0` for proper flex behavior.
+- **Settings modal navigation**: Uses left sidebar (120px width) with 4 tabs: 通用设置, 信息源, 大模型, Agent管理. The old top tab navigation has been removed.
+- **AI Elf chat window**: Adaptive size (520px wide when sidebar collapsed, 720px when expanded; height fixed at 560px). Messages stored per-Agent in `localStorage`. Drag-drop news cards trigger analysis.
+- **Agent history**: Each Agent has independent conversation history, accessible via expand/collapse in AI Elf sidebar. History sessions stored as `{id, title, timestamp, messages}` arrays, max 20 per Agent.
+- **Agent avatars**: Stored as Base64 strings in Agent objects. Default avatar `public/ai-elf-avatar.png`. Avatar upload uses FileReader and stores Base64 in localStorage.
