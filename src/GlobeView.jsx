@@ -850,11 +850,26 @@ function GlobeContent({ items, isFullscreen, onClose }) {
 }
 
 // ============ 主组件 ============
-export default function GlobeView({ items = [] }) {
-  const [isFullscreen, setIsFullscreen] = useState(false);
+export default function GlobeView({ items = [], externalFullscreen, onFullscreenChange }) {
+  const [internalFullscreen, setInternalFullscreen] = useState(false);
+  const isControlled = externalFullscreen !== undefined;
+  const isFullscreen = isControlled ? externalFullscreen : internalFullscreen;
 
-  const openFullscreen = useCallback(() => setIsFullscreen(true), []);
-  const closeFullscreen = useCallback(() => setIsFullscreen(false), []);
+  const openFullscreen = useCallback(() => {
+    if (isControlled) {
+      onFullscreenChange?.(true);
+    } else {
+      setInternalFullscreen(true);
+    }
+  }, [isControlled, onFullscreenChange]);
+
+  const closeFullscreen = useCallback(() => {
+    if (isControlled) {
+      onFullscreenChange?.(false);
+    } else {
+      setInternalFullscreen(false);
+    }
+  }, [isControlled, onFullscreenChange]);
 
   return (
     <>

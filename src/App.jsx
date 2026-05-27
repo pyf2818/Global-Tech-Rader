@@ -384,6 +384,7 @@ function App() {
   const [error, setError] = useState('');
   const [blocked, setBlocked] = useState('');
   const [showSettings, setShowSettings] = useState(false);
+  const [globeFullscreenOpen, setGlobeFullscreenOpen] = useState(false);
   const [settingsTab, setSettingsTab] = useState('general');
   const [elfAvatar, setElfAvatar] = useState(() => {
     try {
@@ -1048,6 +1049,25 @@ function App() {
       return { name, count: data.count, categories: data.categories.size, avgLen: Math.round(avgLen), qualityScore };
     }).sort((a, b) => b.qualityScore - a.qualityScore);
 
+    // 机会雷达：低热度但高价值的资讯（来源权威 × 新鲜度 / 常见度）
+    const opportunityRadar = items.map(item => {
+      const highWeightSources = ['OpenAI', 'Google', 'Anthropic', 'Meta', 'Microsoft', 'Nature', 'MIT Technology Review', 'ArXiv', 'Stanford'];
+      const sourceWeight = highWeightSources.some(s => item.source?.includes(s)) ? 2.0 : 1.0;
+      const age = (Date.now() - new Date(item.publishedAt).getTime()) / (1000 * 60 * 60);
+      const freshness = Math.max(0, 1 - age / 48);
+      const titleWords = (item.title || '').toLowerCase().split(/\s+/);
+      const commonality = titleWords.reduce((sum, word) => {
+        if (word.length < 4) return sum;
+        const freq = items.filter(i => i.title?.toLowerCase().includes(word)).length;
+        return sum + (freq > 0 ? Math.log(freq + 1) : 0);
+      }, 0) / Math.max(titleWords.length, 1);
+      const score = (sourceWeight * freshness * 100) / (commonality + 1);
+      const isRelevant = followKeywords.length === 0 || followKeywords.some(kw =>
+        `${item.title} ${item.summary}`.toLowerCase().includes(kw.toLowerCase())
+      );
+      return { ...item, opportunityScore: score, isRelevant };
+    }).filter(item => item.opportunityScore > 5).sort((a, b) => b.opportunityScore - a.opportunityScore).slice(0, 10);
+
     return {
       categoryGrowth,
       categoryMomentum,
@@ -1069,7 +1089,8 @@ function App() {
       day14,
       day30,
       categoryTrend30,
-      categoryCorrelations
+      categoryCorrelations,
+      opportunityRadar
     };
   }, [items]);
 
@@ -1245,6 +1266,41 @@ function App() {
     return scored.filter(i => !readIds.has(i.id) && i.recScore > 20).sort((a, b) => b.recScore - a.recScore).slice(0, 15);
   }, [items, readingHistory, followKeywords]);
 
+  // 我的关注动态：按关键词分组展示最新匹配的资讯
+  const followKeywordUpdates = useMemo(() => {
+    if (followKeywords.length === 0) return [];
+    return followKeywords.map(kw => {
+      const matched = items.filter(item =>
+        `${item.title} ${item.summary}`.toLowerCase().includes(kw.toLowerCase())
+      ).slice(0, 3);
+      return { keyword: kw, count: matched.length, items: matched };
+    }).filter(g => g.count > 0);
+  }, [followKeywords, items]);
+
+  // 今日必读：基于关注关键词和阅读历史的推荐
+  const todayMustRead = useMemo(() => {
+    const readIds = new Set(readingHistory.map(h => h.id));
+    return items
+      .filter(item => !readIds.has(item.id))
+      .map(item => {
+        let score = 0;
+        followKeywords.forEach(kw => {
+          if (`${item.title} ${item.summary}`.toLowerCase().includes(kw.toLowerCase())) {
+            score += 20;
+          }
+        });
+        // 来源权重
+        const highWeightSources = ['OpenAI', 'Google', 'Anthropic', 'Meta', 'Microsoft'];
+        if (highWeightSources.some(s => item.source?.includes(s))) score += 10;
+        // 新鲜度
+        const age = (Date.now() - new Date(item.publishedAt).getTime()) / (1000 * 60 * 60);
+        score += Math.max(0, 15 - age);
+        return { ...item, mustReadScore: score };
+      })
+      .sort((a, b) => b.mustReadScore - a.mustReadScore)
+      .slice(0, 5);
+  }, [items, followKeywords, readingHistory]);
+
   const calendarDays = useMemo(() => {
     const year = calendarDate.getFullYear();
     const month = calendarDate.getMonth();
@@ -1364,6 +1420,16 @@ function App() {
       str = str.content || str.text || JSON.stringify(str);
     }
     let html = typeof str === 'string' ? str : String(str);
+
+    // 保护已存在的 <img> 标签，避免被 HTML escape 破坏
+    const imgMap = new Map();
+    let imgCounter = 0;
+    html = html.replace(/<img[^>]*\/>/g, (match) => {
+      const key = `__IMG_${imgCounter++}__`;
+      imgMap.set(key, match);
+      return key;
+    });
+
     // Escape HTML (but preserve existing markdown syntax)
     html = html.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     // Fenced code blocks
@@ -1415,6 +1481,12 @@ function App() {
     // Line breaks and paragraphs
     html = html.replace(/\n\n/g, '</p><p>');
     html = html.replace(/\n/g, '<br>');
+
+    // 恢复 <img> 标签
+    imgMap.forEach((imgTag, key) => {
+      html = html.replace(key, imgTag);
+    });
+
     return `<p>${html}</p>`;
   }
 
@@ -2873,7 +2945,7 @@ ${signals}
                       </div>
                       {expandedEvents[cluster.id] && (
                         <div className="cluster-items">
-                          {cluster.items.map((item, ci) => <NewsItem key={item.id} item={item} index={ci} viewMode={viewMode} isFocused={focusedIndex === filtered.indexOf(item)} isBookmarked={isBookmarked(item.id)} isInMaterials={isInMaterials(item.id)} onBookmark={() => toggleBookmark(item)} onAddMaterial={() => toggleMaterial(item)} onSummary={() => setExpandedSummary(p => ({ ...p, [item.id]: !p[item.id] }))} isSummaryOpen={expandedSummary[item.id]} summaryText={generateSummary(item)} isFollowed={followKeywords.some(kw => `${item.title} ${item.summary}`.toLowerCase().includes(kw.toLowerCase()))} onOpenLightbox={(src, title) => setLightbox({ open: true, src, title })} />)}
+                          {cluster.items.map((item, ci) => <NewsItem key={item.id} item={item} index={ci} viewMode={viewMode} isFocused={focusedIndex === filtered.indexOf(item)} isBookmarked={isBookmarked(item.id)} isInMaterials={isInMaterials(item.id)} onBookmark={() => toggleBookmark(item)} onAddMaterial={() => toggleMaterial(item)} onSummary={() => setExpandedSummary(p => ({ ...p, [item.id]: !p[item.id] }))} isSummaryOpen={expandedSummary[item.id]} summaryText={generateSummary(item)} isFollowed={followKeywords.some(kw => `${item.title} ${item.summary}`.toLowerCase().includes(kw.toLowerCase()))} onOpenLightbox={(src, title) => setLightbox({ open: true, src, title })} showTranslation={translationOpen[item.id]} onToggleTranslation={() => setTranslationOpen(p => ({ ...p, [item.id]: !p[item.id] }))} onRequestTranslation={() => requestTranslation(item)} isTranslating={translatingItems[item.id]} translation={getTranslation(item)} />)}
                         </div>
                       )}
                     </div>
@@ -2908,7 +2980,7 @@ ${signals}
               </div>
 
               {trendingLoading && <div className={`feed-list view-${viewMode} ${viewMode === 'card' ? 'card-grid' : ''}`}>{Array.from({ length: 4 }).map((_, i) => <SkeletonCard key={i} viewMode={viewMode} />)}</div>}
-              {!trendingLoading && <div className={`feed-list view-${viewMode} ${viewMode === 'card' ? 'card-grid' : ''}`}>{trendingItems.map((item, i) => <NewsItem key={item.id} item={item} index={i} viewMode={viewMode} isBookmarked={isBookmarked(item.id)} isInMaterials={isInMaterials(item.id)} onBookmark={() => toggleBookmark(item)} onAddMaterial={() => toggleMaterial(item)} isFollowed={false} onOpenLightbox={(src, title) => setLightbox({ open: true, src, title })} />)}</div>}
+              {!trendingLoading && <div className={`feed-list view-${viewMode} ${viewMode === 'card' ? 'card-grid' : ''}`}>{trendingItems.map((item, i) => <NewsItem key={item.id} item={item} index={i} viewMode={viewMode} isBookmarked={isBookmarked(item.id)} isInMaterials={isInMaterials(item.id)} onBookmark={() => toggleBookmark(item)} onAddMaterial={() => toggleMaterial(item)} isFollowed={false} onOpenLightbox={(src, title) => setLightbox({ open: true, src, title })} showTranslation={translationOpen[item.id]} onToggleTranslation={() => setTranslationOpen(p => ({ ...p, [item.id]: !p[item.id] }))} onRequestTranslation={() => requestTranslation(item)} isTranslating={translatingItems[item.id]} translation={getTranslation(item)} />)}</div>}
 
               {!trendingLoading && trendingItems.length > 0 && (
                 <div className="load-more-area">
@@ -2941,7 +3013,7 @@ ${signals}
               )}
               <div className={`feed-list view-${viewMode} ${viewMode === 'card' ? 'card-grid' : ''}`}>
                 {smartRecommendations.map((item, i) => (
-                  <NewsItem key={item.id} item={item} index={i} viewMode={viewMode} isBookmarked={isBookmarked(item.id)} isInMaterials={isInMaterials(item.id)} onBookmark={() => toggleBookmark(item)} onAddMaterial={() => toggleMaterial(item)} onSummary={() => setExpandedSummary(p => ({ ...p, [item.id]: !p[item.id] }))} isSummaryOpen={expandedSummary[item.id]} summaryText={generateSummary(item)} isFollowed={followKeywords.some(kw => `${item.title} ${item.summary}`.toLowerCase().includes(kw.toLowerCase()))} onRead={() => recordReading(item)} onOpenLightbox={(src, title) => setLightbox({ open: true, src, title })} />
+                  <NewsItem key={item.id} item={item} index={i} viewMode={viewMode} isBookmarked={isBookmarked(item.id)} isInMaterials={isInMaterials(item.id)} onBookmark={() => toggleBookmark(item)} onAddMaterial={() => toggleMaterial(item)} onSummary={() => setExpandedSummary(p => ({ ...p, [item.id]: !p[item.id] }))} isSummaryOpen={expandedSummary[item.id]} summaryText={generateSummary(item)} isFollowed={followKeywords.some(kw => `${item.title} ${item.summary}`.toLowerCase().includes(kw.toLowerCase()))} onRead={() => recordReading(item)} onOpenLightbox={(src, title) => setLightbox({ open: true, src, title })} showTranslation={translationOpen[item.id]} onToggleTranslation={() => setTranslationOpen(p => ({ ...p, [item.id]: !p[item.id] }))} onRequestTranslation={() => requestTranslation(item)} isTranslating={translatingItems[item.id]} translation={getTranslation(item)} />
                 ))}
               </div>
             </>
@@ -3024,11 +3096,6 @@ ${signals}
                       </div>
                     </div>
 
-                    {/* 3D 全球热点地球 */}
-                    <section className="insight-section globe-section">
-                      <GlobeView items={items} />
-                    </section>
-
                     {/* AI 每日简报 */}
                     <section className="insight-section">
                       <div className="ai-brief-card">
@@ -3068,6 +3135,77 @@ ${signals}
                         )}
                       </div>
                     </section>
+
+                    {/* 我的今日关注 */}
+                    {followKeywords.length > 0 && (
+                      <section className="insight-section">
+                        <h3 className="insight-section-title">我的今日关注</h3>
+                        <div className="insight-follow-updates">
+                          {followKeywordUpdates.length === 0 ? (
+                            <div className="insight-empty">暂无匹配资讯</div>
+                          ) : (
+                            followKeywordUpdates.slice(0, 3).map(group => (
+                              <div key={group.keyword} className="insight-follow-group">
+                                <div className="insight-follow-header">
+                                  <span className="insight-follow-keyword">{group.keyword}</span>
+                                  <span className="insight-follow-count">+{group.count} 条</span>
+                                </div>
+                                <div className="insight-follow-items">
+                                  {group.items.map((item, idx) => (
+                                    <a key={idx} href={item.url} target="_blank" rel="noreferrer" className="insight-follow-item" title={item.title}>
+                                      <span className="insight-follow-item-title">{item.title}</span>
+                                      <span className="insight-follow-item-source">{item.source}</span>
+                                    </a>
+                                  ))}
+                                </div>
+                              </div>
+                            ))
+                          )}
+                        </div>
+                      </section>
+                    )}
+
+                    {/* 必读榜单 */}
+                    {todayMustRead.length > 0 && (
+                      <section className="insight-section">
+                        <h3 className="insight-section-title">必读榜单</h3>
+                        <div className="insight-must-read">
+                          {todayMustRead.map((item, idx) => (
+                            <a key={item.id} href={item.url} target="_blank" rel="noreferrer" className="insight-must-read-item" title={item.title}>
+                              <div className="insight-must-read-rank">{idx + 1}</div>
+                              <div className="insight-must-read-info">
+                                <span className="insight-must-read-title">{item.title}</span>
+                                <div className="insight-must-read-meta">
+                                  <span>{item.source}</span>
+                                  <span className="insight-must-read-score">{item.mustReadScore.toFixed(0)}</span>
+                                </div>
+                              </div>
+                            </a>
+                          ))}
+                        </div>
+                      </section>
+                    )}
+
+                    {/* 机会雷达 */}
+                    {insightData.opportunityRadar.length > 0 && (
+                      <section className="insight-section">
+                        <h3 className="insight-section-title">机会雷达</h3>
+                        <div className="insight-opportunities">
+                          {insightData.opportunityRadar.slice(0, 5).map((item, idx) => (
+                            <a key={item.id} href={item.url} target="_blank" rel="noreferrer" className="insight-opportunity-item" title={item.title}>
+                              <div className="insight-opportunity-rank">{idx + 1}</div>
+                              <div className="insight-opportunity-info">
+                                <span className="insight-opportunity-title">{item.title}</span>
+                                <div className="insight-opportunity-meta">
+                                  <span>{item.source}</span>
+                                  <span className="insight-opportunity-score">{item.opportunityScore.toFixed(0)}</span>
+                                </div>
+                              </div>
+                            </a>
+                          ))}
+                        </div>
+                      </section>
+                    )}
                   </>
                 )}
 
@@ -4017,10 +4155,12 @@ ${signals}
                             </div>
                             {showImagePanel && (
                               <div className="image-manager-body">
-                                <div className="image-manager-list">
+                                <div className="image-manager-grid">
                                   {article.images.map(img => {
-                                    // 查找当前图片在文章中的占位符，解析大小参数
+                                    // 检查图片是否在文章中被引用
                                     const placeholderRegex = new RegExp(`!\\[[^\\]]*\\]\\(\\#${img.id}(?:\\|[^)]+)?\\)`, 'g');
+                                    const isUsed = placeholderRegex.test(article.content);
+                                    // 解析当前尺寸
                                     const match = article.content.match(placeholderRegex);
                                     let currentWidth = '', currentHeight = '';
                                     if (match) {
@@ -4031,74 +4171,93 @@ ${signals}
                                       }
                                     }
                                     return (
-                                      <div key={img.id} className="image-manager-item">
-                                        <img src={img.base64} alt={img.alt} className="image-manager-thumb" />
-                                        <div className="image-manager-controls">
-                                          <span className="image-manager-name">{img.alt}</span>
-                                          <span className="image-manager-dims">原始: {img.width}×{img.height}</span>
-                                          <div className="image-manager-size-inputs">
-                                            <div className="image-manager-input-group">
-                                              <label>宽度</label>
-                                              <input
-                                                type="number"
-                                                value={currentWidth}
-                                                placeholder="自动"
-                                                onChange={e => {
-                                                  const newWidth = e.target.value;
-                                                  const newHeight = currentHeight;
-                                                  let newPlaceholder = `![${img.alt}](#${img.id}`;
-                                                  if (newWidth) {
-                                                    newPlaceholder += `|w=${newWidth}`;
-                                                    if (newHeight) newPlaceholder += `|h=${newHeight}`;
-                                                  }
-                                                  newPlaceholder += ')';
-                                                  // 替换文章中的占位符
-                                                  const oldRegex = new RegExp(`!\\[[^\\]]*\\]\\(\\#${img.id}(?:\\|[^)]+)?\\)`, 'g');
-                                                  const newContent = article.content.replace(oldRegex, newPlaceholder);
-                                                  updateArticle(article.id, { content: newContent });
-                                                }}
-                                              />
-                                              <span>px</span>
-                                            </div>
-                                            <div className="image-manager-input-group">
-                                              <label>高度</label>
-                                              <input
-                                                type="number"
-                                                value={currentHeight}
-                                                placeholder="自动"
-                                                onChange={e => {
-                                                  const newWidth = currentWidth;
-                                                  const newHeight = e.target.value;
-                                                  let newPlaceholder = `![${img.alt}](#${img.id}`;
-                                                  if (newWidth || newHeight) {
-                                                    newPlaceholder += `|w=${newWidth || img.width}`;
-                                                    if (newHeight) newPlaceholder += `|h=${newHeight}`;
-                                                  }
-                                                  newPlaceholder += ')';
-                                                  const oldRegex = new RegExp(`!\\[[^\\]]*\\]\\(\\#${img.id}(?:\\|[^)]+)?\\)`, 'g');
-                                                  const newContent = article.content.replace(oldRegex, newPlaceholder);
-                                                  updateArticle(article.id, { content: newContent });
-                                                }}
-                                              />
-                                              <span>px</span>
-                                            </div>
+                                      <div key={img.id} className={`image-manager-card ${isUsed ? 'used' : 'unused'}`}>
+                                        <div className="image-manager-card-img-wrap" onClick={() => {
+                                          // 点击缩略图滚动到编辑器中对应位置
+                                          if (editorTextareaRef.current) {
+                                            const ta = editorTextareaRef.current;
+                                            const idx = article.content.indexOf(`#${img.id}`);
+                                            if (idx !== -1) {
+                                              ta.focus();
+                                              ta.setSelectionRange(idx, idx);
+                                              // 计算行号并滚动
+                                              const lines = article.content.substring(0, idx).split('\n');
+                                              const lineHeight = 20;
+                                              ta.scrollTop = Math.max(0, (lines.length - 5) * lineHeight);
+                                            }
+                                          }
+                                        }}>
+                                          <img src={img.base64} alt={img.alt} className="image-manager-card-thumb" />
+                                          {isUsed && <span className="image-manager-used-badge">已引用</span>}
+                                          {!isUsed && <span className="image-manager-unused-badge">未引用</span>}
+                                          <button
+                                            className="image-manager-card-remove"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              const oldRegex = new RegExp(`!\\[[^\\]]*\\]\\(\\#${img.id}(?:\\|[^)]+)?\\)\\n?`, 'g');
+                                              const newContent = article.content.replace(oldRegex, '');
+                                              updateArticle(article.id, {
+                                                content: newContent,
+                                                images: article.images.filter(i => i.id !== img.id)
+                                              });
+                                            }}
+                                            title="删除图片"
+                                          >
+                                            {ICONS.trash}
+                                          </button>
+                                        </div>
+                                        <div className="image-manager-card-info">
+                                          <span className="image-manager-card-name" title={img.alt}>{img.alt}</span>
+                                          <span className="image-manager-card-dims">{img.width}×{img.height}</span>
+                                        </div>
+                                        <div className="image-manager-card-actions">
+                                          {/* 宽度调整 */}
+                                          <div className="image-manager-size-input">
+                                            <label>宽度</label>
+                                            <input
+                                              type="number"
+                                              value={currentWidth}
+                                              placeholder="自动"
+                                              onChange={e => {
+                                                const newWidth = e.target.value;
+                                                const newHeight = currentHeight;
+                                                let newPlaceholder = `![${img.alt}](#${img.id}`;
+                                                if (newWidth) {
+                                                  newPlaceholder += `|w=${newWidth}`;
+                                                  if (newHeight) newPlaceholder += `|h=${newHeight}`;
+                                                }
+                                                newPlaceholder += ')';
+                                                const oldRegex = new RegExp(`!\\[[^\\]]*\\]\\(\\#${img.id}(?:\\|[^)]+)?\\)`, 'g');
+                                                const newContent = article.content.replace(oldRegex, newPlaceholder);
+                                                updateArticle(article.id, { content: newContent });
+                                              }}
+                                            />
+                                            <span>px</span>
+                                          </div>
+                                          {/* 高度调整 */}
+                                          <div className="image-manager-size-input">
+                                            <label>高度</label>
+                                            <input
+                                              type="number"
+                                              value={currentHeight}
+                                              placeholder="自动"
+                                              onChange={e => {
+                                                const newWidth = currentWidth;
+                                                const newHeight = e.target.value;
+                                                let newPlaceholder = `![${img.alt}](#${img.id}`;
+                                                if (newWidth || newHeight) {
+                                                  newPlaceholder += `|w=${newWidth || img.width}`;
+                                                  if (newHeight) newPlaceholder += `|h=${newHeight}`;
+                                                }
+                                                newPlaceholder += ')';
+                                                const oldRegex = new RegExp(`!\\[[^\\]]*\\]\\(\\#${img.id}(?:\\|[^)]+)?\\)`, 'g');
+                                                const newContent = article.content.replace(oldRegex, newPlaceholder);
+                                                updateArticle(article.id, { content: newContent });
+                                              }}
+                                            />
+                                            <span>px</span>
                                           </div>
                                         </div>
-                                        <button
-                                          className="image-manager-remove"
-                                          onClick={() => {
-                                            // 从文章中移除占位符
-                                            const oldRegex = new RegExp(`!\\[[^\\]]*\\]\\(\\#${img.id}(?:\\|[^)]+)?\\)\\n?`, 'g');
-                                            const newContent = article.content.replace(oldRegex, '');
-                                            updateArticle(article.id, {
-                                              content: newContent,
-                                              images: article.images.filter(i => i.id !== img.id)
-                                            });
-                                          }}
-                                          title="删除图片"
-                                        >
-                                          {ICONS.trash}
-                                        </button>
                                       </div>
                                     );
                                   })}
@@ -4583,6 +4742,102 @@ ${signals}
               </div>
             </section>
             <section className="panel-section"><h3 className="panel-title">{ICONS.fire}<span>热门标签</span></h3><div className="hot-tags">{hotTags.map((item, i) => <button key={item.tag} className="hot-tag" onClick={() => executeSearch(item.tag)}><span className="tag-rank">{i + 1}</span><span className="tag-name">{item.tag}</span><span className="tag-trend">24h +{item.trend}</span><span className="tag-count">{item.count}</span></button>)}</div></section>
+            {/* 全球科技大屏预览 */}
+            <section className="panel-section panel-globe-preview">
+              <h3 className="panel-title">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+                <span>全球科技大屏</span>
+              </h3>
+              <div className="globe-preview-card" onClick={() => setGlobeFullscreenOpen(true)}>
+                <div className="globe-preview-visual">
+                  <div className="globe-preview-globe">
+                    <div className="globe-preview-ring" />
+                    <div className="glob-preview-dot" style={{ top: '30%', left: '25%' }} />
+                    <div className="glob-preview-dot" style={{ top: '35%', left: '70%' }} />
+                    <div className="glob-preview-dot" style={{ top: '55%', left: '50%' }} />
+                    <div className="glob-preview-dot" style={{ top: '45%', left: '35%' }} />
+                  </div>
+                </div>
+                <div className="globe-preview-info">
+                  <span className="globe-preview-label">全球热点分布</span>
+                  <span className="globe-preview-count">{items.length} 条资讯</span>
+                </div>
+                <button className="globe-preview-expand" title="点击放大">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
+                  点击放大
+                </button>
+              </div>
+            </section>
+            {/* 我的关注动态 */}
+            {followKeywords.length > 0 && (
+              <section className="panel-section follow-updates-section">
+                <h3 className="panel-title">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+                  <span>关注动态</span>
+                </h3>
+                <div className="follow-updates-list">
+                  {followKeywordUpdates.length === 0 ? (
+                    <div className="follow-updates-empty">暂无匹配资讯</div>
+                  ) : (
+                    followKeywordUpdates.slice(0, 3).map(group => (
+                      <div key={group.keyword} className="follow-update-group">
+                        <div className="follow-update-header">
+                          <span className="follow-update-keyword">{group.keyword}</span>
+                          <span className="follow-update-count">+{group.count}</span>
+                        </div>
+                        <div className="follow-update-items">
+                          {group.items.map((item, idx) => (
+                            <a
+                              key={idx}
+                              href={item.url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="follow-update-item"
+                              title={item.title}
+                              onClick={(e) => { e.stopPropagation(); }}
+                            >
+                              <span className="follow-update-title">{item.title}</span>
+                              <span className="follow-update-source">{item.source}</span>
+                            </a>
+                          ))}
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </section>
+            )}
+            {/* 今日必读 */}
+            {todayMustRead.length > 0 && (
+              <section className="panel-section must-read-section">
+                <h3 className="panel-title">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/><circle cx="12" cy="12" r="3"/></svg>
+                  <span>今日必读</span>
+                </h3>
+                <div className="must-read-list">
+                  {todayMustRead.map((item, idx) => (
+                    <a
+                      key={item.id}
+                      href={item.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="must-read-item"
+                      title={item.title}
+                      onClick={(e) => { e.stopPropagation(); }}
+                    >
+                      <div className="must-read-rank">{idx + 1}</div>
+                      <div className="must-read-info">
+                        <span className="must-read-title">{item.title}</span>
+                        <div className="must-read-meta">
+                          <span className="must-read-source">{item.source}</span>
+                          <span className="must-read-score">{item.mustReadScore.toFixed(0)}</span>
+                        </div>
+                      </div>
+                    </a>
+                  ))}
+                </div>
+              </section>
+            )}
             <section className="panel-section">
               <div className="ai-insights-header">
                 <h3 className="panel-title">{ICONS.sparkles}<span>AI 洞察</span></h3>
@@ -5797,6 +6052,11 @@ ${newAgent.systemPrompt}`
           spaceId: null
         });
       }} />
+
+      {/* 全球科技大屏全屏 */}
+      {globeFullscreenOpen && (
+        <GlobeView items={items} externalFullscreen={globeFullscreenOpen} onFullscreenChange={setGlobeFullscreenOpen} />
+      )}
     </div>
   );
 
@@ -6466,9 +6726,28 @@ function GithubRepoCard({ repo, index, since = 'weekly', isBookmarked = false, i
   const [tutorialExpanded, setTutorialExpanded] = useState(false);
   const tutorialLines = repo.tutorial ? repo.tutorial.split('\n') : [];
   const hasLongTutorial = tutorialLines.length > 4;
-  const isEnglish = /^[a-zA-Z0-9\s\-.,!?'"():]+$/.test(repo.fullName) || /^[a-zA-Z0-9\s\-.,!?'"():]+$/.test(repo.description);
+  const isEnglish = /^[a-zA-Z0-9\s\-.,!?':\(\)\[\]{}]+$/.test(repo.fullName) || /^[a-zA-Z0-9\s\-.,!?':\(\)\[\]{}]+$/.test(repo.description);
+
+  // 拖拽开始 - 生成兼容 AI Elf 的数据格式
+  const handleDragStart = (e) => {
+    const dragItem = {
+      id: repo.id || repo.url,
+      title: repo.fullName,
+      url: repo.url,
+      summary: repo.description,
+      source: 'GitHub',
+      tags: [repo.language].filter(Boolean),
+      region: 'global',
+      mode: 'deep',
+      publishedAt: new Date().toISOString(),
+      category: 'open-source'
+    };
+    e.dataTransfer.setData('application/json', JSON.stringify(dragItem));
+    e.dataTransfer.effectAllowed = 'copy';
+  };
+
   return (
-    <article className="github-card" style={{ animationDelay: `${index * 60}ms` }}>
+    <article className="github-card" style={{ animationDelay: `${index * 60}ms` }} draggable onDragStart={handleDragStart}>
       <div className="gh-card-header">
         <span className="gh-rank">#{index + 1}</span>
         <div className="gh-card-title-row">
