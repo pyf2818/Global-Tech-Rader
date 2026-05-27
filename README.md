@@ -6,19 +6,19 @@
 
 ### 主界面与资讯流
 
-![Main Interface](.monkeycode-tmp-files/fb74ca00-image-1.png)
+![Main Interface](public/screenshots/main-interface.png)
 
 聚合信息流首页，支持分类导航、热搜科技榜、搜索、来源标注和时间线排序。支持深色/浅色双主题和响应式布局。
 
 ### AI Elf 智能助手
 
-![AI Elf Interface](.monkeycode-tmp-files/2969aa6b-image-2.png)
+![AI Elf Interface](public/screenshots/ai-elf-interface.png)
 
 AI Elf 智能助手系统，支持多 Agent 对话、新闻拖拽分析、历史会话管理和 AI 摘要生成。
 
 ### 信息源管理与设置
 
-![Settings and Sources](.monkeycode-tmp-files/d7e08690-image-3.png)
+![Settings and Sources](public/screenshots/settings-sources.png)
 
 信息源管理中心，支持自定义与内置源批量管理、健康监测、导入导出和高级搜索筛选。
 
