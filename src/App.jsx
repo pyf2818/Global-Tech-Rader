@@ -369,6 +369,7 @@ function clearStaleLS() {
 function App() {
   clearStaleLS();
   const [theme, setTheme] = useState(() => localStorage.getItem('theme') || 'dark');
+  const [editorFullscreen, setEditorFullscreen] = useState(false);
   const [nav, setNav] = useState('all');
   const [category, setCategory] = useState('all');
   const [categoryOpen, setCategoryOpen] = useState(false);
@@ -743,6 +744,12 @@ function App() {
   useEffect(() => { document.documentElement.dataset.theme = theme; localStorage.setItem('theme', theme); }, [theme]);
   useEffect(() => { localStorage.setItem('sidebarCollapsed', String(sidebarCollapsed)); }, [sidebarCollapsed]);
   useEffect(() => { localStorage.setItem('panelCollapsed', String(panelCollapsed)); }, [panelCollapsed]);
+  // ESC 退出创作中心全屏
+  useEffect(() => {
+    const handler = (e) => { if (e.key === 'Escape') setEditorFullscreen(false); };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, []);
   useEffect(() => { saveLS('customSources', customSources); }, [customSources]);
   useEffect(() => { saveLS('sourceHealth', sourceHealth); }, [sourceHealth]);
   useEffect(() => { saveLS('disabledSources', disabledSources); }, [disabledSources]);
@@ -2773,7 +2780,7 @@ ${signals}
   }
 
   return (
-    <div className={`app ${sidebarCollapsed ? 'sidebar-collapsed' : ''} ${panelCollapsed ? 'panel-collapsed' : ''}`}>
+    <div className={`app ${sidebarCollapsed ? 'sidebar-collapsed' : ''} ${panelCollapsed ? 'panel-collapsed' : ''} ${editorFullscreen ? 'editor-fullscreen' : ''}`}>
       <div className="particle-layer" aria-hidden="true">
         {Array.from({ length: 24 }).map((_, i) => <span key={i} className="particle" style={{ '--i': i }} />)}
       </div>
@@ -3258,9 +3265,97 @@ ${signals}
                {githubLoading && <div className="github-grid">{Array.from({ length: 6 }).map((_, i) => <article key={i} className="github-card skeleton"><div className="skeleton-gh-header" /><div className="skeleton-gh-desc" /><div className="skeleton-gh-stats" /></article>)}</div>}
                <div className="github-grid">{githubRepos.map((repo, i) => <GithubRepoCard key={repo.id} repo={repo} index={i} since={githubSince} isBookmarked={isBookmarked(repo.url)} isInMaterials={isInMaterials(repo.id)} onBookmark={() => toggleBookmark({ id: repo.url, title: repo.fullName, url: repo.url, source: 'GitHub', summary: repo.description, tags: [repo.language].filter(Boolean), region: 'global', mode: 'deep', publishedAt: new Date().toISOString(), category: 'open-source' })} onAddMaterial={() => toggleMaterial({ id: repo.id, title: repo.fullName, url: repo.url, source: 'GitHub', summary: repo.description, tags: [repo.language].filter(Boolean) })} showTranslation={translationOpen[repo.id]} onToggleTranslation={() => setTranslationOpen(p => ({ ...p, [repo.id]: !p[repo.id] }))} translation={getTranslation({ id: repo.id, title: repo.fullName, summary: repo.description })} onOpenLightbox={(src, title) => setLightbox({ open: true, src, title })} />)}</div>
             </>
+           )}
+
+          {/* READING LIST - 阅读列表 */}
+          {nav === 'reading-list' && (
+            <div className="trends-dashboard">
+              <div className="trends-header">
+                <h2>{ICONS.bookmark}<span>阅读列表</span></h2>
+                <p className="trends-desc">共 {bookmarks.length} 条收藏，{bookmarks.filter(b => !b.isRead).length} 条未读</p>
+              </div>
+              {bookmarks.length === 0 ? (
+                <section className="trends-section">
+                  <div className="empty-state">
+                    <p>暂无收藏内容</p>
+                    <p className="hint">浏览资讯时点击收藏按钮，将感兴趣的内容添加到阅读列表</p>
+                  </div>
+                </section>
+              ) : (
+                <section className="trends-section">
+                  <div className="bookmarks-list">
+                    {bookmarks.map(b => (
+                      <div key={b.id} className={`bookmark-item ${b.isRead ? 'read' : ''}`}>
+                        <div className="bookmark-main">
+                          <a href={b.url} target="_blank" rel="noopener noreferrer" className="bookmark-title">{b.title}</a>
+                          <div className="bookmark-meta">
+                            <span className="bookmark-source">{b.source}</span>
+                            <span className="bookmark-date">{new Date(b.savedAt).toLocaleDateString('zh-CN')}</span>
+                            {b.category && <span className="bookmark-category">{CATEGORIES.find(c => c.id === b.category)?.label || b.category}</span>}
+                          </div>
+                          {b.summary && <p className="bookmark-summary">{b.summary}</p>}
+                        </div>
+                        <div className="bookmark-actions">
+                          <button
+                            className={`bookmark-read-btn ${b.isRead ? 'read' : ''}`}
+                            onClick={() => toggleRead(b.id)}
+                            title={b.isRead ? '标记为未读' : '标记为已读'}
+                          >
+                            {b.isRead ? '已读' : '未读'}
+                          </button>
+                          <button className="bookmark-remove" onClick={() => setBookmarks(prev => prev.filter(x => x.id !== b.id))} title="移除">{ICONS.x}</button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              )}
+            </div>
           )}
 
-          {/* 洞察分析 - 统一仪表盘 */}
+          {/* CALENDAR - 日历管理 */}
+          {nav === 'calendar' && (
+            <div className="trends-dashboard">
+              <div className="trends-header">
+                <h2>{ICONS.calendar}<span>日历管理</span></h2>
+                <div className="header-actions">
+                  <button className="btn-new-article-pro" onClick={() => setShowEventForm(true)}>
+                    {ICONS.plus}
+                    <span>添加事件</span>
+                  </button>
+                </div>
+              </div>
+              {events.length === 0 ? (
+                <section className="trends-section">
+                  <div className="empty-state">
+                    <p>暂无日程事件</p>
+                    <p className="hint">点击"添加事件"按钮创建你的第一个日程</p>
+                  </div>
+                </section>
+              ) : (
+                <section className="trends-section">
+                  <div className="events-list">
+                    {events.map(e => (
+                      <div key={e.id} className="event-item">
+                        <div className="event-date">
+                          <span className="event-day">{new Date(e.date).getDate()}</span>
+                          <span className="event-month">{new Date(e.date).getMonth() + 1}月</span>
+                        </div>
+                        <div className="event-content">
+                          <h4 className="event-title">{e.title}</h4>
+                          {e.description && <p className="event-desc">{e.description}</p>}
+                          {e.time && <p className="event-time">{e.time}</p>}
+                        </div>
+                        <button className="event-remove" onClick={() => setEvents(prev => prev.filter(x => x.id !== e.id))} title="删除">{ICONS.x}</button>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              )}
+            </div>
+          )}
+
+           {/* 洞察分析 - 统一仪表盘 */}
           {(nav === 'briefing' || nav === 'tracker' || nav === 'trends' || nav === 'reading-stats') && (() => {
             const insightTab = nav === 'trends' ? 'trends' : nav === 'tracker' ? 'tracker' : nav === 'reading-stats' ? 'profile' : 'overview';
             const setInsightTab = (t) => {
@@ -4207,6 +4302,14 @@ ${signals}
               <div className="trends-header editor-header">
                 <h2>{ICONS.edit}<span>创作中心</span></h2>
                 <div className="editor-header-actions">
+                  <button className="editor-fullscreen-btn" onClick={() => setEditorFullscreen(f => !f)} title={editorFullscreen ? '退出全屏' : '全屏创作'}>
+                    {editorFullscreen ? (
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M8 3v3a2 2 0 0 1-2 2H3m18 0h-3a2 2 0 0 1-2-2V3m0 18v-3a2 2 0 0 1 2-2h3M3 16h3a2 2 0 0 1 2 2v3"/></svg>
+                    ) : (
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
+                    )}
+                    <span>{editorFullscreen ? '退出全屏' : '全屏'}</span>
+                  </button>
                   <button className="btn-new-article-pro" onClick={() => { const a = createArticle('blank', articleSpaceFilter !== 'all' ? Number(articleSpaceFilter) : null); setCurrentArticleId(a.id); }}>
                     {ICONS.plus}
                     <span>新建文章</span>
@@ -4907,6 +5010,58 @@ ${signals}
                   }}>打印/导出 PDF</button>
                 </div>
               </section>
+            </div>
+          )}
+
+          {/* Event Form Modal */}
+          {showEventForm && (
+            <div className="modal-backdrop" onClick={() => setShowEventForm(false)}>
+              <div className="modal-content modal-small" onClick={e => e.stopPropagation()}>
+                <div className="modal-header">
+                  <h3>添加日程事件</h3>
+                  <button className="modal-close" onClick={() => setShowEventForm(false)}>{ICONS.x}</button>
+                </div>
+                <form className="add-material-form" onSubmit={e => {
+                  e.preventDefault();
+                  const title = e.target.title.value;
+                  const date = e.target.date.value;
+                  const time = e.target.time.value;
+                  const description = e.target.description.value;
+                  if (!title || !date) return;
+                  setEvents(prev => [...prev, {
+                    id: Date.now(),
+                    title,
+                    date,
+                    time,
+                    description,
+                    color: '#22d3ee'
+                  }]);
+                  setShowEventForm(false);
+                }}>
+                  <div className="form-group">
+                    <label>事件标题</label>
+                    <input name="title" type="text" placeholder="输入事件标题" autoFocus required />
+                  </div>
+                  <div className="form-row">
+                    <div className="form-group" style={{ flex: 1 }}>
+                      <label>日期</label>
+                      <input name="date" type="date" required />
+                    </div>
+                    <div className="form-group" style={{ flex: 1 }}>
+                      <label>时间</label>
+                      <input name="time" type="time" />
+                    </div>
+                  </div>
+                  <div className="form-group">
+                    <label>描述</label>
+                    <textarea name="description" placeholder="可选描述..." rows="3" />
+                  </div>
+                  <div className="form-actions">
+                    <button type="button" className="btn-modal-cancel" onClick={() => setShowEventForm(false)}>取消</button>
+                    <button type="submit" className="btn-modal-submit">添加</button>
+                  </div>
+                </form>
+              </div>
             </div>
           )}
         </div>
