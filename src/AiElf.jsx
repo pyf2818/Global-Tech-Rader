@@ -253,14 +253,46 @@ ${baseContent}
     return () => window.removeEventListener('resize', updatePosition);
   }, []);
 
-  // 保存消息历史
+  // 保存消息历史（带大小限制和错误处理）
   useEffect(() => {
-    localStorage.setItem('ai-elf-agent-messages', JSON.stringify(agentMessages));
+    try {
+      const MAX_MESSAGES_PER_AGENT = 50;
+      const trimmed = {};
+      Object.keys(agentMessages).forEach(key => {
+        const msgs = agentMessages[key] || [];
+        if (msgs.length > MAX_MESSAGES_PER_AGENT) {
+          trimmed[key] = msgs.slice(-MAX_MESSAGES_PER_AGENT);
+        } else {
+          trimmed[key] = msgs;
+        }
+      });
+      localStorage.setItem('ai-elf-agent-messages', JSON.stringify(trimmed));
+    } catch (e) {
+      if (e.name === 'QuotaExceededError') {
+        console.warn('localStorage quota exceeded for ai-elf-agent-messages');
+      }
+    }
   }, [agentMessages]);
 
-  // 保存历史会话
+  // 保存历史会话（带大小限制和错误处理）
   useEffect(() => {
-    localStorage.setItem('ai-elf-agent-history', JSON.stringify(agentHistory));
+    try {
+      const MAX_HISTORY_PER_AGENT = 20;
+      const trimmed = {};
+      Object.keys(agentHistory).forEach(key => {
+        const sessions = agentHistory[key] || [];
+        if (sessions.length > MAX_HISTORY_PER_AGENT) {
+          trimmed[key] = sessions.slice(-MAX_HISTORY_PER_AGENT);
+        } else {
+          trimmed[key] = sessions;
+        }
+      });
+      localStorage.setItem('ai-elf-agent-history', JSON.stringify(trimmed));
+    } catch (e) {
+      if (e.name === 'QuotaExceededError') {
+        console.warn('localStorage quota exceeded for ai-elf-agent-history');
+      }
+    }
   }, [agentHistory]);
 
   // 滚动到最新消息
