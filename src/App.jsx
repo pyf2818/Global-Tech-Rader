@@ -657,6 +657,7 @@ function App() {
   const [allSources, setAllSources] = useState([]);
    const [sourceGrades, setSourceGrades] = useState({});
    const [gradeFilter, setGradeFilter] = useState('all');
+  const [sourceTypeTab, setSourceTypeTab] = useState('builtin');
   const [trendingItems, setTrendingItems] = useState([]);
   const [trendingLoading, setTrendingLoading] = useState(false);
   const [trendingPlatform, setTrendingPlatform] = useState('all');
