@@ -3860,6 +3860,243 @@ body {
   padding: 8px 12px;
 }
 
+/* 统计面板 - 内置信息源 */
+.builtin-stats-panel {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin-bottom: 20px;
+  padding: 20px;
+  background: var(--bg-secondary);
+  border-radius: 12px;
+  border: 1px solid var(--border-color);
+}
+
+.builtin-stat-item {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px;
+  background: var(--bg-primary);
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+  transition: all 0.2s ease;
+}
+
+.builtin-stat-item:hover {
+  border-color: var(--accent-cyan);
+  box-shadow: 0 4px 12px rgba(34, 211, 238, 0.1);
+  transform: translateY(-2px);
+}
+
+.builtin-stat-item.enabled {
+  border-left: 4px solid var(--accent-green);
+}
+
+.builtin-stat-item.disabled {
+  border-left: 4px solid var(--accent-orange);
+}
+
+.builtin-stat-item.total {
+  border-left: 4px solid var(--accent-cyan);
+}
+
+.builtin-stat-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: var(--bg-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  font-weight: bold;
+  flex-shrink: 0;
+}
+
+.builtin-stat-item.enabled .builtin-stat-icon {
+  background: rgba(34, 197, 94, 0.1);
+  color: var(--accent-green);
+}
+
+.builtin-stat-item.disabled .builtin-stat-icon {
+  background: rgba(249, 115, 22, 0.1);
+  color: var(--accent-orange);
+}
+
+.builtin-stat-item.total .builtin-stat-icon {
+  background: rgba(34, 211, 238, 0.1);
+  color: var(--accent-cyan);
+}
+
+.builtin-stat-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.builtin-stat-value {
+  font-size: 28px;
+  font-weight: 800;
+  color: var(--text-primary);
+  line-height: 1;
+}
+
+.builtin-stat-label {
+  font-size: 13px;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+/* 操作栏 - 内置信息源 */
+.builtin-operations-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
+  padding: 16px 20px;
+  background: var(--bg-secondary);
+  border-radius: 12px;
+  border: 1px solid var(--border-color);
+}
+
+.builtin-operations-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex: 1;
+}
+
+.builtin-operations-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+/* 批量模式切换按钮 */
+.batch-mode-toggle-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  background: linear-gradient(135deg, var(--accent-cyan) 0%, #0891b2 100%);
+  border: none;
+  border-radius: 8px;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.batch-mode-toggle-btn:hover:not(:disabled) {
+  box-shadow: 0 4px 12px rgba(34, 211, 238, 0.3);
+  transform: translateY(-1px);
+}
+
+.batch-mode-toggle-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.batch-mode-icon {
+  font-size: 18px;
+  line-height: 1;
+}
+
+/* 批量选择计数 */
+.batch-selection-count {
+  padding: 8px 16px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  font-size: 14px;
+  color: var(--text-primary);
+}
+
+.batch-selection-count strong {
+  color: var(--accent-cyan);
+  font-weight: 700;
+}
+
+/* 批量操作按钮 */
+.batch-action-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.batch-action-btn:hover:not(:disabled) {
+  border-color: var(--accent-cyan);
+  background: rgba(34, 211, 238, 0.05);
+  transform: translateY(-1px);
+}
+
+.batch-action-btn:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.batch-action-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.batch-action-btn .btn-icon {
+  font-size: 14px;
+  line-height: 1;
+}
+
+.batch-action-btn.select-by-grade {
+  background: var(--bg-primary);
+}
+
+.batch-action-btn.disable {
+  background: rgba(249, 115, 22, 0.1);
+  border-color: rgba(249, 115, 22, 0.3);
+  color: #f97316;
+}
+
+.batch-action-btn.disable:hover:not(:disabled) {
+  background: rgba(249, 115, 22, 0.2);
+  border-color: #f97316;
+  box-shadow: 0 4px 12px rgba(249, 115, 22, 0.2);
+}
+
+.batch-action-btn.enable {
+  background: rgba(34, 197, 94, 0.1);
+  border-color: rgba(34, 197, 94, 0.3);
+  color: #22c55e;
+}
+
+.batch-action-btn.enable:hover:not(:disabled) {
+  background: rgba(34, 197, 94, 0.2);
+  border-color: #22c55e;
+  box-shadow: 0 4px 12px rgba(34, 197, 94, 0.2);
+}
+
+.batch-action-btn.cancel {
+  background: rgba(100, 116, 139, 0.1);
+  border-color: rgba(100, 116, 139, 0.3);
+  color: #64748b;
+}
+
+.batch-action-btn.cancel:hover:not(:disabled) {
+  background: rgba(100, 116, 139, 0.2);
+  border-color: #64748b;
+}
+
 /* 源卡片网格 */
 .sources-grid,
 .builtin-sources-grid,
