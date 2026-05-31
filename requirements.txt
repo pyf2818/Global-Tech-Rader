@@ -1,0 +1,13 @@
+# Scrapling 核心依赖
+scrapling>=0.4.8
+
+# Flask API 服务器
+flask>=3.1.0
+flask-cors>=6.0.0
+
+# 生产服务器
+gunicorn>=23.0.0
+
+# 可选：监控和日志
+# prometheus-flask-exporter>=0.23.0
+# python-json-logger>=2.0.7

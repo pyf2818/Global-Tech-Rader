@@ -6,6 +6,12 @@ export default defineConfig({
   plugins: [newsPlugin(), react()],
   server: {
     port: 5175,
-    allowedHosts: ['.monkeycode-ai.online']
+    allowedHosts: ['.monkeycode-ai.online'],
+    proxy: {
+      '/api/scrape': {
+        target: 'http://localhost:5000',
+        changeOrigin: true
+      }
+    }
   }
 });

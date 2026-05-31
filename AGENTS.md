@@ -13,13 +13,21 @@ No test, lint, typecheck, or formatter commands exist. Do not run them.
 
 ## Architecture
 
-- **Single-file frontend**: `src/App.jsx` (~6800 lines) — all state, rendering, and logic. Inline components: `NewsItem`, `GithubRepoCard`, `HexRadarChart`, `Lightbox`. No component splitting.
-- **AI Elf component**: `src/AiElf.jsx` (~950 lines) — AI assistant with Agent system, supports news analysis via drag-drop, stores conversations per-Agent in localStorage.
-- **3D Globe component**: `src/GlobeView.jsx` (~880 lines) — `react-globe.gl` based interactive 3D earth visualization with fullscreen dashboard mode. Used within App.jsx.
-- **API is a Vite plugin**: `server/newsPlugin.js` (~1300 lines) is a Vite middleware (`newsPlugin()`) that intercepts `/api/*` during dev. No separate backend server. Production uses `vercel.json` + `api/*.js` serverless functions.
+- **Single-file frontend**: `src/App.jsx` (~7400 lines) — all state, rendering, and logic. Inline components: `NewsItem`, `GithubRepoCard`, `HexRadarChart`, `Lightbox`. No component splitting.
+- **AI Elf component**: `src/AiElf.jsx` (~950 lines) — AI assistant with Agent system, supports news analysis via drag-drop, stores conversations per-Agent in localStorage with quota management.
+- **3D Globe component**: `src/GlobeView.jsx` (~890 lines) — `react-globe.gl` based interactive 3D earth visualization with fullscreen dashboard mode. Used within App.jsx.
+- **API is a Vite plugin**: `server/newsPlugin.js` (~1680 lines) is a Vite middleware (`newsPlugin()`) that intercepts `/api/*` during dev. No separate backend server. Production uses `vercel.json` + `api/*.js` serverless functions.
 - **Entrypoint**: `src/main.jsx` mounts `<App />` inside `<ErrorBoundary>` + `<React.StrictMode>`.
-- **Styling**: `src/styles.css` (~5500 lines) with CSS custom properties for dark/light themes. Tailwind config only sets `content` paths and `fontFamily.sans` — no Tailwind utility classes in the component; all styling is custom CSS.
+- **Styling**: `src/styles.css` (~6200 lines) with CSS custom properties for dark/light themes. Tailwind config only sets `content` paths and `fontFamily.sans` — no Tailwind utility classes in the component; all styling is custom CSS.
 - **Dev server port**: Fixed to **5175** in `vite.config.js` (`server.port: 5175`).
+
+## New Features (Recent)
+
+- **Editor Fullscreen Mode**: Toggle via button in article editor. Hides sidebar, topbar, stats-bar, and right panel; expands editor to full viewport. ESC key exits fullscreen.
+- **Reading List Page**: Displays bookmarked news items with read/unread toggle and remove functionality. Shows bookmark count and unread count in stats bar. Stored in `localStorage` under `bookmarks` key.
+- **Calendar Page**: Event management with date picker grid, event list, and add-event modal. Events stored in `localStorage` under `calendarEvents` key with shape `{id, title, date, time, description, color}`.
+- **Sidebar Compression**: Sidebar header, quick-access bar, nav menu, and footer paddings reduced to increase scrollable area for the "管理沉淀" module.
+- **Navigation Groups**: NAV_GROUPS now includes "管理沉淀" category with `['calendar', 'reading-list', 'knowledge-export']` items.
 
 ## Agent System (AI Elf)
 
@@ -101,6 +109,7 @@ Both workflows use Node.js 20 and `npm ci` for dependency installation.
 - Tutorial extraction (`extractTutorial`): only returns text if >=2 meaningful lines found in Installation/Usage/Getting Started sections. Otherwise returns empty string and the card hides the tutorial block.
 - PWA: `public/sw.js` and `public/manifest.json` exist; `index.html` registers the service worker.
 - `index.html` has a global `onerror` handler that replaces the page with an error display and a "Clear localStorage & Reload" button.
+- **AI Elf localStorage quota**: AI Elf wraps all `localStorage.setItem` calls in try-catch to handle `QuotaExceededError`. Limits messages to 50 per Agent and history to 20 sessions per Agent to prevent quota issues.
 - `LLM_PRESETS` must be defined at file scope (top level of App.jsx), not inside a function — putting it inside `generateSummary` caused a `ReferenceError`.
 - `/api/ai-insights` prompts LLM for concise JSON output (max 800 tokens, 30 chars per item). Truncated responses are caught with a retry-friendly error message.
 - **GlobeView**: Uses `react-globe.gl` which renders a Three.js canvas. The fullscreen mode uses `createPortal` to render at `document.body` level. Ensure the canvas has sufficient `min-height` (420px) or the globe won't render.
@@ -114,3 +123,105 @@ Both workflows use Node.js 20 and `npm ci` for dependency installation.
 - **NewsItem translation**: All `NewsItem` instances across the app (main feed, trending, recommendations, event clusters) must pass translation props: `showTranslation`, `onToggleTranslation`, `onRequestTranslation`, `isTranslating`, `translation`.
 - **Image manager panel**: Redesigned as a grid layout (`image-manager-grid`) with card-based items. Each card shows: thumbnail, used/unused badge, filename, dimensions, width/height inputs (vertical layout), and a hover-reveal delete button. Clicking a thumbnail scrolls the editor to the corresponding placeholder.
 - **renderMarkdown**: The function now protects existing `<img>` tags before HTML-escaping, then restores them after processing. This ensures `renderMarkdownWithImages()` outputs valid `<img src="...">` tags that render in the preview pane.
+
+## Compliance & Production Notes
+
+- The platform only displays titles, short summaries, sources, publication times, tags, and original links. Content copyright belongs to the original publishers.
+- When deploying to production, consider adding: source whitelisting, caching strategies, rate limiting, robots.txt review, and Terms of Service audit.
+
+## Scrapling Integration
+
+The platform now includes **custom web scraping capabilities** using the Scrapling framework:
+
+### Architecture
+- **Backend API**: Flask server (`scrapling_server.py`) on port 5000 with `/api/scrape` endpoint
+- **Proxy Configuration**: Vite proxy forwards `/api/scrape` requests to Scrapling API
+- **Frontend Feature**: New "自定义抓取" (Custom Scrape) page in navigation menu under "资讯中心" group
+
+### Scrapling Capabilities
+- **Three modes**:
+  - `basic`: Fast HTTP requests for static pages
+  - `dynamic`: Browser rendering for JavaScript-heavy pages
+  - `stealth`: Anti-bot bypass for protected sites (Cloudflare, etc.)
+- **Content extraction**: Titles, summaries, authors, dates, images, links, paragraphs
+- **Performance**: Up to 784x faster than BeautifulSoup, 92% test coverage
+
+### API Usage
+```bash
+# POST /api/scrape
+{
+  "url": "https://example.com",
+  "mode": "basic|dynamic|stealth",
+  "timeout": 30
+}
+
+# Returns structured data:
+{
+  "url": "https://example.com",
+  "status": 200,
+  "title": "Page Title",
+  "summary": "Content summary...",
+  "description": "Meta description",
+  "author": "Author name",
+  "published_date": "2026-05-31",
+  "images": [{"src": "...", "alt": "..."}],
+  "links": [{"url": "...", "text": "..."}],
+  "paragraphs_count": 10,
+  "content_length": 5000
+}
+```
+
+### Integration Points
+- **Save to Materials**: Add scraped content to materials library
+- **Save to Editor**: Create article draft from scraped content
+- **UI Components**: Custom URL input, mode selector, result display with metadata, images, links
+
+### Server Requirements
+- Python 3.10+
+- Dependencies: `scrapling[fetchers]`, `flask`, `flask-cors`
+- Browser dependencies: Run `scrapling install` after installation
+- Production: Use WSGI server (gunicorn) instead of Flask dev server
+
+### Performance Notes
+- Stealth mode slower (browser startup), use only when necessary
+- Concurrent browser pooling with automatic cleanup
+- 30-second timeout with retry logic
+- Memory efficient for large-scale scraping
+
+## Deployment
+
+### Quick Deployment
+The project supports deployment to any environment (local, server, cloud):
+
+```bash
+# Docker deployment (recommended)
+chmod +x docker-deploy.sh
+./docker-deploy.sh
+
+# Manual installation
+chmod +x install_dependencies.sh
+./install_dependencies.sh
+```
+
+### Cross-Platform Support
+- ✅ Linux, macOS, Windows compatible
+- ✅ Docker containerization ready
+- ✅ Production deployment with Gunicorn + Nginx
+- ✅ Scrapling web scraping capabilities included
+
+### Deployment Documentation
+- [Quick Deployment Guide](DEPLOYMENT_QUICK.md) - Step-by-step deployment instructions
+- [Full Deployment Guide](DEPLOYMENT.md) - Complete deployment documentation
+- [Scrapling Integration](SCRAPLING_INTEGRATION.md) - Web scraping integration details
+
+### Key Deployment Features
+- 📦 One-click deployment with Docker
+- 🔄 Automatic dependency installation (Python, Node.js, browsers)
+- 🛠 Simplified configuration with environment templates
+- 📊 Built-in health monitoring and logging
+- 🔒 Production security configurations and best practices
+
+### Post-Deployment Access
+- Frontend: http://localhost (or your domain)
+- Scrapling API: http://localhost:5000/api/scrape
+- Health Check: http://localhost:5000/api/health

@@ -110,6 +110,48 @@ npm run preview
 - `GET /api/meta`：返回分类、模式、来源与扩展能力元信息。
 - `POST /api/ai-generate`、`POST /api/ai-insights`、`POST /api/translate`、`POST /api/subscriptions`、`POST /api/bookmarks`：AI 与扩展接口。
 
+## 🚀 部署指南
+
+### 快速部署（推荐）
+
+```bash
+# 方式一：Docker 部署（最简单）
+chmod +x docker-deploy.sh
+./docker-deploy.sh
+
+# 方式二：手动安装
+chmod +x install_dependencies.sh
+./install_dependencies.sh
+```
+
+### 部署到其他环境
+
+本项目支持部署到任何环境（本地、服务器、云端），包括：
+
+- ✅ **跨平台**：支持 Linux、macOS、Windows
+- ✅ **容器化**：提供 Docker 和 Docker Compose 配置
+- ✅ **生产就绪**：支持 Gunicorn + Nginx 部署
+- ✅ **Scrapling 集成**：完整的网页抓取功能随项目一起部署
+
+详细部署说明请查看：
+- [快速部署指南](DEPLOYMENT_QUICK.md)
+- [完整部署文档](DEPLOYMENT.md)
+- [Scrapling 集成说明](SCRAPLING_INTEGRATION.md)
+
+### 部署特性
+
+- 📦 **一键部署**：Docker 方案支持一键启动
+- 🔄 **依赖自动安装**：Python、Node.js、浏览器依赖自动安装
+- 🛠 **配置简化**：提供环境变量模板和配置示例
+- 📊 **健康检查**：内置服务健康监控和日志管理
+- 🔒 **生产安全**：包含安全配置建议和最佳实践
+
+### 部署后访问
+
+- **前端界面**：http://localhost（或你的域名）
+- **Scrapling API**：http://localhost:5000/api/scrape
+- **健康检查**：http://localhost:5000/api/health
+
 ## 项目结构
 
 ```

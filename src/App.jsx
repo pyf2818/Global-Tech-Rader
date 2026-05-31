@@ -42,6 +42,7 @@ const NAV_ITEMS = [
   { id: 'tracker', label: '我的追踪', icon: 'follow' },
   { id: 'trending', label: '热门榜单', icon: 'fire' },
   { id: 'github', label: 'GitHub 热门', icon: 'github' },
+  { id: 'custom-url', label: '自定义抓取', icon: 'link' },
   { id: 'materials', label: '素材库', icon: 'layers' },
   { id: 'editor', label: '创作中心', icon: 'edit' },
   { id: 'calendar', label: '日历管理', icon: 'calendar' },
@@ -52,7 +53,7 @@ const NAV_ITEMS = [
 ];
 
 const NAV_GROUPS = [
-  { id: 'core', label: '资讯中心', items: ['all', 'recommendations', 'trending', 'github'] },
+  { id: 'core', label: '资讯中心', items: ['all', 'recommendations', 'trending', 'github', 'custom-url'] },
   { id: 'insight', label: '洞察分析', items: ['briefing', 'tracker', 'trends', 'reading-stats'] },
   { id: 'create', label: '素材创作', items: ['materials', 'editor'] },
   { id: 'manage', label: '管理沉淀', items: ['calendar', 'reading-list', 'knowledge-export'] }
@@ -274,6 +275,7 @@ const ICONS = {
   target: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>,
   grid: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>,
   link: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>,
+  externalLink: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>,
   calendar: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>,
   github: <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/></svg>,
   star: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>,
@@ -653,6 +655,8 @@ function App() {
 
   const allLlmModels = useMemo(() => [...llmModels, ...(llmConfig.manualModels || [])], [llmModels, llmConfig.manualModels]);
   const [allSources, setAllSources] = useState([]);
+   const [sourceGrades, setSourceGrades] = useState({});
+   const [gradeFilter, setGradeFilter] = useState('all');
   const [trendingItems, setTrendingItems] = useState([]);
   const [trendingLoading, setTrendingLoading] = useState(false);
   const [trendingPlatform, setTrendingPlatform] = useState('all');
@@ -686,6 +690,12 @@ function App() {
   const [expandedEvents, setExpandedEvents] = useState({});
   const [exportCategory, setExportCategory] = useState('all');
   const [exportRange, setExportRange] = useState('all');
+
+  const [customUrlInput, setCustomUrlInput] = useState('');
+  const [customUrlResult, setCustomUrlResult] = useState(null);
+  const [customUrlLoading, setCustomUrlLoading] = useState(false);
+  const [customUrlError, setCustomUrlError] = useState('');
+  const [customUrlMode, setCustomUrlMode] = useState('basic');
   const [showFollowDropdown, setShowFollowDropdown] = useState(false);
   const [recentVisits, setRecentVisits] = useState(() => loadLS('recentVisits', []));
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -867,6 +877,9 @@ function App() {
       .then(d => {
         console.log('Fetched allSources:', d.sources);
         setAllSources(d.sources || []);
+        if (d.sourceGrades) {
+          setSourceGrades(d.sourceGrades);
+        }
       })
       .catch(e => {
         console.error('Failed to fetch allSources:', e);
@@ -3313,6 +3326,182 @@ ${signals}
             </div>
           )}
 
+          {/* CUSTOM URL - 自定义抓取 */}
+          {nav === 'custom-url' && (
+            <div className="trends-dashboard">
+              <div className="trends-header">
+                <h2>{ICONS.link}<span>自定义抓取</span></h2>
+                <p className="trends-desc">输入任意网页 URL，使用 AI 驱动的抓取技术获取内容</p>
+              </div>
+
+              <section className="trends-section">
+                <div className="custom-url-input-section">
+                  <div className="custom-url-input-wrapper">
+                    <input
+                      type="url"
+                      className="custom-url-input"
+                      placeholder="输入网页 URL (例如: https://example.com/article)"
+                      value={customUrlInput}
+                      onChange={(e) => setCustomUrlInput(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && fetchCustomUrl(customUrlInput, customUrlMode)}
+                    />
+                    <div className="custom-url-actions">
+                      <select
+                        className="custom-url-mode-select"
+                        value={customUrlMode}
+                        onChange={(e) => setCustomUrlMode(e.target.value)}
+                      >
+                        <option value="basic">基础模式</option>
+                        <option value="dynamic">动态页面</option>
+                        <option value="stealth">隐身模式</option>
+                      </select>
+                      <button
+                        className="custom-url-fetch-btn"
+                        onClick={() => fetchCustomUrl(customUrlInput, customUrlMode)}
+                        disabled={customUrlLoading || !customUrlInput.trim()}
+                      >
+                        {customUrlLoading ? '抓取中...' : '抓取'}
+                      </button>
+                    </div>
+                  </div>
+
+                  {customUrlError && (
+                    <div className="custom-url-error">{customUrlError}</div>
+                  )}
+                </div>
+
+                {customUrlLoading && (
+                  <div className="custom-url-loading">
+                    <div className="loading-spinner"></div>
+                    <p>正在抓取网页内容...</p>
+                  </div>
+                )}
+
+                {customUrlResult && !customUrlLoading && (
+                  <div className="custom-url-result">
+                    <div className="custom-url-result-header">
+                      <h3>{customUrlResult.title}</h3>
+                      <a
+                        href={customUrlResult.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="custom-url-result-link"
+                      >
+                        {ICONS.externalLink}
+                        <span>打开原文</span>
+                      </a>
+                    </div>
+
+                    <div className="custom-url-result-meta">
+                      {customUrlResult.author && (
+                        <span className="custom-url-meta-item">
+                          <strong>作者:</strong> {customUrlResult.author}
+                        </span>
+                      )}
+                      {customUrlResult.published_date && (
+                        <span className="custom-url-meta-item">
+                          <strong>发布时间:</strong> {customUrlResult.published_date}
+                        </span>
+                      )}
+                      <span className="custom-url-meta-item">
+                        <strong>段落数:</strong> {customUrlResult.paragraphs_count}
+                      </span>
+                      <span className="custom-url-meta-item">
+                        <strong>内容长度:</strong> {customUrlResult.content_length} 字符
+                      </span>
+                    </div>
+
+                    {customUrlResult.description && (
+                      <div className="custom-url-result-description">
+                        <h4>描述</h4>
+                        <p>{customUrlResult.description}</p>
+                      </div>
+                    )}
+
+                    {customUrlResult.summary && (
+                      <div className="custom-url-result-summary">
+                        <h4>摘要</h4>
+                        <p>{customUrlResult.summary}</p>
+                      </div>
+                    )}
+
+                    {customUrlResult.images.length > 0 && (
+                      <div className="custom-url-result-images">
+                        <h4>图片 ({customUrlResult.images.length})</h4>
+                        <div className="custom-url-images-grid">
+                          {customUrlResult.images.map((img, idx) => (
+                            <div key={idx} className="custom-url-image-item">
+                              <img src={img.src} alt={img.alt} />
+                              {img.alt && <p>{img.alt}</p>}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {customUrlResult.links.length > 0 && (
+                      <div className="custom-url-result-links">
+                        <h4>相关链接 ({customUrlResult.links.length})</h4>
+                        <ul className="custom-url-links-list">
+                          {customUrlResult.links.map((link, idx) => (
+                            <li key={idx}>
+                              <a href={link.url} target="_blank" rel="noopener noreferrer">
+                                {link.text}
+                              </a>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
+                    <div className="custom-url-result-actions">
+                      <button
+                        className="btn-new-article-pro"
+                        onClick={() => {
+                          const newArticle = {
+                            id: Date.now(),
+                            title: customUrlResult.title,
+                            content: customUrlResult.summary,
+                            url: customUrlResult.url,
+                            images: [],
+                            createdAt: new Date().toISOString(),
+                            publishedAt: customUrlResult.published_date || new Date().toISOString()
+                          };
+                          setArticles(prev => [newArticle, ...prev]);
+                          setCurrentArticleId(newArticle.id);
+                          setNav('editor');
+                        }}
+                      >
+                        {ICONS.edit}
+                        <span>保存到创作中心</span>
+                      </button>
+                      <button
+                        className="btn-new-article-pro"
+                        onClick={() => {
+                          const newMaterial = {
+                            id: Date.now(),
+                            title: customUrlResult.title,
+                            content: customUrlResult.summary,
+                            source: new URL(customUrlResult.url).hostname,
+                            url: customUrlResult.url,
+                            createdAt: new Date().toISOString(),
+                            category: 'all',
+                            tags: customUrlResult.keywords ? customUrlResult.keywords.split(',').map(k => k.trim()) : []
+                          };
+                          setMaterials(prev => [newMaterial, ...prev]);
+                          setNav('materials');
+                        }}
+                      >
+                        {ICONS.layers}
+                        <span>保存到素材库</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </section>
+            </div>
+          )}
+
           {/* CALENDAR - 日历管理 */}
           {nav === 'calendar' && (
             <div className="trends-dashboard">
@@ -5321,9 +5510,266 @@ ${signals}
 
               {settingsTab === 'sources' && (
                 <>
-                  <div className="setting-item">
-                    <label>自定义信息源</label>
-                    <p className="setting-desc">管理 RSS/Atom 订阅源，支持编辑、批量操作和健康监控</p>
+                  {/* 源类型切换 */}
+                  <div className="source-type-tabs">
+                    <button
+                      className={`source-type-tab ${sourceTypeTab === 'builtin' ? 'active' : ''}`}
+                      onClick={() => setSourceTypeTab('builtin')}
+                    >
+                      内置信息源
+                    </button>
+                    <button
+                      className={`source-type-tab ${sourceTypeTab === 'custom' ? 'active' : ''}`}
+                      onClick={() => setSourceTypeTab('custom')}
+                    >
+                      自定义信息源
+                    </button>
+                  </div>
+
+                  {/* 等级统计面板 - 所有源都显示 */}
+                  {Object.keys(sourceGrades).length > 0 && (
+                    <div className="grade-stats-panel">
+                      <div className="grade-stats-header">
+                        <span className="grade-stats-title">信息源等级分布</span>
+                        <span className="grade-stats-total">总计: {sourceTypeTab === 'builtin' ? allSources.length : customSources.length}个源</span>
+                      </div>
+                      <div className="grade-stats-grid">
+                        {['S', 'A', 'B', 'C', 'D'].map(grade => {
+                          const gradeInfo = sourceGrades[grade];
+                          const currentSources = sourceTypeTab === 'builtin' ? allSources : customSources;
+                          const count = currentSources.filter(s => s.grade === grade).length;
+                          const percentage = currentSources.length > 0 ? (count / currentSources.length * 100).toFixed(1) : 0;
+                          return (
+                            <div key={grade} className="grade-stat-card">
+                              <div className="grade-stat-badge" style={{backgroundColor: gradeInfo?.color || '#ccc'}}>
+                                {grade}
+                              </div>
+                              <div className="grade-stat-content">
+                                <div className="grade-stat-label">{gradeInfo?.label?.split('-')[1] || '未知'}</div>
+                                <div className="grade-stat-stats">
+                                  <span className="grade-stat-count">{count}个</span>
+                                  <span className="grade-stat-percent">{percentage}%</span>
+                                </div>
+                                <div className="grade-stat-desc">{gradeInfo?.description || ''}</div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 内置信息源管理 */}
+                  {sourceTypeTab === 'builtin' && (
+                    <div className="setting-item">
+                      <label>内置信息源管理</label>
+                      <p className="setting-desc">管理系统内置的266个权威信息源，支持等级筛选、批量启用/禁用操作</p>
+
+                      {/* 批量操作栏 */}
+                      <div className="source-batch-actions">
+                        <label className="batch-select-all">
+                          <input
+                            type="checkbox"
+                            checked={selectedSources.size > 0 && selectedSources.size === allSources.length}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setSelectedSources(new Set(allSources.map(s => s.name)));
+                              } else {
+                                setSelectedSources(new Set());
+                              }
+                            }}
+                          />
+                          <span>全选</span>
+                        </label>
+                        <button className="source-action-btn" onClick={() => setBatchMode(!batchMode)} disabled={allSources.length === 0}>
+                          {batchMode ? '退出批量' : '批量操作'}
+                        </button>
+                        {batchMode && (
+                          <>
+                            <select
+                              value={selectedSources.size > 0 ? 'selected' : 'all'}
+                              onChange={(e) => {
+                                const targetGrade = e.target.value;
+                                if (targetGrade === 'all') return;
+                                const sourcesToSelect = allSources.filter(s => s.grade === targetGrade);
+                                setSelectedSources(new Set(sourcesToSelect.map(s => s.name)));
+                              }}
+                              className="source-action-btn"
+                            >
+                              <option value="selected">已选择 ({selectedSources.size})</option>
+                              {Object.keys(sourceGrades).map(grade => (
+                                <option key={grade} value={grade}>
+                                  选择所有{grade}级源
+                                </option>
+                              ))}
+                            </select>
+                            <button className="source-action-btn" onClick={() => setDisabledSources(prev => {
+                              const selectedNames = Array.from(selectedSources);
+                              const newlyDisabled = selectedNames.filter(name => !prev.includes(name));
+                              return [...prev, ...newlyDisabled];
+                            })} disabled={selectedSources.size === 0}>
+                              批量禁用
+                            </button>
+                            <button className="source-action-btn" onClick={() => setDisabledSources(prev => {
+                              const selectedNames = Array.from(selectedSources);
+                              return prev.filter(name => !selectedNames.includes(name));
+                            })} disabled={selectedSources.size === 0}>
+                              批量启用
+                            </button>
+                          </>
+                        )}
+                        <div className="source-stats">
+                          <span>已启用: {allSources.length - disabledSources.length}</span>
+                          <span>已禁用: {disabledSources.length}</span>
+                          <span>总计: {allSources.length}</span>
+                        </div>
+                      </div>
+
+                      {/* 筛选栏 */}
+                      <div className="source-filter-bar">
+                        <input
+                          type="text"
+                          placeholder="搜索源名称、地区..."
+                          value={searchQuery}
+                          onChange={(e) => setSearchQuery(e.target.value)}
+                          className="source-search-input"
+                        />
+                        <select
+                          value={gradeFilter}
+                          onChange={(e) => setGradeFilter(e.target.value)}
+                          className="source-filter-select"
+                        >
+                          <option value="all">全部等级</option>
+                          {Object.keys(sourceGrades).map(grade => (
+                            <option key={grade} value={grade}>{grade}级 - {sourceGrades[grade].label?.split('-')[1]}</option>
+                          ))}
+                        </select>
+                        <select
+                          value={regionFilter}
+                          onChange={(e) => setRegionFilter(e.target.value)}
+                          className="source-filter-select"
+                        >
+                          <option value="all">全部地区</option>
+                          <option value="overseas">海外</option>
+                          <option value="domestic">国内</option>
+                          <option value="global">全球</option>
+                        </select>
+                        <select
+                          value={statusFilter}
+                          onChange={(e) => setStatusFilter(e.target.value)}
+                          className="source-filter-select"
+                        >
+                          <option value="all">全部状态</option>
+                          <option value="enabled">已启用</option>
+                          <option value="disabled">已禁用</option>
+                        </select>
+                      </div>
+
+                      {/* 内置源列表 */}
+                      <div className="builtin-sources-grid">
+                        {allSources.length === 0 ? (
+                          <div className="empty-state">
+                            <p>正在加载内置信息源...</p>
+                          </div>
+                        ) : (
+                          allSources.filter(source => {
+                            if (!source || !source.name) return false;
+
+                            // 搜索匹配
+                            const searchLower = searchQuery.toLowerCase();
+                            const matchesSearch = !searchQuery ||
+                              source.name.toLowerCase().includes(searchLower) ||
+                              source.region?.toLowerCase().includes(searchLower);
+
+                            // 等级筛选
+                            const matchesGrade = gradeFilter === 'all' || source.grade === gradeFilter;
+
+                            // 地区筛选
+                            const matchesRegion = regionFilter === 'all' || source.region === regionFilter;
+
+                            // 状态筛选
+                            const isDisabled = disabledSources.includes(source.name);
+                            const matchesStatus = statusFilter === 'all' ||
+                              (statusFilter === 'enabled' && !isDisabled) ||
+                              (statusFilter === 'disabled' && isDisabled);
+
+                            return matchesSearch && matchesGrade && matchesRegion && matchesStatus;
+                          }).map(source => (
+                            <div
+                              key={source.name}
+                              className={`source-card ${selectedSources.has(source.name) ? 'selected' : ''} ${disabledSources.includes(source.name) ? 'disabled' : ''}`}
+                            >
+                              {batchMode && (
+                                <div className="source-select-checkbox">
+                                  <input
+                                    type="checkbox"
+                                    checked={selectedSources.has(source.name)}
+                                    onChange={(e) => {
+                                      if (e.target.checked) {
+                                        setSelectedSources(prev => new Set([...prev, source.name]));
+                                      } else {
+                                        setSelectedSources(prev => {
+                                          const newSet = new Set(prev);
+                                          newSet.delete(source.name);
+                                          return newSet;
+                                        });
+                                      }
+                                    }}
+                                  />
+                                </div>
+                              )}
+                              <div className="source-card-main">
+                                <div className="source-card-header">
+                                  <div className="source-card-title-row">
+                                    <span className="source-card-name">{source.name}</span>
+                                    {source.grade && sourceGrades[source.grade] && (
+                                      <span
+                                        className="source-grade-badge"
+                                        style={{
+                                          backgroundColor: sourceGrades[source.grade].color,
+                                          color: '#fff'
+                                        }}
+                                      >
+                                        {source.grade}
+                                      </span>
+                                    )}
+                                  </div>
+                                  <button
+                                    className="source-toggle-btn"
+                                    onClick={() => {
+                                      if (disabledSources.includes(source.name)) {
+                                        setDisabledSources(prev => prev.filter(name => name !== source.name));
+                                      } else {
+                                        setDisabledSources(prev => [...prev, source.name]);
+                                      }
+                                    }}
+                                  >
+                                    {disabledSources.includes(source.name) ? '启用' : '禁用'}
+                                  </button>
+                                </div>
+                                <div className="source-card-info">
+                                  <div className="source-card-meta">
+                                    <span className="source-card-region">{REGION_MAP[source.region] || source.region}</span>
+                                    <span className="source-card-category">{source.grade || 'N/A'}级</span>
+                                  </div>
+                                  {source.gradeInfo && (
+                                    <div className="source-card-desc">{source.gradeInfo.description}</div>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                     </div>
+                  )}
+
+                  {/* 自定义信息源管理 */}
+                  {sourceTypeTab === 'custom' && (
+                    <>
+                      <div className="setting-item">
+                        <label>自定义信息源</label>
+                        <p className="setting-desc">管理 RSS/Atom 订阅源，支持编辑、批量操作和健康监控</p>
                     
                     {/* 数据加载状态指示 */}
                     {(!allSources || allSources.length === 0) && (
@@ -5397,37 +5843,59 @@ ${signals}
                       <button className="source-action-btn" onClick={() => setBatchMode(!batchMode)} disabled={customSources.length === 0}>
                         {batchMode ? '退出批量' : '批量操作'}
                       </button>
-                      {batchMode && (
-                        <>
-                          <button className="source-action-btn" onClick={() => setDisabledSources(prev => {
-                            const selectedIds = Array.from(selectedSources);
-                            const enabledSources = customSources.filter(s => !disabledSources.includes(s.name));
-                            const newlyDisabled = enabledSources.filter(s => selectedIds.includes(s.id));
-                            return [...prev, ...newlyDisabled.map(s => s.name)];
-                          })} disabled={selectedSources.size === 0}>
-                            批量禁用
-                          </button>
-                          <button className="source-action-btn" onClick={() => setDisabledSources(prev => {
-                            const selectedIds = Array.from(selectedSources);
-                            const currentlyDisabled = prev.filter(name => {
-                              const source = customSources.find(s => s.id === selectedIds[0]);
-                              return source && source.name === name;
-                            });
-                            return prev.filter(name => !currentlyDisabled.includes(name));
-                          })} disabled={selectedSources.size === 0}>
-                            批量启用
-                          </button>
-                          <button className="source-action-btn danger" onClick={() => {
-                            if (confirm(`确定删除选中的 ${selectedSources.size} 个源？`)) {
-                              setCustomSources(prev => prev.filter(s => !selectedSources.has(s.id)));
-                              setSelectedSources(new Set());
-                              setBatchMode(false);
-                            }
-                          }} disabled={selectedSources.size === 0}>
-                            批量删除
-                          </button>
-                        </>
-                      )}
+{batchMode && (
+                         <>
+                           <select
+                             value={selectedSources.size > 0 ? 'selected' : 'all'}
+                             onChange={(e) => {
+                               const targetGrade = e.target.value;
+                               if (targetGrade === 'all') return;
+
+                               const sourcesToSelect = allSources.filter(s => s.grade === targetGrade);
+                               if (e.target.value === 'selected') {
+                                 // 保持当前选择
+                               } else {
+                                 setSelectedSources(new Set(sourcesToSelect.map(s => s.name)));
+                               }
+                             }}
+                             className="source-action-btn"
+                           >
+                             <option value="selected">已选择 ({selectedSources.size})</option>
+                             {Object.keys(sourceGrades).map(grade => (
+                               <option key={grade} value={grade}>
+                                 选择所有{grade}级源
+                               </option>
+                             ))}
+                           </select>
+                           <button className="source-action-btn" onClick={() => setDisabledSources(prev => {
+                             const selectedIds = Array.from(selectedSources);
+                             const enabledSources = customSources.filter(s => !disabledSources.includes(s.name));
+                             const newlyDisabled = enabledSources.filter(s => selectedIds.includes(s.id));
+                             return [...prev, ...newlyDisabled.map(s => s.name)];
+                           })} disabled={selectedSources.size === 0}>
+                             批量禁用
+                           </button>
+                           <button className="source-action-btn" onClick={() => setDisabledSources(prev => {
+                             const selectedIds = Array.from(selectedSources);
+                             const currentlyDisabled = prev.filter(name => {
+                               const source = customSources.find(s => s.id === selectedIds[0]);
+                               return source && source.name === name;
+                             });
+                             return prev.filter(name => !currentlyDisabled.includes(name));
+                           })} disabled={selectedSources.size === 0}>
+                             批量启用
+                           </button>
+                           <button className="source-action-btn danger" onClick={() => {
+                             if (confirm(`确定删除选中的 ${selectedSources.size} 个源？`)) {
+                               setCustomSources(prev => prev.filter(s => !selectedSources.has(s.id)));
+                               setSelectedSources(new Set());
+                               setBatchMode(false);
+                             }
+                           }} disabled={selectedSources.size === 0}>
+                             批量删除
+                           </button>
+                         </>
+                       )}
                       <button className="source-action-btn primary" onClick={() => setShowSourceForm(true)}>
                         {ICONS.plus} 添加源
                       </button>
@@ -5448,38 +5916,50 @@ ${signals}
                       </label>
                     </div>
 
-                    {/* 高级搜索和筛选 */}
-                    <div className="source-filter-bar">
-                      <input
-                        type="text"
-                        placeholder="搜索源名称、URL、标签..."
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        className="source-search-input"
-                      />
-                      <select
-                        value={customSourceFilter}
-                        onChange={(e) => setCustomSourceFilter(e.target.value)}
-                        className="source-filter-select"
-                      >
-                        <option value="all">全部状态</option>
-                        <option value="enabled">已启用</option>
-                        <option value="disabled">已禁用</option>
-                        <option value="healthy">健康</option>
-                        <option value="warning">警告</option>
-                        <option value="error">异常</option>
-                      </select>
-                      <select
-                        value={regionFilter}
-                        onChange={(e) => setRegionFilter(e.target.value)}
-                        className="source-filter-select"
-                      >
-                        <option value="all">全部地区</option>
-                        <option value="overseas">仅海外</option>
-                        <option value="domestic">仅国内</option>
-                        <option value="global">全球</option>
-                      </select>
-                    </div>
+{/* 高级搜索和筛选 */}
+                     <div className="source-filter-bar">
+                       <input
+                         type="text"
+                         placeholder="搜索源名称、URL、标签..."
+                         value={searchQuery}
+                         onChange={(e) => setSearchQuery(e.target.value)}
+                         className="source-search-input"
+                       />
+                       <select
+                         value={customSourceFilter}
+                         onChange={(e) => setCustomSourceFilter(e.target.value)}
+                         className="source-filter-select"
+                       >
+                         <option value="all">全部状态</option>
+                         <option value="enabled">已启用</option>
+                         <option value="disabled">已禁用</option>
+                         <option value="healthy">健康</option>
+                         <option value="warning">警告</option>
+                         <option value="error">异常</option>
+                       </select>
+                       <select
+                         value={gradeFilter}
+                         onChange={(e) => setGradeFilter(e.target.value)}
+                         className="source-filter-select"
+                       >
+                         <option value="all">全部等级</option>
+{Object.keys(sourceGrades).length > 0 && Object.entries(sourceGrades).map(([grade, info]) => (
+                            <option key={grade} value={grade}>
+                              {grade}级 - {info.label?.split('-')[1] || '未知'}
+                            </option>
+                          ))}
+                       </select>
+                       <select
+                         value={regionFilter}
+                         onChange={(e) => setRegionFilter(e.target.value)}
+                         className="source-filter-select"
+                       >
+                         <option value="all">全部地区</option>
+                         <option value="overseas">仅海外</option>
+                         <option value="domestic">仅国内</option>
+                         <option value="global">全球</option>
+                       </select>
+                     </div>
 
                     {/* 自定义源列表 */}
                     <div className="custom-sources-grid">
@@ -5508,19 +5988,22 @@ ${signals}
                             (customSourceFilter === 'enabled' && !isDisabled) ||
                             (customSourceFilter === 'disabled' && isDisabled);
                           
-                          // 地区筛选
-                          const matchesRegion = regionFilter === 'all' || source.region === regionFilter;
-                          
-                          // 健康状态筛选
-                          const health = sourceHealth[source.id];
-                          const matchesHealth = customSourceFilter === 'all' ||
-                            customSourceFilter === 'enabled' ||
-                            customSourceFilter === 'disabled' ||
-                            (customSourceFilter === 'healthy' && health?.status === 'healthy') ||
-                            (customSourceFilter === 'warning' && health?.status === 'warning') ||
-                            (customSourceFilter === 'error' && health?.status === 'error');
-                          
-                          return matchesSearch && matchesStatus && matchesRegion && matchesHealth;
+// 地区筛选
+                           const matchesRegion = regionFilter === 'all' || source.region === regionFilter;
+
+                           // 等级筛选
+                           const matchesGrade = gradeFilter === 'all' || source.grade === gradeFilter;
+
+                           // 健康状态筛选
+                           const health = sourceHealth[source.id];
+                           const matchesHealth = customSourceFilter === 'all' ||
+                             customSourceFilter === 'enabled' ||
+                             customSourceFilter === 'disabled' ||
+                             (customSourceFilter === 'healthy' && health?.status === 'healthy') ||
+                             (customSourceFilter === 'warning' && health?.status === 'warning') ||
+                             (customSourceFilter === 'error' && health?.status === 'error');
+
+                           return matchesSearch && matchesStatus && matchesRegion && matchesGrade && matchesHealth;
                         }).map(source => (
                           <div
                             key={source.id}
@@ -5545,13 +6028,35 @@ ${signals}
                                 />
                               </div>
                             )}
-                            <div className="source-card-main">
-                              <div className="source-card-header">
-                                <span className="source-card-name">{source.name}</span>
-                                <div className="source-card-status">
-                                  {getSourceHealthIndicator(source.id, 'custom')}
-                                </div>
-                              </div>
+<div className="source-card-main">
+                               <div className="source-card-header">
+                                 <div className="source-card-title-row">
+                                   <span className="source-card-name">{source.name}</span>
+                                   {source.grade && sourceGrades[source.grade] && (
+                                     <span
+                                       className="source-grade-badge"
+                                       style={{
+                                         backgroundColor: sourceGrades[source.grade].color,
+                                         color: '#fff',
+                                         fontSize: '10px',
+                                         padding: '2px 6px',
+                                         borderRadius: '4px',
+                                         marginLeft: '8px',
+                                         fontWeight: '600',
+                                         display: 'inline-flex',
+                                         alignItems: 'center',
+                                         gap: '2px'
+                                       }}
+                                       title={sourceGrades[source.grade].label}
+                                     >
+                                       {sourceGrades[source.grade].icon} {source.grade}级
+                                     </span>
+                                   )}
+                                 </div>
+                                 <div className="source-card-status">
+                                   {getSourceHealthIndicator(source.id, 'custom')}
+                                 </div>
+                               </div>
                               <div className="source-card-info">
                                 <div className="source-card-url" title={source.url}>
                                   {truncateUrl(source.url, 40)}
@@ -5608,6 +6113,7 @@ ${signals}
                         ))
                       )}
                     </div>
+                       </div>
 
                     {/* 编辑/添加源表单 */}
                     {showSourceForm && (
@@ -5756,7 +6262,6 @@ ${signals}
                         </div>
                       </div>
                     )}
-                  </div>
                   <div className="setting-item">
                     <label>内置信息源</label>
                     <p className="setting-desc">管理系统预设的信息源，支持批量操作和健康监控</p>
@@ -5968,8 +6473,10 @@ ${signals}
                   </div>
                 </>
               )}
+            </>
+          )}
 
-              {settingsTab === 'llm' && (
+          {settingsTab === 'llm' && (
                 <div className="setting-item">
                   <label>大模型配置</label>
                   <p className="setting-desc">配置 OpenAI 兼容 API，自动拉取或手动输入模型</p>
@@ -7000,6 +7507,43 @@ ${newAgent.systemPrompt}`
     }).finally(() => setLlmFetching(false));
   }
 
+  async function fetchCustomUrl(url, mode = 'basic') {
+    if (!url.trim()) {
+      setCustomUrlError('请输入 URL');
+      return;
+    }
+
+    setCustomUrlLoading(true);
+    setCustomUrlError('');
+    setCustomUrlResult(null);
+
+    try {
+      const response = await fetch('/api/scrape', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          url: url.trim(),
+          mode: mode,
+          timeout: 30
+        })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || '抓取失败');
+      }
+
+      setCustomUrlResult(data);
+    } catch (error) {
+      setCustomUrlError(error.message || '抓取失败，请稍后重试');
+    } finally {
+      setCustomUrlLoading(false);
+    }
+  }
+
   function addManualModel() {
     if (!llmManualInput.trim()) return;
     setLlmConfig(prev => ({
@@ -7086,6 +7630,34 @@ function NewsItem({ item, index, viewMode = 'standard', isFocused = false, isBoo
     e.dataTransfer.effectAllowed = 'copy';
   };
 
+  // 源等级标识
+  const renderSourceGrade = () => {
+    if (!item.sourceGrade || !item.sourceGradeLabel) return null;
+
+    return (
+      <span
+        className="source-grade-badge"
+        style={{
+          backgroundColor: item.sourceGradeColor,
+          color: '#fff',
+          fontSize: '10px',
+          padding: '2px 6px',
+          borderRadius: '4px',
+          marginLeft: '8px',
+          fontWeight: '600',
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: '2px'
+        }}
+        title={item.sourceGradeLabel}
+      >
+        <span className="news-item-source-grade" style={{backgroundColor: item.sourceGradeColor}}>
+  {item.sourceGrade?.toString().toUpperCase() || 'N/A'}
+</span>
+      </span>
+    );
+  };
+
   return (
     <article
       className={`news-item view-${viewMode} ${isFocused ? 'focused' : ''} ${isFollowed ? 'followed' : ''}`}
@@ -7142,12 +7714,18 @@ function NewsItem({ item, index, viewMode = 'standard', isFocused = false, isBoo
         {!isCompact && <div className="item-meta">
           <div className="item-tags-row">{item.tags?.slice(0, 4).map(t => <span key={t} className="item-tag">{t}</span>)}</div>
           <div className="item-footer">
-            <span className="item-source">{item.source}{item.platform ? ` · ${item.platform}` : ''}</span>
+            <div className="item-source-container">
+              <span className="item-source">{item.source}{item.platform ? ` · ${item.platform}` : ''}</span>
+              {renderSourceGrade()}
+            </div>
             <a href={item.url} target="_blank" rel="noreferrer" className="item-link" onClick={() => onRead?.(item)}>阅读原文 {ICONS.arrowRight}</a>
           </div>
         </div>}
         {isCompact && <div className="item-footer compact-footer">
-          <span className="item-source">{item.source}</span>
+          <div className="item-source-container">
+            <span className="item-source">{item.source}</span>
+            {renderSourceGrade()}
+          </div>
           <a href={item.url} target="_blank" rel="noreferrer" className="item-link" onClick={() => onRead?.(item)}>{ICONS.arrowRight}</a>
         </div>}
       </div>

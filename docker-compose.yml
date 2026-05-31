@@ -1,0 +1,61 @@
+version: '3.8'
+
+services:
+  tech-radar:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: tech-radar-app
+    ports:
+      - "80:80"      # 前端访问
+      - "5000:5000"  # Scrapling API
+    environment:
+      - PYTHONUNBUFFERED=1
+      - FLASK_ENV=production
+      - NODE_ENV=production
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    volumes:
+      # 持久化日志
+      - ./logs:/var/log/nginx
+      - ./scrapling-logs:/var/log/scrapling
+    networks:
+      - tech-radar-network
+
+  # 可选：添加数据库支持
+  # postgres:
+  #   image: postgres:15-alpine
+  #   container_name: tech-radar-db
+  #   environment:
+  #     POSTGRES_DB: tech_radar
+  #     POSTGRES_USER: radar_user
+  #     POSTGRES_PASSWORD: ${DB_PASSWORD:-default_password}
+  #   volumes:
+  #     - postgres_data:/var/lib/postgresql/data
+  #   restart: unless-stopped
+  #   networks:
+  #     - tech-radar-network
+
+  # 可选：Redis 缓存
+  # redis:
+  #   image: redis:7-alpine
+  #   container_name: tech-radar-redis
+  #   command: redis-server --appendonly yes
+  #   volumes:
+  #     - redis_data:/data
+  #   restart: unless-stopped
+  #   networks:
+  #     - tech-radar-network
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  tech-radar-network:
+    driver: bridge
