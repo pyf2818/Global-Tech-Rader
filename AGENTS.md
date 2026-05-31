@@ -4,28 +4,38 @@
 
 ```bash
 npm install                    # Install dependencies
-npm run dev                    # Dev server on 0.0.0.0:5175 (port set in vite.config.js)
+npm run dev                    # Dev server on 0.0.0.0:5175
 npm run build                  # Production build -> dist/
 npm run preview                # Preview production build on 0.0.0.0
+
+# Scrapling server (Python/Flask for custom web scraping)
+python scrapling_server.py     # Starts Flask API on port 5000 (needed for custom scraping)
 ```
 
 No test, lint, typecheck, or formatter commands exist. Do not run them.
 
 ## Architecture
 
-- **Single-file frontend**: `src/App.jsx` (~7400 lines) — all state, rendering, and logic. Inline components: `NewsItem`, `GithubRepoCard`, `HexRadarChart`, `Lightbox`. No component splitting.
-- **AI Elf component**: `src/AiElf.jsx` (~950 lines) — AI assistant with Agent system, supports news analysis via drag-drop, stores conversations per-Agent in localStorage with quota management.
-- **3D Globe component**: `src/GlobeView.jsx` (~890 lines) — `react-globe.gl` based interactive 3D earth visualization with fullscreen dashboard mode. Used within App.jsx.
-- **API is a Vite plugin**: `server/newsPlugin.js` (~1680 lines) is a Vite middleware (`newsPlugin()`) that intercepts `/api/*` during dev. No separate backend server. Production uses `vercel.json` + `api/*.js` serverless functions.
+- **Single-file frontend**: `src/App.jsx` (~8000 lines) — all state, rendering, and logic. Inline components: `NewsItem`, `GithubRepoCard`, `HexRadarChart`, `Lightbox`.
+- **AI Elf component**: `src/AiElf.jsx` (~960 lines) — AI assistant with Agent system, per-Agent localStorage storage with quota limits (50 messages, 20 history sessions).
+- **3D Globe component**: `src/GlobeView.jsx` (~900 lines) — `react-globe.gl` based interactive 3D earth visualization.
+- **API Layer**: Dual implementation:
+  - Development: `server/newsPlugin.js` (~2400 lines) as Vite middleware plugin
+  - Production: `api/*.js` serverless functions (Vercel deployment)
+- **Scrapling Server**: `scrapling_server.py` (Flask on port 5000) — custom web scraping with basic/dynamic/stealth modes
 - **Entrypoint**: `src/main.jsx` mounts `<App />` inside `<ErrorBoundary>` + `<React.StrictMode>`.
-- **Styling**: `src/styles.css` (~6200 lines) with CSS custom properties for dark/light themes. Tailwind config only sets `content` paths and `fontFamily.sans` — no Tailwind utility classes in the component; all styling is custom CSS.
+- **Styling**: `src/styles.css` (~6600 lines) with CSS custom properties for dark/light themes. Tailwind config only sets content paths — no Tailwind utilities used in components.
 - **Dev server port**: Fixed to **5175** in `vite.config.js` (`server.port: 5175`).
+- **Vite proxy**: `/api/scrape` requests forward to `http://localhost:5000` (Scrapling API).
 
 ## New Features (Recent)
 
 - **Editor Fullscreen Mode**: Toggle via button in article editor. Hides sidebar, topbar, stats-bar, and right panel; expands editor to full viewport. ESC key exits fullscreen.
 - **Reading List Page**: Displays bookmarked news items with read/unread toggle and remove functionality. Shows bookmark count and unread count in stats bar. Stored in `localStorage` under `bookmarks` key.
 - **Calendar Page**: Event management with date picker grid, event list, and add-event modal. Events stored in `localStorage` under `calendarEvents` key with shape `{id, title, date, time, description, color}`.
+- **Source Grading System**: 5-tier grading (S/A/B/C/D) with weights 1.0/0.95/0.85/0.75/0.65. Grade badges displayed with colors (S=#dc2626, A=#ea580c, B=#16a34a, C=#2563eb, D=#64748b). No emoji icons.
+- **Builtin Source Management**: Settings page "信息源" tab has builtin/custom sub-tabs. Builtin tab shows all 266 sources with grade filter, region filter, status filter, enable/disable toggle, batch operations.
+- **Custom Web Scraping**: "自定义抓取" page in navigation menu. Uses Scrapling framework (Python Flask on port 5000). Three modes: basic (fast), dynamic (JS rendering), stealth (anti-bot). Save scraped content to materials or editor.
 - **Sidebar Compression**: Sidebar header, quick-access bar, nav menu, and footer paddings reduced to increase scrollable area for the "管理沉淀" module.
 - **Navigation Groups**: NAV_GROUPS now includes "管理沉淀" category with `['calendar', 'reading-list', 'knowledge-export']` items.
 
@@ -43,14 +53,15 @@ The AI Elf component implements a multi-Agent system for news analysis:
 
 ## Key Duplication (Must Update Both Files)
 
-Categories, modes, region labels, and tag rules are defined independently in **both** `server/newsPlugin.js` and `src/App.jsx`. The two files diverge in structure:
+Categories, modes, region labels, tag rules, and **source grading data** are defined independently in **both** `server/newsPlugin.js` and `src/App.jsx`. The two files diverge in structure:
 
 | | `server/newsPlugin.js` | `src/App.jsx` |
 |---|---|---|
 | Categories | Starts with `{ id: 'all', ... }` | Starts with `{ id: 'ai-models', ... }` (no 'all') |
 | Regions | `CATEGORY_RULES` regex map for `detectCategory()` | Hard-coded `REGION_MAP` object |
+| Source Grades | `SOURCE_GRADES` with weight/color/badge info | `sourceGrades` state, grade display logic |
 
-Adding or changing a category requires updating both files.
+Adding or changing a category, region, or grade requires updating both files.
 
 Additionally, `DEFAULT_SOURCES` and `CATEGORIES` are duplicated between `server/newsPlugin.js` and `api/news.js` (the Vercel serverless version). The `api/` copy has a shorter source list — only update it if you need production parity.
 
@@ -123,6 +134,9 @@ Both workflows use Node.js 20 and `npm ci` for dependency installation.
 - **NewsItem translation**: All `NewsItem` instances across the app (main feed, trending, recommendations, event clusters) must pass translation props: `showTranslation`, `onToggleTranslation`, `onRequestTranslation`, `isTranslating`, `translation`.
 - **Image manager panel**: Redesigned as a grid layout (`image-manager-grid`) with card-based items. Each card shows: thumbnail, used/unused badge, filename, dimensions, width/height inputs (vertical layout), and a hover-reveal delete button. Clicking a thumbnail scrolls the editor to the corresponding placeholder.
 - **renderMarkdown**: The function now protects existing `<img>` tags before HTML-escaping, then restores them after processing. This ensures `renderMarkdownWithImages()` outputs valid `<img src="...">` tags that render in the preview pane.
+- **Source grading state declarations**: When adding source grading features, always declare all related useState hooks: `sourceGrades`, `gradeFilter`, `sourceTypeTab`, `statusFilter`, `searchQuery`, `regionFilter`, `selectedSources`, `disabledSources`, `batchMode`. Missing any will cause ReferenceError at runtime.
+- **Settings modal JSX structure**: The settings modal uses a complex nested structure with multiple tabs and fragments. When modifying, ensure: 1) Each tab (general, sources, llm, agents) is a sibling inside `<div className="settings-content">`, 2) Fragment `<>...</>` closes with matching `</>`, 3) Conditional `{xxx && (...)}` closes with matching `)}`. The builtin/custom tabs are nested inside the sources tab.
+- **Source grade rendering**: `NewsItem.renderSourceGrade` uses `item.sourceGradeColor` (NOT `gradeColor`). Never use the undefined `gradeColor` variable.
 
 ## Compliance & Production Notes
 
