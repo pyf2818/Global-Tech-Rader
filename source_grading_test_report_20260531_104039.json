@@ -1,0 +1,14 @@
+{
+  "test_type": "信息源评级系统测试",
+  "timestamp": "2026-05-31T10:40:39.082598",
+  "test_results": {
+    "api_meta": {
+      "status": "error",
+      "error": "HTTPConnectionPool(host='localhost', port=5177): Max retries exceeded with url: /api/meta (Caused by NewConnectionError(\"HTTPConnection(host='localhost', port=5177): Failed to establish a new connection: [Errno 111] Connection refused\"))"
+    },
+    "api_news": {
+      "status": "error",
+      "error": "HTTPConnectionPool(host='localhost', port=5177): Max retries exceeded with url: /api/news (Caused by NewConnectionError(\"HTTPConnection(host='localhost', port=5177): Failed to establish a new connection: [Errno 111] Connection refused\"))"
+    }
+  }
+}

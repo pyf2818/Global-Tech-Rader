@@ -1,0 +1,41 @@
+{
+  "report_type": "股市走向数据分析",
+  "generation_time": "2026-05-31T10:13:21.285331",
+  "data_sources": [
+    {
+      "source": "新浪财经",
+      "url": "https://finance.sina.com.cn/",
+      "title": "新浪财经_金融信息服务商",
+      "description": "新浪财经是国内领先的金融信息服务提供平台，以“打破信息不对称”为使命，专注于交易、资讯、数据、服务四大领域。为用户提供7×24小时全球股票、基金、期货、外汇、债券等实时行情与权威资讯。提供全面的金融数据、智能分析工具、资金流向监测、模拟交易及ESG资讯和评级服务。",
+      "keywords": "新浪财经,金融信息服务,股票行情,A股行情,港股行情,美股行情,基金动态,期货行情,外汇牌价,债券行情,全球股市指数,财经新闻,投资理财资讯,ESG评级,金融数据分析,投资选股工具",
+      "links_count": 10,
+      "images_count": 5,
+      "timestamp": "2026-05-31T10:13:17.937295"
+    },
+    {
+      "source": "上海证券报",
+      "url": "https://www.cnstock.com/",
+      "title": "上海证券报·中国证券网-权威 价值 专业-www.cnstock.com/",
+      "description": "上海证券报，中国证券网，新华社主管主办，证监会法定信息披露平台，以权威、专业、价值为宗旨的全媒体财经机构，以开放、分享、共赢为目标的综合性资本市场服务平台",
+      "links_count": 8,
+      "timestamp": "2026-05-31T10:13:19.169020"
+    },
+    {
+      "source": "纳斯达克",
+      "url": "https://www.nasdaq.com/",
+      "title": "Pre Opening",
+      "description": "Get the latest stock market news, stock information & quotes, data analysis reports, as well as a general overview of the market landscape from Nasdaq.",
+      "keywords": "nasdaq services, corporate business solutions, corporate solutions, business solutions company, companies corporate solutions, private companies corporate solutions",
+      "links_count": 10,
+      "timestamp": "2026-05-31T10:13:21.285312"
+    }
+  ],
+  "market_sentiment": {
+    "sources_count": 0,
+    "sources": [],
+    "total_links": 0,
+    "avg_keywords_per_source": 0,
+    "analysis_time": "2026-05-31T10:13:21.285329"
+  },
+  "summary": "成功抓取 0 个财经数据源\n失败的源: https://finance.sina.com.cn/, https://www.cnstock.com/, https://www.nasdaq.com/\n\n市场情绪分析: 共获取 0 条财经资讯链接\n平均每个数据源提供 0 个关键词"
+}

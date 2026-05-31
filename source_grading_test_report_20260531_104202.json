@@ -1,0 +1,17 @@
+{
+  "test_type": "信息源评级系统测试",
+  "timestamp": "2026-05-31T10:42:02.746927",
+  "test_results": {
+    "api_meta": {
+      "status": "success",
+      "has_source_grades": true,
+      "has_source_list": true,
+      "total_sources": 266,
+      "grade_definitions": 5
+    },
+    "api_news": {
+      "status": "error",
+      "error": "'>' not supported between instances of 'list' and 'int'"
+    }
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "test_type": "设置页面信息源等级管理功能测试",
+  "timestamp": "2026-05-31T10:51:25.150075",
+  "test_results": {
+    "api_grade_info": {
+      "status": "success",
+      "has_grade_definitions": true,
+      "has_source_list": true,
+      "total_grades": 5,
+      "total_sources": 266
+    },
+    "grade_distribution": {
+      "S": 49,
+      "A": 42,
+      "D": 37,
+      "B": 41,
+      "C": 97
+    },
+    "grade_filter": {
+      "status": "success",
+      "filter_results": {
+        "S": 49,
+        "A": 42,
+        "B": 41,
+        "C": 97,
+        "D": 37
+      }
+    }
+  }
+}

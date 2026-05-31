@@ -5567,25 +5567,11 @@ ${signals}
                       <label>内置信息源管理</label>
                       <p className="setting-desc">管理系统内置的266个权威信息源，支持等级筛选、批量启用/禁用操作</p>
 
-                      {/* 批量操作栏 */}
-                      <div className="source-batch-actions">
-                        <label className="batch-select-all">
-                          <input
-                            type="checkbox"
-                            checked={selectedSources.size > 0 && selectedSources.size === allSources.length}
-                            onChange={(e) => {
-                              if (e.target.checked) {
-                                setSelectedSources(new Set(allSources.map(s => s.name)));
-                              } else {
-                                setSelectedSources(new Set());
-                              }
-                            }}
-                          />
-                          <span>全选</span>
-                        </label>
-                        <button className="source-action-btn" onClick={() => setBatchMode(!batchMode)} disabled={allSources.length === 0}>
-                          {batchMode ? '退出批量' : '批量操作'}
-                        </button>
+{/* 批量操作栏 */}
+                       <div className="source-batch-actions">
+                         <button className="source-action-btn" onClick={() => setBatchMode(!batchMode)} disabled={allSources.length === 0}>
+                           {batchMode ? '退出批量' : '批量操作'}
+                         </button>
                         {batchMode && (
                           <>
                             <select
@@ -5828,23 +5814,9 @@ ${signals}
                     
                     {/* 批量操作栏 */}
                     <div className="source-batch-actions">
-                      <label className="batch-select-all">
-                        <input
-                          type="checkbox"
-                          checked={selectedSources.size > 0 && selectedSources.size === customSources.length}
-                          onChange={(e) => {
-                            if (e.target.checked) {
-                              setSelectedSources(new Set(customSources.map(s => s.id)));
-                            } else {
-                              setSelectedSources(new Set());
-                            }
-                          }}
-                        />
-                        <span>全选</span>
-                      </label>
-                      <button className="source-action-btn" onClick={() => setBatchMode(!batchMode)} disabled={customSources.length === 0}>
-                        {batchMode ? '退出批量' : '批量操作'}
-                      </button>
+<button className="source-action-btn" onClick={() => setBatchMode(!batchMode)} disabled={customSources.length === 0}>
+                         {batchMode ? '退出批量' : '批量操作'}
+                       </button>
 {batchMode && (
                          <>
                            <select
@@ -6270,23 +6242,9 @@ ${signals}
                     
                     {/* 内置源工具栏 */}
                     <div className="source-batch-actions">
-                      <label className="batch-select-all">
-                        <input
-                          type="checkbox"
-                          checked={selectedBuiltinSources.size > 0 && selectedBuiltinSources.size === (allSources?.length || 0)}
-                          onChange={(e) => {
-                            if (e.target.checked) {
-                              setSelectedBuiltinSources(new Set((allSources || []).map(s => s.name)));
-                            } else {
-                              setSelectedBuiltinSources(new Set());
-                            }
-                          }}
-                        />
-                        <span>全选</span>
-                      </label>
-                      <button className="source-action-btn" onClick={() => setBuiltinBatchMode(!builtinBatchMode)} disabled={!allSources || allSources.length === 0}>
-                        {builtinBatchMode ? '退出批量' : '批量操作'}
-                      </button>
+<button className="source-action-btn" onClick={() => setBuiltinBatchMode(!builtinBatchMode)} disabled={!allSources || allSources.length === 0}>
+                         {builtinBatchMode ? '退出批量' : '批量操作'}
+                       </button>
                       {builtinBatchMode && (
                         <>
                           <button className="source-action-btn" onClick={() => setDisabledSources([])} disabled={selectedBuiltinSources.size === 0}>
@@ -7636,17 +7594,22 @@ function NewsItem({ item, index, viewMode = 'standard', isFocused = false, isBoo
   const renderSourceGrade = () => {
     if (!item.sourceGrade || !item.sourceGradeLabel) return null;
 
-    const grade = item.sourceGrade?.toString().toUpperCase() || 'N/A';
+    const gradeMap = {
+      1: 'S',
+      2: 'A',
+      3: 'B',
+      4: 'C',
+      5: 'D'
+    };
+
+    const grade = gradeMap[item.sourceGrade] || item.sourceGrade?.toString().toUpperCase() || 'N/A';
 
     return (
       <span
         className="source-grade-badge"
         style={{
-          backgroundColor: item.sourceGradeColor,
           color: '#fff',
           fontSize: '10px',
-          padding: '2px 6px',
-          borderRadius: '4px',
           marginLeft: '8px',
           fontWeight: '600',
           display: 'inline-flex',
@@ -7657,7 +7620,6 @@ function NewsItem({ item, index, viewMode = 'standard', isFocused = false, isBoo
       >
         <span
           className="news-item-source-grade"
-          style={{backgroundColor: item.sourceGradeColor}}
           data-grade={grade}
         >
           {grade}

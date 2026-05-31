@@ -1,0 +1,108 @@
+{
+  "test_type": "信息源优化验证",
+  "timestamp": "2026-05-31T10:34:13.454045",
+  "summary": {
+    "total_tests": 11,
+    "successful": 9,
+    "failed": 2,
+    "success_rate": 81.8
+  },
+  "category_results": {
+    "financial": {
+      "total": 6,
+      "successful": 4,
+      "sources": [
+        {
+          "name": "华尔街日报",
+          "category": "顶级财经媒体",
+          "status": "error",
+          "error": "HTTPConnectionPool(host='localhost', port=5000): Read timed out. (read timeout=25)"
+        },
+        {
+          "name": "彭博社",
+          "category": "顶级财经媒体",
+          "status": "success",
+          "title": "Bloomberg Asia",
+          "description": "Bloomberg delivers business and markets news, data, analysis, and video to the world, featuring stories from Businessweek and Bloomberg News",
+          "content_length": 0
+        },
+        {
+          "name": "路透社财经",
+          "category": "权威财经媒体",
+          "status": "failed",
+          "error": "HTTP 500"
+        },
+        {
+          "name": "CNBC",
+          "category": "财经新闻频道",
+          "status": "success",
+          "title": "International Business, World News & Global Stock Market Analysis",
+          "description": "CNBC International is the world leader for news on business, technology, China, trade, oil prices, the Middle East and markets.",
+          "content_length": 0
+        },
+        {
+          "name": "第一财经",
+          "category": "国内权威财经",
+          "status": "success",
+          "title": "第一财经_专业创造价值",
+          "description": "第一财经官方网站，7X24小时提供股市行情、经济大势、金融政策、行业动态、专家分析等财经资讯；全网独家直播谈股论金、今日股市、公司与行业、解码财商、头脑风暴等第一财经电视节目。",
+          "content_length": 0
+        },
+        {
+          "name": "财新网",
+          "category": "国内权威财经",
+          "status": "success",
+          "title": "财新网",
+          "description": "财新网（caixin.com）与财新《财新周刊》、财新《中国改革》、《比较》同属财新传媒。财新网定位于原创财经新媒体，整合资讯、观点、多媒体、互动等信息时代形态丰富的媒体产品，以客观、专业的视角，实时输出高品质原创内容，为中国政界、学界和产业界精英提供每日经济活动必需的财经新闻和资讯评论",
+          "content_length": 0
+        }
+      ]
+    },
+    "tech": {
+      "total": 5,
+      "successful": 5,
+      "sources": [
+        {
+          "name": "OpenAI Blog",
+          "category": "AI官方博客",
+          "status": "success",
+          "title": "OpenAI News | OpenAI",
+          "description": "Stay up to speed on the rapid advancement of AI technology and the benefits it offers to humanity.",
+          "content_length": 0
+        },
+        {
+          "name": "Google DeepMind",
+          "category": "AI研究",
+          "status": "success",
+          "title": "Google DeepMind",
+          "description": "Artificial intelligence could be one of humanity’s most useful inventions. We research and build safe artificial intelligence systems. We're committed to solving intelligence, to advance science and …",
+          "content_length": 0
+        },
+        {
+          "name": "MIT CSAIL",
+          "category": "顶级研究机构",
+          "status": "success",
+          "title": "Home Page | MIT CSAIL",
+          "description": null,
+          "content_length": 0
+        },
+        {
+          "name": "量子位",
+          "category": "国内AI媒体",
+          "status": "success",
+          "title": "量子位 – 追踪人工智能新趋势，报道科技行业新突破",
+          "description": null,
+          "content_length": 0
+        },
+        {
+          "name": "机器之心",
+          "category": "国内AI媒体",
+          "status": "success",
+          "title": "机器之心",
+          "description": "机器之心",
+          "content_length": 0
+        }
+      ]
+    }
+  }
+}
