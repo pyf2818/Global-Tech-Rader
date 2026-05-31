@@ -5565,53 +5565,13 @@ ${signals}
                   {sourceTypeTab === 'builtin' && (
                     <div className="setting-item">
                       <label>内置信息源管理</label>
-                      <p className="setting-desc">管理系统内置的266个权威信息源，支持等级筛选、批量启用/禁用操作</p>
+                      <p className="setting-desc">管理系统内置的266个权威信息源，支持等级筛选和启用/禁用操作</p>
 
-{/* 批量操作栏 */}
-                       <div className="source-batch-actions">
-                         <button className="source-action-btn" onClick={() => setBatchMode(!batchMode)} disabled={allSources.length === 0}>
-                           {batchMode ? '退出批量' : '批量操作'}
-                         </button>
-                        {batchMode && (
-                          <>
-                            <select
-                              value={selectedSources.size > 0 ? 'selected' : 'all'}
-                              onChange={(e) => {
-                                const targetGrade = e.target.value;
-                                if (targetGrade === 'all') return;
-                                const sourcesToSelect = allSources.filter(s => s.grade === targetGrade);
-                                setSelectedSources(new Set(sourcesToSelect.map(s => s.name)));
-                              }}
-                              className="source-action-btn"
-                            >
-                              <option value="selected">已选择 ({selectedSources.size})</option>
-                              {Object.keys(sourceGrades).map(grade => (
-                                <option key={grade} value={grade}>
-                                  选择所有{grade}级源
-                                </option>
-                              ))}
-                            </select>
-                            <button className="source-action-btn" onClick={() => setDisabledSources(prev => {
-                              const selectedNames = Array.from(selectedSources);
-                              const newlyDisabled = selectedNames.filter(name => !prev.includes(name));
-                              return [...prev, ...newlyDisabled];
-                            })} disabled={selectedSources.size === 0}>
-                              批量禁用
-                            </button>
-                            <button className="source-action-btn" onClick={() => setDisabledSources(prev => {
-                              const selectedNames = Array.from(selectedSources);
-                              return prev.filter(name => !selectedNames.includes(name));
-                            })} disabled={selectedSources.size === 0}>
-                              批量启用
-                            </button>
-                          </>
-                        )}
-                        <div className="source-stats">
-                          <span>已启用: {allSources.length - disabledSources.length}</span>
-                          <span>已禁用: {disabledSources.length}</span>
-                          <span>总计: {allSources.length}</span>
-                        </div>
-                      </div>
+                       <div className="source-stats">
+                         <span>已启用: {allSources.length - disabledSources.length}</span>
+                         <span>已禁用: {disabledSources.length}</span>
+                         <span>总计: {allSources.length}</span>
+                       </div>
 
                       {/* 筛选栏 */}
                       <div className="source-filter-bar">
@@ -5685,28 +5645,9 @@ ${signals}
                           }).map(source => (
                             <div
                               key={source.name}
-                              className={`source-card ${selectedSources.has(source.name) ? 'selected' : ''} ${disabledSources.includes(source.name) ? 'disabled' : ''}`}
+className={`source-card ${disabledSources.includes(source.name) ? 'disabled' : ''}`}
                             >
-                              {batchMode && (
-                                <div className="source-select-checkbox">
-                                  <input
-                                    type="checkbox"
-                                    checked={selectedSources.has(source.name)}
-                                    onChange={(e) => {
-                                      if (e.target.checked) {
-                                        setSelectedSources(prev => new Set([...prev, source.name]));
-                                      } else {
-                                        setSelectedSources(prev => {
-                                          const newSet = new Set(prev);
-                                          newSet.delete(source.name);
-                                          return newSet;
-                                        });
-                                      }
-                                    }}
-                                  />
-                                </div>
-                              )}
-                              <div className="source-card-main">
+                               <div className="source-card-main">
                                 <div className="source-card-header">
                                   <div className="source-card-title-row">
                                     <span className="source-card-name">{source.name}</span>
@@ -5981,28 +5922,9 @@ ${signals}
                         }).map(source => (
                           <div
                             key={source.id}
-                            className={`source-card ${selectedSources.has(source.id) ? 'selected' : ''}`}
+className={`source-card`}
                           >
-                            {batchMode && (
-                              <div className="source-select-checkbox">
-                                <input
-                                  type="checkbox"
-                                  checked={selectedSources.has(source.id)}
-                                  onChange={(e) => {
-                                    if (e.target.checked) {
-                                      setSelectedSources(prev => new Set([...prev, source.id]));
-                                    } else {
-                                      setSelectedSources(prev => {
-                                        const newSet = new Set(prev);
-                                        newSet.delete(source.id);
-                                        return newSet;
-                                      });
-                                    }
-                                  }}
-                                />
-                              </div>
-                            )}
-<div className="source-card-main">
+ <div className="source-card-main">
                                <div className="source-card-header">
                                  <div className="source-card-title-row">
                                    <span className="source-card-name">{source.name}</span>
@@ -6307,28 +6229,9 @@ ${signals}
                           return (
                             <div
                               key={source.name}
-                              className={`source-card builtin ${isDisabled ? 'disabled' : ''} ${isSelected ? 'selected' : ''} ${health?.status ? `health-${health.status}` : ''}`}
+className={`source-card builtin ${isDisabled ? 'disabled' : ''} ${health?.status ? `health-${health.status}` : ''}`}
                             >
-                              {builtinBatchMode && (
-                                <div className="source-select-checkbox">
-                                  <input
-                                    type="checkbox"
-                                    checked={isSelected}
-                                    onChange={(e) => {
-                                      if (e.target.checked) {
-                                        setSelectedBuiltinSources(prev => new Set([...prev, source.name]));
-                                      } else {
-                                        setSelectedBuiltinSources(prev => {
-                                          const newSet = new Set(prev);
-                                          newSet.delete(source.name);
-                                          return newSet;
-                                        });
-                                      }
-                                    }}
-                                  />
-                                </div>
-                              )}
-                              <div className="source-card-main">
+                               <div className="source-card-main">
                                 <div className="source-card-header">
                                   <span className="source-card-name">{source.name}</span>
                                   <div className="source-card-status">

@@ -3884,13 +3884,51 @@ body {
 
 /* 源等级徽章 - 简约风格 */
 .source-grade-badge {
-  font-size: 11px;
-  margin-left: 6px;
-  font-weight: 700;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  white-space: nowrap;
+  min-width: 28px;
+  height: 28px;
+  padding: 0 10px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  color: #fff;
+  margin-left: 8px;
+  position: relative;
+  overflow: hidden;
+  backdrop-filter: blur(10px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15),
+              inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+.source-grade-badge::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.3) 0%, rgba(255, 255, 255, 0) 50%);
+  pointer-events: none;
+}
+
+.source-grade-badge::after {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.15) 0%, transparent 70%);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+}
+
+.source-grade-badge:hover::after {
+  opacity: 1;
 }
 
 /* 新闻卡片中的等级徽章 - 透明荧光动态脉动效果 */
