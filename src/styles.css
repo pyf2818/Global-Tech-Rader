@@ -4437,38 +4437,30 @@ body {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 24px;
-  height: 24px;
-  padding: 0 8px;
-  border-radius: 6px;
-  font-size: 12px;
+  min-width: 28px;
+  height: 28px;
+  padding: 0 10px;
+  border-radius: 8px;
+  font-size: 14px;
   font-weight: 800;
-  letter-spacing: 1px;
+  letter-spacing: 0.5px;
   position: relative;
-  overflow: visible;
-  backdrop-filter: blur(0px);
-  border: 2px solid transparent;
+  overflow: hidden;
+  backdrop-filter: blur(10px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15),
+              inset 0 1px 0 rgba(255, 255, 255, 0.2);
 }
 
-/* 荧光边框效果 */
+/* 荧光效果 */
 .news-item-source-grade::before {
   content: '';
   position: absolute;
-  top: -2px;
-  left: -2px;
-  right: -2px;
-  bottom: -2px;
-  border-radius: 8px;
-  padding: 2px;
-  background: linear-gradient(45deg,
-    var(--glow-color-1, rgba(220, 38, 38, 0.8)),
-    var(--glow-color-2, rgba(234, 88, 12, 0.8)),
-    var(--glow-color-3, rgba(220, 38, 38, 0.8))
-  );
-  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-  -webkit-mask-composite: xor;
-  mask-composite: exclude;
-  animation: border-rotate 3s linear infinite;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.3) 0%, rgba(255, 255, 255, 0) 50%);
+  pointer-events: none;
 }
 
 /* 透明荧光背景 */
@@ -4479,13 +4471,17 @@ body {
   left: 0;
   right: 0;
   bottom: 0;
-  border-radius: 6px;
   background: radial-gradient(circle at center,
     var(--glow-color-1, rgba(220, 38, 38, 0.3)) 0%,
     transparent 70%
   );
   opacity: 0;
-  animation: pulse-glow 2s ease-in-out infinite;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+}
+
+.news-item-source-grade:hover::after {
+  opacity: 1;
 }
 
 /* 文字效果 */
@@ -4501,137 +4497,63 @@ body {
 /* 等级特定样式 */
 .news-item-source-grade[data-grade="S"] {
   --glow-color-1: rgba(220, 38, 38, 1);
-  --glow-color-2: rgba(255, 100, 100, 0.8);
-  --glow-color-3: rgba(180, 30, 30, 0.8);
-  color: #ff6b6b;
-  animation: combined-s-pulse 3s ease-in-out infinite;
+  background: linear-gradient(135deg, rgba(220, 38, 38, 0.9) 0%, rgba(220, 38, 38, 0.7) 100%);
+  color: #fff;
+  box-shadow: 0 0 15px rgba(220, 38, 38, 0.4),
+              0 2px 8px rgba(0, 0, 0, 0.15),
+              inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  animation: tech-glow 3s ease-in-out infinite;
 }
 
 .news-item-source-grade[data-grade="A"] {
   --glow-color-1: rgba(234, 88, 12, 1);
-  --glow-color-2: rgba(255, 150, 80, 0.8);
-  --glow-color-3: rgba(200, 60, 10, 0.8);
-  color: #ff9f43;
-  animation: combined-a-pulse 2.5s ease-in-out infinite;
+  background: linear-gradient(135deg, rgba(234, 88, 12, 0.9) 0%, rgba(234, 88, 12, 0.7) 100%);
+  color: #fff;
+  box-shadow: 0 0 12px rgba(234, 88, 12, 0.35),
+              0 2px 8px rgba(0, 0, 0, 0.15),
+              inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  animation: tech-glow 2.5s ease-in-out infinite;
 }
 
 .news-item-source-grade[data-grade="B"] {
   --glow-color-1: rgba(22, 163, 74, 1);
-  --glow-color-2: rgba(80, 200, 120, 0.8);
-  --glow-color-3: rgba(15, 120, 60, 0.8);
-  color: #2ecc71;
-  animation: combined-b-pulse 2s ease-in-out infinite;
+  background: linear-gradient(135deg, rgba(22, 163, 74, 0.9) 0%, rgba(22, 163, 74, 0.7) 100%);
+  color: #fff;
+  box-shadow: 0 0 10px rgba(22, 163, 74, 0.3),
+              0 2px 8px rgba(0, 0, 0, 0.15),
+              inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  animation: tech-glow 2s ease-in-out infinite;
 }
 
 .news-item-source-grade[data-grade="C"] {
   --glow-color-1: rgba(37, 99, 235, 1);
-  --glow-color-2: rgba(100, 150, 255, 0.8);
-  --glow-color-3: rgba(25, 70, 180, 0.8);
-  color: #3498db;
-  animation: combined-c-pulse 1.8s ease-in-out infinite;
+  background: linear-gradient(135deg, rgba(37, 99, 235, 0.9) 0%, rgba(37, 99, 235, 0.7) 100%);
+  color: #fff;
+  box-shadow: 0 0 8px rgba(37, 99, 235, 0.25),
+              0 2px 8px rgba(0, 0, 0, 0.15),
+              inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  animation: tech-glow 1.8s ease-in-out infinite;
 }
 
 .news-item-source-grade[data-grade="D"] {
   --glow-color-1: rgba(100, 116, 139, 1);
-  --glow-color-2: rgba(150, 170, 190, 0.8);
-  --glow-color-3: rgba(70, 85, 105, 0.8);
-  color: #95a5a6;
-  animation: combined-d-pulse 1.5s ease-in-out infinite;
+  background: linear-gradient(135deg, rgba(100, 116, 139, 0.9) 0%, rgba(100, 116, 139, 0.7) 100%);
+  color: #fff;
+  box-shadow: 0 0 6px rgba(100, 116, 139, 0.2),
+              0 2px 8px rgba(0, 0, 0, 0.15),
+              inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  animation: tech-glow 1.5s ease-in-out infinite;
 }
 
-/* 边框旋转动画 */
-@keyframes border-rotate {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
-}
-
-/* S级综合动画 */
-@keyframes combined-s-pulse {
+/* 科技感脉动动画 */
+@keyframes tech-glow {
   0%, 100% {
+    opacity: 1;
     transform: scale(1);
-    text-shadow:
-      0 0 10px rgba(220, 38, 38, 1),
-      0 0 20px rgba(220, 38, 38, 0.8),
-      0 0 30px rgba(220, 38, 38, 0.6);
   }
   50% {
-    transform: scale(1.1);
-    text-shadow:
-      0 0 15px rgba(220, 38, 38, 1),
-      0 0 30px rgba(220, 38, 38, 0.9),
-      0 0 45px rgba(220, 38, 38, 0.7);
-  }
-}
-
-/* A级综合动画 */
-@keyframes combined-a-pulse {
-  0%, 100% {
-    transform: scale(1);
-    text-shadow:
-      0 0 8px rgba(234, 88, 12, 1),
-      0 0 16px rgba(234, 88, 12, 0.8),
-      0 0 24px rgba(234, 88, 12, 0.6);
-  }
-  50% {
-    transform: scale(1.05);
-    text-shadow:
-      0 0 12px rgba(234, 88, 12, 1),
-      0 0 24px rgba(234, 88, 12, 0.9),
-      0 0 36px rgba(234, 88, 12, 0.7);
-  }
-}
-
-/* B级综合动画 */
-@keyframes combined-b-pulse {
-  0%, 100% {
-    transform: scale(1);
-    text-shadow:
-      0 0 6px rgba(22, 163, 74, 1),
-      0 0 12px rgba(22, 163, 74, 0.8),
-      0 0 18px rgba(22, 163, 74, 0.6);
-  }
-  50% {
-    transform: scale(1.03);
-    text-shadow:
-      0 0 9px rgba(22, 163, 74, 1),
-      0 0 18px rgba(22, 163, 74, 0.9),
-      0 0 27px rgba(22, 163, 74, 0.7);
-  }
-}
-
-/* C级综合动画 */
-@keyframes combined-c-pulse {
-  0%, 100% {
-    transform: scale(1);
-    text-shadow:
-      0 0 5px rgba(37, 99, 235, 1),
-      0 0 10px rgba(37, 99, 235, 0.8),
-      0 0 15px rgba(37, 99, 235, 0.6);
-  }
-  50% {
+    opacity: 0.9;
     transform: scale(1.02);
-    text-shadow:
-      0 0 8px rgba(37, 99, 235, 1),
-      0 0 16px rgba(37, 99, 235, 0.9),
-      0 0 24px rgba(37, 99, 235, 0.7);
-  }
-}
-
-/* D级综合动画 */
-@keyframes combined-d-pulse {
-  0%, 100% {
-    transform: scale(1);
-    text-shadow:
-      0 0 4px rgba(100, 116, 139, 1),
-      0 0 8px rgba(100, 116, 139, 0.8),
-      0 0 12px rgba(100, 116, 139, 0.6);
-  }
-  50% {
-    transform: scale(1.01);
-    text-shadow:
-      0 0 6px rgba(100, 116, 139, 1),
-      0 0 12px rgba(100, 116, 139, 0.9),
-      0 0 18px rgba(100, 116, 139, 0.7);
   }
 }
 

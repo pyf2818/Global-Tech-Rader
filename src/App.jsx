@@ -454,8 +454,6 @@ function App() {
   const [sourceHealth, setSourceHealth] = useState(() => loadLS('sourceHealth', {}));
   const [editingSource, setEditingSource] = useState(null);
   const [showSourceForm, setShowSourceForm] = useState(false);
-  const [batchMode, setBatchMode] = useState(false);
-  const [selectedSources, setSelectedSources] = useState(new Set());
   
   const [searchQuery, setSearchQuery] = useState('');
   const [customSourceFilter, setCustomSourceFilter] = useState('all');
@@ -5598,93 +5596,81 @@ ${signals}
                       </div>
 
                       {/* 操作栏 */}
-                      <div className="builtin-operations-bar">
-                        {/* 左侧：选择和批量模式 */}
-                        <div className="builtin-operations-left">
-                          {batchMode ? (
-                            <>
-                              <label className="batch-select-all">
-                                <input
-                                  type="checkbox"
-                                  checked={selectedSources.size > 0 && selectedSources.size === allSources.length}
-                                  onChange={(e) => {
-                                    if (e.target.checked) {
-                                      setSelectedSources(new Set(allSources.map(s => s.name)));
-                                    } else {
-                                      setSelectedSources(new Set());
-                                    }
-                                  }}
-                                />
-                                <span>全选</span>
-                              </label>
-                              <div className="batch-selection-count">
-                                已选择 <strong>{selectedSources.size}</strong> 个源
-                              </div>
-                            </>
-                          ) : (
-                            <button className="batch-mode-toggle-btn" onClick={() => setBatchMode(true)} disabled={allSources.length === 0}>
-                              <span className="batch-mode-icon">☐</span>
-                              <span>批量操作</span>
-                            </button>
-                          )}
-                        </div>
+<div className="builtin-operations-bar">
+                         {/* 左侧：显示当前筛选结果数量 */}
+                         <div className="builtin-operations-left">
+                           <div className="filtered-results-count">
+                             当前显示 <strong>{allSources.filter(source => {
+                               if (!source || !source.name) return false;
+                               const searchLower = searchQuery.toLowerCase();
+                               const matchesSearch = !searchQuery ||
+                                 source.name.toLowerCase().includes(searchLower) ||
+                                 source.region?.toLowerCase().includes(searchLower);
+                               const matchesGrade = gradeFilter === 'all' || source.grade === gradeFilter;
+                               const matchesRegion = regionFilter === 'all' || source.region === regionFilter;
+                               const isDisabled = disabledSources.includes(source.name);
+                               const matchesStatus = statusFilter === 'all' ||
+                                 (statusFilter === 'enabled' && !isDisabled) ||
+                                 (statusFilter === 'disabled' && isDisabled);
+                               return matchesSearch && matchesGrade && matchesRegion && matchesStatus;
+                             }).length}</strong> 个源
+                           </div>
+                         </div>
 
-                        {/* 右侧：批量操作按钮 */}
-                        {batchMode && (
-                          <div className="builtin-operations-right">
-                            <button
-                              className="batch-action-btn select-by-grade"
-                              onClick={() => {
-                                const targetGrade = prompt('选择要批量操作的等级 (S/A/B/C/D):');
-                                if (targetGrade && ['S', 'A', 'B', 'C', 'D'].includes(targetGrade.toUpperCase())) {
-                                  const sourcesToSelect = allSources.filter(s => s.grade === targetGrade.toUpperCase());
-                                  setSelectedSources(new Set(sourcesToSelect.map(s => s.name)));
-                                }
-                              }}
-                            >
-                              <span>按等级选择</span>
-                            </button>
-                            <button
-                              className="batch-action-btn disable"
-                              onClick={() => {
-                                const selectedNames = Array.from(selectedSources);
-                                const newlyDisabled = selectedNames.filter(name => !disabledSources.includes(name));
-                                if (newlyDisabled.length > 0 && confirm(`确定禁用选中的 ${newlyDisabled.length} 个源？`)) {
-                                  setDisabledSources(prev => [...prev, ...newlyDisabled]);
-                                }
-                              }}
-                              disabled={selectedSources.size === 0}
-                            >
-                              <span className="btn-icon">🚫</span>
-                              <span>批量禁用</span>
-                            </button>
-                            <button
-                              className="batch-action-btn enable"
-                              onClick={() => {
-                                const selectedNames = Array.from(selectedSources);
-                                const toEnable = selectedNames.filter(name => disabledSources.includes(name));
-                                if (toEnable.length > 0) {
-                                  setDisabledSources(prev => prev.filter(name => !toEnable.includes(name)));
-                                }
-                              }}
-                              disabled={selectedSources.size === 0}
-                            >
-                              <span className="btn-icon">✓</span>
-                              <span>批量启用</span>
-                            </button>
-                            <button
-                              className="batch-action-btn cancel"
-                              onClick={() => {
-                                setBatchMode(false);
-                                setSelectedSources(new Set());
-                              }}
-                            >
-                              <span className="btn-icon">✕</span>
-                              <span>退出批量</span>
-                            </button>
-                          </div>
-                        )}
-                      </div>
+                         {/* 右侧：批量操作按钮 */}
+                         <div className="builtin-operations-right">
+                           <button
+                             className="batch-action-btn disable"
+                             onClick={() => {
+                               const filteredSources = allSources.filter(source => {
+                                 if (!source || !source.name) return false;
+                                 const searchLower = searchQuery.toLowerCase();
+                                 const matchesSearch = !searchQuery ||
+                                   source.name.toLowerCase().includes(searchLower) ||
+                                   source.region?.toLowerCase().includes(searchLower);
+                                 const matchesGrade = gradeFilter === 'all' || source.grade === gradeFilter;
+                                 const matchesRegion = regionFilter === 'all' || source.region === regionFilter;
+                                 const isDisabled = disabledSources.includes(source.name);
+                                 const matchesStatus = statusFilter === 'all' ||
+                                   (statusFilter === 'enabled' && !isDisabled) ||
+                                   (statusFilter === 'disabled' && isDisabled);
+                                 return matchesSearch && matchesGrade && matchesRegion && matchesStatus && !isDisabled;
+                               });
+                               if (filteredSources.length > 0 && confirm(`确定禁用当前筛选的 ${filteredSources.length} 个已启用源？`)) {
+                                 setDisabledSources(prev => [...prev, ...filteredSources.map(s => s.name)]);
+                               }
+                             }}
+                           >
+                             <span className="btn-icon">🚫</span>
+                             <span>批量禁用当前</span>
+                           </button>
+                           <button
+                             className="batch-action-btn enable"
+                             onClick={() => {
+                               const filteredSources = allSources.filter(source => {
+                                 if (!source || !source.name) return false;
+                                 const searchLower = searchQuery.toLowerCase();
+                                 const matchesSearch = !searchQuery ||
+                                   source.name.toLowerCase().includes(searchLower) ||
+                                   source.region?.toLowerCase().includes(searchLower);
+                                 const matchesGrade = gradeFilter === 'all' || source.grade === gradeFilter;
+                                 const matchesRegion = regionFilter === 'all' || source.region === regionFilter;
+                                 const isDisabled = disabledSources.includes(source.name);
+                                 const matchesStatus = statusFilter === 'all' ||
+                                   (statusFilter === 'enabled' && !isDisabled) ||
+                                   (statusFilter === 'disabled' && isDisabled);
+                                 return matchesSearch && matchesGrade && matchesRegion && matchesStatus && isDisabled;
+                               });
+                               if (filteredSources.length > 0 && confirm(`确定启用当前筛选的 ${filteredSources.length} 个已禁用源？`)) {
+                                 setDisabledSources(prev => prev.filter(name => !filteredSources.some(s => s.name === name)));
+                               }
+                             }}
+                           >
+                             <span className="btn-icon">✓</span>
+                             <span>批量启用当前</span>
+                           </button>
+                         </div>
+                       </div>
 
                       {/* 筛选栏 */}
                       <div className="source-filter-bar">
@@ -5755,32 +5741,13 @@ ${signals}
                               (statusFilter === 'disabled' && isDisabled);
 
                             return matchesSearch && matchesGrade && matchesRegion && matchesStatus;
-                          }).map(source => (
-                            <div
-                              key={source.name}
-className={`source-card ${selectedSources.has(source.name) ? 'selected' : ''} ${disabledSources.includes(source.name) ? 'disabled' : ''}`}
-                            >
-                              {batchMode && (
-                                <div className="source-select-checkbox">
-                                  <input
-                                    type="checkbox"
-                                    checked={selectedSources.has(source.name)}
-                                    onChange={(e) => {
-                                      if (e.target.checked) {
-                                        setSelectedSources(prev => new Set([...prev, source.name]));
-                                      } else {
-                                        setSelectedSources(prev => {
-                                          const newSet = new Set(prev);
-                                          newSet.delete(source.name);
-                                          return newSet;
-                                        });
-                                      }
-                                    }}
-                                  />
-                                </div>
-                              )}
+}).map(source => (
+                             <div
+                               key={source.name}
+                               className={`source-card ${disabledSources.includes(source.name) ? 'disabled' : ''}`}
+                             >
                                <div className="source-card-main">
-                                <div className="source-card-header">
+                                 <div className="source-card-header">
                                   <div className="source-card-title-row">
                                     <span className="source-card-name">{source.name}</span>
                                     {source.grade && sourceGrades[source.grade] && (
@@ -5886,78 +5853,9 @@ className={`source-card ${selectedSources.has(source.name) ? 'selected' : ''} ${
                     </div>
                     
 {/* 批量操作栏 */}
-                     <div className="source-batch-actions">
-                      <label className="batch-select-all">
-                        <input
-                          type="checkbox"
-                          checked={selectedSources.size > 0 && selectedSources.size === customSources.length}
-                          onChange={(e) => {
-                            if (e.target.checked) {
-                              setSelectedSources(new Set(customSources.map(s => s.id)));
-                            } else {
-                              setSelectedSources(new Set());
-                            }
-                          }}
-                        />
-                        <span>全选</span>
-                      </label>
-                      <button className="source-action-btn" onClick={() => setBatchMode(!batchMode)} disabled={customSources.length === 0}>
-                        {batchMode ? '退出批量' : '批量操作'}
-                      </button>
-{batchMode && (
-                         <>
-                           <select
-                             value={selectedSources.size > 0 ? 'selected' : 'all'}
-                             onChange={(e) => {
-                               const targetGrade = e.target.value;
-                               if (targetGrade === 'all') return;
-
-                               const sourcesToSelect = allSources.filter(s => s.grade === targetGrade);
-                               if (e.target.value === 'selected') {
-                                 // 保持当前选择
-                               } else {
-                                 setSelectedSources(new Set(sourcesToSelect.map(s => s.name)));
-                               }
-                             }}
-                             className="source-action-btn"
-                           >
-                             <option value="selected">已选择 ({selectedSources.size})</option>
-                             {Object.keys(sourceGrades).map(grade => (
-                               <option key={grade} value={grade}>
-                                 选择所有{grade}级源
-                               </option>
-                             ))}
-                           </select>
-                           <button className="source-action-btn" onClick={() => setDisabledSources(prev => {
-                             const selectedIds = Array.from(selectedSources);
-                             const enabledSources = customSources.filter(s => !disabledSources.includes(s.name));
-                             const newlyDisabled = enabledSources.filter(s => selectedIds.includes(s.id));
-                             return [...prev, ...newlyDisabled.map(s => s.name)];
-                           })} disabled={selectedSources.size === 0}>
-                             批量禁用
-                           </button>
-                           <button className="source-action-btn" onClick={() => setDisabledSources(prev => {
-                             const selectedIds = Array.from(selectedSources);
-                             const currentlyDisabled = prev.filter(name => {
-                               const source = customSources.find(s => s.id === selectedIds[0]);
-                               return source && source.name === name;
-                             });
-                             return prev.filter(name => !currentlyDisabled.includes(name));
-                           })} disabled={selectedSources.size === 0}>
-                             批量启用
-                           </button>
-                           <button className="source-action-btn danger" onClick={() => {
-                             if (confirm(`确定删除选中的 ${selectedSources.size} 个源？`)) {
-                               setCustomSources(prev => prev.filter(s => !selectedSources.has(s.id)));
-                               setSelectedSources(new Set());
-                               setBatchMode(false);
-                             }
-                           }} disabled={selectedSources.size === 0}>
-                             批量删除
-                           </button>
-                         </>
-                       )}
-                     </div>
+                      <div className="source-batch-actions">
+                        <span className="source-count">{customSources.length} 个自定义源</span>
+                      </div>
 
 {/* 高级搜索和筛选 */}
                      <div className="source-filter-bar">
@@ -6047,32 +5945,13 @@ className={`source-card ${selectedSources.has(source.name) ? 'selected' : ''} ${
                              (customSourceFilter === 'error' && health?.status === 'error');
 
                            return matchesSearch && matchesStatus && matchesRegion && matchesGrade && matchesHealth;
-                        }).map(source => (
-                          <div
-                            key={source.id}
-className={`source-card ${selectedSources.has(source.id) ? 'selected' : ''}`}
-                          >
-                             {batchMode && (
-                               <div className="source-select-checkbox">
-                                 <input
-                                   type="checkbox"
-                                   checked={selectedSources.has(source.id)}
-                                   onChange={(e) => {
-                                     if (e.target.checked) {
-                                       setSelectedSources(prev => new Set([...prev, source.id]));
-                                     } else {
-                                       setSelectedSources(prev => {
-                                         const newSet = new Set(prev);
-                                         newSet.delete(source.id);
-                                         return newSet;
-                                       });
-                                     }
-                                   }}
-                                 />
-                               </div>
-                             )}
-<div className="source-card-main">
-                                <div className="source-card-header">
+}).map(source => (
+                           <div
+                             key={source.id}
+                             className="source-card"
+                           >
+                             <div className="source-card-main">
+                                 <div className="source-card-header">
                                   <div className="source-card-title-row">
                                     <span className="source-card-name">{source.name}</span>
                                     {source.grade && sourceGrades[source.grade] && (
