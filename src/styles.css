@@ -3473,7 +3473,25 @@ body {
   padding: 12px 16px;
   background: var(--bg-secondary);
   border-radius: 8px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+}
+
+.source-filter-bar::-webkit-scrollbar {
+  height: 4px;
+}
+
+.source-filter-bar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.source-filter-bar::-webkit-scrollbar-thumb {
+  background: var(--border-color);
+  border-radius: 2px;
+}
+
+.source-filter-bar::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
 }
 
 .source-batch-actions {
@@ -3571,14 +3589,16 @@ body {
 
 .source-search-input,
 .source-filter-select {
-  padding: 8px 12px;
+  padding: 6px 10px;
   background: var(--bg-primary);
   border: 1px solid var(--border-color);
   border-radius: 6px;
   color: var(--text-primary);
-  font-size: 14px;
-  transition: border-color 0.2s ease;
-  min-height: 36px;
+  font-size: 13px;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  min-height: 32px;
+  min-width: 120px;
+  flex-shrink: 0;
 }
 
 .source-search-input:focus,
@@ -3594,7 +3614,6 @@ body {
 }
 
 .source-filter-select {
-  min-width: 140px;
   cursor: pointer;
   background-color: var(--bg-primary);
 }
@@ -3754,8 +3773,28 @@ body {
 }
 
 .source-card.disabled {
+  opacity: 0.5;
+  background: var(--bg-secondary);
+  filter: grayscale(30%);
+  border-color: var(--border-color);
+}
+
+.source-card.disabled:hover {
   opacity: 0.6;
-  background: var(--bg-primary);
+  border-color: var(--border-color);
+}
+
+.source-card.disabled .source-card-name {
+  color: var(--text-muted);
+  text-decoration: line-through;
+}
+
+.source-card.disabled .source-card-url {
+  color: var(--text-muted);
+}
+
+.source-card.disabled .source-grade-badge {
+  opacity: 0.4;
 }
 
 .source-card.health-healthy {
@@ -3819,9 +3858,41 @@ body {
   height: 20px;
   line-height: 1;
   letter-spacing: 0.5px;
+  position: relative;
+  overflow: hidden;
+  backdrop-filter: blur(10px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 }
 
-/* 新闻卡片中的等级徽章 */
+.source-grade-badge::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.2) 0%, rgba(255, 255, 255, 0) 50%);
+  pointer-events: none;
+}
+
+.source-grade-badge::after {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.1) 0%, transparent 70%);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+}
+
+.source-grade-badge:hover::after {
+  opacity: 1;
+}
+
+/* 新闻卡片中的等级徽章 - 科技感设计 */
 .news-item-source-grade {
   display: inline-flex;
   align-items: center;
@@ -3835,7 +3906,57 @@ body {
   color: #fff;
   letter-spacing: 0.5px;
   margin-left: 4px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  position: relative;
+  overflow: hidden;
+  backdrop-filter: blur(10px);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+.news-item-source-grade::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.3) 0%, rgba(255, 255, 255, 0) 50%);
+  pointer-events: none;
+}
+
+/* 等级特定样式 */
+.news-item-source-grade[data-grade="S"] {
+  background: linear-gradient(135deg, #dc2626 0%, #991b1b 100%);
+  box-shadow: 0 0 12px rgba(220, 38, 38, 0.4), 0 2px 6px rgba(0, 0, 0, 0.12);
+  animation: pulse-glow 3s ease-in-out infinite;
+}
+
+.news-item-source-grade[data-grade="A"] {
+  background: linear-gradient(135deg, #ea580c 0%, #c2410c 100%);
+  box-shadow: 0 0 10px rgba(234, 88, 12, 0.35), 0 2px 6px rgba(0, 0, 0, 0.12);
+}
+
+.news-item-source-grade[data-grade="B"] {
+  background: linear-gradient(135deg, #16a34a 0%, #15803d 100%);
+  box-shadow: 0 0 8px rgba(22, 163, 74, 0.3), 0 2px 6px rgba(0, 0, 0, 0.12);
+}
+
+.news-item-source-grade[data-grade="C"] {
+  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+  box-shadow: 0 0 6px rgba(37, 99, 235, 0.25), 0 2px 6px rgba(0, 0, 0, 0.12);
+}
+
+.news-item-source-grade[data-grade="D"] {
+  background: linear-gradient(135deg, #64748b 0%, #475569 100%);
+  box-shadow: 0 0 4px rgba(100, 116, 139, 0.2), 0 2px 6px rgba(0, 0, 0, 0.12);
+}
+
+@keyframes pulse-glow {
+  0%, 100% {
+    box-shadow: 0 0 12px rgba(220, 38, 38, 0.4), 0 2px 6px rgba(0, 0, 0, 0.12);
+  }
+  50% {
+    box-shadow: 0 0 18px rgba(220, 38, 38, 0.6), 0 2px 6px rgba(0, 0, 0, 0.12);
+  }
 }
 
 /* 源类型切换标签 */

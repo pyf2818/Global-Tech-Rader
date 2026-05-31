@@ -7636,6 +7636,8 @@ function NewsItem({ item, index, viewMode = 'standard', isFocused = false, isBoo
   const renderSourceGrade = () => {
     if (!item.sourceGrade || !item.sourceGradeLabel) return null;
 
+    const grade = item.sourceGrade?.toString().toUpperCase() || 'N/A';
+
     return (
       <span
         className="source-grade-badge"
@@ -7653,9 +7655,13 @@ function NewsItem({ item, index, viewMode = 'standard', isFocused = false, isBoo
         }}
         title={item.sourceGradeLabel}
       >
-        <span className="news-item-source-grade" style={{backgroundColor: item.sourceGradeColor}}>
-  {item.sourceGrade?.toString().toUpperCase() || 'N/A'}
-</span>
+        <span
+          className="news-item-source-grade"
+          style={{backgroundColor: item.sourceGradeColor}}
+          data-grade={grade}
+        >
+          {grade}
+        </span>
       </span>
     );
   };
