@@ -459,6 +459,7 @@ function App() {
   const [searchQuery, setSearchQuery] = useState('');
   const [customSourceFilter, setCustomSourceFilter] = useState('all');
   const [regionFilter, setRegionFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState('all');
   const [builtinBatchMode, setBuiltinBatchMode] = useState(false);
   const [selectedBuiltinSources, setSelectedBuiltinSources] = useState(new Set());
   const [autoMonitorEnabled, setAutoMonitorEnabled] = useState(() => loadLS('autoMonitorEnabled', false));
