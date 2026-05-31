@@ -5457,24 +5457,28 @@ ${signals}
               )}
               {!aiInsights.loading && !aiInsights.data && !aiInsights.error && (
                 <div className="ai-insights-placeholder">
-                  {!llmConfig.baseUrl ? (
-                    <>
-                      <p>配置大模型后自动生成洞察</p>
-                      <button className="btn-quick-config" onClick={() => setShowLlmQuickConfig(true)}>{ICONS.settings}<span>快速配置</span></button>
-                    </>
-                  ) : (
-                    <>
-                      <div className="llm-status-row">
-                        <span className="llm-status-indicator" title="已配置">●</span>
-                        <span className="llm-model-name">{llmConfig.selectedModel || '未选择模型'}</span>
-                      </div>
-                      <p className="ai-insights-hint">已配置 LLM，点击「重新分析」生成当前资讯的洞察</p>
-                      <div className="llm-action-row">
-                        <button className="btn-test-inline" onClick={fetchAiInsights} disabled={llmTesting}>{llmTesting ? '...' : '分析'}</button>
-                        <button className="btn-edit-config" onClick={() => setShowLlmQuickConfig(true)}>{ICONS.settings}<span>修改</span></button>
-                      </div>
-                    </>
-                  )}
+{!llmConfig.baseUrl ? (
+                     <>
+                       <div className="llm-status-row">
+                         <span className="llm-status-indicator warning" title="未配置">●</span>
+                         <span className="llm-model-name">未配置</span>
+                       </div>
+                       <p className="ai-insights-hint">配置大模型后自动生成洞察</p>
+                       <button className="btn-quick-config primary" onClick={() => setShowLlmQuickConfig(true)}>{ICONS.settings}<span>快速配置</span></button>
+                     </>
+                   ) : (
+                     <>
+                       <div className="llm-status-row">
+                         <span className="llm-status-indicator success" title="已配置">●</span>
+                         <span className="llm-model-name">{llmConfig.selectedModel || '未选择模型'}</span>
+                       </div>
+                       <p className="ai-insights-hint">已配置 LLM，点击「重新分析」生成当前资讯的洞察</p>
+                       <div className="llm-action-row">
+                         <button className="btn-test-inline" onClick={fetchAiInsights} disabled={llmTesting}>{llmTesting ? '...' : '分析'}</button>
+                         <button className="btn-edit-config" onClick={() => setShowLlmQuickConfig(true)}>{ICONS.settings}<span>修改</span></button>
+                       </div>
+                     </>
+                   )}
                 </div>
               )}
             </section>
@@ -5924,86 +5928,86 @@ className={`source-card ${disabledSources.includes(source.name) ? 'disabled' : '
                             key={source.id}
 className={`source-card`}
                           >
- <div className="source-card-main">
-                               <div className="source-card-header">
-                                 <div className="source-card-title-row">
-                                   <span className="source-card-name">{source.name}</span>
-                                   {source.grade && sourceGrades[source.grade] && (
-                                     <span
-                                       className="source-grade-badge"
-                                       style={{
-                                         backgroundColor: sourceGrades[source.grade].color,
-                                         color: '#fff',
-                                         fontSize: '10px',
-                                         padding: '2px 6px',
-                                         borderRadius: '4px',
-                                         marginLeft: '8px',
-                                         fontWeight: '600',
-                                         display: 'inline-flex',
-                                         alignItems: 'center',
-                                         gap: '2px'
-                                       }}
-                                       title={sourceGrades[source.grade].label}
-                                     >
-                                       {sourceGrades[source.grade].icon} {source.grade}级
-                                     </span>
+<div className="source-card-main">
+                                <div className="source-card-header">
+                                  <div className="source-card-title-row">
+                                    <span className="source-card-name">{source.name}</span>
+                                    {source.grade && sourceGrades[source.grade] && (
+                                      <span
+                                        className="source-grade-badge"
+                                        style={{
+                                          backgroundColor: sourceGrades[source.grade].color,
+                                          color: '#fff'
+                                        }}
+                                      >
+                                        {sourceGrades[source.grade].icon} {source.grade}级
+                                      </span>
+                                    )}
+                                  </div>
+                                  <button
+                                    className="source-toggle-btn"
+                                    onClick={() => {
+                                      if (disabledSources.includes(source.name)) {
+                                        setDisabledSources(prev => prev.filter(name => name !== source.name));
+                                      } else {
+                                        setDisabledSources(prev => [...prev, source.name]);
+                                      }
+                                    }}
+                                  >
+                                    {disabledSources.includes(source.name) ? '启用' : '禁用'}
+                                  </button>
+                                </div>
+                               <div className="source-card-info">
+                                 <div className="source-card-url" title={source.url}>
+                                   {truncateUrl(source.url, 40)}
+                                 </div>
+                                 <div className="source-card-meta">
+                                   <span className="source-card-region">{REGION_MAP[source.region] || source.region}</span>
+                                   {source.category && (
+                                     <span className="source-card-category">{source.category}</span>
                                    )}
+                                   {(source.tags || []).slice(0, 3).map((tag, i) => (
+                                     <span key={i} className="source-card-tag">{tag}</span>
+                                   ))}
                                  </div>
-                                 <div className="source-card-status">
-                                   {getSourceHealthIndicator(source.id, 'custom')}
-                                 </div>
+                                 {source.notes && (
+                                   <p className="source-card-notes" title={source.notes}>
+                                     {truncateText(source.notes, 50)}
+                                   </p>
+                                 )}
+</div>
+                               <div className="source-card-actions">
+                                 <button
+                                   className="source-icon-btn"
+                                   title="验证"
+                                   onClick={() => verifySingleSource(source)}
+                                 >
+                                   {ICONS.check || <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="20 6 9 17 4 4" /><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" /><polyline points="16 6 12 12 20 12" /></svg>}
+                                 </button>
+                                 <button
+                                   className="source-icon-btn"
+                                   title="编辑"
+                                   onClick={() => setEditingSource(source)}
+                                 >
+                                   {ICONS.edit || <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0 0-2 2v14a2 2 0 0 0 0 2h7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1 1 4 4z" /></svg>}
+                                 </button>
+                                 <button
+                                   className="source-icon-btn danger"
+                                   title="删除"
+                                   onClick={() => {
+                                     if (confirm(`确定删除「${source.name}」？`)) {
+                                       setCustomSources(prev => prev.filter(s => s.id !== source.id));
+                                       setSourceHealth(prev => {
+                                         const newHealth = { ...prev };
+                                         delete newHealth[source.id];
+                                         return newHealth;
+                                       });
+                                     }
+                                   }}
+                                 >
+                                   {ICONS.x || <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>}
+                                 </button>
                                </div>
-                              <div className="source-card-info">
-                                <div className="source-card-url" title={source.url}>
-                                  {truncateUrl(source.url, 40)}
-                                </div>
-                                <div className="source-card-meta">
-                                  <span className="source-card-region">{REGION_MAP[source.region] || source.region}</span>
-                                  {source.category && (
-                                    <span className="source-card-category">{source.category}</span>
-                                  )}
-                                  {(source.tags || []).slice(0, 3).map((tag, i) => (
-                                    <span key={i} className="source-card-tag">{tag}</span>
-                                  ))}
-                                </div>
-                                {source.notes && (
-                                  <p className="source-card-notes" title={source.notes}>
-                                    {truncateText(source.notes, 50)}
-                                  </p>
-                                )}
-                              </div>
-                              <div className="source-card-actions">
-                                <button
-                                  className="source-icon-btn"
-                                  title="编辑"
-                                  onClick={() => setEditingSource(source)}
-                                >
-                                  {ICONS.edit || <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0 0-2 2v14a2 2 0 0 0 0 2h7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1 1 4 4z" /></svg>}
-                                </button>
-                                <button
-                                  className="source-icon-btn"
-                                  title="验证"
-                                  onClick={() => verifySingleSource(source)}
-                                >
-                                  {ICONS.check || <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="20 6 9 17 4 4" /><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" /><polyline points="16 6 12 12 20 12" /></svg>}
-                                </button>
-                                <button
-                                  className="source-icon-btn danger"
-                                  title="删除"
-                                  onClick={() => {
-                                    if (confirm(`确定删除「${source.name}」？`)) {
-                                      setCustomSources(prev => prev.filter(s => s.id !== source.id));
-                                      setSourceHealth(prev => {
-                                        const newHealth = { ...prev };
-                                        delete newHealth[source.id];
-                                        return newHealth;
-                                      });
-                                    }
-                                  }}
-                                >
-                                  {ICONS.x || <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>}
-                                </button>
-                              </div>
                             </div>
                           </div>
                         ))
