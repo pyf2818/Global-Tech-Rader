@@ -454,6 +454,10 @@ function App() {
   const [sourceHealth, setSourceHealth] = useState(() => loadLS('sourceHealth', {}));
   const [editingSource, setEditingSource] = useState(null);
   const [showSourceForm, setShowSourceForm] = useState(false);
+  const [batchMode, setBatchMode] = useState(false);
+  const [selectedSources, setSelectedSources] = useState(new Set());
+  const [builtinBatchMode, setBuiltinBatchMode] = useState(false);
+  const [selectedBuiltinSources, setSelectedBuiltinSources] = useState(new Set());
   
   const [searchQuery, setSearchQuery] = useState('');
   const [customSourceFilter, setCustomSourceFilter] = useState('all');
