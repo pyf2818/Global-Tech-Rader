@@ -7514,26 +7514,37 @@ function NewsItem({ item, index, viewMode = 'standard', isFocused = false, isBoo
 
     if (!validGrades.includes(grade)) return null;
 
+    const gradeColors = {
+      S: { primary: '#dc2626', glow: 'rgba(220, 38, 38, 0.4)', shadow: 'rgba(220, 38, 38, 0.8)' },
+      A: { primary: '#ea580c', glow: 'rgba(234, 88, 12, 0.4)', shadow: 'rgba(234, 88, 12, 0.8)' },
+      B: { primary: '#16a34a', glow: 'rgba(22, 163, 74, 0.4)', shadow: 'rgba(22, 163, 74, 0.8)' },
+      C: { primary: '#2563eb', glow: 'rgba(37, 99, 235, 0.4)', shadow: 'rgba(37, 99, 235, 0.8)' },
+      D: { primary: '#64748b', glow: 'rgba(100, 116, 139, 0.4)', shadow: 'rgba(100, 116, 139, 0.8)' }
+    };
+
+    const colors = gradeColors[grade] || gradeColors.D;
+
     return (
       <span
         className="source-grade-badge"
         style={{
-          color: '#fff',
-          fontSize: '10px',
           marginLeft: '8px',
-          fontWeight: '600',
           display: 'inline-flex',
-          alignItems: 'center',
-          gap: '2px'
+          alignItems: 'center'
         }}
         title={item.sourceGradeLabel}
       >
-        <span
+        <div
           className="news-item-source-grade"
           data-grade={grade}
+          style={{
+            '--grade-primary': colors.primary,
+            '--grade-glow': colors.glow,
+            '--grade-shadow': colors.shadow
+          }}
         >
           {grade}
-        </span>
+        </div>
       </span>
     );
   };

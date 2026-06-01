@@ -4456,53 +4456,82 @@ body {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 22px;
-  height: 22px;
-  padding: 0 8px;
-  border-radius: 4px;
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.5px;
-  background: transparent;
-  border: 1.5px solid;
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0;
   position: relative;
-  transition: all 0.2s ease;
+  background: linear-gradient(135deg,
+    var(--grade-primary) 0%,
+    color-mix(in srgb, var(--grade-primary), black 20%) 100%
+  );
+  color: #fff;
+  box-shadow:
+    0 2px 8px var(--grade-glow),
+    0 0 16px var(--grade-glow),
+    inset 0 1px 0 rgba(255, 255, 255, 0.3),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.2);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: default;
+  user-select: none;
+}
+
+.news-item-source-grade::before {
+  content: '';
+  position: absolute;
+  top: 1px;
+  left: 1px;
+  right: 1px;
+  bottom: 1px;
+  border-radius: 5px;
+  background: linear-gradient(135deg,
+    rgba(255, 255, 255, 0.15) 0%,
+    rgba(255, 255, 255, 0) 50%,
+    rgba(0, 0, 0, 0.1) 100%
+  );
+  pointer-events: none;
+}
+
+.news-item-source-grade::after {
+  content: '';
+  position: absolute;
+  top: -2px;
+  left: -2px;
+  right: -2px;
+  bottom: -2px;
+  border-radius: 8px;
+  background: linear-gradient(45deg,
+    var(--grade-primary),
+    rgba(255, 255, 255, 0.3),
+    var(--grade-primary)
+  );
+  background-size: 200% 200%;
+  opacity: 0;
+  animation: gradeBorderMove 3s linear infinite;
+  z-index: -1;
+  pointer-events: none;
 }
 
 .news-item-source-grade:hover {
-  transform: scale(1.05);
-  filter: brightness(1.1);
+  transform: translateY(-2px) scale(1.05);
+  box-shadow:
+    0 4px 12px var(--grade-glow),
+    0 0 24px var(--grade-glow),
+    0 0 32px var(--grade-shadow),
+    inset 0 1px 0 rgba(255, 255, 255, 0.4),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.3);
 }
 
-/* 等级特定样式 */
-.news-item-source-grade[data-grade="S"] {
-  color: #dc2626;
-  border-color: #dc2626;
-  text-shadow: 0 0 8px rgba(220, 38, 38, 0.3);
+.news-item-source-grade:hover::after {
+  opacity: 1;
 }
 
-.news-item-source-grade[data-grade="A"] {
-  color: #ea580c;
-  border-color: #ea580c;
-  text-shadow: 0 0 8px rgba(234, 88, 12, 0.3);
-}
-
-.news-item-source-grade[data-grade="B"] {
-  color: #16a34a;
-  border-color: #16a34a;
-  text-shadow: 0 0 8px rgba(22, 163, 74, 0.3);
-}
-
-.news-item-source-grade[data-grade="C"] {
-  color: #2563eb;
-  border-color: #2563eb;
-  text-shadow: 0 0 8px rgba(37, 99, 235, 0.3);
-}
-
-.news-item-source-grade[data-grade="D"] {
-  color: #64748b;
-  border-color: #64748b;
-  text-shadow: 0 0 8px rgba(100, 116, 139, 0.3);
+@keyframes gradeBorderMove {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
 }
 
 /* 源类型切换标签 */
