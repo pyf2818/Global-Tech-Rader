@@ -7515,11 +7515,11 @@ function NewsItem({ item, index, viewMode = 'standard', isFocused = false, isBoo
     if (!validGrades.includes(grade)) return null;
 
     const gradeColors = {
-      S: { primary: '#ff0040', glow: 'rgba(255, 0, 64, 0.8)' },
-      A: { primary: '#ff6600', glow: 'rgba(255, 102, 0, 0.8)' },
-      B: { primary: '#00ff88', glow: 'rgba(0, 255, 136, 0.8)' },
-      C: { primary: '#00ccff', glow: 'rgba(0, 204, 255, 0.8)' },
-      D: { primary: '#8888ff', glow: 'rgba(136, 136, 255, 0.8)' }
+      S: { primary: '#ff0000', glow: 'rgba(255, 0, 0, 1)' },
+      A: { primary: '#ff8800', glow: 'rgba(255, 136, 0, 1)' },
+      B: { primary: '#00cc00', glow: 'rgba(0, 204, 0, 1)' },
+      C: { primary: '#0088ff', glow: 'rgba(0, 136, 255, 1)' },
+      D: { primary: '#666666', glow: 'rgba(102, 102, 102, 1)' }
     };
 
     const colors = gradeColors[grade] || gradeColors.D;
