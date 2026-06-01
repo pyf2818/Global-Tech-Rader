@@ -2760,6 +2760,27 @@ body {
 
 .ai-elf-message-time { font-size: 11px; color: var(--text-muted); margin-top: 4px; padding: 0 4px; }
 
+/* AI精灵消息操作按钮 */
+.ai-elf-message-actions { display: flex; gap: 6px; margin-top: 6px; padding: 0 4px; }
+.ai-elf-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  background: transparent;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  color: var(--text-secondary);
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.ai-elf-action-btn:hover {
+  border-color: var(--accent-cyan);
+  color: var(--accent-cyan);
+  background: rgba(34, 211, 238, 0.08);
+}
+
 /* 加载动画 */
 .ai-elf-message-loading { display: flex; gap: 4px; padding: 12px 16px; align-items: center; }
 .ai-elf-message-loading span { display: inline-block; width: 8px; height: 8px; background: var(--accent-cyan); border-radius: 50%; animation: ai-elf-bounce 1.4s ease-in-out infinite; }

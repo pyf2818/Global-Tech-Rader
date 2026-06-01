@@ -920,6 +920,41 @@ ${baseContent}
                       className="ai-elf-message-text"
                       dangerouslySetInnerHTML={{ __html: renderMarkdown(msg.content) }}
                     />
+                    {msg.role === 'assistant' && (
+                      <div className="ai-elf-message-actions">
+                        <button
+                          className="ai-elf-action-btn"
+                          onClick={() => {
+                            navigator.clipboard.writeText(msg.content).then(() => {
+                              const btn = document.querySelector(`[data-copy-index="${index}"]`);
+                              if (btn) btn.textContent = '已复制';
+                              setTimeout(() => { if (btn) btn.textContent = '复制'; }, 2000);
+                            });
+                          }}
+                          data-copy-index={index}
+                          title="复制内容"
+                        >
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="12" height="12">
+                            <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+                          </svg>
+                          复制
+                        </button>
+                        <button
+                          className="ai-elf-action-btn"
+                          onClick={() => {
+                            setInputText(`基于以上分析，我想进一步了解：`);
+                            document.querySelector('.ai-elf-chat-input')?.focus();
+                          }}
+                          title="引用此分析继续深入探讨"
+                        >
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="12" height="12">
+                            <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
+                          </svg>
+                          继续深入
+                        </button>
+                      </div>
+                    )}
                     <div className="ai-elf-message-time">
                       {new Date(msg.timestamp).toLocaleTimeString()}
                     </div>
