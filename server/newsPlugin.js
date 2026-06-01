@@ -1576,7 +1576,7 @@ ${items.map((i, idx) => {
         // AI 辅助写作
         if (requestUrl.pathname === '/api/ai-generate') {
           const body = await parseBody(req);
-          const { baseUrl = '', apiKey = '', model = '', action = '', content = '', context = '' } = body;
+          const { baseUrl = '', apiKey = '', model = '', action = '', content = '', context = '', messages = [], systemPrompt = '' } = body;
           if (!baseUrl || !model) return sendJson(res, { error: 'baseUrl and model are required' }, 400);
           try {
             const cleanBaseUrl = baseUrl.replace(/\/$/, '');
@@ -1597,7 +1597,26 @@ ${items.map((i, idx) => {
               summary: `请为以下文章生成一段简洁的摘要（不超过 100 字）：\n\n${content}`
             };
 
-            const prompt = prompts[action] || `请根据以下要求处理内容：\n要求：${action}\n内容：${content}`;
+            let apiMessages;
+
+            if (action === 'chat' && messages.length > 0) {
+              apiMessages = [];
+              if (systemPrompt) {
+                apiMessages.push({ role: 'system', content: systemPrompt });
+              }
+              const recentMessages = messages.slice(-20);
+              for (const msg of recentMessages) {
+                apiMessages.push({ role: msg.role, content: msg.content });
+              }
+              apiMessages.push({ role: 'user', content });
+            } else {
+              const prompt = prompts[action] || `请根据以下要求处理内容：\n要求：${action}\n内容：${content}`;
+              apiMessages = [];
+              if (systemPrompt) {
+                apiMessages.push({ role: 'system', content: systemPrompt });
+              }
+              apiMessages.push({ role: 'user', content: prompt });
+            }
 
             const controller = new AbortController();
             const timeout = setTimeout(() => controller.abort(), 30000);
@@ -1606,7 +1625,7 @@ ${items.map((i, idx) => {
               headers,
               body: JSON.stringify({
                 model,
-                messages: [{ role: 'user', content: prompt }],
+                messages: apiMessages,
                 max_tokens: 1500,
                 temperature: 0.7
               }),

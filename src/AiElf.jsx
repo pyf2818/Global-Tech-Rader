@@ -11,7 +11,8 @@ export default function AiElf({ llmConfig, avatarImage, elfName, onExportToMater
   const [isLoading, setIsLoading] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
   const [expandedAgent, setExpandedAgent] = useState(null);
-  const [currentSessionId, setCurrentSessionId] = useState(null); // 展开的Agent ID
+  const [currentSessionId, setCurrentSessionId] = useState(null);
+  const [quotedContext, setQuotedContext] = useState(null); // 展开的Agent ID
 
   // 按Agent保存消息历史 { agentId: [{role, content, timestamp}] }
   const [agentMessages, setAgentMessages] = useState(() => {
@@ -429,6 +430,8 @@ ${baseContent}
 
       const systemPrompt = activeAgent?.systemPrompt || '';
 
+      const currentMessages = agentMessages[activeAgentId] || [];
+
       const response = await fetch('/api/ai-generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -438,7 +441,11 @@ ${baseContent}
           model: llmConfig.selectedModel,
           action: 'chat',
           content: messageText,
-          systemPrompt
+          systemPrompt,
+          messages: currentMessages.map(msg => ({
+            role: msg.role,
+            content: msg.content
+          }))
         })
       });
 
@@ -943,7 +950,12 @@ ${baseContent}
                         <button
                           className="ai-elf-action-btn"
                           onClick={() => {
-                            setInputText(`基于以上分析，我想进一步了解：`);
+                            setQuotedContext({
+                              messageIndex: index,
+                              content: msg.content.slice(0, 120) + (msg.content.length > 120 ? '...' : ''),
+                              fullContent: msg.content
+                            });
+                            setInputText('');
                             document.querySelector('.ai-elf-chat-input')?.focus();
                           }}
                           title="引用此分析继续深入探讨"
@@ -989,9 +1001,30 @@ ${baseContent}
 
             {/* 输入区域 */}
             <div className="ai-elf-chat-input-area">
+              {quotedContext && (
+                <div className="ai-elf-quoted-context">
+                  <div className="ai-elf-quoted-label">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="12" height="12">
+                      <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
+                    </svg>
+                    <span>引用上下文</span>
+                  </div>
+                  <div className="ai-elf-quoted-content">{quotedContext.content}</div>
+                  <button
+                    className="ai-elf-quoted-clear"
+                    onClick={() => setQuotedContext(null)}
+                    title="清除引用"
+                  >
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="10" height="10">
+                      <line x1="18" y1="6" x2="6" y2="18" />
+                      <line x1="6" y1="6" x2="18" y2="18" />
+                    </svg>
+                  </button>
+                </div>
+              )}
               <textarea
                 className="ai-elf-chat-input"
-                placeholder={`与${activeAgent?.name}对话...`}
+                placeholder={quotedContext ? `基于以上分析继续探讨...` : `与${activeAgent?.name}对话...`}
                 value={inputText}
                 onChange={(e) => setInputText(e.target.value)}
                 onKeyDown={(e) => {
