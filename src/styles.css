@@ -4437,124 +4437,35 @@ body {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 28px;
-  height: 28px;
-  padding: 0 10px;
-  border-radius: 8px;
-  font-size: 14px;
-  font-weight: 800;
-  letter-spacing: 0.5px;
-  position: relative;
-  overflow: hidden;
-  backdrop-filter: blur(10px);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15),
-              inset 0 1px 0 rgba(255, 255, 255, 0.2);
-}
-
-/* 荧光效果 */
-.news-item-source-grade::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.3) 0%, rgba(255, 255, 255, 0) 50%);
-  pointer-events: none;
-}
-
-/* 透明荧光背景 */
-.news-item-source-grade::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: radial-gradient(circle at center,
-    var(--glow-color-1, rgba(220, 38, 38, 0.3)) 0%,
-    transparent 70%
-  );
-  opacity: 0;
-  transition: opacity 0.3s ease;
-  pointer-events: none;
-}
-
-.news-item-source-grade:hover::after {
-  opacity: 1;
-}
-
-/* 文字效果 */
-.news-item-source-grade span {
-  position: relative;
-  z-index: 1;
-  text-shadow:
-    0 0 10px var(--glow-color-1, rgba(220, 38, 38, 1)),
-    0 0 20px var(--glow-color-1, rgba(220, 38, 38, 0.8)),
-    0 0 30px var(--glow-color-1, rgba(220, 38, 38, 0.6));
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0;
+  color: #fff;
 }
 
 /* 等级特定样式 */
 .news-item-source-grade[data-grade="S"] {
-  --glow-color-1: rgba(220, 38, 38, 1);
-  background: linear-gradient(135deg, rgba(220, 38, 38, 0.9) 0%, rgba(220, 38, 38, 0.7) 100%);
-  color: #fff;
-  box-shadow: 0 0 15px rgba(220, 38, 38, 0.4),
-              0 2px 8px rgba(0, 0, 0, 0.15),
-              inset 0 1px 0 rgba(255, 255, 255, 0.2);
-  animation: tech-glow 3s ease-in-out infinite;
+  background: #dc2626;
 }
 
 .news-item-source-grade[data-grade="A"] {
-  --glow-color-1: rgba(234, 88, 12, 1);
-  background: linear-gradient(135deg, rgba(234, 88, 12, 0.9) 0%, rgba(234, 88, 12, 0.7) 100%);
-  color: #fff;
-  box-shadow: 0 0 12px rgba(234, 88, 12, 0.35),
-              0 2px 8px rgba(0, 0, 0, 0.15),
-              inset 0 1px 0 rgba(255, 255, 255, 0.2);
-  animation: tech-glow 2.5s ease-in-out infinite;
+  background: #ea580c;
 }
 
 .news-item-source-grade[data-grade="B"] {
-  --glow-color-1: rgba(22, 163, 74, 1);
-  background: linear-gradient(135deg, rgba(22, 163, 74, 0.9) 0%, rgba(22, 163, 74, 0.7) 100%);
-  color: #fff;
-  box-shadow: 0 0 10px rgba(22, 163, 74, 0.3),
-              0 2px 8px rgba(0, 0, 0, 0.15),
-              inset 0 1px 0 rgba(255, 255, 255, 0.2);
-  animation: tech-glow 2s ease-in-out infinite;
+  background: #16a34a;
 }
 
 .news-item-source-grade[data-grade="C"] {
-  --glow-color-1: rgba(37, 99, 235, 1);
-  background: linear-gradient(135deg, rgba(37, 99, 235, 0.9) 0%, rgba(37, 99, 235, 0.7) 100%);
-  color: #fff;
-  box-shadow: 0 0 8px rgba(37, 99, 235, 0.25),
-              0 2px 8px rgba(0, 0, 0, 0.15),
-              inset 0 1px 0 rgba(255, 255, 255, 0.2);
-  animation: tech-glow 1.8s ease-in-out infinite;
+  background: #2563eb;
 }
 
 .news-item-source-grade[data-grade="D"] {
-  --glow-color-1: rgba(100, 116, 139, 1);
-  background: linear-gradient(135deg, rgba(100, 116, 139, 0.9) 0%, rgba(100, 116, 139, 0.7) 100%);
-  color: #fff;
-  box-shadow: 0 0 6px rgba(100, 116, 139, 0.2),
-              0 2px 8px rgba(0, 0, 0, 0.15),
-              inset 0 1px 0 rgba(255, 255, 255, 0.2);
-  animation: tech-glow 1.5s ease-in-out infinite;
-}
-
-/* 科技感脉动动画 */
-@keyframes tech-glow {
-  0%, 100% {
-    opacity: 1;
-    transform: scale(1);
-  }
-  50% {
-    opacity: 0.9;
-    transform: scale(1.02);
-  }
+  background: #64748b;
 }
 
 /* 源类型切换标签 */
