@@ -7515,11 +7515,11 @@ function NewsItem({ item, index, viewMode = 'standard', isFocused = false, isBoo
     if (!validGrades.includes(grade)) return null;
 
     const gradeColors = {
-      S: { primary: '#dc2626', glow: 'rgba(220, 38, 38, 0.4)', shadow: 'rgba(220, 38, 38, 0.8)' },
-      A: { primary: '#ea580c', glow: 'rgba(234, 88, 12, 0.4)', shadow: 'rgba(234, 88, 12, 0.8)' },
-      B: { primary: '#16a34a', glow: 'rgba(22, 163, 74, 0.4)', shadow: 'rgba(22, 163, 74, 0.8)' },
-      C: { primary: '#2563eb', glow: 'rgba(37, 99, 235, 0.4)', shadow: 'rgba(37, 99, 235, 0.8)' },
-      D: { primary: '#64748b', glow: 'rgba(100, 116, 139, 0.4)', shadow: 'rgba(100, 116, 139, 0.8)' }
+      S: { primary: '#ff0040', glow: 'rgba(255, 0, 64, 0.8)' },
+      A: { primary: '#ff6600', glow: 'rgba(255, 102, 0, 0.8)' },
+      B: { primary: '#00ff88', glow: 'rgba(0, 255, 136, 0.8)' },
+      C: { primary: '#00ccff', glow: 'rgba(0, 204, 255, 0.8)' },
+      D: { primary: '#8888ff', glow: 'rgba(136, 136, 255, 0.8)' }
     };
 
     const colors = gradeColors[grade] || gradeColors.D;
@@ -7539,8 +7539,7 @@ function NewsItem({ item, index, viewMode = 'standard', isFocused = false, isBoo
           data-grade={grade}
           style={{
             '--grade-primary': colors.primary,
-            '--grade-glow': colors.glow,
-            '--grade-shadow': colors.shadow
+            '--grade-glow': colors.glow
           }}
         >
           {grade}
