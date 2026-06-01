@@ -2739,6 +2739,25 @@ body {
 .ai-elf-message-text { padding: 10px 14px; border-radius: 12px; font-size: 13px; line-height: 1.7; word-break: break-word; }
 .ai-elf-message.user .ai-elf-message-text { background: linear-gradient(135deg, rgba(34, 211, 238, 0.15), rgba(59, 130, 246, 0.1)); color: var(--text-primary); border-bottom-right-radius: 4px; }
 .ai-elf-message.assistant .ai-elf-message-text { background: var(--bg-secondary); color: var(--text-primary); border-bottom-left-radius: 4px; }
+
+/* AI精灵消息内的Markdown样式 */
+.ai-elf-message-text table { border-collapse: collapse; width: 100%; margin: 8px 0; font-size: 12px; }
+.ai-elf-message-text th, .ai-elf-message-text td { border: 1px solid var(--border-color); padding: 6px 10px; text-align: left; }
+.ai-elf-message-text th { background: var(--bg-hover); font-weight: 600; }
+.ai-elf-message-text tr:hover { background: var(--bg-hover); }
+.ai-elf-message-text h1, .ai-elf-message-text h2, .ai-elf-message-text h3 { font-size: 14px; font-weight: 600; margin: 8px 0 4px 0; color: var(--accent-cyan); }
+.ai-elf-message-text p { margin: 6px 0; }
+.ai-elf-message-text code { padding: 2px 4px; background: var(--bg-primary); border-radius: 3px; font-family: 'SF Mono', 'Fira Code', monospace; font-size: 11px; color: var(--accent-cyan); }
+.ai-elf-message-text pre { background: var(--bg-primary); padding: 8px; border-radius: 6px; overflow-x: auto; margin: 8px 0; }
+.ai-elf-message-text pre code { background: none; padding: 0; }
+.ai-elf-message-text ul, .ai-elf-message-text ol { margin: 6px 0; padding-left: 20px; }
+.ai-elf-message-text li { margin: 4px 0; }
+.ai-elf-message-text a { color: var(--accent-cyan); text-decoration: underline; }
+.ai-elf-message-text strong { font-weight: 700; }
+.ai-elf-message-text em { font-style: italic; }
+.ai-elf-message-text blockquote { border-left: 3px solid var(--accent-cyan); padding-left: 10px; color: var(--text-secondary); margin: 8px 0; }
+.ai-elf-message-text hr { border: none; border-top: 1px solid var(--border-color); margin: 12px 0; }
+
 .ai-elf-message-time { font-size: 11px; color: var(--text-muted); margin-top: 4px; padding: 0 4px; }
 
 /* 加载动画 */

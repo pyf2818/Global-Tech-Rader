@@ -7507,17 +7507,12 @@ function NewsItem({ item, index, viewMode = 'standard', isFocused = false, isBoo
 
   // 源等级标识
   const renderSourceGrade = () => {
-    if (!item.sourceGrade || !item.sourceGradeLabel) return null;
+    if (!item.sourceGradeLabel) return null;
 
-    const gradeMap = {
-      1: 'S',
-      2: 'A',
-      3: 'B',
-      4: 'C',
-      5: 'D'
-    };
+    const grade = item.sourceGradeLabel?.charAt(0) || 'N/A';
+    const validGrades = ['S', 'A', 'B', 'C', 'D'];
 
-    const grade = gradeMap[item.sourceGrade] || item.sourceGrade?.toString().toUpperCase() || 'N/A';
+    if (!validGrades.includes(grade)) return null;
 
     return (
       <span
