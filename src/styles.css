@@ -4456,35 +4456,53 @@ body {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 20px;
-  height: 20px;
-  padding: 0 6px;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 8px;
   border-radius: 4px;
   font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0;
-  color: #fff;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  background: transparent;
+  border: 1.5px solid;
+  position: relative;
+  transition: all 0.2s ease;
+}
+
+.news-item-source-grade:hover {
+  transform: scale(1.05);
+  filter: brightness(1.1);
 }
 
 /* 等级特定样式 */
 .news-item-source-grade[data-grade="S"] {
-  background: #dc2626;
+  color: #dc2626;
+  border-color: #dc2626;
+  text-shadow: 0 0 8px rgba(220, 38, 38, 0.3);
 }
 
 .news-item-source-grade[data-grade="A"] {
-  background: #ea580c;
+  color: #ea580c;
+  border-color: #ea580c;
+  text-shadow: 0 0 8px rgba(234, 88, 12, 0.3);
 }
 
 .news-item-source-grade[data-grade="B"] {
-  background: #16a34a;
+  color: #16a34a;
+  border-color: #16a34a;
+  text-shadow: 0 0 8px rgba(22, 163, 74, 0.3);
 }
 
 .news-item-source-grade[data-grade="C"] {
-  background: #2563eb;
+  color: #2563eb;
+  border-color: #2563eb;
+  text-shadow: 0 0 8px rgba(37, 99, 235, 0.3);
 }
 
 .news-item-source-grade[data-grade="D"] {
-  background: #64748b;
+  color: #64748b;
+  border-color: #64748b;
+  text-shadow: 0 0 8px rgba(100, 116, 139, 0.3);
 }
 
 /* 源类型切换标签 */

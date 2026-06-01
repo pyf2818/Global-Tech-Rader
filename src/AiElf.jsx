@@ -10,7 +10,8 @@ export default function AiElf({ llmConfig, avatarImage, elfName, onExportToMater
   const [inputText, setInputText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
-  const [expandedAgent, setExpandedAgent] = useState(null); // 展开的Agent ID
+  const [expandedAgent, setExpandedAgent] = useState(null);
+  const [currentSessionId, setCurrentSessionId] = useState(null); // 展开的Agent ID
 
   // 按Agent保存消息历史 { agentId: [{role, content, timestamp}] }
   const [agentMessages, setAgentMessages] = useState(() => {
@@ -300,6 +301,11 @@ ${baseContent}
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
+  // 切换Agent时重置会话ID
+  useEffect(() => {
+    setCurrentSessionId(null);
+  }, [activeAgentId]);
+
   // 计算聊天窗口位置（跟随精灵）
   const getWindowPosition = () => {
     const windowWidth = window.innerWidth;
@@ -447,16 +453,44 @@ ${baseContent}
           }]
         }));
       } else {
-        setAgentMessages(prev => ({
-          ...prev,
-          [activeAgentId]: [...(prev[activeAgentId] || []), {
+        setAgentMessages(prev => {
+          const updatedMessages = [...(prev[activeAgentId] || []), {
             role: 'assistant',
             content: data.content || '暂无分析结果',
             timestamp: Date.now()
-          }]
-        }));
-        // 每次收到 AI 回复后自动保存当前会话
-        saveSession();
+          }];
+
+          const allMessages = {
+            ...prev,
+            [activeAgentId]: updatedMessages
+          };
+
+          if (!currentSessionId) {
+            const newSessionId = Date.now();
+            setCurrentSessionId(newSessionId);
+            const session = {
+              id: newSessionId,
+              title: newMessage.content.slice(0, 30) + (newMessage.content.length > 30 ? '...' : ''),
+              timestamp: Date.now(),
+              messages: updatedMessages
+            };
+            setAgentHistory(history => ({
+              ...history,
+              [activeAgentId]: [session, ...(history[activeAgentId] || [])].slice(0, 20)
+            }));
+          } else {
+            setAgentHistory(history => ({
+              ...history,
+              [activeAgentId]: (history[activeAgentId] || []).map(session =>
+                session.id === currentSessionId
+                  ? { ...session, messages: updatedMessages, timestamp: Date.now() }
+                  : session
+              )
+            }));
+          }
+
+          return allMessages;
+        });
       }
     } catch (e) {
       setAgentMessages(prev => ({
@@ -515,22 +549,9 @@ ${baseContent}
   };
 
   // 保存当前会话到历史
-  const saveSession = () => {
-    if (messages.length === 0) return;
-    const session = {
-      id: Date.now(),
-      title: messages[0].content.slice(0, 30) + (messages[0].content.length > 30 ? '...' : ''),
-      timestamp: Date.now(),
-      messages: messages
-    };
-    setAgentHistory(prev => ({
-      ...prev,
-      [activeAgentId]: [session, ...(prev[activeAgentId] || [])].slice(0, 20)
-    }));
-  };
-
   // 加载历史会话
   const loadSession = (session) => {
+    setCurrentSessionId(session.id);
     setAgentMessages(prev => ({
       ...prev,
       [activeAgentId]: session.messages
@@ -548,13 +569,23 @@ ${baseContent}
 
   // 清空当前Agent对话
   const clearConversation = () => {
-    if (messages.length > 0) {
-      saveSession();
+    if (messages.length > 0 && currentSessionId) {
+      const session = {
+        id: currentSessionId,
+        title: messages[0].content.slice(0, 30) + (messages[0].content.length > 30 ? '...' : ''),
+        timestamp: Date.now(),
+        messages: messages
+      };
+      setAgentHistory(prev => ({
+        ...prev,
+        [activeAgentId]: [session, ...(prev[activeAgentId] || []).filter(s => s.id !== currentSessionId)].slice(0, 20)
+      }));
     }
     setAgentMessages(prev => ({
       ...prev,
       [activeAgentId]: []
     }));
+    setCurrentSessionId(null);
   };
 
   // 渲染Markdown内容
