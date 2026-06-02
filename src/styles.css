@@ -7,9 +7,9 @@
   --border-color: rgba(255, 255, 255, 0.06);
   --border-active: rgba(56, 189, 248, 0.3);
   --border-glow: rgba(34, 211, 238, 0.15);
-  --text-primary: #f1f5f9;
-  --text-secondary: #b0bcc8;
-  --text-muted: #8b9db3;
+  --text-primary: #ffffff;
+  --text-secondary: #cbd5e1;
+  --text-muted: #94a3b8;
   --accent-cyan: #22d3ee;
   --accent-blue: #3b82f6;
   --accent-violet: #a78bfa;
@@ -26,6 +26,7 @@
   --bg-glow-2: rgba(167, 139, 250, 0.15);
   --particle-c1: rgba(34, 211, 238, 0.85);
   --particle-c2: rgba(167, 139, 250, 0.8);
+  --grid-color: rgba(34, 211, 238, 0.03);
 }
 
 :root {
