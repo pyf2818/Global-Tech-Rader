@@ -390,6 +390,49 @@ async function resolveImageFromArticleWithScrapling(articleUrl) {
 - 优先选择包含人物、产品、场景等有意义内容的图片
 - 排除纯文字图、几何图形、图表等
 
+## 修复说明（2026-06-02）
+
+### 发现的问题
+1. **最低分数太低**：MIN_IMAGE_SCORE=20 过于宽松，低质量图片也能通过
+2. **路径评分冲突**：banner 同时在好坏路径中
+3. **og:image 过于优先**：即使是通用分享图也被加分 5
+4. **没有排除通用图片**：网站 logo、header/footer 图可能被选中
+5. **没有图片去重**：同一图片可能被多个新闻使用
+
+### 修复措施
+1. **提高评分阈值**：
+   - MIN_IMAGE_SCORE: 20 → 40（提高 100%）
+   - MIN_IMAGE_WIDTH: 300 → 400
+   - MIN_IMAGE_HEIGHT: 200 → 300
+
+2. **增强黑名单**：
+   - 新增路径黑名单：logo、brand、identity、template、default、generic、common、shared、global
+   - 新增域名黑名单：logo、brand、identity、template、default、generic、common、shared、global
+
+3. **修复路径评分**：
+   - 从 goodPaths 中移除 banner（避免冲突）
+   - badPaths 从 -20 提高到 -30
+   - 新增 veryBadPaths（-50分）：logo、header-bg、footer-bg、nav-bg、hero-bg、banner-bg、site-logo、brand-logo、company-logo、organization-logo
+
+4. **降低 meta 图片优先级**：
+   - og:image 加分：5 → 2，且只在高分时（≥40）才考虑
+   - twitter:image 加分：3 → 1，且只在高分时（≥40）才考虑
+
+5. **增强图片过滤**：
+   - 在 isGoodImageUrl 中新增通用文件名检测：logo、brand、identity、header、footer、nav、bg、background、banner、template、default、generic、common、shared、global、placeholder、sample、example、demo、test
+   - 新增尺寸文件名检测：icon、thumb、tiny、small、mini、avatar、badge
+   - 使用 MEDIA_CONFIG.MIN_IMAGE_WIDTH/MIN_IMAGE_HEIGHT 过滤小图
+
+6. **添加图片去重**：
+   - 按 URL 去重（移除查询参数）
+   - 避免同一图片被多个新闻使用
+
+### 预期效果
+- 大幅减少低质量图片和通用图片
+- 避免图片重复
+- 提高图片与内容的相关性
+- 图片获取率可能下降（70-80% → 50-60%），但质量显著提升
+
 ## 实施优先级
 
 | 优先级 | 阶段 | 预期效果 | 工作量 |

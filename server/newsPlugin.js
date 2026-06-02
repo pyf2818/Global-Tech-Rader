@@ -7,10 +7,10 @@ const MEDIA_CONFIG = {
   SCRAPLING_MODE: 'dynamic',    // Scrapling 模式（basic/dynamic/stealth）
   SCRAPLING_TIMEOUT: 10000,     // Scrapling 超时（毫秒）
 
-  // 图片评分阈值
-  MIN_IMAGE_SCORE: 20,          // 最低分数才使用
-  MIN_IMAGE_WIDTH: 300,         // 最小宽度（像素）
-  MIN_IMAGE_HEIGHT: 200,        // 最小高度（像素）
+  // 图片评分阈值（提高以确保质量）
+  MIN_IMAGE_SCORE: 40,          // 最低分数才使用（从 20 提高到 40）
+  MIN_IMAGE_WIDTH: 400,         // 最小宽度（像素，从 300 提高到 400）
+  MIN_IMAGE_HEIGHT: 300,        // 最小高度（像素，从 200 提高到 300）
   ASPECT_RATIO_MIN: 1.2,        // 最小宽高比
   ASPECT_RATIO_MAX: 2.5,        // 最大宽高比
 
@@ -1949,30 +1949,54 @@ async function resolveImageFromArticle(articleUrl) {
         const { score, reasons } = scoreImageUrl(url, html);
         return { url, score, reasons };
       })
-      .filter(img => img.score > 0)
+      .filter(img => img.score >= MEDIA_CONFIG.MIN_IMAGE_SCORE)
       .sort((a, b) => b.score - a.score);
 
-    // 提取 og:image 作为备选（加分以提高优先级）
+    // 新增：去重（按 URL 去重，保留分数最高的）
+    const uniqueImages = [];
+    const seenUrls = new Set();
+    for (const img of scoredImages) {
+      const normalizedUrl = img.url.split('?')[0]; // 移除查询参数
+      if (!seenUrls.has(normalizedUrl)) {
+        seenUrls.add(normalizedUrl);
+        uniqueImages.push(img);
+      }
+    }
+
+    // 提取 og:image 作为备选（只有在高分时才加分）
     const ogImage = html.match(/<meta\s+property=["']og:image["']\s+content=["']([^"']+)["']/i);
     if (ogImage) {
       const ogScore = scoreImageUrl(ogImage[1], html);
-      if (ogScore.score > 0) {
-        scoredImages.push({ url: ogImage[1], score: ogScore.score + 5, reasons: ['og:image', ...ogScore.reasons] });
+      // 只有当 og:image 分数较高时才考虑，且不是通用分享图
+      if (ogScore.score >= MEDIA_CONFIG.MIN_IMAGE_SCORE) {
+        const ogUrl = ogImage[1].split('?')[0];
+        if (!seenUrls.has(ogUrl)) {
+          uniqueImages.push({ url: ogImage[1], score: ogScore.score + 2, reasons: ['og:image', ...ogScore.reasons] });
+          seenUrls.add(ogUrl);
+        }
       }
     }
 
-    // 提取 twitter:image 作为备选
+    // 提取 twitter:image 作为备选（只有在高分时才加分）
     const twitterImage = html.match(/<meta\s+name=["']twitter:image["']\s+content=["']([^"']+)["']/i);
     if (twitterImage) {
       const twitterScore = scoreImageUrl(twitterImage[1], html);
-      if (twitterScore.score > 0) {
-        scoredImages.push({ url: twitterImage[1], score: twitterScore.score + 3, reasons: ['twitter:image', ...twitterScore.reasons] });
+      // 只有当 twitter:image 分数较高时才考虑
+      if (twitterScore.score >= MEDIA_CONFIG.MIN_IMAGE_SCORE) {
+        const twitterUrl = twitterImage[1].split('?')[0];
+        if (!seenUrls.has(twitterUrl)) {
+          uniqueImages.push({ url: twitterImage[1], score: twitterScore.score + 1, reasons: ['twitter:image', ...twitterScore.reasons] });
+          seenUrls.add(twitterUrl);
+        }
       }
     }
 
+    // 重新排序（去重后可能顺序改变）
+    uniqueImages.sort((a, b) => b.score - a.score);
+
     // 选择最佳图片
-    if (scoredImages.length > 0) {
-      const best = scoredImages[0];
+    if (uniqueImages.length > 0) {
+      const best = uniqueImages[0];
       const optimizedUrl = optimizeImageUrl(best.url);
       console.log(`[resolveImage] Selected for ${articleUrl}:`, {
         url: optimizedUrl.substring(0, 80),
@@ -2406,8 +2430,8 @@ function escapeRegExp(string) {
   return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-const IMAGE_BLACKLIST_RE = /(\/|^)(ads|advert|banner|sponsor|promo|tracking|pixel|beacon|stat|analytics|share-bar|social-bar|gravatar|feedburner|rss|newsletter-signup|popup|overlay|interstitial|cdnp|cloudfront\.net\/images\/ui|fb-[a-z]|tw-[a-z]|linkedin-[a-z]|pinterest-[a-z]|buffer-[a-z]|addthis|sharethis|disqus|wp-emoticon|mstile|apple-touch-icon|android-chrome|safari-pinned|og-image-default|placeholder|stock|ticker|chart-bar|subscribe|related-post|sidebar|widget|newsletter|popup-icon|notification|push|web-push)\b/i;
-const IMAGE_BLACKLIST_DOMAINS = /\/\/(feedburner\.|gravatar\.|disqus\.|addthis\.|sharethis\.|buffer\.|pixel\.|tracking\.|analytics\.|doubleclick\.|adsense\.|adnxs\.|moatads\.|chartbeat\.|newrelic\.|pingdom\.|taboola\.|outbrain\.|zemanta\.|scoopit\.)/i;
+const IMAGE_BLACKLIST_RE = /(\/|^)(ads|advert|banner|sponsor|promo|tracking|pixel|beacon|stat|analytics|share-bar|social-bar|gravatar|feedburner|rss|newsletter-signup|popup|overlay|interstitial|cdnp|cloudfront\.net\/images\/ui|fb-[a-z]|tw-[a-z]|linkedin-[a-z]|pinterest-[a-z]|buffer-[a-z]|addthis|sharethis|disqus|wp-emoticon|mstile|apple-touch-icon|android-chrome|safari-pinned|og-image-default|placeholder|stock|ticker|chart-bar|subscribe|related-post|sidebar|widget|newsletter|popup-icon|notification|push|web-push|logo|brand|identity|template|default|generic|common|shared|global|header-bg|footer-bg|nav-bg|hero-bg|banner-bg|site-logo|company-logo|organization-logo)\b/i;
+const IMAGE_BLACKLIST_DOMAINS = /\/\/(feedburner\.|gravatar\.|disqus\.|addthis\.|sharethis\.|buffer\.|pixel\.|tracking\.|analytics\.|doubleclick\.|adsense\.|adnxs\.|moatads\.|chartbeat\.|newrelic\.|pingdom\.|taboola\.|outbrain\.|zemanta\.|scoopit\.|logo\.|brand\.|identity\.|template\.|default\.|generic\.|common\.|shared\.|global\.)/i;
 const IMAGE_MIN_DIM_HINT = /width=["']([0-9]+)["']|height=["']([0-9]+)["']/i;
 
 function isGoodImageUrl(url, htmlSource) {
@@ -2416,12 +2440,21 @@ function isGoodImageUrl(url, htmlSource) {
   if (IMAGE_BLACKLIST_DOMAINS.test(url)) return false;
   if (/\.(ico|cur|bmp|svg)$/i.test(url) && !/\/(thumbnail|preview|featured|hero|cover|banner-img|article-img)\b/i.test(url)) return false;
 
+  // 新增：排除尺寸明显过小的图片
   const dimMatch = htmlSource?.match(IMAGE_MIN_DIM_HINT);
   if (dimMatch) {
     const w = parseInt(dimMatch[1] || '0', 10);
     const h = parseInt(dimMatch[2] || '0', 10);
-    if ((w > 0 && w < 50) || (h > 0 && h < 50)) return false;
+    if ((w > 0 && w < MEDIA_CONFIG.MIN_IMAGE_WIDTH) || (h > 0 && h < MEDIA_CONFIG.MIN_IMAGE_HEIGHT)) return false;
   }
+
+  // 新增：排除通用图片文件名
+  const genericPatterns = /\/(logo|brand|identity|header|footer|nav|bg|background|banner|template|default|generic|common|shared|global|placeholder|sample|example|demo|test)([-_]|$)/i;
+  if (genericPatterns.test(url)) return false;
+
+  // 新增：排除尺寸提示文件名
+  const sizePatterns = /\/(icon|thumb|tiny|small|mini|avatar|badge)([-_]|$)/i;
+  if (sizePatterns.test(url)) return false;
 
   return true;
 }
@@ -2621,16 +2654,20 @@ function scoreDimensions(url, context) {
 function scorePath(url) {
   let score = 0;
 
-  // 好的路径
-  const goodPaths = /(img|images|assets|static|public|media|photos|screenshots|pictures|gallery|content|article|post|featured|hero|cover|banner|main|lead|primary|display)/i;
+  // 好的路径（移除 banner，避免冲突）
+  const goodPaths = /(img|images|assets|static|public|media|photos|screenshots|pictures|gallery|content|article|post|featured|hero|cover|main|lead|primary|display)/i;
   if (goodPaths.test(url)) score += 10;
 
   // 特别好的路径（首图、封面图）
-  if (/\/(cover|hero|featured|main|lead|primary|headline|thumbnail)(\/|$)/i.test(url)) score += 10;
+  if (/\/(cover|hero|featured|main|lead|primary|headline)(\/|$)/i.test(url)) score += 10;
 
-  // 坏的路径（图标、按钮、导航等）
-  const badPaths = /(icon|logo|avatar|badge|shield|button|btn|nav|header|footer|sidebar|widget|share|social|tracking|pixel|analytics|ad|advertisement|sponsor|promo|popup|overlay|separator|divider|spacer|background|bg|texture|pattern|watermark)/i;
-  if (badPaths.test(url)) score -= 20;
+  // 坏的路径（图标、按钮、导航等 - 添加更多）
+  const badPaths = /(icon|logo|avatar|badge|shield|button|btn|nav|header|footer|sidebar|widget|share|social|tracking|pixel|analytics|ad|advertisement|sponsor|promo|popup|overlay|separator|divider|spacer|background|bg|texture|pattern|watermark|brand|identity|template|placeholder|default|generic|common|shared|global)/i;
+  if (badPaths.test(url)) score -= 30; // 从 -20 提高到 -30
+
+  // 特别坏的路径（通用图片）
+  const veryBadPaths = /(logo|header-bg|footer-bg|nav-bg|hero-bg|banner-bg|site-logo|brand-logo|company-logo|organization-logo)/i;
+  if (veryBadPaths.test(url)) score -= 50;
 
   return score;
 }
