@@ -17,39 +17,42 @@ No test, lint, typecheck, or formatter commands exist. Do not run them.
 ## Architecture
 
 - **Single-file frontend**: `src/App.jsx` (~8000 lines) — all state, rendering, and logic. Inline components: `NewsItem`, `GithubRepoCard`, `HexRadarChart`, `Lightbox`.
-- **AI Elf component**: `src/AiElf.jsx` (~960 lines) — AI assistant with Agent system, per-Agent localStorage storage with quota limits (50 messages, 20 history sessions).
+- **AI Elf component**: `src/AiElf.jsx` (~1050 lines) — AI assistant with Agent system, per-Agent localStorage storage with quota limits (50 messages, 20 history sessions). **Now supports conversation context and quoted references**.
 - **3D Globe component**: `src/GlobeView.jsx` (~900 lines) — `react-globe.gl` based interactive 3D earth visualization.
 - **API Layer**: Dual implementation:
   - Development: `server/newsPlugin.js` (~2400 lines) as Vite middleware plugin
   - Production: `api/*.js` serverless functions (Vercel deployment)
 - **Scrapling Server**: `scrapling_server.py` (Flask on port 5000) — custom web scraping with basic/dynamic/stealth modes
 - **Entrypoint**: `src/main.jsx` mounts `<App />` inside `<ErrorBoundary>` + `<React.StrictMode>`.
-- **Styling**: `src/styles.css` (~6600 lines) with CSS custom properties for dark/light themes. Tailwind config only sets content paths — no Tailwind utilities used in components.
+- **Styling**: `src/styles.css` (~7300 lines) with CSS custom properties for dark/light themes. Tailwind config only sets content paths — no Tailwind utilities used in components.
 - **Dev server port**: Fixed to **5175** in `vite.config.js` (`server.port: 5175`).
 - **Vite proxy**: `/api/scrape` requests forward to `http://localhost:5000` (Scrapling API).
 
-## New Features (Recent)
+## AI Elf Conversation System
 
-- **Editor Fullscreen Mode**: Toggle via button in article editor. Hides sidebar, topbar, stats-bar, and right panel; expands editor to full viewport. ESC key exits fullscreen.
-- **Reading List Page**: Displays bookmarked news items with read/unread toggle and remove functionality. Shows bookmark count and unread count in stats bar. Stored in `localStorage` under `bookmarks` key.
-- **Calendar Page**: Event management with date picker grid, event list, and add-event modal. Events stored in `localStorage` under `calendarEvents` key with shape `{id, title, date, time, description, color}`.
-- **Source Grading System**: 5-tier grading (S/A/B/C/D) with weights 1.0/0.95/0.85/0.75/0.65. Grade badges displayed with colors (S=#dc2626, A=#ea580c, B=#16a34a, C=#2563eb, D=#64748b). No emoji icons.
-- **Builtin Source Management**: Settings page "信息源" tab has builtin/custom sub-tabs. Builtin tab shows all 266 sources with grade filter, region filter, status filter, enable/disable toggle, batch operations.
-- **Custom Web Scraping**: "自定义抓取" page in navigation menu. Uses Scrapling framework (Python Flask on port 5000). Three modes: basic (fast), dynamic (JS rendering), stealth (anti-bot). Save scraped content to materials or editor.
-- **Sidebar Compression**: Sidebar header, quick-access bar, nav menu, and footer paddings reduced to increase scrollable area for the "管理沉淀" module.
-- **Navigation Groups**: NAV_GROUPS now includes "管理沉淀" category with `['calendar', 'reading-list', 'knowledge-export']` items.
+**Multi-turn conversation support**:
+- Messages parameter: `sendMessage` now passes complete conversation history to `/api/ai-generate` API
+- Backend constructs full conversation context (last 20 messages) for the LLM
+- Enables continuous, context-aware dialogue without memory loss
+- Each message includes role (`user`/`assistant`) and content
 
-## Agent System (AI Elf)
+**Quoted reference feature**:
+- `quotedContext` state tracks referenced message (index, truncated content, full content)
+- "继续深入" button sets reference context and shows UI above input field
+- Reference display: cyan border, shows truncated content, clear button to remove
+- When quoting: placeholder changes to "基于以上分析继续探讨..."
+- Clear button removes reference context, returns to normal conversation
 
-The AI Elf component implements a multi-Agent system for news analysis:
+**Session management**:
+- `currentSessionId` tracks active conversation session
+- New session created on first message of conversation
+- Existing session updated on subsequent messages (no duplicate sessions)
+- Loading history session sets `currentSessionId` for continued context
+- `clearConversation` saves session and resets ID
 
-- **8 predefined Agents**: Defined in `DEFAULT_AGENTS` array (App.jsx), each with id, name, description, system prompt, category, tags, and avatar.
-- **Agent Categories**: `AGENT_CATEGORIES` = ['全部', '分析', '技术', '商业', '创作', '语言', '教育', '思辨']
-- **Per-Agent Storage**: Messages and history stored in `localStorage` under keys `ai-elf-agent-messages` and `ai-elf-agent-history`, keyed by `agentId`.
-- **Custom Agents**: Users can create custom Agents via settings modal; stored with `isCustom: true` flag.
-- **Analysis Templates**: Each Agent uses `buildAnalysisPrompt()` to generate domain-specific prompts (e.g., `analyst` uses 5-dimension template, `tech-advisor` uses tech-focused template).
-- **Export to Materials**: AI Elf analysis can be saved to the materials library via `onExportToMaterials` callback.
-- **Settings Integration**: Agent management merged into "Agent管理" settings tab with independent avatar upload, prompt editing, and AI prompt refinement.
+**Message actions** (only for assistant messages):
+- **Copy button**: Copies raw message content to clipboard via navigator.clipboard API
+- **Continue button**: Sets quoted context for deep exploration on specific analysis
 
 ## Key Duplication (Must Update Both Files)
 
@@ -77,7 +80,8 @@ Additionally, `DEFAULT_SOURCES` and `CATEGORIES` are duplicated between `server/
 | `/api/llm-models` | GET | `baseUrl`, `apiKey` | Fetches available models from LLM provider |
 | `/api/llm-test` | POST | `baseUrl`, `model`, `apiKey` | Tests LLM API connectivity |
 | `/api/ai-insights` | POST | `baseUrl`, `apiKey`, `model`, `items[]` | Analyzes top 30 news items via LLM, returns `{trends, correlations, signals}` |
-| `/api/ai-generate` | POST | `baseUrl`, `apiKey`, `model`, `action`, `content` | LLM content generation (continue, rewrite, expand, simplify, translate, title, summary) |
+| `/api/ai-generate` | POST | `baseUrl`, `apiKey`, `model`, `action`, `content`, `messages?`, `systemPrompt?` | LLM content generation (continue, rewrite, expand, simplify, translate, title, summary, **chat**). **chat** action supports `messages` array for conversation context |
+| `/api/scrape` | POST | `url`, `mode`, `timeout` | Custom web scraping via Scrapling framework |
 | `/api/ai/*`, `/api/translate/*`, `/api/subscriptions/*`, `/api/bookmarks/*` | — | — | Stub endpoints returning 501 |
 
 ## LLM Config
@@ -89,6 +93,33 @@ AI insights are triggered on `items` change (auto) or via manual refresh button.
 ## Source Config
 
 All RSS/Atom sources live in `DEFAULT_SOURCES` and `TRENDING_SOURCES` arrays at the top of `server/newsPlugin.js`. Each source needs `name`, `url`, `region` (`domestic`/`overseas`/`global`), and `defaultCategory`.
+
+## Batch Operations
+
+**Simplified batch operations** (no checkboxes):
+- Builtin sources management uses filter-based batch operations
+- Show current filtered count: "当前显示 X 个源"
+- Two batch action buttons: "批量禁用当前" (operates on enabled sources in filter), "批量启用当前" (operates on disabled sources in filter)
+- Confirmation dialogs before destructive operations
+- No selection state, no batch mode toggle
+- Users filter by grade/region/status/search, then batch operate on results
+
+## Grade Badge Design
+
+**Current design** (static, clean):
+- 18×18px square with colored text and border
+- System fonts (not monospace), 11px size, 900 weight
+- Multi-layer text shadow (4-20px glow radius) for effect
+- 1.5px colored border with inner/outer glow
+- 30% background opacity
+- High contrast colors: S=#ff0000, A=#ff8800, B=#00cc00, C=#0088ff, D=#666666
+- No animations, no flickering
+- Renders at grade: S/A/B/C/D (extracted from sourceGradeLabel first char)
+
+**Previous iterations** (for reference):
+- Cyberpunk neon: flickering, animated borders, monospace font
+- Premium gradient: 26×26px, gradient background, shadows, hover effects
+- Transparent border: 22×22px, thin border with text shadow
 
 ## Caching
 
@@ -122,7 +153,7 @@ Both workflows use Node.js 20 and `npm ci` for dependency installation.
 - `index.html` has a global `onerror` handler that replaces the page with an error display and a "Clear localStorage & Reload" button.
 - **AI Elf localStorage quota**: AI Elf wraps all `localStorage.setItem` calls in try-catch to handle `QuotaExceededError`. Limits messages to 50 per Agent and history to 20 sessions per Agent to prevent quota issues.
 - `LLM_PRESETS` must be defined at file scope (top level of App.jsx), not inside a function — putting it inside `generateSummary` caused a `ReferenceError`.
-- `/api/ai-insights` prompts LLM for concise JSON output (max 800 tokens, 30 chars per item). Truncated responses are caught with a retry-friendly error message.
+- `/api/ai-generate` chat action: Pass `messages` array (last 20) and `systemPrompt` for multi-turn conversations. Missing these will cause single-turn contextless responses.
 - **GlobeView**: Uses `react-globe.gl` which renders a Three.js canvas. The fullscreen mode uses `createPortal` to render at `document.body` level. Ensure the canvas has sufficient `min-height` (420px) or the globe won't render.
 - **Globe interaction**: The old `.globe-bg` wrapper blocked mouse events on the fullscreen globe. Always use `.globe-bg-decoration` with `pointer-events: none` for background effects, and render the `Globe` component directly at the root level.
 - **Image upload in editor**: `App.jsx` supports image upload (click image button or paste Ctrl+V) and stores images as Base64 in `article.images` array. The editor uses placeholder syntax `![alt](#{id})` to avoid cluttering the text with long Base64 strings. Use `renderMarkdownWithImages(text, images)` to replace placeholders with actual Base64 data during preview/export.
@@ -145,97 +176,16 @@ Both workflows use Node.js 20 and `npm ci` for dependency installation.
 
 ## Scrapling Integration
 
-The platform now includes **custom web scraping capabilities** using the Scrapling framework:
-
-### Architecture
-- **Backend API**: Flask server (`scrapling_server.py`) on port 5000 with `/api/scrape` endpoint
-- **Proxy Configuration**: Vite proxy forwards `/api/scrape` requests to Scrapling API
-- **Frontend Feature**: New "自定义抓取" (Custom Scrape) page in navigation menu under "资讯中心" group
-
-### Scrapling Capabilities
-- **Three modes**:
-  - `basic`: Fast HTTP requests for static pages
-  - `dynamic`: Browser rendering for JavaScript-heavy pages
-  - `stealth`: Anti-bot bypass for protected sites (Cloudflare, etc.)
-- **Content extraction**: Titles, summaries, authors, dates, images, links, paragraphs
-- **Performance**: Up to 784x faster than BeautifulSoup, 92% test coverage
-
-### API Usage
+**Quick start**:
 ```bash
-# POST /api/scrape
-{
-  "url": "https://example.com",
-  "mode": "basic|dynamic|stealth",
-  "timeout": 30
-}
-
-# Returns structured data:
-{
-  "url": "https://example.com",
-  "status": 200,
-  "title": "Page Title",
-  "summary": "Content summary...",
-  "description": "Meta description",
-  "author": "Author name",
-  "published_date": "2026-05-31",
-  "images": [{"src": "...", "alt": "..."}],
-  "links": [{"url": "...", "text": "..."}],
-  "paragraphs_count": 10,
-  "content_length": 5000
-}
+python scrapling_server.py  # Starts Flask API on port 5000
 ```
 
-### Integration Points
-- **Save to Materials**: Add scraped content to materials library
-- **Save to Editor**: Create article draft from scraped content
-- **UI Components**: Custom URL input, mode selector, result display with metadata, images, links
+**Three modes**:
+- `basic`: Fast HTTP requests for static pages
+- `dynamic`: Browser rendering for JavaScript-heavy pages  
+- `stealth`: Anti-bot bypass for protected sites (Cloudflare, etc.)
 
-### Server Requirements
-- Python 3.10+
-- Dependencies: `scrapling[fetchers]`, `flask`, `flask-cors`
-- Browser dependencies: Run `scrapling install` after installation
-- Production: Use WSGI server (gunicorn) instead of Flask dev server
+**API**: POST `/api/scrape` with `{ url, mode, timeout }`. Returns structured data with title, summary, author, date, images, links, etc.
 
-### Performance Notes
-- Stealth mode slower (browser startup), use only when necessary
-- Concurrent browser pooling with automatic cleanup
-- 30-second timeout with retry logic
-- Memory efficient for large-scale scraping
-
-## Deployment
-
-### Quick Deployment
-The project supports deployment to any environment (local, server, cloud):
-
-```bash
-# Docker deployment (recommended)
-chmod +x docker-deploy.sh
-./docker-deploy.sh
-
-# Manual installation
-chmod +x install_dependencies.sh
-./install_dependencies.sh
-```
-
-### Cross-Platform Support
-- ✅ Linux, macOS, Windows compatible
-- ✅ Docker containerization ready
-- ✅ Production deployment with Gunicorn + Nginx
-- ✅ Scrapling web scraping capabilities included
-
-### Deployment Documentation
-- [Quick Deployment Guide](DEPLOYMENT_QUICK.md) - Step-by-step deployment instructions
-- [Full Deployment Guide](DEPLOYMENT.md) - Complete deployment documentation
-- [Scrapling Integration](SCRAPLING_INTEGRATION.md) - Web scraping integration details
-
-### Key Deployment Features
-- 📦 One-click deployment with Docker
-- 🔄 Automatic dependency installation (Python, Node.js, browsers)
-- 🛠 Simplified configuration with environment templates
-- 📊 Built-in health monitoring and logging
-- 🔒 Production security configurations and best practices
-
-### Post-Deployment Access
-- Frontend: http://localhost (or your domain)
-- Scrapling API: http://localhost:5000/api/scrape
-- Health Check: http://localhost:5000/api/health
+**Deployment**: Python 3.10+, dependencies: `scrapling[fetchers]`, `flask`, `flask-cors`. Production uses gunicorn instead of Flask dev server.
