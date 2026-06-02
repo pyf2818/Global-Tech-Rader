@@ -1,3 +1,73 @@
+// ========== 多媒体配置 ==========
+const MEDIA_CONFIG = {
+  // 抓取配置
+  MAX_RESOLVE_ITEMS: 60,        // 最多抓取多少条无图片新闻
+  RESOLVE_TIMEOUT: 8000,        // 抓取超时（毫秒）
+  USE_SCRAPLING: false,         // 是否使用 Scrapling 动态渲染（需要 Scrapling 服务器）
+  SCRAPLING_MODE: 'dynamic',    // Scrapling 模式（basic/dynamic/stealth）
+  SCRAPLING_TIMEOUT: 10000,     // Scrapling 超时（毫秒）
+
+  // 图片评分阈值
+  MIN_IMAGE_SCORE: 20,          // 最低分数才使用
+  MIN_IMAGE_WIDTH: 300,         // 最小宽度（像素）
+  MIN_IMAGE_HEIGHT: 200,        // 最小高度（像素）
+  ASPECT_RATIO_MIN: 1.2,        // 最小宽高比
+  ASPECT_RATIO_MAX: 2.5,        // 最大宽高比
+
+  // 缓存配置
+  IMAGE_CACHE_SIZE: 1000,       // 缓存条目数量
+  IMAGE_CACHE_TTL: 3600000,     // 缓存有效期（1小时，毫秒）
+};
+
+// ========== 多媒体统计 ==========
+const mediaStats = {
+  totalItems: 0,
+  itemsWithImage: 0,
+  itemsWithVideo: 0,
+  rssImageCount: 0,
+  resolvedImageCount: 0,
+  scraplingImageCount: 0,
+  ogImageCount: 0,
+  twitterImageCount: 0,
+  totalImageScore: 0,
+  failedResolves: 0,
+  lastUpdate: null
+};
+
+function resetMediaStats() {
+  mediaStats.totalItems = 0;
+  mediaStats.itemsWithImage = 0;
+  mediaStats.itemsWithVideo = 0;
+  mediaStats.rssImageCount = 0;
+  mediaStats.resolvedImageCount = 0;
+  mediaStats.scraplingImageCount = 0;
+  mediaStats.ogImageCount = 0;
+  mediaStats.twitterImageCount = 0;
+  mediaStats.totalImageScore = 0;
+  mediaStats.failedResolves = 0;
+  mediaStats.lastUpdate = new Date().toISOString();
+}
+
+function logMediaStats() {
+  const totalResolveAttempts = mediaStats.resolvedImageCount + mediaStats.scraplingImageCount + mediaStats.failedResolves;
+  const coverageRate = mediaStats.totalItems > 0 ? ((mediaStats.itemsWithImage / mediaStats.totalItems) * 100).toFixed(1) : '0.0';
+  const avgScore = mediaStats.itemsWithImage > 0 ? (mediaStats.totalImageScore / mediaStats.itemsWithImage).toFixed(1) : '0.0';
+  const failRate = totalResolveAttempts > 0 ? ((mediaStats.failedResolves / totalResolveAttempts) * 100).toFixed(1) : '0.0';
+
+  console.log('[Media Stats]', {
+    更新时间: mediaStats.lastUpdate,
+    总条目: mediaStats.totalItems,
+    图片覆盖率: `${coverageRate}%`,
+    RSS图片: mediaStats.rssImageCount,
+    补全图片: mediaStats.resolvedImageCount,
+    Og图片: mediaStats.ogImageCount,
+    Twitter图片: mediaStats.twitterImageCount,
+    Scrapling图片: mediaStats.scraplingImageCount,
+    平均图片分: avgScore,
+    失败率: `${failRate}%`
+  });
+}
+
 // ========== 信息源质量权重 ==========
 // 从顶级项目（Horizon/TrendRadar）学到的：给不同质量源设置权重，高权重源优先展示
 const SOURCE_WEIGHTS = {
@@ -1710,11 +1780,26 @@ async function getNews(blocked, customSources, page = 0, pageSize = PAGE_SIZE, s
       return (b.sourceGrade || 0) - (a.sourceGrade || 0);
     });
 
+    // 初始化统计
+    resetMediaStats();
+    mediaStats.totalItems = fullItems.length;
+
+    // 统计 RSS 图片
+    fullItems.forEach(item => {
+      if (item.imageUrl) {
+        mediaStats.itemsWithImage++;
+        mediaStats.rssImageCount++;
+      }
+      if (item.videoUrl) {
+        mediaStats.itemsWithVideo++;
+      }
+    });
+
     const itemsWithoutImage = fullItems.filter(item => !item.imageUrl && item.url);
     if (itemsWithoutImage.length > 0) {
-      const imageSettled = await Promise.allSettled(itemsWithoutImage.slice(0, 30).map(async (item) => {
+      const imageSettled = await Promise.allSettled(itemsWithoutImage.slice(0, MEDIA_CONFIG.MAX_RESOLVE_ITEMS).map(async (item) => {
         try {
-          const resolved = await resolveImageFromArticle(item.url);
+          const resolved = await resolveImageWithScrapling(item.url);
           return { id: item.id, imageUrl: resolved.imageUrl, videoUrl: resolved.videoUrl || item.videoUrl };
         } catch { return null; }
       }));
@@ -1728,6 +1813,12 @@ async function getNews(blocked, customSources, page = 0, pageSize = PAGE_SIZE, s
         }
       });
     }
+
+    // 更新统计
+    mediaStats.lastUpdate = new Date().toISOString();
+
+    // 输出统计日志
+    logMediaStats();
 
     newsCache = { data: { items: fullItems, sourceResults, failedSources, blockedCount }, expiresAt: now + 1000 * 60 * 5, key: cacheKey };
   }
@@ -1821,38 +1912,153 @@ function normalizeUrl(url) {
 async function resolveImageFromArticle(articleUrl) {
   if (!articleUrl) return { imageUrl: '', videoUrl: '' };
   if (imageResolveCache[articleUrl]) return imageResolveCache[articleUrl];
+
   try {
     const res = await fetch(articleUrl, {
       headers: { 'User-Agent': 'GlobalTechRadar/0.1' },
-      signal: AbortSignal.timeout(4000)
+      signal: AbortSignal.timeout(8000)
     });
     if (!res.ok) return { imageUrl: '', videoUrl: '' };
+
     const html = await res.text();
+
+    // 提取所有图片（包括懒加载图片）
+    const allImages = [];
+    const imgMatches = [
+      ...html.matchAll(/<img[^>]+src=["']([^"']+)["'][^>]*>/gi),
+      ...html.matchAll(/<img[^>]+data-src=["']([^"']+)["'][^>]*>/gi),
+      ...html.matchAll(/<img[^>]+data-original=["']([^"']+)["'][^>]*>/gi),
+      ...html.matchAll(/<img[^>]+data-lazy-src=["']([^"']+)["'][^>]*>/gi)
+    ];
+
+    for (const match of imgMatches) {
+      allImages.push(match[1]);
+    }
+
+    // 提取 srcset 中的图片
+    const srcsetMatches = [...html.matchAll(/srcset=["']([^"']+)["']/gi)];
+    for (const match of srcsetMatches) {
+      const maxSrc = parseSrcset(match[1]);
+      if (maxSrc) allImages.push(maxSrc);
+    }
+
+    // 对所有图片进行评分
+    const scoredImages = allImages
+      .filter(url => isGoodImageUrl(url, html))
+      .map(url => {
+        const { score, reasons } = scoreImageUrl(url, html);
+        return { url, score, reasons };
+      })
+      .filter(img => img.score > 0)
+      .sort((a, b) => b.score - a.score);
+
+    // 提取 og:image 作为备选（加分以提高优先级）
     const ogImage = html.match(/<meta\s+property=["']og:image["']\s+content=["']([^"']+)["']/i);
-    if (ogImage && isGoodImageUrl(ogImage[1], html)) {
-      const result = { imageUrl: ogImage[1], videoUrl: '' };
-      imageResolveCache[articleUrl] = result;
-      return result;
+    if (ogImage) {
+      const ogScore = scoreImageUrl(ogImage[1], html);
+      if (ogScore.score > 0) {
+        scoredImages.push({ url: ogImage[1], score: ogScore.score + 5, reasons: ['og:image', ...ogScore.reasons] });
+      }
     }
+
+    // 提取 twitter:image 作为备选
     const twitterImage = html.match(/<meta\s+name=["']twitter:image["']\s+content=["']([^"']+)["']/i);
-    if (twitterImage && isGoodImageUrl(twitterImage[1], html)) {
-      const result = { imageUrl: twitterImage[1], videoUrl: '' };
+    if (twitterImage) {
+      const twitterScore = scoreImageUrl(twitterImage[1], html);
+      if (twitterScore.score > 0) {
+        scoredImages.push({ url: twitterImage[1], score: twitterScore.score + 3, reasons: ['twitter:image', ...twitterScore.reasons] });
+      }
+    }
+
+    // 选择最佳图片
+    if (scoredImages.length > 0) {
+      const best = scoredImages[0];
+      const optimizedUrl = optimizeImageUrl(best.url);
+      console.log(`[resolveImage] Selected for ${articleUrl}:`, {
+        url: optimizedUrl.substring(0, 80),
+        score: best.score,
+        reasons: best.reasons.join(', ')
+      });
+
+      const result = { imageUrl: optimizedUrl, videoUrl: '' };
       imageResolveCache[articleUrl] = result;
+
+      // 统计
+      mediaStats.resolvedImageCount++;
+      mediaStats.totalImageScore += best.score;
+      if (best.reasons.includes('og:image')) mediaStats.ogImageCount++;
+      if (best.reasons.includes('twitter:image')) mediaStats.twitterImageCount++;
+
       return result;
     }
-    const allImgs = [...html.matchAll(/<img[^>]+src=["']([^"']+)["'][^>]*>/gi)].map(m => m[1]);
-    for (const src of allImgs) {
-      if (!/\.(jpg|jpeg|png|gif|webp)/i.test(src)) continue;
-      if (!isGoodImageUrl(src, html)) continue;
-      const re = /(badge|shield|icon|logo|tracker|pixel|gravatar|avatar|emoji)/i;
-      if (r.test(src)) continue;
-      const result = { imageUrl: src, videoUrl: '' };
-      imageResolveCache[articleUrl] = result;
-      return result;
+
+    mediaStats.failedResolves++;
+    return { imageUrl: '', videoUrl: '' };
+  } catch (e) {
+    console.error(`[resolveImage] Error for ${articleUrl}:`, e.message);
+    mediaStats.failedResolves++;
+    return { imageUrl: '', videoUrl: '' };
+  }
+}
+
+// 可选：使用 Scrapling 动态渲染抓取图片
+async function resolveImageWithScrapling(articleUrl) {
+  if (!MEDIA_CONFIG.USE_SCRAPLING) {
+    return resolveImageFromArticle(articleUrl);
+  }
+
+  try {
+    const response = await fetch('http://localhost:5000/api/scrape', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        url: articleUrl,
+        mode: MEDIA_CONFIG.SCRAPLING_MODE,
+        timeout: MEDIA_CONFIG.SCRAPLING_TIMEOUT / 1000
+      })
+    });
+
+    if (!response.ok) {
+      console.error(`[resolveImageWithScrapling] Scrapling returned ${response.status}`);
+      return resolveImageFromArticle(articleUrl);
     }
-    return { imageUrl: '', videoUrl: '' };
-  } catch {
-    return { imageUrl: '', videoUrl: '' };
+
+    const data = await response.json();
+
+    if (data.status === 200 && data.images && data.images.length > 0) {
+      // 使用 Scrapling 提取的图片
+      const scoredImages = data.images
+        .filter(img => img.src && isGoodImageUrl(img.src, data.content || ''))
+        .map(img => {
+          const { score, reasons } = scoreImageUrl(img.src, data.content || '');
+          return { url: img.src, score, reasons };
+        })
+        .filter(img => img.score >= MEDIA_CONFIG.MIN_IMAGE_SCORE)
+        .sort((a, b) => b.score - a.score);
+
+      if (scoredImages.length > 0) {
+        const best = scoredImages[0];
+        const optimizedUrl = optimizeImageUrl(best.url);
+        console.log(`[resolveImageWithScrapling] Selected for ${articleUrl}:`, {
+          url: optimizedUrl.substring(0, 80),
+          score: best.score,
+          reasons: best.reasons.join(', ')
+        });
+
+        const result = { imageUrl: optimizedUrl, videoUrl: '' };
+        imageResolveCache[articleUrl] = result;
+        mediaStats.scraplingImageCount++;
+        mediaStats.totalImageScore += best.score;
+        return result;
+      }
+    }
+
+    // 回退到传统方式
+    return resolveImageFromArticle(articleUrl);
+  } catch (e) {
+    console.error(`[resolveImageWithScrapling] Error:`, e.message);
+    // 回退到传统方式
+    return resolveImageFromArticle(articleUrl);
   }
 }
 
@@ -2143,6 +2349,63 @@ function pickAtomLink(block) {
   return href ? decodeEntities(href) : '';
 }
 
+// 懒加载图片属性
+const LAZY_LOAD_ATTRS = ['data-src', 'data-original', 'data-lazy-src', 'data-img-src', 'data-url', 'data-lazy', 'data-aspect-url'];
+
+function parseSrcset(srcset) {
+  const candidates = srcset.split(',').map(s => {
+    const parts = s.trim().split(/\s+/);
+    if (parts.length < 2) return null;
+    const url = parts[0];
+    const widthMatch = parts[1].match(/(\d+)w/);
+    const width = widthMatch ? parseInt(widthMatch[1], 10) : 0;
+    return { url, width };
+  }).filter(Boolean);
+
+  if (candidates.length === 0) return null;
+  candidates.sort((a, b) => b.width - a.width);
+  return candidates[0].url;
+}
+
+function optimizeImageUrl(url) {
+  if (!url) return url;
+
+  try {
+    const urlObj = new URL(url);
+
+    // WordPress thumbnail → full size
+    url = url.replace(/-\d+x\d+(\.(jpg|jpeg|png|webp))/i, '$1');
+
+    // Cloudinary：移除缩放参数
+    url = url.replace(/\/upload\/(q_\d+,c_scale,w_\d+,h_\d+|c_fill,w_\d+,h_\d+|w_\d+,h_\d+,c_scale)/, '/upload');
+
+    // Unsplash：获取大图
+    url = url.replace(/\/w=\d+&h=\d+&fit=crop/, '/w=1600&fit=cover');
+    url = url.replace(/\/w=\d+&q=\d+/, '/w=1600&q=90');
+
+    // Imgix：获取原图
+    url = url.replace(/\?.*$/, '');
+
+    // WordPress.com：移除尺寸参数
+    url = url.replace(/\?w=\d+(&h=\d+)?(&fit=crop)?/, '');
+
+    // 移除常见查询参数以获取原图
+    url = url.replace(/[?&](width|height|w|h|size|resize|scale|quality|q)=\d+/gi, '');
+    url = url.replace(/[?&](fit|crop|fill|pad)=\w+/gi, '');
+
+    // 确保只有一个 ?
+    url = url.replace(/[?&]+/, '?').replace(/\?$/, '');
+
+    return url;
+  } catch {
+    return url;
+  }
+}
+
+function escapeRegExp(string) {
+  return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 const IMAGE_BLACKLIST_RE = /(\/|^)(ads|advert|banner|sponsor|promo|tracking|pixel|beacon|stat|analytics|share-bar|social-bar|gravatar|feedburner|rss|newsletter-signup|popup|overlay|interstitial|cdnp|cloudfront\.net\/images\/ui|fb-[a-z]|tw-[a-z]|linkedin-[a-z]|pinterest-[a-z]|buffer-[a-z]|addthis|sharethis|disqus|wp-emoticon|mstile|apple-touch-icon|android-chrome|safari-pinned|og-image-default|placeholder|stock|ticker|chart-bar|subscribe|related-post|sidebar|widget|newsletter|popup-icon|notification|push|web-push)\b/i;
 const IMAGE_BLACKLIST_DOMAINS = /\/\/(feedburner\.|gravatar\.|disqus\.|addthis\.|sharethis\.|buffer\.|pixel\.|tracking\.|analytics\.|doubleclick\.|adsense\.|adnxs\.|moatads\.|chartbeat\.|newrelic\.|pingdom\.|taboola\.|outbrain\.|zemanta\.|scoopit\.)/i;
 const IMAGE_MIN_DIM_HINT = /width=["']([0-9]+)["']|height=["']([0-9]+)["']/i;
@@ -2164,49 +2427,339 @@ function isGoodImageUrl(url, htmlSource) {
 }
 
 function extractImageUrl(block, rawContent) {
+  let url = '';
+
   // 1. <enclosure> with image type
   const enclosure = block.match(/<enclosure[^>]+url=["']([^"']+)["'][^>]+type=["'][^"']*image[^"']*["']/i)
     || block.match(/<enclosure[^>]+type=["'][^"']*image[^"']*["'][^>]+url=["']([^"']+)["']/i);
-  if (enclosure && isGoodImageUrl(enclosure[1], block)) return enclosure[1];
-
-  // 2. <media:thumbnail> or <media:content> with image
-  const mediaThumb = block.match(/<media:thumbnail[^>]+url=["']([^"']+)["']/i);
-  if (mediaThumb && isGoodImageUrl(mediaThumb[1], block)) return mediaThumb[1];
-  const mediaContent = block.match(/<media:content[^>]+(?:medium|type)=["']image["'][^>]+url=["']([^"']+)["']/i)
-    || block.match(/<media:content[^>]+url=["']([^"']+)["'][^>]+(?:medium|type)=["']image["']/i);
-  if (mediaContent && isGoodImageUrl(mediaContent[1], block)) return mediaContent[1];
-
-  // 3. <enclosure> without type (assume image if url looks like one)
-  const encNoType = block.match(/<enclosure[^>]+url=["']([^"']+)["']/i);
-  if (encNoType && /\.(jpg|jpeg|png|gif|webp)/i.test(encNoType[1]) && isGoodImageUrl(encNoType[1], block)) return encNoType[1];
-
-  // 4. <img> inside content/description HTML — scan all images, pick best one
-  const htmlSource = rawContent || pick(block, ['description', 'summary']);
-  const allImages = [...htmlSource.matchAll(/<img[^>]+src=["']([^"']+)["'][^>]*>/gi)];
-  for (const imgMatch of allImages) {
-    const src = imgMatch[1];
-    const fullTag = imgMatch[0];
-    if (isGoodImageUrl(src, fullTag) && /\.(jpg|jpeg|png|gif|webp)/i.test(src)) return src;
+  if (enclosure && isGoodImageUrl(enclosure[1], block)) {
+    url = enclosure[1];
   }
 
-  return '';
+  // 2. <media:thumbnail> or <media:content> with image
+  if (!url) {
+    const mediaThumb = block.match(/<media:thumbnail[^>]+url=["']([^"']+)["']/i);
+    if (mediaThumb && isGoodImageUrl(mediaThumb[1], block)) {
+      url = mediaThumb[1];
+    }
+  }
+
+  if (!url) {
+    const mediaContent = block.match(/<media:content[^>]+(?:medium|type)=["']image["'][^>]+url=["']([^"']+)["']/i)
+      || block.match(/<media:content[^>]+url=["']([^"']+)["'][^>]+(?:medium|type)=["']image["']/i);
+    if (mediaContent && isGoodImageUrl(mediaContent[1], block)) {
+      url = mediaContent[1];
+    }
+  }
+
+  // 3. <enclosure> without type (assume image if url looks like one)
+  if (!url) {
+    const encNoType = block.match(/<enclosure[^>]+url=["']([^"']+)["']/i);
+    if (encNoType && /\.(jpg|jpeg|png|gif|webp|avif)/i.test(encNoType[1]) && isGoodImageUrl(encNoType[1], block)) {
+      url = encNoType[1];
+    }
+  }
+
+  // 4. <img> tags inside content/description HTML — scan all images
+  if (!url) {
+    const htmlSource = rawContent || pick(block, ['description', 'summary']);
+
+    // 4a. Check for lazy-loaded images first (they are usually the main images)
+    for (const attr of LAZY_LOAD_ATTRS) {
+      const lazyMatch = htmlSource.match(new RegExp(`<img[^>]+${attr}=["']([^"']+)["'][^>]*>`, 'i'));
+      if (lazyMatch && isGoodImageUrl(lazyMatch[1], htmlSource)) {
+        url = lazyMatch[1];
+        break;
+      }
+    }
+
+    // 4b. Check for srcset and use highest resolution
+    if (!url) {
+      const srcsetMatch = htmlSource.match(/<img[^>]+srcset=["']([^"']+)["'][^>]*>/i);
+      if (srcsetMatch) {
+        const maxSrc = parseSrcset(srcsetMatch[1]);
+        if (maxSrc && isGoodImageUrl(maxSrc, htmlSource)) {
+          url = maxSrc;
+        }
+      }
+    }
+
+    // 4c. Fall back to regular src attribute
+    if (!url) {
+      const allImages = [...htmlSource.matchAll(/<img[^>]+src=["']([^"']+)["'][^>]*>/gi)];
+      for (const imgMatch of allImages) {
+        const src = imgMatch[1];
+        const fullTag = imgMatch[0];
+        if (isGoodImageUrl(src, fullTag) && /\.(jpg|jpeg|png|gif|webp|avif)/i.test(src)) {
+          url = src;
+          break;
+        }
+      }
+    }
+  }
+
+// Optimize the URL if found
+  return url ? optimizeImageUrl(url) : '';
 }
 
 function extractVideoUrl(block) {
-  // <enclosure> with video type
+  // 1. <enclosure> with video type
   const videoEnc = block.match(/<enclosure[^>]+url=["']([^"']+)["'][^>]+type=["'][^"']*video[^"']*["']/i)
     || block.match(/<enclosure[^>]+type=["'][^"']*video[^"']*["'][^>]+url=["']([^"']+)["']/i);
   if (videoEnc) return videoEnc[1];
 
-  // <media:content> with video
+  // 2. <media:content> with video
   const mediaVideo = block.match(/<media:content[^>]+(?:medium|type)=["']video["'][^>]+url=["']([^"']+)["']/i);
   if (mediaVideo) return mediaVideo[1];
 
-  // YouTube embed in content
+  // 3. YouTube formats
+  const ytWatch = block.match(/https?:\/\/(?:www\.)?youtube\.com\/watch\?v=([a-zA-Z0-9_-]+)/i);
+  if (ytWatch) return ytWatch[0];
+
+  const ytShort = block.match(/https?:\/\/youtu\.be\/([a-zA-Z0-9_-]+)/i);
+  if (ytShort) return `https://www.youtube.com/watch?v=${ytShort[1]}`;
+
   const ytEmbed = block.match(/youtube\.com\/embed\/([a-zA-Z0-9_-]+)/i);
   if (ytEmbed) return `https://www.youtube.com/watch?v=${ytEmbed[1]}`;
 
+  // 4. Vimeo
+  const vimeo = block.match(/https?:\/\/vimeo\.com\/(\d+)/i);
+  if (vimeo) return vimeo[0];
+
+  // 5. Bilibili
+  const bili = block.match(/https?:\/\/(?:www\.)?bilibili\.com\/video\/([a-zA-Z0-9]+)/i);
+  if (bili) return bili[0];
+
+  // 6. HTML5 video tag
+  const videoTag = block.match(/<video[^>]*>\s*<source[^>]+src=["']([^"']+)["'][^>]*>/is);
+  if (videoTag) return videoTag[1];
+
+  const videoTagDirect = block.match(/<video[^>]+src=["']([^"']+)["'][^>]*>/i);
+  if (videoTagDirect) return videoTagDirect[1];
+
   return '';
+}
+
+// ========== 智能图片评分系统 ==========
+
+function scoreImageUrl(url, context) {
+  if (!url) return { score: -1, reasons: [] };
+
+  let score = 0;
+  const reasons = [];
+
+  // 维度 1：尺寸评分 (0-30分)
+  const dimScore = scoreDimensions(url, context);
+  score += dimScore;
+  if (dimScore > 0) reasons.push(`尺寸:${dimScore}`);
+  if (dimScore < 0) reasons.push(`尺寸:${dimScore}`);
+
+  // 维度 2：路径评分 (0-20分)
+  const pathScore = scorePath(url);
+  score += pathScore;
+  if (pathScore > 0) reasons.push(`路径:${pathScore}`);
+  if (pathScore < 0) reasons.push(`路径:${pathScore}`);
+
+  // 维度 3：alt 文本评分 (0-15分)
+  const altScore = scoreAltText(url, context);
+  score += altScore;
+  if (altScore > 0) reasons.push(`Alt:${altScore}`);
+  if (altScore < 0) reasons.push(`Alt:${altScore}`);
+
+  // 维度 4：位置评分 (0-25分)
+  const posScore = scorePosition(url, context);
+  score += posScore;
+  if (posScore > 0) reasons.push(`位置:${posScore}`);
+  if (posScore < 0) reasons.push(`位置:${posScore}`);
+
+  // 维度 5：类型评分 (0-15分)
+  const typeScore = scoreType(url);
+  score += typeScore;
+  if (typeScore > 0) reasons.push(`类型:${typeScore}`);
+  if (typeScore < 0) reasons.push(`类型:${typeScore}`);
+
+  // 维度 6：语义评分 (0-20分)
+  const semanticScore = scoreSemantic(url, context);
+  score += semanticScore;
+  if (semanticScore > 0) reasons.push(`语义:${semanticScore}`);
+  if (semanticScore < 0) reasons.push(`语义:${semanticScore}`);
+
+  return { score, reasons };
+}
+
+function scoreDimensions(url, context) {
+  let score = 0;
+
+  // 从 HTML 提取宽高
+  const widthMatch = context?.match(/<img[^>]+src=["'][^"']*${escapeRegExp(url)}[^"']*["'][^>]*width=["'](\d+)["']/i);
+  const heightMatch = context?.match(/<img[^>]+src=["'][^"']*${escapeRegExp(url)}[^"']*["'][^>]*height=["'](\d+)["']/i);
+
+  if (widthMatch && heightMatch) {
+    const w = parseInt(widthMatch[1], 10);
+    const h = parseInt(heightMatch[1], 10);
+
+    // 大图加分
+    if (w >= 800 && h >= 400) score += 30;
+    else if (w >= 600 && h >= 300) score += 20;
+    else if (w >= 400 && h >= 200) score += 10;
+    else if (w >= 300 && h >= 150) score += 5;
+    else if (w < 200 || h < 100) score -= 20; // 小图扣分
+
+    // 宽高比（新闻图片通常 4:3 或 16:9）
+    const ratio = w / h;
+    if (ratio >= 1.2 && ratio <= 2.0) score += 5;
+    else if (ratio < 0.8 || ratio > 3.0) score -= 5;
+  }
+
+  // URL 包含尺寸提示
+  if (/full|large|xl|xxl|2x|3x|original|hd|highres|maxi|grande/i.test(url)) score += 10;
+  if (/thumbnail|thumb|small|tiny|mini|icon|logo|square|avatar|profile/i.test(url)) score -= 15;
+
+  return score;
+}
+
+function scorePath(url) {
+  let score = 0;
+
+  // 好的路径
+  const goodPaths = /(img|images|assets|static|public|media|photos|screenshots|pictures|gallery|content|article|post|featured|hero|cover|banner|main|lead|primary|display)/i;
+  if (goodPaths.test(url)) score += 10;
+
+  // 特别好的路径（首图、封面图）
+  if (/\/(cover|hero|featured|main|lead|primary|headline|thumbnail)(\/|$)/i.test(url)) score += 10;
+
+  // 坏的路径（图标、按钮、导航等）
+  const badPaths = /(icon|logo|avatar|badge|shield|button|btn|nav|header|footer|sidebar|widget|share|social|tracking|pixel|analytics|ad|advertisement|sponsor|promo|popup|overlay|separator|divider|spacer|background|bg|texture|pattern|watermark)/i;
+  if (badPaths.test(url)) score -= 20;
+
+  return score;
+}
+
+function scoreAltText(url, context) {
+  let score = 0;
+
+  if (!context) return score;
+
+  // 提取 alt 文本
+  const altMatch = context.match(new RegExp(`<img[^>]+src=["'][^"']*${escapeRegExp(url)}[^"']*["'][^>]*alt=["']([^"']+)["']`, 'i'));
+  if (!altMatch) return 0;
+
+  const alt = altMatch[1].toLowerCase();
+
+  // 好的 alt 文本（有意义的描述）
+  const goodAlts = /(screenshot|demo|preview|illustration|chart|graph|diagram|example|result|output|interface|界面|截图|演示|效果图|架构图|流程图|example|diagram|infographic|visual|visualization|mockup|prototype|product|device|scene|scenario|landscape|portrait)/i;
+  if (goodAlts.test(alt)) score += 15;
+
+  // 长度评分（描述性文本通常更长）
+  if (alt.length >= 20 && alt.length <= 100) score += 5;
+  else if (alt.length < 5) score -= 5; // 太短可能是占位符
+
+  // 坏的 alt 文本
+  if (/^(image|img|pic|photo|picture|图片|照片|图标|logo|icon|photo|screenshot|screenshot of|a|an|the)$/i.test(alt)) score -= 10;
+  if (/^(banner|ad|advertisement|sponsor|promo|button|btn|icon|logo|avatar|badge)$/i.test(alt)) score -= 15;
+
+  return score;
+}
+
+function scorePosition(url, context) {
+  if (!context) return 0;
+
+  let score = 0;
+
+  // 提取图片在文章中的位置
+  const imgMatch = context.match(new RegExp(`<img[^>]+src=["'][^"']*${escapeRegExp(url)}[^"']*["']`, 'i'));
+  if (!imgMatch) return 0;
+
+  const imgIndex = context.indexOf(imgMatch[0]);
+
+  // 提取文章正文区域
+  const articlePatterns = [
+    /<(article|main)[^>]*>/i,
+    /<div[^>]*(class|id)=["'][^"']*(article|content|post|entry|body|text)[^"']*["'][^>]*>/i,
+    /<div[^>]*(class|id)=["'][^"']*story[^"']*["'][^>]*>/i
+  ];
+
+  let articleStart = -1;
+  let articleEnd = context.length;
+
+  for (const pattern of articlePatterns) {
+    const startMatch = context.match(pattern);
+    if (startMatch) {
+      articleStart = context.indexOf(startMatch[0]) + startMatch[0].length;
+      break;
+    }
+  }
+
+  for (const pattern of articlePatterns) {
+    const endMatch = context.match(new RegExp(pattern.source.replace('<', '</'), 'gi'));
+    if (endMatch && endMatch.index < articleEnd) {
+      articleEnd = endMatch.index;
+    }
+  }
+
+  // 判断是否在正文区域
+  if (articleStart !== -1 && imgIndex > articleStart && imgIndex < articleEnd) {
+    score += 20;
+
+    // 前 500 字符内的是首图，加分
+    if (imgIndex - articleStart < 500) score += 5;
+
+    // 前 2000 字符内的也是好位置
+    else if (imgIndex - articleStart < 2000) score += 2;
+  } else {
+    score -= 10; // 正文外扣分
+  }
+
+  return score;
+}
+
+function scoreType(url) {
+  let score = 0;
+
+  // 格式评分（优先高质量格式）
+  if (/\.webp$/i.test(url)) score += 15;
+  if (/\.png$/i.test(url)) score += 10;
+  if (/(jpg|jpeg)$/i.test(url)) score += 8;
+  if (/\.gif$/i.test(url)) score -= 5; // GIF 通常是动图或小图
+  if (/\.svg$/i.test(url)) score -= 10; // SVG 通常是图标
+  if (/\.ico$/i.test(url)) score -= 20; // ICO 是图标
+
+  return score;
+}
+
+function scoreSemantic(url, context) {
+  if (!context) return 0;
+
+  let score = 0;
+
+  // 检查图片周围的文本上下文
+  const imgMatch = context.match(new RegExp(`<img[^>]+src=["'][^"']*${escapeRegExp(url)}[^"']*["'][^>]*>`, 'i'));
+  if (!imgMatch) return 0;
+
+  const imgIndex = context.indexOf(imgMatch[0]);
+
+  // 提取图片前后 500 字符的上下文
+  const beforeText = context.substring(Math.max(0, imgIndex - 500), imgIndex);
+  const afterText = context.substring(imgIndex + imgMatch[0].length, Math.min(context.length, imgIndex + imgMatch[0].length + 500));
+  const surroundingText = (beforeText + afterText).toLowerCase();
+
+  // 好的上下文关键词（表示图片是内容的一部分）
+  const goodKeywords = /(shown|show|above|below|image|photo|picture|graph|chart|diagram|illustration|screenshot|example|demonstrat|depict|display|feature|illustrate|shown in the figure|as shown in)/i;
+  if (goodKeywords.test(surroundingText)) score += 10;
+
+  // 好的中文上下文
+  const goodChineseKeywords = /(如图|图片|照片|截图|演示|示例|上图|下图|所示|显示)/i;
+  if (goodChineseKeywords.test(surroundingText)) score += 10;
+
+  // 坏的上下文（表示图片是装饰或广告）
+  const badKeywords = /(advertisement|ad|sponsor|promoted|promotional|affiliate|referral|tracking|pixel|analytics)/i;
+  if (badKeywords.test(surroundingText)) score -= 15;
+
+  // 检查图片标题（figcaption）
+  const figcaptionMatch = context.match(new RegExp(`<figcaption[^>]*>.*?(?:${beforeText.slice(-100)})`, 'is'));
+  if (figcaptionMatch) score += 10;
+
+  return score;
 }
 
 function cleanText(value) {
@@ -2267,10 +2820,6 @@ function decodeEntities(value) {
     .replace(/&#39;/g, "'")
     .replace(/&#x([0-9a-f]+);/gi, (_, hex) => String.fromCharCode(parseInt(hex, 16)))
     .replace(/&#(\d+);/g, (_, num) => String.fromCharCode(parseInt(num, 10)));
-}
-
-function escapeRegExp(value) {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 function hash(value) {
