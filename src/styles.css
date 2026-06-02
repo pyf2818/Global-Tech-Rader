@@ -28,21 +28,27 @@
   --particle-c2: rgba(167, 139, 250, 0.8);
 }
 
+:root {
+  --grid-color: rgba(34, 211, 238, 0.03);
+}
+
 :root[data-theme="light"] {
-  --bg-primary: #f4f1ea;
-  --bg-secondary: #f9f7f2;
-  --bg-card: #ffffff;
-  --bg-hover: #ebe6dc;
-  --border-color: rgba(0, 0, 0, 0.08);
-  --border-active: rgba(167, 139, 250, 0.5);
-  --text-primary: #3d342b;
-  --text-secondary: #5c534a;
-  --text-muted: #8b8176;
-  --bg-glow-1: rgba(251, 191, 36, 0.18);
-  --bg-glow-2: rgba(251, 146, 60, 0.12);
-  --particle-c1: rgba(251, 146, 60, 0.45);
-  --particle-c2: rgba(245, 158, 11, 0.4);
-  --gradient-primary: linear-gradient(135deg, #3b82f6, #8b5cf6);
+  --bg-primary: #f9f4e8;
+  --bg-secondary: #fdf9ed;
+  --bg-card: #fffefb;
+  --bg-hover: #f5efe0;
+  --border-color: rgba(0, 0, 0, 0.1);
+  --border-active: rgba(251, 146, 60, 0.5);
+  --text-primary: #2d2418;
+  --text-secondary: #4a3d2d;
+  --text-muted: #6b5e4e;
+  --bg-glow-1: rgba(251, 146, 60, 0.2);
+  --bg-glow-2: rgba(245, 158, 11, 0.15);
+  --particle-c1: rgba(251, 146, 60, 0.55);
+  --particle-c2: rgba(245, 158, 11, 0.5);
+  --gradient-primary: linear-gradient(135deg, #fb923c, #f97316);
+  --gradient-glow: linear-gradient(135deg, rgba(251, 146, 60, 0.1), rgba(245, 158, 11, 0.08));
+  --grid-color: rgba(251, 146, 60, 0.04);
 }
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -79,7 +85,7 @@ body {
 @keyframes glowPulse { 0%, 100% { opacity: 0.6; transform: scale(1); } 50% { opacity: 0.9; transform: scale(1.1); } }
 
 /* Background Grid */
-.app-bg-grid { position: fixed; inset: 0; pointer-events: none; z-index: 0; background-image: linear-gradient(rgba(34, 211, 238, 0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(34, 211, 238, 0.03) 1px, transparent 1px); background-size: 60px 60px; }
+.app-bg-grid { position: fixed; inset: 0; pointer-events: none; z-index: 0; background-image: linear-gradient(var(--grid-color) 1px, transparent 1px), linear-gradient(90deg, var(--grid-color) 1px, transparent 1px); background-size: 60px 60px; }
 
 /* Glass Card Base */
 .glass-card { background: var(--bg-card); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border: 1px solid var(--border-color); border-radius: 12px; transition: all 0.3s ease; position: relative; overflow: hidden; }
