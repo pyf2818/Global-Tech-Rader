@@ -2881,6 +2881,18 @@ body {
 .ai-elf-list li { position: relative; padding-left: 14px; margin: 4px 0; font-size: 13px; line-height: 1.7; }
 .ai-elf-list li::before { content: ''; position: absolute; left: 0; top: 9px; width: 5px; height: 5px; background: var(--accent-cyan); border-radius: 50%; }
 
+.ai-elf-code-block { display: block; margin: 8px 0; padding: 12px; background: var(--bg-hover); border: 1px solid var(--border-color); border-radius: 8px; overflow-x: auto; }
+.ai-elf-code-block code { display: block; font-family: 'SF Mono', 'Fira Code', monospace; font-size: 12px; line-height: 1.6; color: var(--text-secondary); }
+
+.ai-elf-table { display: block; margin: 8px 0; width: 100%; border-collapse: collapse; overflow-x: auto; }
+.ai-elf-table thead { display: table-header-group; }
+.ai-elf-table tbody { display: table-row-group; }
+.ai-elf-table tr { display: table-row; }
+.ai-elf-table th { display: table-cell; padding: 8px 12px; text-align: left; font-size: 12px; font-weight: 600; color: var(--accent-cyan); border-bottom: 2px solid var(--border-color); background: var(--bg-hover); }
+.ai-elf-table td { display: table-cell; padding: 8px 12px; font-size: 12px; color: var(--text-secondary); border-bottom: 1px solid var(--border-color); }
+.ai-elf-table tr:last-child td { border-bottom: none; }
+.ai-elf-table tr:hover td { background: var(--bg-hover); }
+
 /* 响应式 */
 @media (max-width: 768px) {
   .ai-elf-chat-window { width: calc(100vw - 40px) !important; height: calc(100vh - 100px) !important; left: 20px !important; top: 80px !important; }

@@ -613,27 +613,84 @@ ${baseContent}
     const lines = processed.split('\n');
     const result = [];
     let inList = false;
+    let inTable = false;
+    let tableRows = [];
+
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
-      const listMatch = line.match(/^-\s(.+)$/);
-      if (listMatch) {
-        if (!inList) {
-          result.push('<ul class="ai-elf-list">');
-          inList = true;
+
+      const tableMatch = line.match(/^\|(.+)\|$/);
+      if (tableMatch) {
+        const cells = tableMatch[1].split('|').map(cell => cell.trim());
+        const isSeparator = cells.every(cell => cell.match(/^[-:]+$/));
+
+        if (!inTable) {
+          inTable = true;
+          tableRows = [];
         }
-        result.push(`<li>${processInlineStyles(escapeHtml(listMatch[1]))}</li>`);
-      } else if (line.trim() === '' && inList) {
-        result.push('</ul>');
-        inList = false;
-        result.push('');
+
+        if (isSeparator) {
+          if (tableRows.length === 1) {
+            result.push('<table class="ai-elf-table"><thead><tr>');
+            tableRows[0].forEach(cell => {
+              result.push(`<th>${escapeHtml(cell)}</th>`);
+            });
+            result.push('</tr></thead><tbody>');
+          }
+          tableRows = [];
+        } else {
+          tableRows.push(cells);
+        }
       } else {
-        if (inList) {
+        if (inTable) {
+          if (tableRows.length > 0) {
+            tableRows.forEach(row => {
+              result.push('<tr>');
+              row.forEach(cell => {
+                result.push(`<td>${processInlineStyles(escapeHtml(cell))}</td>`);
+              });
+              result.push('</tr>');
+            });
+          }
+          result.push('</tbody></table>');
+          inTable = false;
+          tableRows = [];
+        }
+
+        const listMatch = line.match(/^-\s(.+)$/);
+        if (listMatch) {
+          if (!inList) {
+            result.push('<ul class="ai-elf-list">');
+            inList = true;
+          }
+          result.push(`<li>${processInlineStyles(escapeHtml(listMatch[1]))}</li>`);
+        } else if (line.trim() === '' && inList) {
           result.push('</ul>');
           inList = false;
+          result.push('');
+        } else {
+          if (inList) {
+            result.push('</ul>');
+            inList = false;
+          }
+          result.push(line);
         }
-        result.push(line);
       }
     }
+
+    if (inTable) {
+      if (tableRows.length > 0) {
+        tableRows.forEach(row => {
+          result.push('<tr>');
+          row.forEach(cell => {
+            result.push(`<td>${processInlineStyles(escapeHtml(cell))}</td>`);
+          });
+          result.push('</tr>');
+        });
+      }
+      result.push('</tbody></table>');
+    }
+
     if (inList) result.push('</ul>');
     processed = result.join('\n');
 
@@ -643,7 +700,7 @@ ${baseContent}
     processed = paragraphs.map(p => {
       const trimmed = p.trim();
       if (!trimmed) return '';
-      if (trimmed.startsWith('<h') || trimmed.startsWith('<pre') || trimmed.startsWith('<ul')) {
+      if (trimmed.startsWith('<h') || trimmed.startsWith('<pre') || trimmed.startsWith('<ul') || trimmed.startsWith('<table')) {
         return trimmed;
       }
       if (trimmed.startsWith('<') && trimmed.endsWith('>')) return trimmed;
