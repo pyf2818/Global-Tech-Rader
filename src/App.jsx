@@ -967,7 +967,8 @@ function App() {
       const cat = category === 'all' || item.category === category;
       const md = mode === 'all' || item.mode === mode;
       const src = sourceFilter === 'all' || item.source === sourceFilter;
-      return cat && md && src;
+      const reg = regionFilter === 'all' || item.region === regionFilter;
+      return cat && md && src && reg;
     });
 
     if (followKeywords.length > 0) {
@@ -3090,6 +3091,13 @@ ${signals}
                         <option value="all">全部来源</option>
                         {sourceOptions.slice(0, 20).map(([name, count]) => <option key={name} value={name}>{name} ({count})</option>)}
                       </select>
+                    </div>
+                  )}
+                  {(nav === 'all' || nav === 'recommendations') && (
+                    <div className="region-filter-wrap">
+                      <button className={`region-filter-btn ${regionFilter === 'all' ? 'active' : ''}`} onClick={() => setRegionFilter('all')}>全部</button>
+                      <button className={`region-filter-btn ${regionFilter === 'domestic' ? 'active' : ''}`} onClick={() => setRegionFilter('domestic')}>国内</button>
+                      <button className={`region-filter-btn ${regionFilter === 'overseas' ? 'active' : ''}`} onClick={() => setRegionFilter('overseas')}>国外</button>
                     </div>
                   )}
                   <div className="view-toggle">
@@ -6400,6 +6408,50 @@ className={`source-card builtin ${isDisabled ? 'disabled' : ''} ${health?.status
                       className="elf-name-input"
                       maxLength={20}
                     />
+                  </div>
+                  <div className="setting-item">
+                    <label>AI精灵头像</label>
+                    <p className="setting-desc">自定义AI精灵的头像图片</p>
+                    <div className="elf-avatar-setting">
+                      <div className="elf-avatar-preview">
+                        {elfAvatar ? (
+                          <img src={elfAvatar} alt="AI精灵头像" />
+                        ) : (
+                          <div className="elf-avatar-default">AI</div>
+                        )}
+                      </div>
+                      <div className="elf-avatar-actions">
+                        <label htmlFor="elf-avatar-upload" className="elf-avatar-upload-btn">选择图片</label>
+                        <input
+                          id="elf-avatar-upload"
+                          type="file"
+                          accept="image/*"
+                          onChange={(e) => {
+                            const file = e.target.files[0];
+                            if (!file) return;
+                            const reader = new FileReader();
+                            reader.onload = (ev) => {
+                              const base64 = ev.target.result;
+                              setElfAvatar(base64);
+                              showToast('头像已更新');
+                            };
+                            reader.readAsDataURL(file);
+                          }}
+                          style={{ display: 'none' }}
+                        />
+                        {elfAvatar && (
+                          <button
+                            className="elf-avatar-reset-btn"
+                            onClick={() => {
+                              setElfAvatar('');
+                              showToast('已恢复默认头像');
+                            }}
+                          >
+                            恢复默认
+                          </button>
+                        )}
+                      </div>
+                    </div>
                   </div>
                   <div className="setting-item">
                     <label>Agent管理</label>
