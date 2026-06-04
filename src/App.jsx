@@ -978,6 +978,12 @@ function App() {
       return cat && md && src && reg;
     });
 
+    console.log('[Region Filter] regionFilter:', regionFilter, 'items.length:', items.length, 'filtered.length:', result.length);
+    if (items.length > 0) {
+      const sampleRegions = items.slice(0, 5).map(i => ({ title: i.title?.substring(0, 30), region: i.region }));
+      console.log('[Region Filter] Sample items:', sampleRegions);
+    }
+
     if (followKeywords.length > 0) {
       result.sort((a, b) => {
         const aFollow = followKeywords.some(kw => `${a.title} ${a.summary}`.toLowerCase().includes(kw.toLowerCase())) ? 0 : 1;
@@ -1608,6 +1614,11 @@ function App() {
     fetch(`/api/news?blocked=${encodeURIComponent(b)}&page=${page}&pageSize=40${searchParam}${disabledParam}${interestsParam}${customParams ? '&' + customParams : ''}`)
       .then(r => r.json())
       .then(d => {
+        console.log('[loadNews] Received items:', d.items?.length || 0);
+        if (d.items && d.items.length > 0) {
+          const sampleRegions = d.items.slice(0, 3).map(i => ({ title: i.title?.substring(0, 30), region: i.region }));
+          console.log('[loadNews] Sample regions:', sampleRegions);
+        }
         if (append) {
           setItems(prev => [...prev, ...(d.items || [])]);
         } else {
