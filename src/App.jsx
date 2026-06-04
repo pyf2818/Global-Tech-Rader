@@ -987,7 +987,7 @@ function App() {
     }
 
     return result;
-  }, [items, category, mode, sourceFilter, followKeywords]);
+  }, [items, category, mode, sourceFilter, followKeywords, regionFilter]);
 
   const sourceOptions = useMemo(() => {
     const counts = new Map();
