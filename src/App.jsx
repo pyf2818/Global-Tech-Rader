@@ -3113,9 +3113,9 @@ ${signals}
                   )}
                   {(nav === 'all' || nav === 'recommendations') && (
                     <div className="region-filter-wrap">
-                      <button className={`region-filter-btn ${regionFilter === 'all' ? 'active' : ''}`} onClick={() => setRegionFilter('all')}>全部</button>
-                      <button className={`region-filter-btn ${regionFilter === 'domestic' ? 'active' : ''}`} onClick={() => setRegionFilter('domestic')}>国内</button>
-                      <button className={`region-filter-btn ${regionFilter === 'overseas' ? 'active' : ''}`} onClick={() => setRegionFilter('overseas')}>国外</button>
+                      <button className={`region-filter-btn ${regionFilter === 'all' ? 'active' : ''}`} onClick={() => { console.log('[Region] Setting to: all'); setRegionFilter('all'); }}>全部</button>
+                      <button className={`region-filter-btn ${regionFilter === 'domestic' ? 'active' : ''}`} onClick={() => { console.log('[Region] Setting to: domestic'); setRegionFilter('domestic'); }}>国内</button>
+                      <button className={`region-filter-btn ${regionFilter === 'overseas' ? 'active' : ''}`} onClick={() => { console.log('[Region] Setting to: overseas'); setRegionFilter('overseas'); }}>国外</button>
                     </div>
                   )}
                   <div className="view-toggle">
