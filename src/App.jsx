@@ -967,7 +967,14 @@ function App() {
       const cat = category === 'all' || item.category === category;
       const md = mode === 'all' || item.mode === mode;
       const src = sourceFilter === 'all' || item.source === sourceFilter;
-      const reg = regionFilter === 'all' || item.region === regionFilter;
+      let reg = regionFilter === 'all';
+      if (!reg) {
+        if (regionFilter === 'domestic') {
+          reg = item.region === 'domestic';
+        } else if (regionFilter === 'overseas') {
+          reg = item.region === 'overseas' || item.region === 'global';
+        }
+      }
       return cat && md && src && reg;
     });
 
