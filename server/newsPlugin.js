@@ -1226,6 +1226,37 @@ const DEFAULT_SOURCES = [
   { name: 'Science Advances', url: 'https://www.science.org/rss/advance.xml', region: 'overseas', defaultCategory: 'research' },
   { name: 'TechRadar', url: 'https://www.techradar.com/rss', region: 'overseas', defaultCategory: 'devices' },
   { name: 'Gizmodo', url: 'https://gizmodo.com/rss', region: 'overseas', defaultCategory: 'devices' },
+
+  // ========== 欧美主流官方RSS（国际权威媒体）==========
+  // 英国
+  { name: 'BBC World', url: 'https://feeds.bbci.co.uk/news/world/rss.xml', region: 'overseas', defaultCategory: 'economy-stock' },
+  { name: 'BBC Business', url: 'https://feeds.bbci.co.uk/news/business/rss.xml', region: 'overseas', defaultCategory: 'economy-stock' },
+  { name: 'BBC Technology', url: 'https://feeds.bbci.co.uk/news/technology/rss.xml', region: 'overseas', defaultCategory: 'devices' },
+  { name: 'Guardian International', url: 'https://www.theguardian.com/world/rss', region: 'overseas', defaultCategory: 'economy-stock' },
+  { name: 'SkyNews World', url: 'https://feeds.skynews.com/feeds/rss/world.xml', region: 'overseas', defaultCategory: 'economy-stock' },
+  // 美国
+  { name: 'Reuters TopNews', url: 'https://feeds.reuters.com/reuters/topNews', region: 'overseas', defaultCategory: 'economy-stock' },
+  { name: 'Reuters World', url: 'https://feeds.reuters.com/reuters/worldNews', region: 'overseas', defaultCategory: 'economy-stock' },
+  { name: 'CNN World', url: 'http://rss.cnn.com/rss/cnn_world.rss', region: 'overseas', defaultCategory: 'economy-stock' },
+  { name: 'NYT Homepage', url: 'https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml', region: 'overseas', defaultCategory: 'economy-stock' },
+  { name: 'Washington Post World', url: 'https://feeds.washingtonpost.com/rss/world', region: 'overseas', defaultCategory: 'economy-stock' },
+  { name: 'NPR Global', url: 'https://feeds.npr.org/1001/rss.xml', region: 'overseas', defaultCategory: 'economy-stock' },
+  { name: 'CNBC Global', url: 'https://www.cnbc.com/id/100003114/device/rss/rss.xml', region: 'overseas', defaultCategory: 'economy-stock' },
+  // 欧洲/加拿大
+  { name: 'DW English', url: 'https://rss.dw.com/rdf/rss-en-all', region: 'overseas', defaultCategory: 'economy-stock' },
+  { name: 'France24 International', url: 'https://www.france24.com/en/rss', region: 'overseas', defaultCategory: 'economy-stock' },
+  { name: 'CBC World', url: 'https://www.cbc.ca/rss/world.xml', region: 'overseas', defaultCategory: 'economy-stock' },
+  { name: 'GlobalNews World', url: 'https://globalnews.ca/world/feed/', region: 'overseas', defaultCategory: 'economy-stock' },
+  // 日韩/亚太
+  { name: 'NHK World', url: 'https://www3.nhk.or.jp/rss/news/cat0.xml', region: 'overseas', defaultCategory: 'economy-stock' },
+  { name: 'SCMP International', url: 'https://www.scmp.com/rss/91/feed', region: 'overseas', defaultCategory: 'economy-stock' },
+  { name: 'RT International', url: 'https://www.rt.com/rss/news/', region: 'overseas', defaultCategory: 'economy-stock' },
+  // 中文外媒
+  { name: '联合早报', url: 'https://www.zaobao.com/rss.xml', region: 'domestic', defaultCategory: 'china-tech' },
+  { name: '德国之声中文', url: 'https://rss.dw.com/rdf/rss-zh-all', region: 'domestic', defaultCategory: 'china-tech' },
+  { name: '香港电台国际', url: 'https://news.rthk.hk/rthk/ch/rss/international.xml', region: 'domestic', defaultCategory: 'china-tech' },
+  // 中文科技媒体（官方RSS）
+  { name: '观察者网', url: 'https://www.guancha.cn/rss', region: 'domestic', defaultCategory: 'china-tech' },
 ];
 
 const RSSHUB_BASE = 'https://rsshub.rssforever.com';
