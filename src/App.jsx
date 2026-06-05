@@ -1054,45 +1054,13 @@ function App() {
 
   const filtered = useMemo(() => {
     let result = items.filter(item => {
-      // 垂直频道筛选（优先于分类筛选）
-      let channelMatch = true;
-      if (verticalChannel !== 'all') {
-        const channel = VERTICAL_CHANNELS.find(ch => ch.id === verticalChannel);
-        if (channel) {
-          // 匹配垂直频道的分类
-          const catMatch = channel.categories.length === 0 || channel.categories.includes(item.category);
-          // 匹配垂直频道的关键词（同时匹配中英文）
-          const textToMatch = `${item.title} ${item.summary} ${item.tags ? item.tags.join(' ') : ''}`.toLowerCase();
-          const keywordMatch = channel.keywords.some(kw => {
-            // 对于英文关键词，区分大小写匹配
-            if (/^[a-zA-Z\s]+$/.test(kw)) {
-              return textToMatch.includes(kw.toLowerCase()) || textToMatch.includes(kw);
-            }
-            // 对于中文关键词，直接匹配
-            return textToMatch.includes(kw.toLowerCase());
-          });
-          // 涉华频道更宽松：只要关键词部分匹配即可
-          // 其他频道：匹配分类或关键词
-          channelMatch = channel.id === 'china-focused' ? keywordMatch : catMatch || keywordMatch;
-        }
-      }
-
       const cat = category === 'all' || item.category === category;
       const md = mode === 'all' || item.mode === mode;
       const src = sourceFilter === 'all' || item.source === sourceFilter;
-      let reg = regionFilter === 'all';
-      if (!reg) {
-        if (regionFilter === 'domestic') {
-          reg = item.region === 'domestic';
-        } else if (regionFilter === 'overseas') {
-          reg = item.region === 'overseas' || item.region === 'global';
-        }
-      }
-      return channelMatch && cat && md && src && reg;
+      return cat && md && src;
     });
 
-    console.log('[Vertical Channel Filter] verticalChannel:', verticalChannel, 'filtered.length:', result.length);
-    console.log('[Region Filter] regionFilter:', regionFilter, 'items.length:', items.length, 'filtered.length:', result.length);
+    console.log('[Filter] category:', category, 'mode:', mode, 'sourceFilter:', sourceFilter, 'filtered.length:', result.length);
     if (items.length > 0) {
       const sampleRegions = items.slice(0, 5).map(i => ({ title: i.title?.substring(0, 30), region: i.region }));
       console.log('[Region Filter] Sample items:', sampleRegions);
@@ -1107,7 +1075,7 @@ function App() {
     }
 
     return result;
-  }, [items, category, mode, sourceFilter, followKeywords, regionFilter, verticalChannel]);
+  }, [items, category, mode, sourceFilter, followKeywords]);
 
   const sourceOptions = useMemo(() => {
     const counts = new Map();
@@ -3261,6 +3229,9 @@ ${signals}
               )}
               {(nav === 'all' || nav === 'trending' || nav === 'reading-list' || nav === 'recommendations' || nav === 'materials' || nav === 'editor') && (
                 <>
+                  <div className="mode-tabs">
+                    {MODES.map(m => <button key={m.id} className={`mode-tab ${mode === m.id ? 'active' : ''}`} onClick={() => setMode(m.id)}>{m.label}</button>)}
+                  </div>
                   {nav === 'all' && (
                     <div className="source-filter-wrap">
                       <select id="source-filter" value={sourceFilter} onChange={(e) => setSourceFilter(e.target.value)} className="source-filter-select">
@@ -3268,27 +3239,6 @@ ${signals}
                         {sourceOptions.slice(0, 20).map(([name, count]) => <option key={name} value={name}>{name} ({count})</option>)}
                       </select>
                     </div>
-                  )}
-                  {(nav === 'all' || nav === 'recommendations') && (
-                    <>
-                      <div className="vertical-channel-wrap">
-                        <select 
-                          className="vertical-channel-select"
-                          value={verticalChannel}
-                          onChange={(e) => setVerticalChannel(e.target.value)}
-                        >
-                          <option value="all">全部频道</option>
-                          {VERTICAL_CHANNELS.map(ch => (
-                            <option key={ch.id} value={ch.id}>{ch.label}</option>
-                          ))}
-                        </select>
-                      </div>
-                      <div className="region-filter-wrap">
-                        <button className={`region-filter-btn ${regionFilter === 'all' ? 'active' : ''}`} onClick={() => { console.log('[Region] Setting to: all'); setRegionFilter('all'); }}>全部</button>
-                        <button className={`region-filter-btn ${regionFilter === 'domestic' ? 'active' : ''}`} onClick={() => { console.log('[Region] Setting to: domestic'); setRegionFilter('domestic'); }}>国内</button>
-                        <button className={`region-filter-btn ${regionFilter === 'overseas' ? 'active' : ''}`} onClick={() => { console.log('[Region] Setting to: overseas'); setRegionFilter('overseas'); }}>国外</button>
-                      </div>
-                    </>
                   )}
                   <div className="view-toggle">
                     {VIEW_MODES.map(v => <button key={v.id} className={`view-btn ${viewMode === v.id ? 'active' : ''}`} onClick={() => setViewMode(v.id)} title={v.label}>{v.id === 'compact' ? ICONS.list : v.id === 'standard' ? ICONS.rows : ICONS.grid3}</button>)}
