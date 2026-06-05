@@ -927,6 +927,10 @@ function App() {
     return () => observer.disconnect();
 }, [nav, newsHasMore, loadingMore, loading]);
 
+  const scrollToTop = () => {
+    feedRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   // Dynamic page title and description based on current navigation
   useEffect(() => {
     let title = 'Global Tech Radar - 全球科技圈实时资讯聚合平台';
