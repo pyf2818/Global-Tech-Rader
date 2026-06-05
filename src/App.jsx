@@ -778,7 +778,6 @@ function App() {
   const [githubSince, setGithubSince] = useState('weekly');
   const [calendarDate, setCalendarDate] = useState(new Date());
   const [events, setEvents] = useState(() => loadLS('calendarEvents', []));
-  const [selectedDate, setSelectedDate] = useState(null);
   const [eventForm, setEventForm] = useState({ title: '', time: '', color: '#22d3ee' });
   const [showEventForm, setShowEventForm] = useState(false);
 
@@ -3017,13 +3016,13 @@ ${signals}
   }
 
   function addEvent() {
-    if (!eventForm.title || !selectedDate) return;
+    if (!eventForm.title) return;
     setEvents(prev => [...prev, {
       id: Date.now(),
       title: eventForm.title,
       time: eventForm.time,
       color: eventForm.color,
-      date: `${selectedDate.year}-${String(selectedDate.month + 1).padStart(2, '0')}-${String(selectedDate.day).padStart(2, '0')}`
+      date: `${calendarDate.getFullYear()}-${String(calendarDate.getMonth() + 1).padStart(2, '0')}-${String(calendarDate.getDate()).padStart(2, '0')}`
     }]);
     setEventForm({ title: '', time: '', color: '#22d3ee' });
     setShowEventForm(false);
