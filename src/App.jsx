@@ -1073,8 +1073,9 @@ function App() {
             // 对于中文关键词，直接匹配
             return textToMatch.includes(kw.toLowerCase());
           });
-          // 匹配分类或关键词
-          channelMatch = catMatch || keywordMatch;
+          // 涉华频道更宽松：只要关键词部分匹配即可
+          // 其他频道：匹配分类或关键词
+          channelMatch = channel.id === 'china-focused' ? keywordMatch : catMatch || keywordMatch;
         }
       }
 
@@ -1726,7 +1727,7 @@ function App() {
     if (nav === 'recommendations' && isLoggedIn && selectedInterests.length > 0) {
       interestsParam = `&interests=${encodeURIComponent(selectedInterests.join(','))}`;
     }
-    fetch(`/api/news?blocked=${encodeURIComponent(b)}&page=${page}&pageSize=40${searchParam}${disabledParam}${interestsParam}${customParams ? '&' + customParams : ''}`)
+    fetch(`/api/news?blocked=${encodeURIComponent(b)}&page=${page}&pageSize=60${searchParam}${disabledParam}${interestsParam}${customParams ? '&' + customParams : ''}`)
       .then(r => r.json())
       .then(d => {
         console.log('[loadNews] Received items:', d.items?.length || 0);
@@ -3313,9 +3314,6 @@ ${signals}
               )}
               {(nav === 'all' || nav === 'trending' || nav === 'reading-list' || nav === 'recommendations' || nav === 'materials' || nav === 'editor') && (
                 <>
-                  <div className="mode-tabs">
-                    {MODES.map(m => <button key={m.id} className={`mode-tab ${mode === m.id ? 'active' : ''}`} onClick={() => setMode(m.id)}>{m.label}</button>)}
-                  </div>
                   {nav === 'all' && (
                     <div className="source-filter-wrap">
                       <select id="source-filter" value={sourceFilter} onChange={(e) => setSourceFilter(e.target.value)} className="source-filter-select">
