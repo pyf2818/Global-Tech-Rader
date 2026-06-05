@@ -2013,6 +2013,16 @@ async function getNews(blocked, customSources, page = 0, pageSize = PAGE_SIZE, s
   const start = page * pageSize;
   const end = start + pageSize;
   const pagedItems = filteredItems.slice(start, end);
+  
+  console.log('[getNews] Pagination:', { 
+    page, 
+    pageSize, 
+    start, 
+    end, 
+    filteredItemsLength: filteredItems.length,
+    pagedItemsLength: pagedItems.length,
+    hasMore: end < filteredItems.length 
+  });
 
   return {
     updatedAt: new Date().toISOString(),

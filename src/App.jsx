@@ -926,7 +926,7 @@ function App() {
     const sentinel = document.getElementById('load-more-sentinel');
     if (sentinel) observer.observe(sentinel);
     return () => observer.disconnect();
-  }, [nav, newsHasMore, loadingMore, loading, items.length]);
+  }, [nav, newsHasMore, loadingMore, loading]);
 
   const scrollToTop = () => {
     feedRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
@@ -1696,7 +1696,14 @@ function App() {
     fetch(`/api/news?blocked=${encodeURIComponent(b)}&page=${page}&pageSize=60${searchParam}${disabledParam}${interestsParam}${customParams ? '&' + customParams : ''}`)
       .then(r => r.json())
       .then(d => {
-        console.log('[loadNews] Received items:', d.items?.length || 0);
+        console.log('[loadNews] Received data:', { 
+          items: d.items?.length || 0, 
+          total: d.total, 
+          page: d.page, 
+          pageSize: d.pageSize, 
+          hasMore: d.hasMore,
+          currentNewsPage: newsPage 
+        });
         if (d.items && d.items.length > 0) {
           const sampleRegions = d.items.slice(0, 3).map(i => ({ title: i.title?.substring(0, 30), region: i.region }));
           console.log('[loadNews] Sample regions:', sampleRegions);
@@ -1729,7 +1736,9 @@ function App() {
   }
 
   function loadMoreNews() {
+    console.log('[loadMoreNews] Called:', { newsHasMore, loadingMore, loading, newsPage });
     if (!newsHasMore || loadingMore || loading) return;
+    console.log('[loadMoreNews] Loading more news...');
     setLoadingMore(true);
     loadNews(blocked, true, debouncedQuery);
   }
