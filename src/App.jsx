@@ -3327,12 +3327,16 @@ ${signals}
                   {(nav === 'all' || nav === 'recommendations') && (
                     <>
                       <div className="vertical-channel-wrap">
-                        <button className={`vertical-channel-btn ${verticalChannel === 'all' ? 'active' : ''}`} onClick={() => setVerticalChannel('all')}>全部频道</button>
-                        {VERTICAL_CHANNELS.map(ch => (
-                          <button key={ch.id} className={`vertical-channel-btn ${verticalChannel === ch.id ? 'active' : ''}`} onClick={() => setVerticalChannel(ch.id)} title={ch.description}>
-                            {ch.label}
-                          </button>
-                        ))}
+                        <select 
+                          className="vertical-channel-select"
+                          value={verticalChannel}
+                          onChange={(e) => setVerticalChannel(e.target.value)}
+                        >
+                          <option value="all">全部频道</option>
+                          {VERTICAL_CHANNELS.map(ch => (
+                            <option key={ch.id} value={ch.id}>{ch.label}</option>
+                          ))}
+                        </select>
                       </div>
                       <div className="region-filter-wrap">
                         <button className={`region-filter-btn ${regionFilter === 'all' ? 'active' : ''}`} onClick={() => { console.log('[Region] Setting to: all'); setRegionFilter('all'); }}>全部</button>
