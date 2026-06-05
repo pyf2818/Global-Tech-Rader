@@ -561,11 +561,6 @@ function App() {
   const [customSourceFilter, setCustomSourceFilter] = useState('all');
   const [regionFilter, setRegionFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
-  const [selectedDate, setSelectedDate] = useState(() => {
-    const savedDate = loadLS('selectedDate', null);
-    return savedDate || new Date().toISOString().split('T')[0];
-  });
-  const [timelineDates, setTimelineDates] = useState([]);
   
   
   const [autoMonitorEnabled, setAutoMonitorEnabled] = useState(() => loadLS('autoMonitorEnabled', false));
@@ -973,43 +968,7 @@ function App() {
     const sentinel = document.getElementById('load-more-sentinel');
     if (sentinel) observer.observe(sentinel);
     return () => observer.disconnect();
-  }, [nav, newsHasMore, loadingMore, loading]);
-
-  const scrollToTop = () => {
-    feedRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
-  };
-
-  useEffect(() => {
-    fetch('/api/meta')
-      .then(r => r.json())
-      .then(d => {
-        console.log('Fetched allSources:', d.sources);
-        setAllSources(d.sources || []);
-        if (d.sourceGrades) {
-          setSourceGrades(d.sourceGrades);
-        }
-      })
-      .catch(e => {
-        console.error('Failed to fetch allSources:', e);
-      });
-  }, []);
-  useEffect(() => { loadNews(); }, []);
-
-  // Initialize timeline dates
-  useEffect(() => {
-    try {
-      const dates = JSON.parse(localStorage.getItem('timeline_dates') || '[]');
-      setTimelineDates(dates);
-      
-      // 如果没有今天的数据，添加今天
-      const today = new Date().toISOString().split('T')[0];
-      if (!dates.includes(today)) {
-        const updatedDates = [today, ...dates].slice(0, 7);
-        setTimelineDates(updatedDates);
-        localStorage.setItem('timeline_dates', JSON.stringify(updatedDates));
-      }
-    } catch {}
-  }, []);
+}, [nav, newsHasMore, loadingMore, loading]);
 
   // Dynamic page title and description based on current navigation
   useEffect(() => {
@@ -1801,12 +1760,6 @@ function App() {
         setStats({ ...d, items: undefined });
         setNewsHasMore(d.hasMore ?? false);
         setNewsPage(page);
-        
-        // 保存今日数据到时间线
-        if (!append) {
-          const today = new Date().toISOString().split('T')[0];
-          saveDailyNewsData(today, itemsWithChinaTag, { ...d, items: undefined });
-        }
       })
       .catch(e => setError(e.message))
       .finally(() => { setLoading(false); setLoadingMore(false); });
@@ -1818,29 +1771,6 @@ function App() {
     console.log('[loadMoreNews] Loading more news...');
     setLoadingMore(true);
     loadNews(blocked, true, debouncedQuery);
-  }
-
-  function selectDate(date) {
-    setSelectedDate(date);
-    saveLS('selectedDate', date);
-    
-    if (date === new Date().toISOString().split('T')[0]) {
-      // 加载今日最新数据
-      loadNews();
-    } else {
-      // 加载历史数据
-      const dailyData = loadDailyNewsData(date);
-      if (dailyData) {
-        setItems(dailyData.items);
-        setStats(dailyData.stats);
-        setNewsPage(0);
-        setNewsHasMore(false);
-        setLoading(false);
-      } else {
-        setItems([]);
-        showToast('该日期暂无数据');
-      }
-    }
   }
 
   function renderMarkdown(text) {
@@ -3363,7 +3293,7 @@ ${signals}
                           );
                         })}
                       </select>
-                    </div>
+</div>
                   )}
                   {nav === 'all' && (
                     <div className="source-filter-wrap">

@@ -294,11 +294,6 @@ body {
 .region-filter-btn:hover { color: var(--text-primary); background: var(--bg-hover); }
 .region-filter-btn.active { color: var(--accent-cyan); background: rgba(34, 211, 238, 0.1); }
 
-.timeline-wrap { display: flex; align-items: center; gap: 6px; padding: 4px; background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 8px; }
-.timeline-select { padding: 6px 10px; background: transparent; border: none; border-radius: 6px; color: var(--text-primary); font-size: 12px; font-weight: 600; cursor: pointer; outline: none; min-width: 80px; }
-.timeline-select:focus { background: var(--bg-hover); }
-.timeline-select option { padding: 8px; background: var(--bg-primary); color: var(--text-primary); }
-
 .trending-toolbar, .recommendations-toolbar { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; padding: 10px 14px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 10px; }
 
 .topbar-trending .mode-tabs .mode-tab { padding: 6px 11px; font-size: 12px; }
