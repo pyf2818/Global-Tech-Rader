@@ -2344,6 +2344,58 @@ async function resolveImageFromArticle(articleUrl) {
   }
 }
 
+async function resolveImageWithScrapling(articleUrl) {
+  if (!MEDIA_CONFIG.USE_SCRAPLING) {
+    return resolveImageFromArticle(articleUrl);
+  }
+
+  try {
+    const response = await fetch('http://localhost:5000/api/scrape', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        url: articleUrl,
+        mode: MEDIA_CONFIG.SCRAPLING_MODE,
+        timeout: MEDIA_CONFIG.SCRAPLING_TIMEOUT / 1000
+      }),
+      signal: AbortSignal.timeout(MEDIA_CONFIG.SCRAPLING_TIMEOUT)
+    });
+
+    if (!response.ok) {
+      console.error(`[resolveImageWithScrapling] Scrapling returned ${response.status}`);
+      return resolveImageFromArticle(articleUrl);
+    }
+
+    const data = await response.json();
+
+    if (data.status === 200 && data.images && data.images.length > 0) {
+      const scoredImages = data.images
+        .filter(img => img.src && isGoodImageUrl(img.src, data.content || ''))
+        .map(img => {
+          const { score, reasons } = scoreImageUrl(img.src, data.content || '');
+          return { url: img.src, score, reasons };
+        })
+        .filter(img => img.score >= MEDIA_CONFIG.MIN_IMAGE_SCORE)
+        .sort((a, b) => b.score - a.score);
+
+      if (scoredImages.length > 0) {
+        const best = scoredImages[0];
+        const optimizedUrl = optimizeImageUrl(best.url);
+        const result = { imageUrl: optimizedUrl, videoUrl: '' };
+        imageResolveCache[articleUrl] = result;
+        mediaStats.scraplingImageCount = (mediaStats.scraplingImageCount || 0) + 1;
+        mediaStats.totalImageScore += best.score;
+        return result;
+      }
+    }
+
+    return resolveImageFromArticle(articleUrl);
+  } catch (e) {
+    console.error(`[resolveImageWithScrapling] Error:`, e.message);
+    return resolveImageFromArticle(articleUrl);
+  }
+}
+
 async function getTrending(platformFilter = 'all', page = 0, pageSize = 60) {
   const now = Date.now();
   
