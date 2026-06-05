@@ -139,6 +139,14 @@ const VERTICAL_CHANNELS = [
     description: '全球经济、股市、金融动态',
     keywords: ['股市', '股票', '经济', '金融', '加息', '降息', '通胀', '就业', 'GDP', '央行', '利率', '市场', '投资'],
     categories: ['economy-stock', 'fintech', 'policy-finance']
+  },
+  {
+    id: 'china-focused',
+    label: '涉华资讯',
+    icon: 'flag',
+    description: '海外对华政策、外贸订单、中国企业出海',
+    keywords: ['China', '中国', '中企', '中国企业', '人民币', '华为', '腾讯', '阿里巴巴', '字节跳动', '对华', '涉华', '中美', '中欧', '一带一路', 'RCEP', '东盟'],
+    categories: []
   }
 ];
 
@@ -1022,10 +1030,17 @@ function App() {
         const channel = VERTICAL_CHANNELS.find(ch => ch.id === verticalChannel);
         if (channel) {
           // 匹配垂直频道的分类
-          const catMatch = channel.categories.includes(item.category);
-          // 匹配垂直频道的关键词
-          const titleLower = `${item.title} ${item.summary}`.toLowerCase();
-          const keywordMatch = channel.keywords.some(kw => titleLower.includes(kw.toLowerCase()));
+          const catMatch = channel.categories.length === 0 || channel.categories.includes(item.category);
+          // 匹配垂直频道的关键词（同时匹配中英文）
+          const textToMatch = `${item.title} ${item.summary} ${item.tags ? item.tags.join(' ') : ''}`.toLowerCase();
+          const keywordMatch = channel.keywords.some(kw => {
+            // 对于英文关键词，区分大小写匹配
+            if (/^[a-zA-Z\s]+$/.test(kw)) {
+              return textToMatch.includes(kw.toLowerCase()) || textToMatch.includes(kw);
+            }
+            // 对于中文关键词，直接匹配
+            return textToMatch.includes(kw.toLowerCase());
+          });
           // 匹配分类或关键词
           channelMatch = catMatch || keywordMatch;
         }
@@ -1687,10 +1702,24 @@ function App() {
           const sampleRegions = d.items.slice(0, 3).map(i => ({ title: i.title?.substring(0, 30), region: i.region }));
           console.log('[loadNews] Sample regions:', sampleRegions);
         }
+        
+        // 标记涉华内容
+        const chinaFocusedKeywords = ['China', '中国', '中企', '中国企业', '人民币', '华为', '腾讯', '阿里巴巴', '字节跳动', '对华', '涉华', '中美', '中欧', '一带一路', 'RCEP', '东盟'];
+        const itemsWithChinaTag = (d.items || []).map(item => {
+          const textToMatch = `${item.title} ${item.summary} ${item.tags ? item.tags.join(' ') : ''}`.toLowerCase();
+          const isChinaFocused = chinaFocusedKeywords.some(kw => {
+            if (/^[a-zA-Z\s]+$/.test(kw)) {
+              return textToMatch.includes(kw.toLowerCase()) || textToMatch.includes(kw);
+            }
+            return textToMatch.includes(kw.toLowerCase());
+          });
+          return { ...item, isChinaFocused };
+        });
+        
         if (append) {
-          setItems(prev => [...prev, ...(d.items || [])]);
+          setItems(prev => [...prev, ...itemsWithChinaTag]);
         } else {
-          setItems(d.items || []);
+          setItems(itemsWithChinaTag);
         }
         setStats({ ...d, items: undefined });
         setNewsHasMore(d.hasMore ?? false);
@@ -7731,6 +7760,33 @@ function NewsItem({ item, index, viewMode = 'standard', isFocused = false, isBoo
     );
   };
 
+  // 涉华标记
+  const renderChinaFocused = () => {
+    if (!item.isChinaFocused) return null;
+
+    return (
+      <div
+        className="news-item-china-focused"
+        title="涉华资讯"
+        style={{
+          marginLeft: '6px',
+          display: 'inline-flex',
+          alignItems: 'center',
+          padding: '2px 6px',
+          background: 'rgba(239, 68, 68, 0.1)',
+          border: '1px solid rgba(239, 68, 68, 0.3)',
+          borderRadius: '4px',
+          color: '#ef4444',
+          fontSize: '10px',
+          fontWeight: '700',
+          letterSpacing: '0.5px'
+        }}
+      >
+        涉华
+      </div>
+    );
+  };
+
   return (
     <article
       className={`news-item view-${viewMode} ${isFocused ? 'focused' : ''} ${isFollowed ? 'followed' : ''}`}
@@ -7790,6 +7846,7 @@ function NewsItem({ item, index, viewMode = 'standard', isFocused = false, isBoo
             <div className="item-source-container">
               <span className="item-source">{item.source}{item.platform ? ` · ${item.platform}` : ''}</span>
               {renderSourceGrade()}
+              {renderChinaFocused()}
             </div>
             <a href={item.url} target="_blank" rel="noreferrer" className="item-link" onClick={() => onRead?.(item)}>阅读原文 {ICONS.arrowRight}</a>
           </div>
@@ -7798,6 +7855,7 @@ function NewsItem({ item, index, viewMode = 'standard', isFocused = false, isBoo
           <div className="item-source-container">
             <span className="item-source">{item.source}</span>
             {renderSourceGrade()}
+            {renderChinaFocused()}
           </div>
           <a href={item.url} target="_blank" rel="noreferrer" className="item-link" onClick={() => onRead?.(item)}>{ICONS.arrowRight}</a>
         </div>}
