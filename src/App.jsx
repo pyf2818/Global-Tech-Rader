@@ -406,49 +406,6 @@ function saveLS(key, value) {
   try { localStorage.setItem(key, JSON.stringify(value)); } catch {}
 }
 
-function saveDailyNewsData(date, items, stats) {
-  try {
-    const dailyData = {
-      items,
-      stats,
-      timestamp: Date.now()
-    };
-    localStorage.setItem(`daily_news_${date}`, JSON.stringify(dailyData));
-    
-    // 更新时间线日期列表
-    const existingDates = JSON.parse(localStorage.getItem('timeline_dates') || '[]');
-    const updatedDates = [...new Set([date, ...existingDates])].sort().reverse();
-    localStorage.setItem('timeline_dates', JSON.stringify(updatedDates));
-    
-    // 保留7天数据
-    cleanupOldNewsData();
-  } catch {}
-}
-
-function loadDailyNewsData(date) {
-  try {
-    const data = localStorage.getItem(`daily_news_${date}`);
-    return data ? JSON.parse(data) : null;
-  } catch {
-    return null;
-  }
-}
-
-function cleanupOldNewsData() {
-  try {
-    const timelineDates = JSON.parse(localStorage.getItem('timeline_dates') || '[]');
-    const datesToKeep = timelineDates.slice(0, 7); // 只保留最近7天
-    
-    // 删除超过7天的数据
-    const datesToDelete = timelineDates.slice(7);
-    datesToDelete.forEach(date => {
-      localStorage.removeItem(`daily_news_${date}`);
-    });
-    
-    localStorage.setItem('timeline_dates', JSON.stringify(datesToKeep));
-  } catch {}
-}
-
 function showToast(message, duration = 2000) {
   const toast = document.createElement('div');
   toast.className = 'material-toast';
@@ -3273,28 +3230,9 @@ ${signals}
                   </div>
                   <div className="region-filter-wrap">
                     <button className={`region-filter-btn ${regionFilter === 'all' ? 'active' : ''}`} onClick={() => { console.log('[Region] Setting to: all'); setRegionFilter('all'); }}>全部</button>
-                    <button className={`region-filter-btn ${regionFilter === 'domestic' ? 'active' : ''}`} onClick={() => { console.log('[Region] Setting to: domestic'); setRegionFilter('domestic'); }}>国内</button>
+<button className={`region-filter-btn ${regionFilter === 'domestic' ? 'active' : ''}`} onClick={() => { console.log('[Region] Setting to: domestic'); setRegionFilter('domestic'); }}>国内</button>
                     <button className={`region-filter-btn ${regionFilter === 'overseas' ? 'active' : ''}`} onClick={() => { console.log('[Region] Setting to: overseas'); setRegionFilter('overseas'); }}>国外</button>
                   </div>
-                  {nav === 'all' && timelineDates.length > 0 && (
-                    <div className="timeline-wrap">
-                      <select 
-                        className="timeline-select"
-                        value={selectedDate}
-                        onChange={(e) => selectDate(e.target.value)}
-                      >
-                        {timelineDates.map(date => {
-                          const isToday = date === new Date().toISOString().split('T')[0];
-                          const displayDate = isToday ? '今天' : date;
-                          return (
-                            <option key={date} value={date}>
-                              {displayDate}
-                            </option>
-                          );
-                        })}
-                      </select>
-</div>
-                  )}
                   {nav === 'all' && (
                     <div className="source-filter-wrap">
                       <select id="source-filter" value={sourceFilter} onChange={(e) => setSourceFilter(e.target.value)} className="source-filter-select">
