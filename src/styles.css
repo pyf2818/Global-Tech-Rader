@@ -297,6 +297,11 @@ body {
 .btn-refresh { display: flex; align-items: center; gap: 6px; padding: 7px 14px; background: var(--gradient-primary); border: none; border-radius: 8px; color: var(--bg-primary); font-size: 12px; font-weight: 600; cursor: pointer; transition: opacity 0.2s; flex-shrink: 0; }
 .btn-refresh:hover { opacity: 0.9; }
 .btn-refresh svg { width: 14px; height: 14px; }
+.btn-batch-translate { display: flex; align-items: center; gap: 6px; padding: 7px 14px; background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); border: none; border-radius: 8px; color: var(--bg-primary); font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.2s; flex-shrink: 0; }
+.btn-batch-translate:hover { opacity: 0.9; transform: scale(1.02); }
+.btn-batch-translate:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+.btn-batch-translate svg { width: 14px; height: 14px; }
+.btn-batch-translate-text { white-space: nowrap; }
 .topbar-actions-all .btn-refresh-all { margin-left: auto; }
 
 .trending-toolbar, .recommendations-toolbar { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; padding: 10px 14px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 10px; }

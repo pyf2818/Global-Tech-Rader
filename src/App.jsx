@@ -769,6 +769,8 @@ function App() {
   const [aiInsights, setAiInsights] = useState({ loading: false, data: null, error: '' });
   const [translationOpen, setTranslationOpen] = useState({});
   const [translatingItems, setTranslatingItems] = useState({});
+  const [batchTranslating, setBatchTranslating] = useState(false);
+  const [batchTranslationProgress, setBatchTranslationProgress] = useState({ current: 0, total: 0 });
   const [navGroupOpen, setNavGroupOpen] = useState({ core: true, insight: true, manage: false });
   const [currentArticleId, setCurrentArticleId] = useState(null);
   const [materialFilter, setMaterialFilter] = useState('all');
@@ -2888,6 +2890,57 @@ ${signals}
     }
   }
 
+  async function batchTranslateEnglish() {
+    console.log('[Batch Translation] Starting batch translation');
+    
+    if (!llmConfig.baseUrl || !llmConfig.selectedModel) {
+      showToast('请先在设置中配置大模型 API');
+      return;
+    }
+
+    // 筛选英文内容
+    const englishItems = filtered.filter(item => {
+      const isEnglish = /^[a-zA-Z0-9\s\-.,!?"'():;&%$#@*+\[\]{}|\\\/<>`~+=]+$/.test(item.title) && !/^[\u4e00-\u9fff]/.test(item.title);
+      const notTranslated = !translations[item.id];
+      return isEnglish && notTranslated;
+    });
+
+    if (englishItems.length === 0) {
+      showToast('没有需要翻译的英文内容');
+      return;
+    }
+
+    console.log('[Batch Translation] Found', englishItems.length, 'English items to translate');
+    setBatchTranslating(true);
+    setBatchTranslationProgress({ current: 0, total: englishItems.length });
+
+    let successCount = 0;
+    let failCount = 0;
+
+    for (let i = 0; i < englishItems.length; i++) {
+      const item = englishItems[i];
+      console.log('[Batch Translation] Translating', i + 1, 'of', englishItems.length, ':', item.title);
+      
+      const result = await requestTranslation(item);
+      if (result) {
+        successCount++;
+      } else {
+        failCount++;
+      }
+
+      setBatchTranslationProgress({ current: i + 1, total: englishItems.length });
+      
+      // 添加延迟避免API限流
+      if (i < englishItems.length - 1) {
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
+    }
+
+    setBatchTranslating(false);
+    showToast(`批量翻译完成：成功 ${successCount} 条，失败 ${failCount} 条`);
+    console.log('[Batch Translation] Completed:', { successCount, failCount });
+  }
+
   function getTranslation(item) {
     return translations[item.id] || null;
   }
@@ -3263,9 +3316,24 @@ ${signals}
                 </>
               )}
               {(nav === 'all' || nav === 'trending' || nav === 'github') && (
-                <button className={`btn-refresh ${nav === 'all' ? 'btn-refresh-all' : ''}`} onClick={() => { if (nav === 'all') loadNews(); else if (nav === 'trending') loadTrending(false, trendingPlatform, trendingType); else if (nav === 'github') loadGithub(); }}>
-                  {ICONS.refresh}
-                </button>
+                <>
+                  <button className={`btn-refresh ${nav === 'all' ? 'btn-refresh-all' : ''}`} onClick={() => { if (nav === 'all') loadNews(); else if (nav === 'trending') loadTrending(false, trendingPlatform, trendingType); else if (nav === 'github') loadGithub(); }}>
+                    {ICONS.refresh}
+                  </button>
+                  {nav === 'all' && (
+                    <button 
+                      className="btn-batch-translate" 
+                      onClick={batchTranslateEnglish}
+                      disabled={batchTranslating}
+                      title="批量翻译英文内容"
+                    >
+                      {batchTranslating ? ICONS.spinner : ICONS.globe}
+                      <span className="btn-batch-translate-text">
+                        {batchTranslating ? `翻译中 ${batchTranslationProgress.current}/${batchTranslationProgress.total}` : '批量翻译'}
+                      </span>
+                    </button>
+                  )}
+                </>
               )}
               {nav === 'trending' && (
                 <>
