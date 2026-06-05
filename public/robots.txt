@@ -1,0 +1,16 @@
+# robots.txt for Global Tech Radar
+
+# Allow all crawlers
+User-agent: *
+Allow: /
+
+# Disallow admin and development areas
+Disallow: /admin/
+Disallow: /api/
+Disallow: /*.json$
+
+# Sitemap location
+Sitemap: https://global-tech-radar.com/sitemap.xml
+
+# Crawl-delay for respectful crawling
+Crawl-delay: 1

@@ -950,6 +950,36 @@ function App() {
   }, []);
   useEffect(() => { loadNews(); }, []);
 
+  // Dynamic page title and description based on current navigation
+  useEffect(() => {
+    let title = 'Global Tech Radar - 全球科技圈实时资讯聚合平台';
+    let description = '聚合 AI、大模型、芯片、开源、科研、政策与投融资动态。';
+    
+    if (nav === 'trending') {
+      title = `Global Tech Radar - ${TRENDING_TYPES.find(t => t.id === trendingType)?.label || '热门榜单'}`;
+      description = `24小时热点、7日全球财经、时政热议 - 全球科技圈实时资讯聚合平台。`;
+    } else if (nav === 'github') {
+      title = 'Global Tech Radar - GitHub 热门项目';
+      description = '全球GitHub热门开源项目实时追踪，聚合最新技术趋势。';
+    } else if (nav === 'all') {
+      if (verticalChannel !== 'all') {
+        const channel = VERTICAL_CHANNELS.find(ch => ch.id === verticalChannel);
+        if (channel) {
+          title = `Global Tech Radar - ${channel.label}`;
+          description = `${channel.description} - 全球科技圈实时资讯聚合平台。`;
+        }
+      }
+    }
+    
+    document.title = title;
+    
+    // Update meta description
+    const metaDescription = document.querySelector('meta[name="description"]');
+    if (metaDescription) {
+      metaDescription.setAttribute('content', description);
+    }
+  }, [nav, trendingType, verticalChannel]);
+
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedQuery(query.trim()), 300);
     return () => clearTimeout(timer);
