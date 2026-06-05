@@ -3364,50 +3364,51 @@ ${signals}
                       </span>
                     </button>
                   )}
+                  {nav === 'trending' && (
+                    <>
+                      <div className="trending-type-tabs">
+                        {TRENDING_TYPES.map(t => (
+                          <button key={t.id} className={`trending-type-tab ${trendingType === t.id ? 'active' : ''}`} onClick={() => { setTrendingType(t.id); loadTrending(false, trendingPlatform, t.id); }}>
+                            <span className="trending-type-icon">{t.icon}</span>
+                            {t.label}
+                          </button>
+                        ))}
+                      </div>
+                      <div className="trending-platform-topbar">
+                        <select 
+                          className="platform-dropdown-topbar"
+                          value={trendingPlatform} 
+                          onChange={(e) => { setTrendingPlatform(e.target.value); loadTrending(false, e.target.value, trendingType); }}
+                        >
+                        <option value="all">全部平台</option>
+                        <optgroup label="国内平台">
+                          <option value="36氪">36氪</option>
+                          <option value="少数派">少数派</option>
+                          <option value="爱范儿">爱范儿</option>
+                          <option value="品玩">品玩</option>
+                          <option value="虎扑">虎扑</option>
+                          <option value="IT之家">IT之家</option>
+                        </optgroup>
+                        <optgroup label="国际平台">
+                          <option value="Hacker News">Hacker News</option>
+                          <option value="Product Hunt">Product Hunt</option>
+                          <option value="Dev.to">Dev.to</option>
+                          <option value="GitHub">GitHub</option>
+                          <option value="TechCrunch">TechCrunch</option>
+                          <option value="The Verge">The Verge</option>
+                          <option value="Ars Technica">Ars Technica</option>
+                          <option value="Wired">Wired</option>
+                          <option value="MIT Review">MIT Review</option>
+                          <option value="Engadget">Engadget</option>
+                          <option value="Slashdot">Slashdot</option>
+                          <option value="Smashing Mag">Smashing Mag</option>
+                          <option value="Lobsters">Lobsters</option>
+                        </optgroup>
+                      </select>
+                    </div>
+                    </>
+                  )}
                 </>
-              )}
-              {nav === 'trending' && (
-                <>
-                  <div className="trending-type-tabs">
-                    {TRENDING_TYPES.map(t => (
-                      <button key={t.id} className={`trending-type-tab ${trendingType === t.id ? 'active' : ''}`} onClick={() => { setTrendingType(t.id); loadTrending(false, trendingPlatform, t.id); }}>
-                        <span className="trending-type-icon">{t.icon}</span>
-                        {t.label}
-                      </button>
-                    ))}
-                  </div>
-                  <div className="trending-platform-topbar">
-                    <select 
-                      className="platform-dropdown-topbar"
-                      value={trendingPlatform} 
-                      onChange={(e) => { setTrendingPlatform(e.target.value); loadTrending(false, e.target.value, trendingType); }}
-                    >
-                    <option value="all">全部平台</option>
-                    <optgroup label="国内平台">
-                      <option value="36氪">36氪</option>
-                      <option value="少数派">少数派</option>
-                      <option value="爱范儿">爱范儿</option>
-                      <option value="品玩">品玩</option>
-                      <option value="虎扑">虎扑</option>
-                      <option value="IT之家">IT之家</option>
-                    </optgroup>
-                    <optgroup label="国际平台">
-                      <option value="Hacker News">Hacker News</option>
-                      <option value="Product Hunt">Product Hunt</option>
-                      <option value="Dev.to">Dev.to</option>
-                      <option value="GitHub">GitHub</option>
-                      <option value="TechCrunch">TechCrunch</option>
-                      <option value="The Verge">The Verge</option>
-                      <option value="Ars Technica">Ars Technica</option>
-                      <option value="Wired">Wired</option>
-                      <option value="MIT Review">MIT Review</option>
-                      <option value="Engadget">Engadget</option>
-                      <option value="Slashdot">Slashdot</option>
-                      <option value="Smashing Mag">Smashing Mag</option>
-                      <option value="Lobsters">Lobsters</option>
-                    </optgroup>
-                  </select>
-                </div>
               )}
             </div>
           </div>
