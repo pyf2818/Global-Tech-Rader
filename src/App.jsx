@@ -7595,26 +7595,20 @@ function NewsItem({ item, index, viewMode = 'standard', isFocused = false, isBoo
     const colors = gradeColors[grade] || gradeColors.D;
 
     return (
-      <span
-        className="source-grade-badge"
+      <div
+        className="news-item-source-grade"
+        data-grade={grade}
         style={{
           marginLeft: '8px',
           display: 'inline-flex',
-          alignItems: 'center'
+          alignItems: 'center',
+          '--grade-primary': colors.primary,
+          '--grade-glow': colors.glow
         }}
         title={item.sourceGradeLabel}
       >
-        <div
-          className="news-item-source-grade"
-          data-grade={grade}
-          style={{
-            '--grade-primary': colors.primary,
-            '--grade-glow': colors.glow
-          }}
-        >
-          {grade}
-        </div>
-      </span>
+        {grade}
+      </div>
     );
   };
 
