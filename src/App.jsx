@@ -98,6 +98,50 @@ const CATEGORY_GROUPS = [
   { id: 'lifestyle-health', label: '生活健康', icon: 'heart', categories: ['space', 'new-energy', 'climate-esg', 'healthcare', 'education-tech'] }
 ];
 
+// ========== 5大垂直频道（精准用户圈层）==========
+const VERTICAL_CHANNELS = [
+  {
+    id: 'cross-trade',
+    label: '跨境经贸',
+    icon: 'globe',
+    description: '外贸、跨境电商、出海企业、货代',
+    keywords: ['贸易', '关税', '出口', '进口', '跨境电商', '外贸', '海运', '货代', '美元', '人民币', '汇率', '采购', '供应链', '关税政策'],
+    categories: ['policy-finance', 'fintech', 'economy-stock']
+  },
+  {
+    id: 'study-immigration',
+    label: '留学移民',
+    icon: 'edu',
+    description: '学生、家长，海外教育',
+    keywords: ['留学', '签证', '移民', '教育', '大学', '院校', '雅思', '托福', '研究生', '博士', '学费', '奖学金'],
+    categories: ['education-tech', 'healthcare']
+  },
+  {
+    id: 'international-politics',
+    label: '国际时政',
+    icon: 'document',
+    description: '大国地缘冲突、国际政坛变动、全球防务',
+    keywords: ['地缘', '政治', '外交', '冲突', '战争', '选举', '总统', '政府', '政策', '国际关系', '防务', '军事'],
+    categories: ['silicon-valley', 'china-tech', 'policy-finance']
+  },
+  {
+    id: 'tech-frontier',
+    label: '科技前沿',
+    icon: 'cpu',
+    description: 'AI、芯片、量子计算、前沿科技',
+    keywords: ['AI', '人工智能', '大模型', '芯片', '量子', '计算', '研究', '科技', '创新', '突破', '发布', '推出'],
+    categories: ['ai-models', 'research', 'open-source', 'data-science', 'quantum', 'cybersecurity', 'chips-compute']
+  },
+  {
+    id: 'global-finance',
+    label: '环球财经',
+    icon: 'trendingUp',
+    description: '全球经济、股市、金融动态',
+    keywords: ['股市', '股票', '经济', '金融', '加息', '降息', '通胀', '就业', 'GDP', '央行', '利率', '市场', '投资'],
+    categories: ['economy-stock', 'fintech', 'policy-finance']
+  }
+];
+
 const LLM_PRESETS = [
   { id: 'openai', name: 'OpenAI', baseUrl: 'https://api.openai.com', models: ['gpt-4o', 'gpt-4-turbo', 'gpt-4o-mini', 'gpt-3.5-turbo'], icon: '🟢', placeholder: 'sk-...' },
   { id: 'deepseek', name: 'DeepSeek', baseUrl: 'https://api.deepseek.com', models: ['deepseek-chat', 'deepseek-coder'], icon: '🔵', placeholder: 'sk-...' },
@@ -375,6 +419,7 @@ function App() {
   const [nav, setNav] = useState('all');
   const [category, setCategory] = useState('all');
   const [categoryOpen, setCategoryOpen] = useState(false);
+  const [verticalChannel, setVerticalChannel] = useState('all');
   const [mode, setMode] = useState('all');
   const [sourceFilter, setSourceFilter] = useState('all');
   const [viewMode, setViewMode] = useState(() => loadLS('viewMode', 'standard'));
@@ -964,6 +1009,21 @@ function App() {
 
   const filtered = useMemo(() => {
     let result = items.filter(item => {
+      // 垂直频道筛选（优先于分类筛选）
+      let channelMatch = true;
+      if (verticalChannel !== 'all') {
+        const channel = VERTICAL_CHANNELS.find(ch => ch.id === verticalChannel);
+        if (channel) {
+          // 匹配垂直频道的分类
+          const catMatch = channel.categories.includes(item.category);
+          // 匹配垂直频道的关键词
+          const titleLower = `${item.title} ${item.summary}`.toLowerCase();
+          const keywordMatch = channel.keywords.some(kw => titleLower.includes(kw.toLowerCase()));
+          // 匹配分类或关键词
+          channelMatch = catMatch || keywordMatch;
+        }
+      }
+
       const cat = category === 'all' || item.category === category;
       const md = mode === 'all' || item.mode === mode;
       const src = sourceFilter === 'all' || item.source === sourceFilter;
@@ -975,9 +1035,10 @@ function App() {
           reg = item.region === 'overseas' || item.region === 'global';
         }
       }
-      return cat && md && src && reg;
+      return channelMatch && cat && md && src && reg;
     });
 
+    console.log('[Vertical Channel Filter] verticalChannel:', verticalChannel, 'filtered.length:', result.length);
     console.log('[Region Filter] regionFilter:', regionFilter, 'items.length:', items.length, 'filtered.length:', result.length);
     if (items.length > 0) {
       const sampleRegions = items.slice(0, 5).map(i => ({ title: i.title?.substring(0, 30), region: i.region }));
@@ -993,7 +1054,7 @@ function App() {
     }
 
     return result;
-  }, [items, category, mode, sourceFilter, followKeywords, regionFilter]);
+  }, [items, category, mode, sourceFilter, followKeywords, regionFilter, verticalChannel]);
 
   const sourceOptions = useMemo(() => {
     const counts = new Map();
@@ -3112,10 +3173,19 @@ ${signals}
                     </div>
                   )}
                   {(nav === 'all' || nav === 'recommendations') && (
-                    <div className="region-filter-wrap">
-                      <button className={`region-filter-btn ${regionFilter === 'all' ? 'active' : ''}`} onClick={() => { console.log('[Region] Setting to: all'); setRegionFilter('all'); }}>全部</button>
-                      <button className={`region-filter-btn ${regionFilter === 'domestic' ? 'active' : ''}`} onClick={() => { console.log('[Region] Setting to: domestic'); setRegionFilter('domestic'); }}>国内</button>
-                      <button className={`region-filter-btn ${regionFilter === 'overseas' ? 'active' : ''}`} onClick={() => { console.log('[Region] Setting to: overseas'); setRegionFilter('overseas'); }}>国外</button>
+                    <>
+                      <div className="vertical-channel-wrap">
+                        <button className={`vertical-channel-btn ${verticalChannel === 'all' ? 'active' : ''}`} onClick={() => setVerticalChannel('all')}>全部频道</button>
+                        {VERTICAL_CHANNELS.map(ch => (
+                          <button key={ch.id} className={`vertical-channel-btn ${verticalChannel === ch.id ? 'active' : ''}`} onClick={() => setVerticalChannel(ch.id)} title={ch.description}>
+                            {ch.label}
+                          </button>
+                        ))}
+                      </div>
+                      <div className="region-filter-wrap">
+                        <button className={`region-filter-btn ${regionFilter === 'all' ? 'active' : ''}`} onClick={() => { console.log('[Region] Setting to: all'); setRegionFilter('all'); }}>全部</button>
+                        <button className={`region-filter-btn ${regionFilter === 'domestic' ? 'active' : ''}`} onClick={() => { console.log('[Region] Setting to: domestic'); setRegionFilter('domestic'); }}>国内</button>
+                        <button className={`region-filter-btn ${regionFilter === 'overseas' ? 'active' : ''}`} onClick={() => { console.log('[Region] Setting to: overseas'); setRegionFilter('overseas'); }}>国外</button>
                     </div>
                   )}
                   <div className="view-toggle">

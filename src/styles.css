@@ -284,6 +284,11 @@ body {
 .source-filter-select { height: 26px; width: 100%; min-width: 0; background: transparent; border: none; color: var(--text-primary); font-size: 12px; outline: none; text-overflow: ellipsis; cursor: pointer; }
 .source-filter-select option { background: var(--bg-secondary); color: var(--text-primary); }
 
+.vertical-channel-wrap { display: flex; align-items: center; gap: 6px; padding: 4px; background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 8px; flex-wrap: wrap; }
+.vertical-channel-btn { padding: 6px 12px; background: transparent; border: none; border-radius: 6px; color: var(--text-secondary); font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.2s ease; white-space: nowrap; }
+.vertical-channel-btn:hover { color: var(--text-primary); background: var(--bg-hover); }
+.vertical-channel-btn.active { color: var(--accent-orange); background: rgba(251, 146, 60, 0.1); }
+
 .region-filter-wrap { display: flex; align-items: center; gap: 6px; padding: 4px; background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 8px; }
 .region-filter-btn { padding: 6px 12px; background: transparent; border: none; border-radius: 6px; color: var(--text-secondary); font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.2s ease; white-space: nowrap; }
 .region-filter-btn:hover { color: var(--text-primary); background: var(--bg-hover); }
