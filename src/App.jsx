@@ -406,6 +406,49 @@ function saveLS(key, value) {
   try { localStorage.setItem(key, JSON.stringify(value)); } catch {}
 }
 
+function saveDailyNewsData(date, items, stats) {
+  try {
+    const dailyData = {
+      items,
+      stats,
+      timestamp: Date.now()
+    };
+    localStorage.setItem(`daily_news_${date}`, JSON.stringify(dailyData));
+    
+    // 更新时间线日期列表
+    const existingDates = JSON.parse(localStorage.getItem('timeline_dates') || '[]');
+    const updatedDates = [...new Set([date, ...existingDates])].sort().reverse();
+    localStorage.setItem('timeline_dates', JSON.stringify(updatedDates));
+    
+    // 保留7天数据
+    cleanupOldNewsData();
+  } catch {}
+}
+
+function loadDailyNewsData(date) {
+  try {
+    const data = localStorage.getItem(`daily_news_${date}`);
+    return data ? JSON.parse(data) : null;
+  } catch {
+    return null;
+  }
+}
+
+function cleanupOldNewsData() {
+  try {
+    const timelineDates = JSON.parse(localStorage.getItem('timeline_dates') || '[]');
+    const datesToKeep = timelineDates.slice(0, 7); // 只保留最近7天
+    
+    // 删除超过7天的数据
+    const datesToDelete = timelineDates.slice(7);
+    datesToDelete.forEach(date => {
+      localStorage.removeItem(`daily_news_${date}`);
+    });
+    
+    localStorage.setItem('timeline_dates', JSON.stringify(datesToKeep));
+  } catch {}
+}
+
 function showToast(message, duration = 2000) {
   const toast = document.createElement('div');
   toast.className = 'material-toast';
@@ -518,6 +561,11 @@ function App() {
   const [customSourceFilter, setCustomSourceFilter] = useState('all');
   const [regionFilter, setRegionFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [selectedDate, setSelectedDate] = useState(() => {
+    const savedDate = loadLS('selectedDate', null);
+    return savedDate || new Date().toISOString().split('T')[0];
+  });
+  const [timelineDates, setTimelineDates] = useState([]);
   
   
   const [autoMonitorEnabled, setAutoMonitorEnabled] = useState(() => loadLS('autoMonitorEnabled', false));
@@ -947,6 +995,22 @@ function App() {
       });
   }, []);
   useEffect(() => { loadNews(); }, []);
+
+  // Initialize timeline dates
+  useEffect(() => {
+    try {
+      const dates = JSON.parse(localStorage.getItem('timeline_dates') || '[]');
+      setTimelineDates(dates);
+      
+      // 如果没有今天的数据，添加今天
+      const today = new Date().toISOString().split('T')[0];
+      if (!dates.includes(today)) {
+        const updatedDates = [today, ...dates].slice(0, 7);
+        setTimelineDates(updatedDates);
+        localStorage.setItem('timeline_dates', JSON.stringify(updatedDates));
+      }
+    } catch {}
+  }, []);
 
   // Dynamic page title and description based on current navigation
   useEffect(() => {
@@ -1701,7 +1765,7 @@ function App() {
     if (nav === 'recommendations' && isLoggedIn && selectedInterests.length > 0) {
       interestsParam = `&interests=${encodeURIComponent(selectedInterests.join(','))}`;
     }
-    fetch(`/api/news?blocked=${encodeURIComponent(b)}&page=${page}&pageSize=60${searchParam}${disabledParam}${interestsParam}${customParams ? '&' + customParams : ''}`)
+    fetch(`/api/news?blocked=${encodeURIComponent(b)}&page=${page}&pageSize=40${searchParam}${disabledParam}${interestsParam}${customParams ? '&' + customParams : ''}`)
       .then(r => r.json())
       .then(d => {
         console.log('[loadNews] Received data:', { 
@@ -1738,6 +1802,12 @@ function App() {
         setStats({ ...d, items: undefined });
         setNewsHasMore(d.hasMore ?? false);
         setNewsPage(page);
+        
+        // 保存今日数据到时间线
+        if (!append) {
+          const today = new Date().toISOString().split('T')[0];
+          saveDailyNewsData(today, itemsWithChinaTag, { ...d, items: undefined });
+        }
       })
       .catch(e => setError(e.message))
       .finally(() => { setLoading(false); setLoadingMore(false); });
@@ -1749,6 +1819,29 @@ function App() {
     console.log('[loadMoreNews] Loading more news...');
     setLoadingMore(true);
     loadNews(blocked, true, debouncedQuery);
+  }
+
+  function selectDate(date) {
+    setSelectedDate(date);
+    saveLS('selectedDate', date);
+    
+    if (date === new Date().toISOString().split('T')[0]) {
+      // 加载今日最新数据
+      loadNews();
+    } else {
+      // 加载历史数据
+      const dailyData = loadDailyNewsData(date);
+      if (dailyData) {
+        setItems(dailyData.items);
+        setStats(dailyData.stats);
+        setNewsPage(0);
+        setNewsHasMore(false);
+        setLoading(false);
+      } else {
+        setItems([]);
+        showToast('该日期暂无数据');
+      }
+    }
   }
 
   function renderMarkdown(text) {
@@ -3254,6 +3347,25 @@ ${signals}
                     <button className={`region-filter-btn ${regionFilter === 'domestic' ? 'active' : ''}`} onClick={() => { console.log('[Region] Setting to: domestic'); setRegionFilter('domestic'); }}>国内</button>
                     <button className={`region-filter-btn ${regionFilter === 'overseas' ? 'active' : ''}`} onClick={() => { console.log('[Region] Setting to: overseas'); setRegionFilter('overseas'); }}>国外</button>
                   </div>
+                  {nav === 'all' && timelineDates.length > 0 && (
+                    <div className="timeline-wrap">
+                      <select 
+                        className="timeline-select"
+                        value={selectedDate}
+                        onChange={(e) => selectDate(e.target.value)}
+                      >
+                        {timelineDates.map(date => {
+                          const isToday = date === new Date().toISOString().split('T')[0];
+                          const displayDate = isToday ? '今天' : date;
+                          return (
+                            <option key={date} value={date}>
+                              {displayDate}
+                            </option>
+                          );
+                        })}
+                      </select>
+                    </div>
+                  )}
                   {nav === 'all' && (
                     <div className="source-filter-wrap">
                       <select id="source-filter" value={sourceFilter} onChange={(e) => setSourceFilter(e.target.value)} className="source-filter-select">

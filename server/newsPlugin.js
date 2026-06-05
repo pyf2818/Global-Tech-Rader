@@ -1433,7 +1433,7 @@ let imageResolveCache = {};
 
 const MAX_NEWS_ITEMS = 500;
 const MAX_ITEMS_PER_SOURCE = 16;
-const PAGE_SIZE = 60;
+const PAGE_SIZE = 40;
 
 export function newsPlugin() {
   return {
