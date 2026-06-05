@@ -2097,6 +2097,11 @@ body {
 .btn-export-wechat:hover { background: rgba(52, 211, 153, 0.1); }
 .btn-export-zhihu { color: var(--accent-blue); border-color: #0066ff; }
 .btn-export-zhihu:hover { background: rgba(0, 102, 255, 0.1); }
+.trending-type-tabs { display: flex; align-items: center; gap: 6px; padding: 4px; background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 8px; }
+.trending-type-tab { display: flex; align-items: center; gap: 6px; padding: 6px 12px; background: transparent; border: none; border-radius: 6px; color: var(--text-secondary); font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.2s ease; white-space: nowrap; }
+.trending-type-tab:hover { color: var(--text-primary); background: var(--bg-hover); }
+.trending-type-tab.active { color: var(--accent-orange); background: rgba(251, 146, 60, 0.1); }
+.trending-type-icon { font-size: 14px; }
 .trending-platform-bar { display: flex; gap: 8px; margin: 16px 0 8px; flex-wrap: wrap; }
 .trending-platform-topbar { display: flex; align-items: center; margin-left: 8px; }
 .platform-dropdown-topbar { height: 32px; padding: 0 28px 0 10px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 6px; font-size: 12px; font-weight: 600; color: var(--text-primary); cursor: pointer; transition: all 0.2s; appearance: none; -webkit-appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 12 12'%3E%3Cpath fill='%236b7280' d='M6 8L1 3h10z'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 8px center; min-width: 120px; }

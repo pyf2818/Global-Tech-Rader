@@ -256,6 +256,12 @@ const VIEW_MODES = [
   { id: 'card', label: '卡片' }
 ];
 
+const TRENDING_TYPES = [
+  { id: '24h', label: '24小时热点', icon: '🔥' },
+  { id: '7d', label: '7日全球财经', icon: '📈' },
+  { id: 'politics', label: '时政热议', icon: '🌍' }
+];
+
 const GITHUB_LANGS = [
   { id: '', label: 'All' },
   { id: 'python', label: 'Python' },
@@ -706,6 +712,7 @@ function App() {
   const [trendingItems, setTrendingItems] = useState([]);
   const [trendingLoading, setTrendingLoading] = useState(false);
   const [trendingPlatform, setTrendingPlatform] = useState('all');
+  const [trendingType, setTrendingType] = useState('24h');
   const [trendingPage, setTrendingPage] = useState(0);
   const [trendingHasMore, setTrendingHasMore] = useState(true);
   const [trendingLoadingMore, setTrendingLoadingMore] = useState(false);
@@ -1814,7 +1821,7 @@ function App() {
     return renderMarkdown(processedText);
   }
 
-  function loadTrending(append = false, platform = trendingPlatform) {
+  function loadTrending(append = false, platform = trendingPlatform, type = trendingType) {
     if (!append) {
       setTrendingLoading(true);
       setTrendingPage(0);
@@ -1824,19 +1831,52 @@ function App() {
     }
     const params = new URLSearchParams();
     if (platform !== 'all') params.set('platform', platform);
+    if (type !== '24h') params.set('type', type);
     const page = append ? trendingPage + 1 : 0;
     params.set('page', page);
     params.set('pageSize', 20);
     const url = `/api/trending?${params}`;
-    console.log('[Trending] Fetching:', url);
+    console.log('[Trending] Fetching:', url, 'type:', type);
     fetch(url).then(r => r.json()).then(d => {
-      console.log('[Trending] Received:', d.items?.length || 0, 'items, hasMore:', d.hasMore);
+      console.log('[Trending] Received:', d.items?.length || 0, 'items, hasMore:', d.hasMore, 'type:', type);
+      
+      // 根据榜单类型进行本地排序和过滤
+      let items = d.items || [];
+      
+      if (type === '24h') {
+        // 24小时热点：按时间倒序，最近24小时内的
+        const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+        items = items.filter(item => item.publishedAt && item.publishedAt > oneDayAgo);
+        items.sort((a, b) => new Date(b.publishedAt) - new Date(a.publishedAt));
+      } else if (type === '7d') {
+        // 7日全球财经：筛选财经相关，按7天内排序
+        const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+        items = items.filter(item => {
+          const within7Days = !item.publishedAt || item.publishedAt > sevenDaysAgo;
+          const financeRelated = item.category === 'economy-stock' || 
+                                item.category === 'fintech' || 
+                                item.category === 'policy-finance' ||
+                                (item.tags && item.tags.some(tag => ['财经', '金融', '股市', '经济', '投资', '加息', '通胀'].includes(tag)));
+          return within7Days && financeRelated;
+        });
+        items.sort((a, b) => new Date(b.publishedAt) - new Date(a.publishedAt));
+      } else if (type === 'politics') {
+        // 时政热议：筛选时政相关
+        items = items.filter(item => {
+          const politicsRelated = item.category === 'policy-finance' ||
+                                  (item.tags && item.tags.some(tag => ['政治', '外交', '国际', '地缘', '冲突', '选举', '政府'].includes(tag))) ||
+                                  (item.title && /政治|外交|国际|地缘|冲突|选举|政府|国际关系/.test(item.title));
+          return politicsRelated;
+        });
+        items.sort((a, b) => new Date(b.publishedAt) - new Date(a.publishedAt));
+      }
+      
       if (append) {
-        setTrendingItems(prev => [...prev, ...(d.items || [])]);
+        setTrendingItems(prev => [...prev, ...items]);
         setTrendingHasMore(d.hasMore ?? false);
         setTrendingPage(page);
       } else {
-        setTrendingItems(d.items || []);
+        setTrendingItems(items);
         setTrendingHasMore(d.hasMore ?? true);
         setTrendingPage(page);
       }
@@ -3194,17 +3234,26 @@ ${signals}
                 </>
               )}
               {(nav === 'all' || nav === 'trending' || nav === 'github') && (
-                <button className={`btn-refresh ${nav === 'all' ? 'btn-refresh-all' : ''}`} onClick={() => { if (nav === 'all') loadNews(); else if (nav === 'trending') loadTrending(); else if (nav === 'github') loadGithub(); }}>
+                <button className={`btn-refresh ${nav === 'all' ? 'btn-refresh-all' : ''}`} onClick={() => { if (nav === 'all') loadNews(); else if (nav === 'trending') loadTrending(false, trendingPlatform, trendingType); else if (nav === 'github') loadGithub(); }}>
                   {ICONS.refresh}
                 </button>
               )}
               {nav === 'trending' && (
-                <div className="trending-platform-topbar">
-                  <select 
-                    className="platform-dropdown-topbar"
-                    value={trendingPlatform} 
-                    onChange={(e) => { setTrendingPlatform(e.target.value); loadTrending(false, e.target.value); }}
-                  >
+                <>
+                  <div className="trending-type-tabs">
+                    {TRENDING_TYPES.map(t => (
+                      <button key={t.id} className={`trending-type-tab ${trendingType === t.id ? 'active' : ''}`} onClick={() => { setTrendingType(t.id); loadTrending(false, trendingPlatform, t.id); }}>
+                        <span className="trending-type-icon">{t.icon}</span>
+                        {t.label}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="trending-platform-topbar">
+                    <select 
+                      className="platform-dropdown-topbar"
+                      value={trendingPlatform} 
+                      onChange={(e) => { setTrendingPlatform(e.target.value); loadTrending(false, e.target.value, trendingType); }}
+                    >
                     <option value="all">全部平台</option>
                     <optgroup label="国内平台">
                       <option value="36氪">36氪</option>
@@ -3305,7 +3354,7 @@ ${signals}
                 <div className="load-more-area">
                   {trendingLoadingMore && <div className="load-more-spinner"><div className="spinner" /><span>加载中...</span></div>}
                   {!trendingLoadingMore && trendingHasMore && (
-                    <button className="btn-load-more" onClick={() => loadTrending(true)}>加载更多</button>
+                    <button className="btn-load-more" onClick={() => loadTrending(true, trendingPlatform, trendingType)}>加载更多</button>
                   )}
                   {!trendingHasMore && <span className="load-more-done">已全部加载</span>}
                 </div>
