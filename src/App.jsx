@@ -2876,33 +2876,31 @@ ${signals}
         .map(line => line.trim())
         .filter(line => line.length > 0);
 
-      console.log('[Translation] Parsed lines:', lines);
+      // 跳过 LLM 添加的说明文字前缀
+      const skipPrefixes = ['以下是', 'Here is', 'Translation:', '翻译：', 'Translated:', '翻译结果', '以下是翻译结果'];
+      const filteredLines = lines.filter(line => !skipPrefixes.some(prefix => line.toLowerCase().startsWith(prefix.toLowerCase())));
+      const finalLines = filteredLines.length > 0 ? filteredLines : lines;
 
-      if (lines.length === 0) {
+      console.log('[Translation] Parsed lines:', finalLines);
+
+      if (finalLines.length === 0) {
         showToast('翻译返回空内容');
         return null;
       }
 
-      // 解析中英对照格式：原文 | 翻译
-      const translatedLines = lines.filter(line => line.includes('|'));
-      if (translatedLines.length === 0) {
-        showToast('翻译格式错误，未找到分隔符');
-        return null;
-      }
-
-      // 提取标题翻译（第一行包含 "title:" 的行）
-      const titleLine = translatedLines.find(line => line.toLowerCase().includes('title:')) || translatedLines[0];
-      const titleParts = titleLine.split('|').map(p => p.trim());
-      const title = titleParts.length >= 2 ? titleParts[1].replace(/^(title:|Title:)?\s*/, '') : item.title;
-
-      // 提取摘要翻译（其他行包含 "summary:" 的行）
-      const summaryLine = translatedLines.find(line => line.toLowerCase().includes('summary:'));
-      const summary = summaryLine ? summaryLine.split('|').map(p => p.trim())[1]?.replace(/^(summary:|Summary:)?\s*/, '') || '' : '';
+      // 第一行作为标题，其余作为摘要
+      const title = finalLines[0] || item.title;
+      const summary = finalLines.slice(1).join('\n') || '';
 
       console.log('[Translation] Translated:', { title, summary });
 
+      if (!title || title === item.title) {
+        showToast('翻译失败：无法获取翻译结果');
+        return null;
+      }
+
       // 检查翻译是否包含中文
-      const hasChinese = /[\u4e00-\u9fff]/.test(title + summary);
+      const hasChinese = /[\u4e00-\u9fff]/.test(title);
       if (!hasChinese) {
         showToast('翻译结果不包含中文，请重试');
         return null;
@@ -7844,14 +7842,14 @@ function NewsItem({ item, index, viewMode = 'standard', isFocused = false, isBoo
           {onBookmark && <button className={`bookmark-btn ${isBookmarked ? 'active' : ''}`} onClick={onBookmark} title={isBookmarked ? '取消收藏' : '收藏'}>{isBookmarked ? ICONS.bookmarkFill : ICONS.bookmark}</button>}
           {onAddMaterial && <button className={`add-material-btn ${isInMaterials ? 'active' : ''}`} onClick={() => onAddMaterial(item)} title={isInMaterials ? '已在素材库' : '收藏为素材'}>{ICONS.layers}</button>}
           {onSummary && <button className="summary-btn" onClick={onSummary} title="AI 摘要">{ICONS.sparkle}</button>}
-          {isEnglish && onToggleTranslation && <button className={`translate-btn ${showTranslation ? 'active' : ''} ${isTranslating ? 'translating' : ''}`} onClick={() => { console.log('[NewsItem] Translate button clicked:', { isTranslating, translation, onRequestTranslation: !!onRequestTranslation }); if (isTranslating) return; if (!translation && onRequestTranslation) { onRequestTranslation().then(result => { console.log('[NewsItem] Translation result:', result); if (result) onToggleTranslation(); }); } else { onToggleTranslation(); } }} title="中英对照" disabled={isTranslating}>{isTranslating ? ICONS.spinner : ICONS.globe}</button>}
+          {isEnglish && onToggleTranslation && <button className={`translate-btn ${showTranslation ? 'active' : ''} ${isTranslating ? 'translating' : ''}`} onClick={() => { console.log('[NewsItem] Translate button clicked:', { isTranslating, translation, onRequestTranslation: !!onRequestTranslation }); if (isTranslating) return; if (!translation && onRequestTranslation) { onRequestTranslation().then(result => { console.log('[NewsItem] Translation result:', result); if (result) onToggleTranslation(); }); } else { onToggleTranslation(); } }} title="翻译" disabled={isTranslating}>{isTranslating ? ICONS.spinner : ICONS.globe}</button>}
         </div>
       </div>
       <div className="item-main">
         <div className="item-content-row">
           <div className="item-text">
-            <h2 className="item-title"><span className="item-rank">{index + 1}.</span> {showTranslation && translation ? `${item.title} | ${translation.title}` : item.title}</h2>
-            {!isCompact && <p className="item-summary">{showTranslation && translation && translation.summary ? `${item.summary} | ${translation.summary}` : item.summary}</p>}
+            <h2 className="item-title"><span className="item-rank">{index + 1}.</span> {showTranslation && translation ? translation.title : item.title}</h2>
+            {!isCompact && <p className="item-summary">{showTranslation && translation && translation.summary ? translation.summary : item.summary}</p>}
             {!isCompact && item.bodyIntro && <p className="item-intro">导读：{item.bodyIntro}</p>}
           </div>
           {hasMedia && !isCompact && (
@@ -8131,7 +8129,7 @@ function GithubRepoCard({ repo, index, since = 'weekly', isBookmarked = false, i
       <div className="gh-card-actions">
         <button className={`gh-bookmark-btn ${isBookmarked ? 'active' : ''}`} onClick={onBookmark} title={isBookmarked ? '取消收藏' : '收藏'}>{isBookmarked ? ICONS.bookmarkFill : ICONS.bookmark}</button>
         {onAddMaterial && <button className={`gh-add-material-btn ${isInMaterials ? 'active' : ''}`} onClick={onAddMaterial} title={isInMaterials ? '已在素材库' : '收藏为素材'}>{ICONS.layers}</button>}
-        {isEnglish && onToggleTranslation && <button className={`gh-translate-btn ${showTranslation ? 'active' : ''}`} onClick={onToggleTranslation} title="中英对照">{ICONS.globe}</button>}
+        {isEnglish && onToggleTranslation && <button className={`gh-translate-btn ${showTranslation ? 'active' : ''}`} onClick={onToggleTranslation} title="翻译">{ICONS.globe}</button>}
       </div>
     </article>
   );
