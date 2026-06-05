@@ -3299,11 +3299,9 @@ ${signals}
               )}
               {(nav === 'all' || nav === 'trending' || nav === 'github') && (
                 <>
-<button className={`btn-refresh ${nav === 'all' ? 'btn-refresh-all' : ''}`} onClick={() => { if (nav === 'all') loadNews(); else if (nav === 'trending') loadTrending(false, trendingPlatform, trendingType); else if (nav === 'github') loadGithub(); }}>
+                  <button className={`btn-refresh ${nav === 'all' ? 'btn-refresh-all' : ''}`} onClick={() => { if (nav === 'all') loadNews(); else if (nav === 'trending') loadTrending(false, trendingPlatform, trendingType); else if (nav === 'github') loadGithub(); }}>
                     {ICONS.refresh}
                   </button>
-                </>
-              )}
                   {nav === 'trending' && (
                     <>
                       <div className="trending-type-tabs">
