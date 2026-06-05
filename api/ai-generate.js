@@ -35,7 +35,7 @@ export default async function handler(req, res) {
       rewrite: `请改写以下段落，使其更清晰、更专业，但保持原意不变：\n\n${content}`,
       expand: `请扩展以下内容，添加更多细节和论据，使其更丰富：\n\n${content}`,
       simplify: `请简化以下段落，使其更简洁易懂：\n\n${content}`,
-      translate_zh: `请将以下内容翻译成中文。只输出翻译结果，不要添加任何解释、说明、前缀或后缀：\n\n${content}`,
+      translate_zh: `请将以下内容翻译成中文，格式要求：原文 | 翻译。例如：\nOriginal: Hello World\n翻译: 你好世界\n\n请按照这个格式翻译以下内容：\n\n${content}`,
       translate_en: `请将以下内容翻译成英文：\n\n${content}`,
       title: `请为以下文章生成 5 个吸引人的标题，每个标题不超过 30 字：\n\n${content}`,
       summary: `请为以下文章生成一段简洁的摘要（不超过 100 字）：\n\n${content}`

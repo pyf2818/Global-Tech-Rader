@@ -2878,31 +2878,33 @@ ${signals}
         .map(line => line.trim())
         .filter(line => line.length > 0);
 
-      // 跳过 LLM 添加的说明文字前缀
-      const skipPrefixes = ['以下是', 'Here is', 'Translation:', '翻译：', 'Translated:', '翻译结果', '以下是翻译结果'];
-      const filteredLines = lines.filter(line => !skipPrefixes.some(prefix => line.toLowerCase().startsWith(prefix.toLowerCase())));
-      const finalLines = filteredLines.length > 0 ? filteredLines : lines;
+      console.log('[Translation] Parsed lines:', lines);
 
-      console.log('[Translation] Parsed lines:', finalLines);
-
-      if (finalLines.length === 0) {
+      if (lines.length === 0) {
         showToast('翻译返回空内容');
         return null;
       }
 
-      // 第一行作为标题，其余作为摘要
-      const title = finalLines[0] || item.title;
-      const summary = finalLines.slice(1).join('\n') || '';
-
-      console.log('[Translation] Translated:', { title, summary });
-
-      if (!title || title === item.title) {
-        showToast('翻译失败：无法获取翻译结果');
+      // 解析中英对照格式：原文 | 翻译
+      const translatedLines = lines.filter(line => line.includes('|'));
+      if (translatedLines.length === 0) {
+        showToast('翻译格式错误，未找到分隔符');
         return null;
       }
 
-      // 检查标题是否包含中文（简单判断）
-      const hasChinese = /[\u4e00-\u9fff]/.test(title);
+      // 提取标题翻译（第一行包含 "title:" 的行）
+      const titleLine = translatedLines.find(line => line.toLowerCase().includes('title:')) || translatedLines[0];
+      const titleParts = titleLine.split('|').map(p => p.trim());
+      const title = titleParts.length >= 2 ? titleParts[1].replace(/^(title:|Title:)?\s*/, '') : item.title;
+
+      // 提取摘要翻译（其他行包含 "summary:" 的行）
+      const summaryLine = translatedLines.find(line => line.toLowerCase().includes('summary:'));
+      const summary = summaryLine ? summaryLine.split('|').map(p => p.trim())[1]?.replace(/^(summary:|Summary:)?\s*/, '') || '' : '';
+
+      console.log('[Translation] Translated:', { title, summary });
+
+      // 检查翻译是否包含中文
+      const hasChinese = /[\u4e00-\u9fff]/.test(title + summary);
       if (!hasChinese) {
         showToast('翻译结果不包含中文，请重试');
         return null;
@@ -7914,11 +7916,9 @@ function NewsItem({ item, index, viewMode = 'standard', isFocused = false, isBoo
       <div className="item-main">
         <div className="item-content-row">
           <div className="item-text">
-            <h2 className="item-title"><span className="item-rank">{index + 1}.</span> {item.title}</h2>
-            {showTranslation && translation && <p className="item-translation">{translation.title}</p>}
-            {!isCompact && <p className="item-summary">{item.summary}</p>}
+            <h2 className="item-title"><span className="item-rank">{index + 1}.</span> {showTranslation && translation ? `${item.title} | ${translation.title}` : item.title}</h2>
+            {!isCompact && <p className="item-summary">{showTranslation && translation && translation.summary ? `${item.summary} | ${translation.summary}` : item.summary}</p>}
             {!isCompact && item.bodyIntro && <p className="item-intro">导读：{item.bodyIntro}</p>}
-            {showTranslation && translation && !isCompact && translation.summary && <p className="item-translation">{translation.summary}</p>}
           </div>
           {hasMedia && !isCompact && (
             <div className="item-media">
