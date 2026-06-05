@@ -289,6 +289,11 @@ body {
 .btn-refresh svg { width: 14px; height: 14px; }
 .topbar-actions-all .btn-refresh-all { margin-left: auto; }
 
+.region-filter-wrap { display: flex; align-items: center; gap: 6px; padding: 4px; background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 8px; }
+.region-filter-btn { padding: 6px 12px; background: transparent; border: none; border-radius: 6px; color: var(--text-secondary); font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.2s ease; white-space: nowrap; }
+.region-filter-btn:hover { color: var(--text-primary); background: var(--bg-hover); }
+.region-filter-btn.active { color: var(--accent-cyan); background: rgba(34, 211, 238, 0.1); }
+
 .trending-toolbar, .recommendations-toolbar { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; padding: 10px 14px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 10px; }
 
 .topbar-trending .mode-tabs .mode-tab { padding: 6px 11px; font-size: 12px; }

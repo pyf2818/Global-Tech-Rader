@@ -1057,10 +1057,18 @@ function App() {
       const cat = category === 'all' || item.category === category;
       const md = mode === 'all' || item.mode === mode;
       const src = sourceFilter === 'all' || item.source === sourceFilter;
-      return cat && md && src;
+      let reg = regionFilter === 'all';
+      if (!reg) {
+        if (regionFilter === 'domestic') {
+          reg = item.region === 'domestic';
+        } else if (regionFilter === 'overseas') {
+          reg = item.region === 'overseas' || item.region === 'global';
+        }
+      }
+      return cat && md && src && reg;
     });
 
-    console.log('[Filter] category:', category, 'mode:', mode, 'sourceFilter:', sourceFilter, 'filtered.length:', result.length);
+    console.log('[Filter] category:', category, 'mode:', mode, 'sourceFilter:', sourceFilter, 'regionFilter:', regionFilter, 'filtered.length:', result.length);
     if (items.length > 0) {
       const sampleRegions = items.slice(0, 5).map(i => ({ title: i.title?.substring(0, 30), region: i.region }));
       console.log('[Region Filter] Sample items:', sampleRegions);
@@ -1075,7 +1083,7 @@ function App() {
     }
 
     return result;
-  }, [items, category, mode, sourceFilter, followKeywords]);
+  }, [items, category, mode, sourceFilter, followKeywords, regionFilter]);
 
   const sourceOptions = useMemo(() => {
     const counts = new Map();
@@ -3240,6 +3248,11 @@ ${signals}
                 <>
                   <div className="mode-tabs">
                     {MODES.map(m => <button key={m.id} className={`mode-tab ${mode === m.id ? 'active' : ''}`} onClick={() => setMode(m.id)}>{m.label}</button>)}
+                  </div>
+                  <div className="region-filter-wrap">
+                    <button className={`region-filter-btn ${regionFilter === 'all' ? 'active' : ''}`} onClick={() => { console.log('[Region] Setting to: all'); setRegionFilter('all'); }}>全部</button>
+                    <button className={`region-filter-btn ${regionFilter === 'domestic' ? 'active' : ''}`} onClick={() => { console.log('[Region] Setting to: domestic'); setRegionFilter('domestic'); }}>国内</button>
+                    <button className={`region-filter-btn ${regionFilter === 'overseas' ? 'active' : ''}`} onClick={() => { console.log('[Region] Setting to: overseas'); setRegionFilter('overseas'); }}>国外</button>
                   </div>
                   {nav === 'all' && (
                     <div className="source-filter-wrap">
