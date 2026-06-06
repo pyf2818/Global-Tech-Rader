@@ -807,14 +807,14 @@ ${baseContent}
                               handleChangeAgent(agent.id);
                               setAgentMessages(prev => ({
                                 ...prev,
-                                [agent.id]: agentHistory[agent.id].messages
+                                [agent.id]: agentHistory[agent.id].messages || []
                               }));
                             }}
                           >
                             <div className="ai-elf-agent-history-item-title">对话历史</div>
                             <div className="ai-elf-agent-history-item-meta">
                               <span>{new Date(agentHistory[agent.id].timestamp).toLocaleDateString('zh-CN')}</span>
-                              <span>{agentHistory[agent.id].messages.length} 条消息</span>
+                              <span>{(agentHistory[agent.id].messages || []).length} 条消息</span>
                             </div>
                             <button
                               className="ai-elf-agent-history-item-delete"
