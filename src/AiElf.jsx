@@ -11,28 +11,8 @@ export default function AiElf({ llmConfig, avatarImage, elfName, onExportToMater
   const [isLoading, setIsLoading] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
   const [expandedAgent, setExpandedAgent] = useState(null);
-  const [currentSessionId, setCurrentSessionId] = useState(null);
-  const [quotedContext, setQuotedContext] = useState(null); // 展开的Agent ID
-
-  // 按Agent保存消息历史 { agentId: [{role, content, timestamp}] }
-  const [agentMessages, setAgentMessages] = useState(() => {
-    try {
-      const saved = localStorage.getItem('ai-elf-agent-messages');
-      return saved ? JSON.parse(saved) : {};
-    } catch {
-      return {};
-    }
-  });
-
-  // 按Agent保存历史会话 { agentId: [{id, title, timestamp, messages}] }
-  const [agentHistory, setAgentHistory] = useState(() => {
-    try {
-      const saved = localStorage.getItem('ai-elf-agent-history');
-      return saved ? JSON.parse(saved) : {};
-    } catch {
-      return {};
-    }
-  });
+// 当前Agent的对话历史（每个agent一个对话窗口）
+  const historyConversation = agentHistory[activeAgentId];
 
   const dragRef = useRef({ startX: 0, startY: 0, initialX: 0, initialY: 0 });
   const messagesEndRef = useRef(null);
@@ -43,11 +23,11 @@ export default function AiElf({ llmConfig, avatarImage, elfName, onExportToMater
   // 当前活跃Agent
   const activeAgent = agents.find(a => a.id === activeAgentId) || agents[0];
 
-  // 当前Agent的消息
+// 当前Agent的消息
   const messages = agentMessages[activeAgentId] || [];
 
-  // 当前Agent的历史记录
-  const historySessions = agentHistory[activeAgentId] || [];
+  // 当前Agent的对话历史（每个agent一个对话窗口）
+  const historyConversation = agentHistory[activeAgentId];
 
   // 生成Agent专属的分析Prompt
   const buildAnalysisPrompt = (itemData, pageContent) => {
@@ -277,19 +257,21 @@ ${baseContent}
   }, [agentMessages]);
 
   // 保存历史会话（带大小限制和错误处理）
+  // 切换Agent时自动加载对话历史
+  useEffect(() => {
+    const history = agentHistory[activeAgentId];
+    if (history && history.messages && history.messages.length > 0) {
+      setAgentMessages(prev => ({
+        ...prev,
+        [activeAgentId]: history.messages
+      }));
+    }
+  }, [activeAgentId, agentHistory]);
+
+  // 保存对话历史到localStorage
   useEffect(() => {
     try {
-      const MAX_HISTORY_PER_AGENT = 10; // 改为10个对话窗口
-      const trimmed = {};
-      Object.keys(agentHistory).forEach(key => {
-        const sessions = agentHistory[key] || [];
-        if (sessions.length > MAX_HISTORY_PER_AGENT) {
-          trimmed[key] = sessions.slice(-MAX_HISTORY_PER_AGENT);
-        } else {
-          trimmed[key] = sessions;
-        }
-      });
-      localStorage.setItem('ai-elf-agent-history', JSON.stringify(trimmed));
+      localStorage.setItem('ai-elf-agent-history', JSON.stringify(agentHistory));
     } catch (e) {
       if (e.name === 'QuotaExceededError') {
         console.warn('localStorage quota exceeded for ai-elf-agent-history');
@@ -301,11 +283,6 @@ ${baseContent}
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
-
-  // 切换Agent时重置会话ID
-  useEffect(() => {
-    setCurrentSessionId(null);
-  }, [activeAgentId]);
 
   // 计算聊天窗口位置（跟随精灵）
   const getWindowPosition = () => {
@@ -472,40 +449,16 @@ ${baseContent}
             [activeAgentId]: updatedMessages
           };
 
-          // 修改：保存为对话窗口（整个对话历史），而不是每次对话
-          if (!currentSessionId) {
-            const newSessionId = Date.now();
-            setCurrentSessionId(newSessionId);
-          }
-
-          setAgentHistory(history => {
-            const sessions = history[activeAgentId] || [];
-            const existingSession = sessions.find(s => s.id === currentSessionId);
-            
-            if (existingSession) {
-              // 更新现有会话
-              return {
-                ...history,
-                [activeAgentId]: sessions.map(s =>
-                  s.id === currentSessionId
-                    ? { ...s, messages: updatedMessages, timestamp: Date.now(), title: newMessage.content.slice(0, 50) + (newMessage.content.length > 50 ? '...' : '') }
-                    : s
-                )
-              };
-            } else {
-              // 创建新会话（对话窗口）
-              const session = {
-                id: currentSessionId,
-                title: newMessage.content.slice(0, 50) + (newMessage.content.length > 50 ? '...' : ''),
-                timestamp: Date.now(),
-                messages: updatedMessages
-              };
-              return {
-                ...history,
-                [activeAgentId]: [session, ...sessions].slice(0, 10) // 保存最多10个对话窗口
-              };
+          // 保存对话历史（每个agent只有一个对话窗口）
+          setAgentHistory(history => ({
+            ...history,
+            [activeAgentId]: {
+              id: activeAgentId,
+              title: activeAgent.name,
+              timestamp: Date.now(),
+              messages: updatedMessages
             }
-          });
+          }));
 
           return allMessages;
         });
@@ -587,19 +540,6 @@ ${baseContent}
 
 // 清空当前Agent对话
   const clearConversation = () => {
-    if (messages.length > 0 && currentSessionId) {
-      const session = {
-        id: currentSessionId,
-        title: messages[0].content.slice(0, 50) + (messages[0].content.length > 50 ? '...' : ''),
-        timestamp: Date.now(),
-        messages: messages
-      };
-      setAgentHistory(prev => ({
-        ...prev,
-        [activeAgentId]: [session, ...(prev[activeAgentId] || []).filter(s => s.id !== currentSessionId)].slice(0, 10)
-      }));
-    }
-    setCurrentSessionId(null);
     setAgentMessages(prev => ({
       ...prev,
       [activeAgentId]: []
@@ -837,51 +777,38 @@ ${baseContent}
                     {/* Agent历史记录 */}
                     {expandedAgent === agent.id && (
                       <div className="ai-elf-agent-history-list">
-                        {(agentHistory[agent.id] || []).length === 0 ? (
-                          <div className="ai-elf-agent-history-empty">暂无历史</div>
+                        {!agentHistory[agent.id] ? (
+                          <div className="ai-elf-agent-history-empty">暂无对话历史</div>
                         ) : (
-                          (agentHistory[agent.id] || []).map(session => {
-                              const lastMessage = session.messages[session.messages.length - 1];
-                              const messageCount = session.messages.length;
-                              const lastMessagePreview = lastMessage?.content?.slice(0, 60) || '';
-                              
-                              return (
-                                <div
-                                  key={session.id}
-                                  className="ai-elf-agent-history-item"
-                                  onClick={() => {
-                                    handleChangeAgent(agent.id);
-                                    setCurrentSessionId(session.id);
-                                    setAgentMessages(prev => ({
-                                      ...prev,
-                                      [agent.id]: session.messages
-                                    }));
-                                  }}
-                                >
-                                  <div className="ai-elf-agent-history-item-title">{session.title}</div>
-                                  {lastMessagePreview && (
-                                    <div className="ai-elf-agent-history-item-preview">{lastMessagePreview}...</div>
-                                  )}
-                                  <div className="ai-elf-agent-history-item-meta">
-                                    <span>{new Date(session.timestamp).toLocaleDateString('zh-CN')}</span>
-                                    <span>{new Date(session.timestamp).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}</span>
-                                    <span>{messageCount} 条消息</span>
-                                  </div>
-                                  <button
-                                    className="ai-elf-agent-history-item-delete"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setAgentHistory(prev => ({
-                                        ...prev,
-                                        [agent.id]: (prev[agent.id] || []).filter(s => s.id !== session.id)
-                                      }));
-                                    }}
-                                  >
-                                    删除
-                                  </button>
-                                </div>
-                              );
-                            })
+                          <div
+                            className="ai-elf-agent-history-item"
+                            onClick={() => {
+                              handleChangeAgent(agent.id);
+                              setAgentMessages(prev => ({
+                                ...prev,
+                                [agent.id]: agentHistory[agent.id].messages
+                              }));
+                            }}
+                          >
+                            <div className="ai-elf-agent-history-item-title">对话历史</div>
+                            <div className="ai-elf-agent-history-item-meta">
+                              <span>{new Date(agentHistory[agent.id].timestamp).toLocaleDateString('zh-CN')}</span>
+                              <span>{agentHistory[agent.id].messages.length} 条消息</span>
+                            </div>
+                            <button
+                              className="ai-elf-agent-history-item-delete"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setAgentHistory(prev => {
+                                  const updated = { ...prev };
+                                  delete updated[agent.id];
+                                  return updated;
+                                });
+                              }}
+                            >
+                              删除
+                            </button>
+                          </div>
                         )}
                       </div>
                     )}
