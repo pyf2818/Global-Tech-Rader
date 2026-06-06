@@ -9,17 +9,17 @@ const MEDIA_CONFIG = {
 
   // 图片评分阈值（大幅降低以提高覆盖率）
   MIN_IMAGE_SCORE: 10,          // 最低分数才使用（从25降低到10，优先获取图片）
-  MIN_IMAGE_WIDTH: 200,         // 最小宽度（像素，从300降低到200）
-  MIN_IMAGE_HEIGHT: 150,        // 最小高度（像素，从200降低到150）
-  ASPECT_RATIO_MIN: 0.5,        // 最小宽高比（从0.8降低到0.5）
-  ASPECT_RATIO_MAX: 4.0,        // 最大宽高比（从3.0提高到4.0）
+  MIN_IMAGE_WIDTH: 200,         // 最小宽度（像素，从400降低到300）
+  MIN_IMAGE_HEIGHT: 150,        // 最小高度（像素，从300降低到200）
+  ASPECT_RATIO_MIN: 0.5,        // 最小宽高比（从1.2降低到0.5）
+  ASPECT_RATIO_MAX: 4.0,        // 最大宽高比（从2.5提高到3.0）
 
   // 缓存配置
   IMAGE_CACHE_SIZE: 2000,       // 缓存条目数量（从1000提高到2000）
   IMAGE_CACHE_TTL: 7200000,     // 缓存有效期（2小时，从1小时提高）
 
   // 图片去重配置
-  MAX_IMAGE_REUSE: 5,           // 同一图片最多使用次数（从2提高到5）
+  MAX_IMAGE_REUSE: 1,           // 同一图片最多使用次数（从2降低到1，避免重复）
 };
 
 // ========== 多媒体统计 ==========
@@ -1927,7 +1927,32 @@ async function getNews(blocked, customSources, page = 0, pageSize = PAGE_SIZE, s
     resetGlobalImageUsage(); // 重置全局图片使用跟踪
     mediaStats.totalItems = fullItems.length;
 
-    // 统计 RSS 图片
+    // 去重RSS图片，防止同一图片在多个资讯中重复出现
+    const rssImageUsage = new Map();
+    fullItems.forEach(item => {
+      if (item.imageUrl) {
+        try {
+          const urlObj = new URL(item.imageUrl);
+          urlObj.search = '';
+          urlObj.hash = '';
+          const normalized = urlObj.href;
+          const usageCount = rssImageUsage.get(normalized) || 0;
+          
+          if (usageCount >= 1) {
+            // 如果图片已经被使用过，清除它
+            console.log(`[getNews] Removing duplicate RSS image: ${normalized.substring(0, 60)} (usage: ${usageCount})`);
+            item.imageUrl = '';
+          } else {
+            // 记录图片使用
+            rssImageUsage.set(normalized, usageCount + 1);
+          }
+        } catch (e) {
+          // URL解析失败，保留原样
+        }
+      }
+    });
+
+    // 统计 RSS 图片（去重后）
     fullItems.forEach(item => {
       if (item.imageUrl) {
         mediaStats.itemsWithImage++;
@@ -2322,117 +2347,15 @@ async function resolveImageFromArticle(articleUrl) {
             mediaStats.totalImageScore += candidate.score;
             return result;
           }
-        }
-      }
-    }
-
-    // 备用：使用社交媒体图片（降低要求）
-    const ogImage = html.match(/<meta\s+property=["']og:image["']\s+content=["']([^"']+)["']/i);
-    const twitterImage = html.match(/<meta\s+name=["']twitter:image["']\s+content=["']([^"']+)["']/i);
-    
-    const socialImages = [];
-    if (ogImage) socialImages.push({ url: ogImage[1], type: 'og:image' });
-    if (twitterImage) socialImages.push({ url: twitterImage[1], type: 'twitter:image' });
-
-    for (const social of socialImages) {
-      const optimizedUrl = optimizeImageUrl(social.url);
-      const usageCount = getImageUsageCount(optimizedUrl);
-      
-      if (usageCount < MEDIA_CONFIG.MAX_IMAGE_REUSE) {
-        const isValid = await validateImageUrl(optimizedUrl, 3000);
-        if (isValid) {
-          incrementImageUsage(optimizedUrl);
-          console.log(`[resolveImage] Fallback to ${social.type} for ${articleUrl}`);
-          
-          const result = { imageUrl: optimizedUrl, videoUrl };
-          imageResolveCache[articleUrl] = result;
-          mediaStats.resolvedImageCount++;
-          if (social.type === 'og:image') mediaStats.ogImageCount++;
-          if (social.type === 'twitter:image') mediaStats.twitterImageCount++;
-          return result;
-        }
 }
-    }
-
-    // 选择最佳图片（带全局使用跟踪和验证）
-    let bestImage = null;
-    let bestScore = 0;
-    let bestReasons = [];
-
-    for (let i = 0; i < scoredImages.length; i++) {
-      const img = scoredImages[i];
-      const normalizedUrl = img.url.split('?')[0];
-
-      // 检查全局使用次数
-      const usageCount = globalImageUsage.get(normalizedUrl) || 0;
-      if (usageCount >= MEDIA_CONFIG.MAX_IMAGE_REUSE) {
-        console.log(`[resolveImage] Image already used ${usageCount} times, skipping:`, normalizedUrl.substring(0, 80));
-        continue;
-      }
-
-      // 验证图片URL
-      const isValid = await validateImageUrl(img.url);
-      if (!isValid) {
-        console.log(`[resolveImage] Image validation failed:`, img.url.substring(0, 80));
-        mediaStats.validationFailedCount++;
-        continue;
-      }
-
-      bestImage = img;
-      bestScore = img.score;
-      bestReasons = img.reasons;
-      break;
-    }
-
-    // 如果没有找到有效的图片，尝试使用社交媒体图片
-    if (!bestImage) {
-      const socialImages = [
-        html.match(/<meta\s+property=["']og:image["']\s+content=["']([^"']+)["']/i),
-        html.match(/<meta\s+property=["']og:image:url["']\s+content=["']([^"']+)["']/i),
-        html.match(/<meta\s+name=["']twitter:image["']\s+content=["']([^"']+)["']/i),
-        html.match(/<link\s+rel=["']image_src["']\s+href=["']([^"']+)["']/i)
-      ];
-
-      for (const match of socialImages) {
-        if (match) {
-          const url = match[1];
-          const normalizedUrl = url.split('?')[0];
-          const usageCount = globalImageUsage.get(normalizedUrl) || 0;
-
-          if (usageCount < MEDIA_CONFIG.MAX_IMAGE_REUSE) {
-            const isValid = await validateImageUrl(url);
-            if (isValid) {
-              bestImage = { url, score: 15, reasons: ['social-image'] };
-              console.log(`[resolveImage] Using social image as fallback:`, url.substring(0, 80));
-              break;
-            }
-          }
-        }
       }
     }
 
-    if (bestImage) {
-      const optimizedUrl = optimizeImageUrl(bestImage.url);
-      const normalizedUrl = bestImage.url.split('?')[0];
-
-      // 更新全局使用计数
-      globalImageUsage.set(normalizedUrl, (globalImageUsage.get(normalizedUrl) || 0) + 1);
-
-      console.log(`[resolveImage] Selected for ${articleUrl}:`, {
-        url: optimizedUrl.substring(0, 80),
-        score: bestScore,
-        reasons: bestReasons.join(', ')
-      });
-
-      const result = { imageUrl: optimizedUrl, videoUrl };
-      imageResolveCache[articleUrl] = result;
-      mediaStats.resolvedImageCount++;
-      mediaStats.totalImageScore += bestScore;
-      return result;
-    }
-
-    mediaStats.failedResolves++;
-    return { imageUrl: '', videoUrl };
+    // 返回空结果（不使用社交媒体图片作为fallback，避免重复）
+    console.log(`[resolveImage] No valid image found for ${articleUrl}`);
+    const result = { imageUrl: '', videoUrl };
+    imageResolveCache[articleUrl] = result;
+    return result;
   } catch (e) {
     console.error(`[resolveImage] Error for ${articleUrl}:`, e.message);
     mediaStats.failedResolves++;
@@ -2848,11 +2771,17 @@ function isGoodImageUrl(url, htmlSource) {
   const TRACKING_DOMAINS = /\/\/(gravatar\.|disqus\.|pixel\.|tracking\.|analytics\.|doubleclick\.|adsense\.|adnxs\.|moatads\.|chartbeat\.|newrelic\.|pingdom\.|taboola\.|outbrain\.|zemanta\.)/i;
   if (TRACKING_DOMAINS.test(url)) return false;
 
+  // 排除图标和favicon（增强版）
+  const iconPatterns = /\/(favicon|apple-touch-icon|android-chrome|mstile|browserconfig|tile|icon-|logo[-_]?icon|site[-_]?icon|touch[-_]?icon|bookmark[-_]?icon|shortcut[-_]?icon)/i;
+  if (iconPatterns.test(url)) return false;
+
   // 放宽文件类型限制（允许更多格式）
-  if (/\.(ico|cur|bmp)$/i.test(url)) {
-    // 允许某些特殊情况下的这些格式
-    if (!/\/(screenshot|demo|preview|featured|hero|article|post|content)\b/i.test(url)) {
-      return false;
+  if (/\.(ico|cur|bmp|svg)$/i.test(url)) {
+    // SVG允许特殊情况，其他格式排除
+    if (!/svg/i.test(url)) {
+      if (!/\/(screenshot|demo|preview|featured|hero|article|post|content)\b/i.test(url)) {
+        return false;
+      }
     }
   }
 
@@ -2865,16 +2794,20 @@ function isGoodImageUrl(url, htmlSource) {
     if (w > 0 && w < 100 && h > 0 && h < 100) return false;
   }
 
-  // 精简通用图片文件名排除（减少误判，只排除最明显的）
-  const genericPatterns = /\/(logo|header-bg|footer-bg|nav-bg|hero-bg|banner-bg|site-logo|brand-logo|company-logo|organization-logo|placeholder|no-image|image-not-found)([-_]|$)/i;
+  // 增强通用图片文件名排除（排除更多占位图和logo）
+  const genericPatterns = /\/(logo|header[-_]?bg|footer[-_]?bg|nav[-_]?bg|hero[-_]?bg|banner[-_]?bg|site[-_]?logo|brand[-_]?logo|company[-_]?logo|organization[-_]?logo|placeholder|no[-_]?image|image[-_]?not[-_]?found|default[-_]?image|generic[-_]?image|common[-_]?image|shared[-_]?image|global[-_]?image|empty|blank|skeleton|loading|spinner|pulse|dots|badge|shield|button[-_]?icon|nav[-_]?icon|menu[-_]?icon|social[-_]?icon|share[-_]?icon|notification[-_]?icon|push[-_]?icon|web[-_]?push[-_]?icon)([-_]|$)/i;
   if (genericPatterns.test(url)) return false;
 
   // 排除明显的占位符服务
-  const placeholderServices = /\/(via\.placeholder\.com|placehold\.co|dummyimage\.com|placehold\.it|fakeimg\.pl)/i;
+  const placeholderServices = /\/(via\.placeholder\.com|placehold\.co|dummyimage\.com|placehold\.it|fakeimg\.pl|loremflickr\.com|placekitten\.com|baconmockup\.com|placebear\.com)/i;
   if (placeholderServices.test(url)) return false;
 
-  // 排除通用尺寸（只排除明显的图标尺寸，从16x16/32x32/48x48改为只排除16x16）
-  if (/\/(16x16)\b/i.test(url)) return false;
+  // 排除通用尺寸（只排除明显的图标尺寸）
+  if (/\/(16x16|24x24|32x32|40x40|48x48|64x64)\b/i.test(url)) return false;
+
+  // 排除跟踪和分析图片（增强版）
+  const trackingPatterns = /\/(tracking|pixel|beacon|stat|analytics|log|impression|click|view|counter|tracker|monitor|telemetry|hit|collect|event|session|user[-_]?id|visitor[-_]?id|page[-_]?view)/i;
+  if (trackingPatterns.test(url)) return false;
 
   return true;
 }
