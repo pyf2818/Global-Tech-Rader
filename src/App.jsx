@@ -390,6 +390,7 @@ const ICONS = {
   download: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>,
   power: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M18.36 6.64a9 9 0 1 1-12.72 0"/><line x1="12" y1="2" x2="12" y2="12"/></svg>,
   user: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>,
+  play: <svg viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>,
 };
 
 function loadLS(key, fallback) {
@@ -7809,16 +7810,28 @@ function NewsItem({ item, index, viewMode = 'standard', isFocused = false, isBoo
           </div>
           {hasMedia && !isCompact && (
             <div className="item-media">
-              {item.imageUrl && (
+              {item.videoUrl ? (
+                // 优先显示视频
+                <a href={item.videoUrl} target="_blank" rel="noreferrer" className="item-media-video-link">
+                  {item.imageUrl ? (
+                    // 如果有封面图，显示封面图+播放图标
+                    <div className="item-media-thumb">
+                      <img src={item.imageUrl} alt="" loading="lazy" onError={e => { e.target.style.display = 'none'; }} />
+                      <span className="item-media-play video-play">{ICONS.play}</span>
+                    </div>
+                  ) : (
+                    // 只有视频链接，显示视频链接按钮
+                    <div className="item-media-video-only">
+                      <span className="item-media-play video-play">{ICONS.play}</span>
+                      <span>观看视频</span>
+                    </div>
+                  )}
+                </a>
+              ) : item.imageUrl && (
+                // 没有视频，显示图片
                 <div className="item-media-thumb" onClick={() => onOpenLightbox?.(item.imageUrl, item.title)}>
                   <img src={item.imageUrl} alt="" loading="lazy" onError={e => { e.target.style.display = 'none'; }} />
-                  {item.videoUrl && <span className="item-media-play">{ICONS.eye}</span>}
                 </div>
-              )}
-              {!item.imageUrl && item.videoUrl && (
-                <a href={item.videoUrl} target="_blank" rel="noreferrer" className="item-media-video-link">
-                  {ICONS.eye}<span>视频</span>
-                </a>
               )}
             </div>
           )}
@@ -7827,6 +7840,12 @@ function NewsItem({ item, index, viewMode = 'standard', isFocused = false, isBoo
           <div className="ai-summary">
             <div className="ai-summary-header">{ICONS.sparkle}<span>AI 摘要</span></div>
             <div className="ai-summary-content">{summaryText.split(' | ').map((p, i) => <p key={i}>{p}</p>)}</div>
+          </div>
+        )}
+        {!isCompact && item.recommendation && (
+          <div className="recommendation-reason">
+            <span className="recommendation-label">推荐理由：</span>
+            <span className="recommendation-text">{item.recommendation}</span>
           </div>
         )}
         {!isCompact && <div className="item-meta">

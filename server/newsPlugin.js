@@ -2,24 +2,24 @@
 const MEDIA_CONFIG = {
   // 抓取配置
   MAX_RESOLVE_ITEMS: 80,        // 最多抓取80条无图片新闻（从60提高）
-  RESOLVE_TIMEOUT: 12000,       // 抓取超时（毫秒，从8秒提高到12秒）
+  RESOLVE_TIMEOUT: 15000,       // 抓取超时（毫秒，从12秒提高到15秒）
   USE_SCRAPLING: true,          // 启用 Scrapling 动态渲染（从false改为true）
   SCRAPLING_MODE: 'dynamic',    // Scrapling 模式（basic/dynamic/stealth）
-  SCRAPLING_TIMEOUT: 15000,     // Scrapling 超时（毫秒，从10秒提高到15秒）
+  SCRAPLING_TIMEOUT: 18000,     // Scrapling 超时（毫秒，从15秒提高到18秒）
 
-  // 图片评分阈值（降低以提高覆盖率）
-  MIN_IMAGE_SCORE: 25,          // 最低分数才使用（从40降低到25，平衡质量和数量）
-  MIN_IMAGE_WIDTH: 300,         // 最小宽度（像素，从400降低到300）
-  MIN_IMAGE_HEIGHT: 200,        // 最小高度（像素，从300降低到200）
-  ASPECT_RATIO_MIN: 0.8,        // 最小宽高比（从1.2降低到0.8）
-  ASPECT_RATIO_MAX: 3.0,        // 最大宽高比（从2.5提高到3.0）
+  // 图片评分阈值（大幅降低以提高覆盖率）
+  MIN_IMAGE_SCORE: 10,          // 最低分数才使用（从25降低到10，优先获取图片）
+  MIN_IMAGE_WIDTH: 200,         // 最小宽度（像素，从300降低到200）
+  MIN_IMAGE_HEIGHT: 150,        // 最小高度（像素，从200降低到150）
+  ASPECT_RATIO_MIN: 0.5,        // 最小宽高比（从0.8降低到0.5）
+  ASPECT_RATIO_MAX: 4.0,        // 最大宽高比（从3.0提高到4.0）
 
   // 缓存配置
   IMAGE_CACHE_SIZE: 2000,       // 缓存条目数量（从1000提高到2000）
   IMAGE_CACHE_TTL: 7200000,     // 缓存有效期（2小时，从1小时提高）
 
   // 图片去重配置
-  MAX_IMAGE_REUSE: 2,           // 同一图片最多使用次数
+  MAX_IMAGE_REUSE: 5,           // 同一图片最多使用次数（从2提高到5）
 };
 
 // ========== 多媒体统计 ==========
@@ -114,7 +114,7 @@ function resetGlobalImageUsage() {
 }
 
 // ========== 图片验证函数 ==========
-async function validateImageUrl(url, timeout = 3000) {
+async function validateImageUrl(url, timeout = 8000) {
   try {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), timeout);
@@ -135,7 +135,7 @@ async function validateImageUrl(url, timeout = 3000) {
     }
 
     const contentLength = parseInt(response.headers.get('content-length') || '0');
-    if (contentLength > 0 && contentLength < 10240) { // 小于10KB可能是占位图
+    if (contentLength > 0 && contentLength < 5120) { // 降低到5KB，避免误判有效图片
       console.log(`[validateImageUrl] Image too small: ${contentLength} bytes`);
       return false;
     }
@@ -2179,7 +2179,77 @@ async function resolveImageFromArticle(articleUrl) {
 .filter(img => img.score >= MEDIA_CONFIG.MIN_IMAGE_SCORE)
       .sort((a, b) => b.score - a.score);
 
-    // 提取视频（增强版）
+    // 提取视频（增强版）- 在图片之前提取，优先视频
+    let videoUrl = '';
+
+    // 1. 提取 YouTube 视频
+    const youtubeMatches = [
+      ...html.matchAll(/<iframe[^>]+src=["'](?:https?:)?\/\/(?:www\.)?youtube\.com\/embed\/([^"'?&]+)/gi),
+      ...html.matchAll(/<iframe[^>]+src=["'](?:https?:)?\/\/(?:www\.)?youtube\.com\/watch\?v=([^"'?&]+)/gi),
+      ...html.matchAll(/<iframe[^>]+src=["'](?:https?:)?\/\/youtu\.be\/([^"'?&]+)/gi),
+      ...html.matchAll(/(?:https?:)?\/\/(?:www\.)?youtube\.com\/watch\?v=([a-zA-Z0-9_-]+)/gi),
+      ...html.matchAll(/(?:https?:)?\/\/(?:www\.)?youtube\.com\/embed\/([a-zA-Z0-9_-]+)/gi)
+    ];
+
+    for (const match of youtubeMatches) {
+      const videoId = match[1];
+      if (videoId && videoId.length > 5) {
+        videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
+        console.log(`[resolveImage] Found YouTube video: ${videoUrl}`);
+        break;
+      }
+    }
+
+    // 2. 提取 Vimeo 视频
+    if (!videoUrl) {
+      const vimeoMatches = [
+        ...html.matchAll(/<iframe[^>]+src=["'](?:https?:)?\/\/(?:player\.)?vimeo\.com\/video\/(\d+)/gi),
+        ...html.matchAll(/(?:https?:)?\/\/(?:www\.)?vimeo\.com\/(\d+)/gi)
+      ];
+
+      for (const match of vimeoMatches) {
+        const videoId = match[1];
+        if (videoId && videoId.length >= 7) {
+          videoUrl = `https://vimeo.com/${videoId}`;
+          console.log(`[resolveImage] Found Vimeo video: ${videoUrl}`);
+          break;
+        }
+      }
+    }
+
+    // 3. 提取 MP4/WebM 视频文件
+    if (!videoUrl) {
+      const directVideoMatches = [
+        ...html.matchAll(/<video[^>]+src=["']([^"']+\.(?:mp4|webm|ogg))["']/gi),
+        ...html.matchAll(/<source[^>]+src=["']([^"']+\.(?:mp4|webm|ogg))["'][^>]*type=["']video\//gi)
+      ];
+
+      for (const match of directVideoMatches) {
+        const url = match[1];
+        if (url) {
+          videoUrl = url.startsWith('http') ? url : new URL(url, articleUrl).href;
+          console.log(`[resolveImage] Found direct video: ${videoUrl.substring(0, 60)}`);
+          break;
+        }
+      }
+    }
+
+    // 4. 提取 Bilibili 视频
+    if (!videoUrl) {
+      const bilibiliMatches = [
+        ...html.matchAll(/<iframe[^>]+src=["'](?:https?:)?\/\/(?:www\.)?bilibili\.com\/video\/([a-zA-Z0-9_-]+)/gi),
+        ...html.matchAll(/(?:https?:)?\/\/(?:www\.)?bilibili\.com\/video\/([a-zA-Z0-9_-]+)/gi)
+      ];
+
+      for (const match of bilibiliMatches) {
+        const videoId = match[1];
+        if (videoId && videoId.length > 5) {
+          videoUrl = `https://www.bilibili.com/video/${videoId}`;
+          console.log(`[resolveImage] Found Bilibili video: ${videoUrl}`);
+          break;
+        }
+      }
+    }
 
     // 选择最佳图片（带全局使用跟踪和验证）
     if (scoredImages.length > 0) {
@@ -2206,7 +2276,7 @@ async function resolveImageFromArticle(articleUrl) {
 
       // 验证最佳图片
       const bestUrl = optimizeImageUrl(best.url);
-      const isValid = await validateImageUrl(bestUrl, 5000); // 5秒超时
+      const isValid = await validateImageUrl(bestUrl, 8000); // 8秒超时（从5秒增加）
       
       if (isValid) {
         incrementImageUsage(bestUrl);
@@ -2282,21 +2352,6 @@ async function resolveImageFromArticle(articleUrl) {
           return result;
         }
 }
-    }
-
-    // 提取视频（增强版）
-    let videoUrl = '';
-    const videoMatches = [
-      ...html.matchAll(/<iframe[^>]+src=["']([^"']*youtube\.com[^"']*)["'][^>]*>/gi),
-      ...html.matchAll(/<iframe[^>]+src=["']([^"']*youtu\.be[^"']*)["'][^>]*>/gi),
-      ...html.matchAll(/<iframe[^>]+src=["']([^"']*vimeo\.com[^"']*)["'][^>]*>/gi),
-      ...html.matchAll(/<iframe[^>]+src=["']([^"']*bilibili\.com[^"']*)["'][^>]*>/gi),
-      ...html.matchAll(/<video[^>]+src=["']([^"']+)["'][^>]*>/gi),
-      ...html.matchAll(/<source[^>]+src=["']([^"']+\.mp4[^"']*)["'][^>]*>/gi),
-      ...html.matchAll(/<embed[^>]+src=["']([^"']*youtube\.com[^"']*)["'][^>]*>/gi),
-    ];
-    if (videoMatches.length > 0) {
-      videoUrl = videoMatches[0][1];
     }
 
     // 选择最佳图片（带全局使用跟踪和验证）
@@ -2806,11 +2861,11 @@ function isGoodImageUrl(url, htmlSource) {
   if (dimMatch) {
     const w = parseInt(dimMatch[1] || '0', 10);
     const h = parseInt(dimMatch[2] || '0', 10);
-    // 只排除非常小的图片
-    if (w > 0 && w < 200 && h > 0 && h < 150) return false;
+    // 只排除非常小的图片（从200x150降低到100x100）
+    if (w > 0 && w < 100 && h > 0 && h < 100) return false;
   }
 
-  // 精简通用图片文件名排除（减少误判）
+  // 精简通用图片文件名排除（减少误判，只排除最明显的）
   const genericPatterns = /\/(logo|header-bg|footer-bg|nav-bg|hero-bg|banner-bg|site-logo|brand-logo|company-logo|organization-logo|placeholder|no-image|image-not-found)([-_]|$)/i;
   if (genericPatterns.test(url)) return false;
 
@@ -2818,8 +2873,8 @@ function isGoodImageUrl(url, htmlSource) {
   const placeholderServices = /\/(via\.placeholder\.com|placehold\.co|dummyimage\.com|placehold\.it|fakeimg\.pl)/i;
   if (placeholderServices.test(url)) return false;
 
-  // 排除通用尺寸（只排除明显的图标尺寸）
-  if (/\/(16x16|32x32|48x48)\b/i.test(url)) return false;
+  // 排除通用尺寸（只排除明显的图标尺寸，从16x16/32x32/48x48改为只排除16x16）
+  if (/\/(16x16)\b/i.test(url)) return false;
 
   return true;
 }
@@ -3026,18 +3081,18 @@ function scorePath(url) {
   // 特别好的路径（降低加分，从10→5）
   if (/\/(cover|hero|featured|main|lead|primary|headline|banner-img|article-img|screenshot|demo|screen)(\/|$)/i.test(url)) score += 5;
 
-  // 坏的路径（降低惩罚，从-30→-15）
+  // 坏的路径（降低惩罚，从-15→-8）
   const badPaths = /(icon|logo|avatar|badge|shield|button|btn|nav|header|footer|sidebar|widget|share|social|tracking|pixel|analytics|ad|advertisement|sponsor|promo|popup|overlay|separator|divider|spacer|texture|pattern|watermark|brand|identity|template|default|generic|common|shared|global|menu-btn|nav-btn|close-btn|icon-btn|social-icon|share-icon|notification-icon|push-icon|web-push-icon|mstile|apple-touch-icon|android-chrome|safari-pinned|cdnp|cloudfront\.net\/images\/ui|ticker|chart-bar|subscribe|related-post|og-image-default)/i;
-  if (badPaths.test(url)) score -= 15;
+  if (badPaths.test(url)) score -= 8;
 
-  // 特别坏的路径（降低惩罚，从-50→-25）
+  // 特别坏的路径（降低惩罚，从-25→-12）
   const veryBadPaths = /(logo|header-bg|footer-bg|nav-bg|hero-bg|banner-bg|site-logo|brand-logo|company-logo|organization-logo|tracking|pixel|beacon|stat|analytics|ad-server|adsense|doubleclick|adnxs|moatads|chartbeat|newrelic|pingdom|taboola|outbrain|zemanta|scoopit|share-bar|social-bar|gravatar|feedburner|rss)/i;
-  if (veryBadPaths.test(url)) score -= 25;
+  if (veryBadPaths.test(url)) score -= 12;
 
-  // 新增：识别推荐区域路径并扣分
+  // 新增：识别推荐区域路径并扣分（从-20降低到-10）
   const recommendationPaths = /(recommendation|related|trending|popular|sponsored|promo|advertisement|sidebar|widget|footer)/i;
   if (recommendationPaths.test(url)) {
-    score -= 20;
+    score -= 10;
     console.log(`[scorePath] Recommendation path detected: ${url.substring(0, 60)}`);
   }
 

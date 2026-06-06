@@ -432,9 +432,13 @@ body {
 .item-media-thumb:hover img { transform: scale(1.05); }
 .item-media-play { position: absolute; inset: 0; display: grid; place-items: center; background: rgba(0, 0, 0, 0.4); border-radius: 8px; color: white; }
 .item-media-play svg { width: 24px; height: 24px; }
+.item-media-play.video-play { background: rgba(0, 0, 0, 0.5); }
+.item-media-play.video-play svg { width: 32px; height: 32px; filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3)); }
 .item-media-video-link { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; width: 140px; height: 90px; border-radius: 8px; background: var(--bg-card); border: 1px solid var(--border-color); color: var(--text-secondary); font-size: 12px; transition: all 0.15s; }
 .item-media-video-link:hover { border-color: var(--accent-cyan); color: var(--accent-cyan); }
 .item-media-video-link svg { width: 20px; height: 20px; }
+.item-media-video-only { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; width: 140px; height: 90px; border-radius: 8px; background: var(--bg-card); border: 1px solid var(--border-color); color: var(--text-secondary); font-size: 12px; transition: all 0.15s; }
+.item-media-video-only:hover { border-color: var(--accent-cyan); color: var(--accent-cyan); background: rgba(6, 182, 212, 0.05); }
 .item-title { font-size: 14px; font-weight: 600; color: var(--text-primary); margin-bottom: 4px; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; transition: color 0.15s; }
 .item-rank { color: var(--accent-cyan); font-weight: 800; margin-right: 4px; }
 .news-item:hover .item-title { color: var(--accent-cyan); }
@@ -461,6 +465,10 @@ body {
 .ai-summary-header svg { width: 14px; height: 14px; }
 .ai-summary-content p { font-size: 12px; color: var(--text-secondary); line-height: 1.5; padding: 2px 0; }
 .ai-summary-content p::before { content: ''; display: inline-block; width: 4px; height: 4px; background: var(--accent-violet); border-radius: 50%; margin-right: 8px; vertical-align: middle; }
+
+.recommendation-reason { margin-top: 8px; padding: 8px 10px; background: rgba(251, 191, 36, 0.08); border-left: 3px solid #fbbf24; border-radius: 4px; animation: fadeUp 0.2s ease; }
+.recommendation-label { font-size: 11px; font-weight: 600; color: #f59e0b; }
+.recommendation-text { font-size: 12px; color: var(--text-secondary); line-height: 1.4; }
 
 /* Bookmark Item */
 .bookmark-item .item-left { align-items: center; gap: 8px; }
