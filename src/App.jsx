@@ -6884,7 +6884,17 @@ ${newAgent.systemPrompt}`
                           <button
                             className="btn-save"
                             onClick={() => {
-                              setAgents(prev => prev.map(a => a.id === editingAgent.id ? editingAgent : a));
+                              setAgents(prev => {
+                                const updated = prev.map(a => a.id === editingAgent.id ? editingAgent : a);
+                                // 保存自定义agents到localStorage
+                                const customAgents = updated.filter(a => a.isCustom);
+                                try {
+                                  localStorage.setItem('elfAgents', JSON.stringify(customAgents));
+                                } catch (e) {
+                                  console.warn('Failed to save custom agents to localStorage:', e);
+                                }
+                                return updated;
+                              });
                               setEditingAgent(null);
                             }}
                           >
