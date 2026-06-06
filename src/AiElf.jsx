@@ -22,6 +22,16 @@ export default function AiElf({ llmConfig, avatarImage, elfName, onExportToMater
     }
   });
 
+  // 按Agent保存历史会话 { agentId: {id, title, timestamp, messages} }
+  const [agentHistory, setAgentHistory] = useState(() => {
+    try {
+      const saved = localStorage.getItem('ai-elf-agent-history');
+      return saved ? JSON.parse(saved) : {};
+    } catch {
+      return {};
+    }
+  });
+
   const dragRef = useRef({ startX: 0, startY: 0, initialX: 0, initialY: 0 });
   const messagesEndRef = useRef(null);
   const chatWindowRef = useRef(null);
