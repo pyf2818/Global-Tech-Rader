@@ -605,17 +605,6 @@ ${baseContent}
       [activeAgentId]: []
     }));
   };
-      setAgentHistory(prev => ({
-        ...prev,
-        [activeAgentId]: [session, ...(prev[activeAgentId] || []).filter(s => s.id !== currentSessionId)].slice(0, 20)
-      }));
-    }
-    setAgentMessages(prev => ({
-      ...prev,
-      [activeAgentId]: []
-    }));
-    setCurrentSessionId(null);
-  };
 
   // 渲染Markdown内容
   const renderMarkdown = (text) => {
