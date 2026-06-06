@@ -26,7 +26,28 @@ export default function AiElf({ llmConfig, avatarImage, elfName, onExportToMater
   const [agentHistory, setAgentHistory] = useState(() => {
     try {
       const saved = localStorage.getItem('ai-elf-agent-history');
-      return saved ? JSON.parse(saved) : {};
+      if (!saved) return {};
+      
+      const history = JSON.parse(saved);
+      
+      // 数据迁移：将旧的对象结构转换为新的数组结构
+      const migrated = {};
+      Object.keys(history).forEach(agentId => {
+        const sessions = history[agentId];
+        // 如果是对象（旧结构），转换为数组
+        if (!Array.isArray(sessions)) {
+          if (sessions && sessions.messages) {
+            migrated[agentId] = [sessions];
+          } else {
+            migrated[agentId] = [];
+          }
+        } else {
+          // 已经是数组，直接使用
+          migrated[agentId] = sessions;
+        }
+      });
+      
+      return migrated;
     } catch {
       return {};
     }
@@ -284,13 +305,15 @@ ${baseContent}
   // 切换Agent时自动加载最近的历史会话
   useEffect(() => {
     const sessions = agentHistory[activeAgentId] || [];
-    if (sessions.length > 0) {
+    const validSessions = Array.isArray(sessions) ? sessions : [];
+    
+    if (validSessions.length > 0) {
       // 加载最近的历史会话
-      const recentSession = sessions[0];
+      const recentSession = validSessions[0];
       setCurrentSessionId(recentSession.id);
       setAgentMessages(prev => ({
         ...prev,
-        [activeAgentId]: recentSession.messages
+        [activeAgentId]: recentSession.messages || []
       }));
     } else {
       // 没有历史会话，清空
@@ -309,10 +332,11 @@ ${baseContent}
       const trimmed = {};
       Object.keys(agentHistory).forEach(key => {
         const sessions = agentHistory[key] || [];
-        if (sessions.length > MAX_HISTORY_PER_AGENT) {
-          trimmed[key] = sessions.slice(0, MAX_HISTORY_PER_AGENT);
+        const validSessions = Array.isArray(sessions) ? sessions : [];
+        if (validSessions.length > MAX_HISTORY_PER_AGENT) {
+          trimmed[key] = validSessions.slice(0, MAX_HISTORY_PER_AGENT);
         } else {
-          trimmed[key] = sessions;
+          trimmed[key] = validSessions;
         }
       });
       localStorage.setItem('ai-elf-agent-history', JSON.stringify(trimmed));
@@ -505,14 +529,17 @@ ${baseContent}
               timestamp: Date.now(),
               messages: updatedMessages
             };
-            setAgentHistory(history => ({
-              ...history,
-              [activeAgentId]: [session, ...(history[activeAgentId] || [])].slice(0, 10)
-            }));
+            setAgentHistory(history => {
+              const sessions = Array.isArray(history[activeAgentId]) ? history[activeAgentId] : [];
+              return {
+                ...history,
+                [activeAgentId]: [session, ...sessions].slice(0, 10)
+              };
+            });
           } else {
             // 更新现有session
             setAgentHistory(history => {
-              const sessions = history[activeAgentId] || [];
+              const sessions = Array.isArray(history[activeAgentId]) ? history[activeAgentId] : [];
               const updatedSessions = sessions.map(s =>
                 s.id === currentSessionId
                   ? { ...s, messages: updatedMessages, timestamp: Date.now(), title: newMessage.content.slice(0, 50) + (newMessage.content.length > 50 ? '...' : '') }
@@ -605,7 +632,15 @@ ${baseContent}
 
 // 清空当前Agent对话
   const clearConversation = () => {
-    // 保存当前session（如果有消息）
+    const newSessionId = Date.now();
+    const newSession = {
+      id: newSessionId,
+      title: '新对话',
+      timestamp: Date.now(),
+      messages: []
+    };
+
+    // 如果当前session有消息，保存当前session到历史记录
     if (messages.length > 0 && currentSessionId) {
       const session = {
         id: currentSessionId,
@@ -613,14 +648,26 @@ ${baseContent}
         timestamp: Date.now(),
         messages: messages
       };
-      setAgentHistory(prev => ({
-        ...prev,
-        [activeAgentId]: [session, ...(prev[activeAgentId] || []).filter(s => s.id !== currentSessionId)].slice(0, 10)
-      }));
+      setAgentHistory(prev => {
+        const sessions = Array.isArray(prev[activeAgentId]) ? prev[activeAgentId] : [];
+        return {
+          ...prev,
+          [activeAgentId]: [newSession, session, ...sessions.filter(s => s.id !== currentSessionId)].slice(0, 10)
+        };
+      });
+    } else {
+      // 如果当前session没有消息，直接添加新的空session
+      setAgentHistory(prev => {
+        const sessions = Array.isArray(prev[activeAgentId]) ? prev[activeAgentId] : [];
+        return {
+          ...prev,
+          [activeAgentId]: [newSession, ...sessions].slice(0, 10)
+        };
+      });
     }
     
-    // 创建新session
-    setCurrentSessionId(null);
+    // 切换到新的session
+    setCurrentSessionId(newSessionId);
     setAgentMessages(prev => ({
       ...prev,
       [activeAgentId]: []
@@ -858,10 +905,10 @@ ${baseContent}
                     {/* Agent历史记录 */}
                     {expandedAgent === agent.id && (
                       <div className="ai-elf-agent-history-list">
-                        {(agentHistory[agent.id] || []).length === 0 ? (
+                        {(!agentHistory[agent.id] || !Array.isArray(agentHistory[agent.id]) || agentHistory[agent.id].length === 0) ? (
                           <div className="ai-elf-agent-history-empty">暂无历史记录</div>
                         ) : (
-                          (agentHistory[agent.id] || []).map(session => {
+                          agentHistory[agent.id].map(session => {
                             const lastMessage = session.messages[session.messages.length - 1];
                             const messageCount = session.messages.length;
                             const lastMessagePreview = lastMessage?.content?.slice(0, 60) || '';
