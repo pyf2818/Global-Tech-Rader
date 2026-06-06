@@ -7,12 +7,10 @@ export default function AiElf({ llmConfig, avatarImage, elfName, onExportToMater
   const [isDragging, setIsDragging] = useState(false);
   const [activeAgentId, setActiveAgentId] = useState(currentAgent || 'analyst');
   const [showSidebar, setShowSidebar] = useState(true);
-  const [inputText, setInputText] = useState('');
+const [inputText, setInputText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
   const [expandedAgent, setExpandedAgent] = useState(null);
-// 当前Agent的对话历史（每个agent一个对话窗口）
-  const historyConversation = agentHistory[activeAgentId];
 
   const dragRef = useRef({ startX: 0, startY: 0, initialX: 0, initialY: 0 });
   const messagesEndRef = useRef(null);
@@ -23,7 +21,7 @@ export default function AiElf({ llmConfig, avatarImage, elfName, onExportToMater
   // 当前活跃Agent
   const activeAgent = agents.find(a => a.id === activeAgentId) || agents[0];
 
-// 当前Agent的消息
+  // 当前Agent的消息
   const messages = agentMessages[activeAgentId] || [];
 
   // 当前Agent的对话历史（每个agent一个对话窗口）
