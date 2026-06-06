@@ -32,6 +32,9 @@ export default function AiElf({ llmConfig, avatarImage, elfName, onExportToMater
     }
   });
 
+  // 引用上下文（用于多轮对话时引用之前的消息）
+  const [quotedContext, setQuotedContext] = useState(null);
+
   const dragRef = useRef({ startX: 0, startY: 0, initialX: 0, initialY: 0 });
   const messagesEndRef = useRef(null);
   const chatWindowRef = useRef(null);
