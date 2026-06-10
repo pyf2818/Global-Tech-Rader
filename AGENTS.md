@@ -47,6 +47,19 @@ Server `SOURCE_GRADES` colors (line ~566): S=#dc2626, A=#ea580c, B=#16a34a, C=#2
 
 Settings page uses separate `<span className="source-grade-badge">` with `sourceGrades[grade].color`.
 
+## Missing Functions & Dependencies
+
+**Critical Helper Functions**: These functions must exist at the top level of `server/newsPlugin.js` (file scope, not inside functions):
+- `LAZY_LOAD_ATTRS`: Array of lazy-loading image attributes
+- `isGoodImageUrl(url, htmlContext)`: Validates image URLs and filters out ads/placeholders
+- `extractVideoUrl(content)`: Extracts video URLs from content
+- `parseSrcset(srcset)`: Parses srcset attributes and selects largest image
+- `optimizeImageUrl(url)`: Removes optimization parameters from image URLs
+
+**Missing these causes**: Runtime errors when parsing RSS feeds or extracting images, leading to complete source failures.
+
+**Location**: These should be defined before `DEFAULT_SOURCES` and after `MEDIA_CONFIG` in `server/newsPlugin.js`.
+
 ## Media Config
 
 All image resolution controlled by `MEDIA_CONFIG` at top of `server/newsPlugin.js`. Key tunable values:
@@ -84,6 +97,18 @@ Image resolution pipeline: `resolveImageWithScrapling()` (Scrapling dynamic rend
 
 Build: `npm run build`, output: `dist/`.
 
+## Git History & Known Issues
+
+**Current HEAD**: `bcab533` - "enhance today's must-read recommendation algorithm with multi-dimensional scoring"
+
+**Recent Rollback (2026-06-10)**: Repository was rolled back from `8c3d3d0` to `bcab533`, removing 8 commits that attempted to fix RSS source failures and improve image extraction. The rollback restored the multi-dimensional recommendation algorithm but reintroduced RSS source reliability issues.
+
+**Known Issues**:
+- High RSS source failure rate (~46% based on recent logs)
+- Many DEFAULT_SOURCES entries are duplicates (e.g., IEEE Spectrum appears 5+ times)
+- Some sources return HTML instead of RSS feeds
+- Chinese sources frequently return 403 (anti-scraping)
+
 ## CI/CD
 
 - **verify-sources.yml**: Daily 6:00 UTC — validates RSS source health
@@ -108,3 +133,28 @@ Build: `npm run build`, output: `dist/`.
 - **Grade badge**: single `<div>` with `className="news-item-source-grade"`, no outer `<span>` wrapper.
 - **Editor image upload**: Uses placeholder syntax `![alt](#{id})`. Call `renderMarkdownWithImages(text, images)` for preview/export.
 - **Duplicate sources in DEFAULT_SOURCES**: Some sources appear multiple times (e.g. IEEE Spectrum 5 times). Dedup happens downstream by URL, not at fetch time — wastes API calls.
+
+## RSS Source Management
+
+**Current State**: 289 sources configured (current HEAD: bcab533), but many are invalid. Expect 40-50% failure rate in production.
+
+**Validation**: Test individual sources with `timeout 10 curl -I <url>`. Common failure patterns:
+- 404/403: URL expired or access restricted
+- Returns HTML instead of RSS: site changed feed format
+- Timeout: rate limiting or server issues
+
+**Reliable Sources** (verified working):
+- ArXiv series: `export.arxiv.org/rss/cs.*`
+- TechCrunch: `techcrunch.com/feed/`
+- GitHub Blog: `github.blog/feed/`
+- Hacker News: `hnrss.org/frontpage`, `hnrss.org/best`
+- 36氪: `36kr.com/feed`
+
+**Known Problem Sources** (avoid or fix URLs):
+- Anthropic: 404 (no RSS available)
+- Google DeepMind: 404 (no RSS available)
+- Meta AI Blog: no response
+- Stanford HAI: returns HTML not RSS
+- Many Chinese sources: 403 (anti-scraping)
+
+**When Updating Sources**: Update in **both** `server/newsPlugin.js` and `api/news.js` for production parity. Test locally before deploying.
