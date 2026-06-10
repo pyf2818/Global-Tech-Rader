@@ -198,54 +198,94 @@ const DEFAULT_AGENTS = [
     description: '帮助润色、改写、创作各类文案',
     icon: 'document',
     avatar: '',
-    tags: ['文案创作', '润色改写'],
-    systemPrompt: '你是一位专业写作助手。擅长帮助用户润色文章、改写文案、生成创意内容。根据用户输入的风格和语气要求，提供高质量的写作建议和输出。保持原文风格的同时提升表达质量。',
-    category: '创作',
+    tags: ['写作辅助', '文案创作'],
+    systemPrompt: '你是一位专业写作助手。擅长润色、改写、创作各类文案。保持专业、简洁的风格，突出核心信息。',
+    category: '写作',
     isDefault: true
+  }
+];
+
+// 滚动资讯热点数据源
+const SCROLLING_NEWS_ITEMS = [
+  {
+    id: 1,
+    title: 'OpenAI发布最新GPT-5模型',
+    category: 'ai-models',
+    source: 'OpenAI官方博客',
+    time: '10分钟前',
+    hot: true
   },
   {
-    id: 'translator',
-    name: '翻译专家',
-    description: '专业级翻译，保持原文语义和风格',
-    icon: 'globe',
-    avatar: '',
-    tags: ['翻译', '语言'],
-    systemPrompt: '你是一位资深翻译专家。擅长中英文互译，注重语义准确性和表达地道性。翻译时保持原文的专业术语准确，同时让译文读起来自然流畅。遇到专业术语请保留原文并附注。',
-    category: '语言',
-    isDefault: true
+    id: 2,
+    title: '苹果M4芯片性能提升40%',
+    category: 'chips-compute',
+    source: 'MacRumors',
+    time: '15分钟前',
+    hot: true
   },
   {
-    id: 'code-reviewer',
-    name: '代码审查员',
-    description: '审查代码质量，提供优化建议',
-    icon: 'code',
-    avatar: '',
-    tags: ['代码审查', '技术'],
-    systemPrompt: '你是一位资深代码审查员。擅长审查代码质量，发现潜在问题，提供优化建议。输出简洁专业，一针见血，不重复显而易见的点。关注代码可读性、性能、安全性和最佳实践。',
-    category: '技术',
-    isDefault: true
+    id: 3,
+    title: '英伟达发布新一代Blackwell架构',
+    category: 'ai-models',
+    source: 'NVIDIA官方',
+    time: '20分钟前',
+    hot: false
   },
   {
-    id: 'learning-coach',
-    name: '学习教练',
-    description: '拆解复杂知识，帮助高效学习',
-    icon: 'star',
-    avatar: '',
-    tags: ['知识拆解', '学习方法'],
-    systemPrompt: '你是一位学习教练。擅长将复杂的知识拆解成易于理解的部分，帮助用户建立知识体系。输出结构清晰，重点突出，善于用类比和例子帮助理解。推荐学习路径和资源。',
-    category: '教育',
-    isDefault: true
+    id: 4,
+    title: '中国量子计算取得重大突破',
+    category: 'quantum',
+    source: '科技日报',
+    time: '30分钟前',
+    hot: true
   },
   {
-    id: 'debate-master',
-    name: '辩论大师',
-    description: '多角度分析问题，提供正反观点',
-    icon: 'alert',
-    avatar: '',
-    tags: ['思辨', '多角度分析'],
-    systemPrompt: '你是一位辩论大师。擅长从不同角度分析问题，提供正反两面的观点和论据。输出逻辑严密，论据充分，帮助用户全面理解议题。每个观点都要有事实依据支撑。',
-    category: '思辨',
-    isDefault: true
+    id: 5,
+    title: 'GitHub推出AI代码助手新功能',
+    category: 'open-source',
+    source: 'GitHub Blog',
+    time: '35分钟前',
+    hot: false
+  },
+  {
+    id: 6,
+    title: '特斯拉Optimus机器人实现量产',
+    category: 'robotics',
+    source: 'Electrek',
+    time: '45分钟前',
+    hot: true
+  },
+  {
+    id: 7,
+    title: 'SpaceX星舰第四次试飞成功',
+    category: 'space',
+    source: 'SpaceX官方',
+    time: '50分钟前',
+    hot: true
+  },
+  {
+    id: 8,
+    title: '量子通信实现1000公里安全传输',
+    category: 'quantum',
+    source: 'Nature',
+    time: '1小时前',
+    hot: false
+  },
+  {
+    id: 9,
+    title: 'ChatGPT用户突破10亿大关',
+    category: 'ai-models',
+    source: 'OpenAI',
+    time: '1小时前',
+    hot: true
+  },
+  {
+    id: 10,
+    title: '全球半导体市场预计增长20%',
+    category: 'chips-compute',
+    source: 'IC Insights',
+    time: '2小时前',
+    hot: false
   }
 ];
 
@@ -806,6 +846,13 @@ function App() {
   const [articleSpaceFormOpen, setArticleSpaceFormOpen] = useState(false);
   const [newArticleSpaceName, setNewArticleSpaceName] = useState('');
   const [articleSpaceForNewArticle, setArticleSpaceForNewArticle] = useState('all');
+  
+  // 滚动资讯热点状态
+  const [scrollingNews, setScrollingNews] = useState(SCROLLING_NEWS_ITEMS);
+  const [scrollingNewsPaused, setScrollingNewsPaused] = useState(false);
+  const [scrollingNewsIndex, setScrollingNewsIndex] = useState(0);
+  const scrollingNewsRef = useRef(null);
+  
   const editorTextareaRef = useRef(null);
   const imageInputRef = useRef(null);
 
@@ -899,6 +946,17 @@ function App() {
     const timer = setTimeout(fetchAiInsights, 1000);
     return () => clearTimeout(timer);
   }, [items, llmConfig.baseUrl, llmConfig.apiKey, llmConfig.selectedModel]);
+
+  // 滚动资讯自动滚动效果
+  useEffect(() => {
+    if (scrollingNewsPaused) return;
+    
+    const interval = setInterval(() => {
+      setScrollingNewsIndex(prev => (prev + 1) % scrollingNews.length);
+    }, 4000); // 每4秒滚动一次
+    
+    return () => clearInterval(interval);
+  }, [scrollingNews.length, scrollingNewsPaused]);
 
   useEffect(() => {
     if (!lightbox.open) return;
@@ -3228,6 +3286,52 @@ ${signals}
               <span className="brand-theme-icon" aria-hidden="true">{theme === 'light' ? ICONS.sun : ICONS.moon}</span>
             </div>
           )}
+          
+          {/* 滚动资讯热点区域 */}
+          {nav === 'all' && (
+            <div className="scrolling-news-container">
+              <div className="scrolling-news-header">
+                <span className="scrolling-news-label">热门资讯</span>
+                <span className="scrolling-news-icon">{ICONS.fire}</span>
+              </div>
+              <div 
+                className="scrolling-news-content"
+                onMouseEnter={() => setScrollingNewsPaused(true)}
+                onMouseLeave={() => setScrollingNewsPaused(false)}
+              >
+                <div 
+                  className="scrolling-news-track"
+                  style={{
+                    transform: `translateX(-${scrollingNewsIndex * (100 / Math.min(scrollingNews.length, 3))}%)`
+                  }}
+                >
+                  {[...scrollingNews, ...scrollingNews].map((item, index) => (
+                    <div key={`${item.id}-${index}`} className="scrolling-news-item">
+                      {item.hot && <span className="scrolling-news-hot">HOT</span>}
+                      <span className="scrolling-news-title">{item.title}</span>
+                      <span className="scrolling-news-meta">
+                        <span className="scrolling-news-source">{item.source}</span>
+                        <span className="scrolling-news-time">{item.time}</span>
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <button 
+                className="scrolling-news-nav scrolling-news-prev"
+                onClick={() => setScrollingNewsIndex(prev => (prev - 1 + scrollingNews.length) % scrollingNews.length)}
+              >
+                {ICONS.chevronLeft}
+              </button>
+              <button 
+                className="scrolling-news-nav scrolling-news-next"
+                onClick={() => setScrollingNewsIndex(prev => (prev + 1) % scrollingNews.length)}
+              >
+                {ICONS.chevronRight}
+              </button>
+            </div>
+          )}
+          
           <button className="mobile-menu-btn" onClick={() => setMobileMenuOpen(true)}>
             {ICONS.menu}
           </button>
