@@ -1567,29 +1567,110 @@ function App() {
     }).filter(g => g.count > 0);
   }, [followKeywords, items]);
 
-  // 今日必读：基于关注关键词和阅读历史的推荐
+  // 今日必读：多维度推荐算法
   const todayMustRead = useMemo(() => {
     const readIds = new Set(readingHistory.map(h => h.id));
+    const bookmarkIds = new Set(bookmarks.map(b => b.id));
+    
+    // 领域热度统计（基于当前所有文章）
+    const categoryPopularity = new Map();
+    items.forEach(item => {
+      if (item.category) {
+        categoryPopularity.set(item.category, (categoryPopularity.get(item.category) || 0) + 1);
+      }
+    });
+    const maxCategoryPop = Math.max(...categoryPopularity.values(), 1);
+
+    // 热门关键词统计
+    const keywordFrequency = new Map();
+    items.forEach(item => {
+      const text = `${item.title} ${item.summary || ''}`.toLowerCase();
+      const words = text.match(/\b[a-z\u4e00-\u9fa5]{2,}\b/g) || [];
+      words.forEach(word => {
+        if (!/^[a-z]{2}$/.test(word)) { // 过滤过短的英文单词
+          keywordFrequency.set(word, (keywordFrequency.get(word) || 0) + 1);
+        }
+      });
+    });
+    const topKeywords = [...keywordFrequency.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 50)
+      .map(([word]) => word);
+
     return items
       .filter(item => !readIds.has(item.id))
       .map(item => {
         let score = 0;
+        
+        // 1. 领域匹配分数（用户关注领域）
+        if (selectedInterests && selectedInterests.length > 0) {
+          if (selectedInterests.includes(item.category)) {
+            score += 30; // 直接匹配用户关注的领域
+          }
+          // 检查相关领域
+          const relatedCategories = CATEGORY_GROUPS
+            .filter(group => group.categories.includes(item.category))
+            .flatMap(group => group.categories);
+          if (relatedCategories.some(cat => selectedInterests.includes(cat))) {
+            score += 15; // 匹配相关领域
+          }
+        }
+
+        // 2. 关键词匹配分数
         followKeywords.forEach(kw => {
           if (`${item.title} ${item.summary}`.toLowerCase().includes(kw.toLowerCase())) {
             score += 20;
           }
         });
-        // 来源权重
-        const highWeightSources = ['OpenAI', 'Google', 'Anthropic', 'Meta', 'Microsoft'];
+
+        // 3. 资讯热度分数
+        // 3.1 标题质量（长度适中）
+        const titleLen = item.title?.length || 0;
+        if (titleLen >= 20 && titleLen <= 60) score += 5;
+        else if (titleLen > 60) score += 2;
+        
+        // 3.2 摘要完整性
+        if (item.summary && item.summary.length > 50) score += 5;
+        
+        // 3.3 媒体丰富度
+        if (item.imageUrl) score += 5;
+        if (item.videoUrl) score += 3;
+        
+        // 3.4 领域热度（该领域的文章数量）
+        const categoryScore = categoryPopularity.get(item.category) || 0;
+        score += Math.round((categoryScore / maxCategoryPop) * 10);
+        
+        // 3.5 热门关键词匹配
+        const itemText = `${item.title} ${item.summary || ''}`.toLowerCase();
+        const hotKeywordMatches = topKeywords.filter(kw => itemText.includes(kw)).length;
+        score += Math.min(hotKeywordMatches * 2, 10);
+
+        // 4. 来源权重
+        const highWeightSources = ['OpenAI', 'Google', 'Anthropic', 'Meta', 'Microsoft', 'NVIDIA', 'Tesla', 'SpaceX'];
         if (highWeightSources.some(s => item.source?.includes(s))) score += 10;
-        // 新鲜度
+        const mediumWeightSources = ['IEEE', 'Nature', 'Science', 'MIT', 'Stanford', 'Berkeley'];
+        if (mediumWeightSources.some(s => item.source?.includes(s))) score += 5;
+
+        // 5. 互动热度（基于用户行为）
+        if (bookmarkIds.has(item.id)) score += 15; // 已收藏
+        // 阅读历史中该类别的阅读频率
+        const categoryReadCount = readingHistory.filter(h => h.category === item.category).length;
+        if (categoryReadCount > 0) score += Math.min(categoryReadCount * 2, 10);
+
+        // 6. 新鲜度
         const age = (Date.now() - new Date(item.publishedAt).getTime()) / (1000 * 60 * 60);
-        score += Math.max(0, 15 - age);
+        if (age < 1) score += 15; // 1小时内
+        else if (age < 3) score += 12; // 3小时内
+        else if (age < 6) score += 8; // 6小时内
+        else if (age < 12) score += 5; // 12小时内
+        else if (age < 24) score += 2; // 24小时内
+        // 超过24小时不加分
+
         return { ...item, mustReadScore: score };
       })
       .sort((a, b) => b.mustReadScore - a.mustReadScore)
       .slice(0, 5);
-  }, [items, followKeywords, readingHistory]);
+  }, [items, followKeywords, readingHistory, bookmarks, selectedInterests]);
 
   const calendarDays = useMemo(() => {
     const year = calendarDate.getFullYear();
@@ -5558,26 +5639,43 @@ ${signals}
                   <span>今日必读</span>
                 </h3>
                 <div className="must-read-list">
-                  {todayMustRead.map((item, idx) => (
-                    <a
-                      key={item.id}
-                      href={item.url}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="must-read-item"
-                      title={item.title}
-                      onClick={(e) => { e.stopPropagation(); }}
-                    >
-                      <div className="must-read-rank">{idx + 1}</div>
-                      <div className="must-read-info">
-                        <span className="must-read-title">{item.title}</span>
-                        <div className="must-read-meta">
-                          <span className="must-read-source">{item.source}</span>
-                          <span className="must-read-score">{item.mustReadScore.toFixed(0)}</span>
+                  {todayMustRead.map((item, idx) => {
+                    const isTopTier = item.mustReadScore >= 50;
+                    const scoreColor = isTopTier ? '#22d3ee' : (item.mustReadScore >= 30 ? '#f59e0b' : '#64748b');
+                    return (
+                      <a
+                        key={item.id}
+                        href={item.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className={`must-read-item ${isTopTier ? 'must-read-item-top' : ''}`}
+                        title={item.title}
+                        onClick={(e) => { e.stopPropagation(); }}
+                      >
+                        <div className="must-read-rank" style={{ background: isTopTier ? '#22d3ee' : '#64748b' }}>{idx + 1}</div>
+                        <div className="must-read-info">
+                          <span className="must-read-title">{item.title}</span>
+                          <div className="must-read-meta">
+                            <span className="must-read-source">{item.source}</span>
+                            <span className="must-read-score" style={{ color: scoreColor }}>
+                              {item.mustReadScore.toFixed(0)}分
+                            </span>
+                          </div>
+                          <div className="must-read-tags">
+                            {selectedInterests.includes(item.category) && (
+                              <span className="must-read-tag must-read-tag-match">关注领域</span>
+                            )}
+                            {item.imageUrl && (
+                              <span className="must-read-tag must-read-tag-media">图文</span>
+                            )}
+                            {((Date.now() - new Date(item.publishedAt).getTime()) / (1000 * 60 * 60)) < 3 && (
+                              <span className="must-read-tag must-read-tag-fresh">新发布</span>
+                            )}
+                          </div>
                         </div>
-                      </div>
-                    </a>
-                  ))}
+                      </a>
+                    );
+                  })}
                 </div>
               </section>
             )}

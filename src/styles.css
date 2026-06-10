@@ -5781,6 +5781,16 @@ body {
   transition: all 0.2s ease;
 }
 
+.must-read-item-top {
+  background: rgba(34, 211, 238, 0.06);
+  border-color: rgba(34, 211, 238, 0.15);
+}
+
+.must-read-item-top:hover {
+  border-color: rgba(34, 211, 238, 0.4);
+  background: rgba(34, 211, 238, 0.1);
+}
+
 .must-read-item:hover {
   border-color: rgba(251, 191, 36, 0.3);
   background: rgba(251, 191, 36, 0.08);
@@ -5821,11 +5831,16 @@ body {
   color: var(--accent-amber);
 }
 
+.must-read-item-top:hover .must-read-title {
+  color: #22d3ee;
+}
+
 .must-read-meta {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 4px;
+  margin-bottom: 4px;
 }
 
 .must-read-source {
@@ -5840,6 +5855,38 @@ body {
   background: rgba(251, 191, 36, 0.1);
   padding: 1px 5px;
   border-radius: 4px;
+}
+
+.must-read-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.must-read-tag {
+  font-size: 9px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-weight: 500;
+}
+
+.must-read-tag-match {
+  background: rgba(34, 211, 238, 0.15);
+  color: #22d3ee;
+  border: 1px solid rgba(34, 211, 238, 0.25);
+}
+
+.must-read-tag-media {
+  background: rgba(147, 51, 234, 0.1);
+  color: #a855f7;
+  border: 1px solid rgba(147, 51, 234, 0.2);
+}
+
+.must-read-tag-fresh {
+  background: rgba(34, 197, 94, 0.1);
+  color: #22c55e;
+  border: 1px solid rgba(34, 197, 94, 0.2);
 }
 
 /* ===== 洞察分析 - 我的今日关注 ===== */
