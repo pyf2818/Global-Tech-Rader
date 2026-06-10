@@ -37,6 +37,7 @@ const MOTIVATIONAL_QUOTES = [
 
 const NAV_ITEMS = [
   { id: 'all', label: '全部动态', icon: 'grid' },
+  { id: 'dashboard', label: '态势大屏', icon: 'globe' },
   { id: 'recommendations', label: '智能推荐', icon: 'sparkle' },
   { id: 'briefing', label: '今日态势', icon: 'document' },
   { id: 'tracker', label: '我的追踪', icon: 'follow' },
@@ -53,7 +54,7 @@ const NAV_ITEMS = [
 ];
 
 const NAV_GROUPS = [
-  { id: 'core', label: '资讯中心', items: ['all', 'recommendations', 'trending', 'github', 'custom-url'] },
+  { id: 'core', label: '资讯中心', items: ['dashboard', 'all', 'recommendations', 'trending', 'github', 'custom-url'] },
   { id: 'insight', label: '洞察分析', items: ['briefing', 'tracker', 'trends', 'reading-stats'] },
   { id: 'create', label: '素材创作', items: ['materials', 'editor'] },
   { id: 'manage', label: '管理沉淀', items: ['calendar', 'reading-list', 'knowledge-export'] }
