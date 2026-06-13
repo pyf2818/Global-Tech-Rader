@@ -230,7 +230,7 @@ function LeftPanel({ items, filteredItems, onCategoryChange }) {
               <rect x="14" y="14" width="7" height="7" rx="1" />
               <rect x="3" y="14" width="7" height="7" rx="1" />
             </svg>
-          </span> 资讯分类统计
+          </span> 赛道分布
         </h4>
         <div className="globe-panel-content">
           {categoryStats.length === 0 ? (
@@ -260,7 +260,7 @@ function LeftPanel({ items, filteredItems, onCategoryChange }) {
               <path d="M4 7h16" />
               <path d="M4 17h16" />
             </svg>
-          </span> 来源分布
+          </span> 来源排行
         </h4>
         <div className="globe-panel-content">
           {sourceStats.length === 0 ? (
@@ -287,7 +287,7 @@ function LeftPanel({ items, filteredItems, onCategoryChange }) {
               <path d="M3 3v18h18" />
               <path d="M7 16l4-4 3 3 5-5" />
             </svg>
-          </span> 7日趋势
+          </span> 赛道分析
         </h4>
         <div className="globe-panel-content">
           <div className="globe-trend-chart">
@@ -472,11 +472,23 @@ function GlobeContent({ items, isFullscreen, onClose }) {
     });
   }, [dateItems, filterCategory, filterRegion]);
 
+  const dashboardItems = useMemo(() => {
+    if (filteredItems.length > 0) return filteredItems;
+    return items.filter(item => {
+      if (filterCategory !== 'all' && item.category !== filterCategory) return false;
+      if (filterRegion !== 'all') {
+        const itemRegion = item.region || getRegionFromSource(item.source);
+        if (itemRegion !== filterRegion) return false;
+      }
+      return true;
+    });
+  }, [filteredItems, items, filterCategory, filterRegion]);
+
   // 热力图数据
   const heatmapData = useMemo(() => {
-    if (filteredItems.length === 0) return { points: [], maxCount: 0 };
+    if (dashboardItems.length === 0) return { points: [], maxCount: 0 };
     const cityGroups = {};
-    filteredItems.forEach(item => {
+    dashboardItems.forEach(item => {
       const cityInfo = getCityFromSource(item.source, item.region);
       const key = `${cityInfo.lat}-${cityInfo.lng}`;
       if (!cityGroups[key]) {
@@ -493,7 +505,7 @@ function GlobeContent({ items, isFullscreen, onClose }) {
       count: group.count, items: group.items, city: group.city,
     }));
     return { points, maxCount };
-  }, [filteredItems]);
+  }, [dashboardItems]);
 
   // 默认城市
   const defaultPoints = useMemo(() => {
@@ -550,16 +562,16 @@ function GlobeContent({ items, isFullscreen, onClose }) {
 
   // 统计
   const stats = useMemo(() => {
-    const totalToday = filteredItems.length;
+    const totalToday = dashboardItems.length;
     const cityCounts = {};
-    filteredItems.forEach(item => {
+    dashboardItems.forEach(item => {
       const cityInfo = getCityFromSource(item.source, item.region);
       cityCounts[cityInfo.city] = (cityCounts[cityInfo.city] || 0) + 1;
     });
     const topCityEntry = Object.entries(cityCounts).sort((a, b) => b[1] - a[1])[0];
     const topCity = topCityEntry ? topCityEntry[0] : '-';
     const categoryCounts = {};
-    filteredItems.forEach(item => { if (item.category) categoryCounts[item.category] = (categoryCounts[item.category] || 0) + 1; });
+    dashboardItems.forEach(item => { if (item.category) categoryCounts[item.category] = (categoryCounts[item.category] || 0) + 1; });
     const topCategoryEntry = Object.entries(categoryCounts).sort((a, b) => b[1] - a[1])[0];
     const topCategory = topCategoryEntry ? (CATEGORY_LABELS[topCategoryEntry[0]] || topCategoryEntry[0]) : '-';
     const yesterday = new Date();
@@ -568,7 +580,16 @@ function GlobeContent({ items, isFullscreen, onClose }) {
     const yesterdayCount = items.filter(i => i.publishedAt?.slice(0, 10) === yesterdayStr).length;
     const growthRate = yesterdayCount > 0 ? Math.round(((dateItems.length - yesterdayCount) / yesterdayCount) * 100) : (dateItems.length > 0 ? 100 : 0);
     return { totalToday, topCity, topCategory, growthRate };
-  }, [filteredItems, items, dateItems.length]);
+  }, [dashboardItems, items, dateItems.length]);
+
+  const tickerItems = useMemo(() => {
+    const source = dashboardItems.length ? dashboardItems : items;
+    return source.slice(0, 6).map(item => ({
+      title: item.title || 'Global technology signal',
+      source: item.source || 'Global Tech Radar',
+      category: CATEGORY_LABELS[item.category] || item.category || '热门资讯',
+    }));
+  }, [dashboardItems, items]);
 
   const handlePointClick = (point) => { if (point.items && point.items.length > 0) setSelectedCity(point); };
   const handleClosePanel = () => setSelectedCity(null);
@@ -702,12 +723,16 @@ function GlobeContent({ items, isFullscreen, onClose }) {
   }
 
   // 全屏大屏模式：地球铺满全屏，面板浮层
-  const globeWidth = window.innerWidth;
-  const globeHeight = window.innerHeight;
+  const dashboardSideWidth = Math.min(420, Math.max(window.innerWidth < 1500 ? 250 : 280, window.innerWidth * 0.22));
+  const dashboardTopHeight = Math.min(124, Math.max(window.innerWidth < 1500 ? 78 : 88, window.innerHeight * 0.12));
+  const dashboardBottomHeight = Math.min(112, Math.max(window.innerWidth < 1500 ? 72 : 82, window.innerHeight * 0.11));
+  const globeWidth = Math.max(360, window.innerWidth - dashboardSideWidth * 2 - 72);
+  const globeHeight = Math.max(300, window.innerHeight - dashboardTopHeight - dashboardBottomHeight - 36);
 
   return (
     <div className="globe-dashboard">
       {/* 地球铺满整个背景 */}
+      <div className="globe-stage">
       <Globe ref={globeRef} width={globeWidth} height={globeHeight}
         globeImageUrl="//unpkg.com/three-globe/example/img/earth-blue-marble.jpg"
         bumpImageUrl="//unpkg.com/three-globe/example/img/earth-topology.png"
@@ -719,12 +744,15 @@ function GlobeContent({ items, isFullscreen, onClose }) {
         arcsData={arcsData} arcColor="color" arcDashLength="dashLength" arcDashGap="dashGap" arcDashAnimateTime="dashAnimateTime" arcStroke={0.5}
         enablePointerInteraction={true}
       />
+      </div>
 
       {/* 背景装饰 */}
       <div className="globe-bg-decoration" />
       <div className="globe-scanlines" />
 
       {/* 四角装饰 */}
+      <div className="corner-tl" />
+      <div className="corner-tr" />
       <div className="corner-bl" />
       <div className="corner-br" />
 
@@ -747,6 +775,24 @@ function GlobeContent({ items, isFullscreen, onClose }) {
           </div>
         </div>
         <div className="globe-topbar-center">
+          <div className="globe-hot-ticker">
+            <div className="globe-hot-label">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 2c0 4-3 6-3 10 0 3 1.5 5 3 7 1.5-2 3-4 3-7 0-4-3-6-3-10z" />
+                <path d="M8 14c-1.5 1-3 3-3 5a5 5 0 0 0 10 0c0-2-1.5-4-3-5" />
+              </svg>
+              <span>热门资讯</span>
+            </div>
+            <div className="globe-hot-track">
+              {tickerItems.map((item, idx) => (
+                <div className="globe-hot-chip" key={`${item.title}-${idx}`}>
+                  <strong>{item.category}</strong>
+                  <span>{item.title}</span>
+                  <em>{item.source}</em>
+                </div>
+              ))}
+            </div>
+          </div>
           <div className="globe-topbar-date">
             <span className="globe-date-label">SELECTED DATE</span>
             <span className="globe-date-value">{selectedDate}</span>
@@ -778,16 +824,20 @@ function GlobeContent({ items, isFullscreen, onClose }) {
 
       {/* 左侧面板：统计 */}
       <div className="globe-side-panel globe-side-left">
-        <LeftPanel items={items} filteredItems={filteredItems} onCategoryChange={setFilterCategory} />
+        <LeftPanel items={items} filteredItems={dashboardItems} onCategoryChange={setFilterCategory} />
       </div>
 
       {/* 右侧面板：资讯 */}
       <div className="globe-side-panel globe-side-right">
-        <RightPanel items={items} filteredItems={filteredItems} />
+        <RightPanel items={items} filteredItems={dashboardItems} />
       </div>
 
       {/* 底部时间轴 */}
       <div className="globe-bottombar">
+        <div className="globe-selected-date-card">
+          <span className="globe-date-label">SELECTED DATE</span>
+          <span className="globe-date-value">{selectedDate}</span>
+        </div>
         <button className="globe-timeline-btn" onClick={() => { const idx = dateRange.indexOf(selectedDate); if (idx > 0) setSelectedDate(dateRange[idx - 1]); }} disabled={dateRange.indexOf(selectedDate) <= 0}>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <polyline points="15 18 9 12 15 6" />
