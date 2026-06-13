@@ -4610,7 +4610,7 @@ body {
 .globe-hot-ticker {
   height: clamp(50px, 6.2vh, 70px);
   display: grid;
-  grid-template-columns: clamp(104px, 8vw, 142px) minmax(0, 1fr);
+  grid-template-columns: clamp(104px, 8vw, 142px) 34px minmax(0, 1fr) 34px;
   gap: clamp(8px, 0.8vw, 16px);
   align-items: center;
   padding: 0 clamp(10px, 0.9vw, 16px);
@@ -4637,7 +4637,33 @@ body {
   display: flex;
   gap: clamp(10px, 1vw, 18px);
   min-width: 0;
-  overflow: hidden;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-behavior: smooth;
+  scrollbar-width: none;
+}
+
+.globe-hot-track::-webkit-scrollbar {
+  display: none;
+}
+
+.globe-hot-nav {
+  width: 32px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(24, 220, 245, 0.2);
+  border-radius: 7px;
+  color: var(--gtd-accent);
+  background: rgba(24, 220, 245, 0.07);
+  cursor: pointer;
+  transition: background 0.18s ease, border-color 0.18s ease, transform 0.18s ease;
+}
+
+.globe-hot-nav:hover {
+  background: rgba(24, 220, 245, 0.16);
+  border-color: rgba(24, 220, 245, 0.42);
+  transform: translateY(-1px);
 }
 
 .globe-hot-chip {
@@ -4651,6 +4677,17 @@ body {
   border-radius: 7px;
   border: 1px solid rgba(24, 220, 245, 0.16);
   background: rgba(22, 42, 56, 0.72);
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+  flex: 0 0 auto;
+  transition: background 0.18s ease, border-color 0.18s ease, transform 0.18s ease;
+}
+
+.globe-hot-chip:hover {
+  background: rgba(24, 220, 245, 0.12);
+  border-color: rgba(24, 220, 245, 0.38);
+  transform: translateY(-1px);
 }
 
 .globe-hot-chip strong,

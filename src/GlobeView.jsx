@@ -421,6 +421,7 @@ function RightPanel({ filteredItems }) {
 
 function GlobeContent({ items, isFullscreen, onClose }) {
   const globeRef = useRef();
+  const tickerTrackRef = useRef();
   const [selectedCity, setSelectedCity] = useState(null);
   const [filterCategory, setFilterCategory] = useState('all');
   const [filterRegion, setFilterRegion] = useState('all');
@@ -429,6 +430,16 @@ function GlobeContent({ items, isFullscreen, onClose }) {
     return now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
   });
   const [isPlaying, setIsPlaying] = useState(false);
+
+  const followedKeywords = useMemo(() => {
+    try {
+      const saved = localStorage.getItem('selectedInterests');
+      const parsed = saved ? JSON.parse(saved) : [];
+      return Array.isArray(parsed) ? parsed.filter(Boolean) : [];
+    } catch {
+      return [];
+    }
+  }, []);
 
   // 自动播放
   useEffect(() => {
@@ -583,13 +594,40 @@ function GlobeContent({ items, isFullscreen, onClose }) {
   }, [dashboardItems, items, dateItems.length]);
 
   const tickerItems = useMemo(() => {
-    const source = dashboardItems.length ? dashboardItems : items;
+    const base = dashboardItems.length ? dashboardItems : items;
+    const followed = followedKeywords.length
+      ? base.filter(item => {
+        const text = `${item.title || ''} ${item.summary || ''} ${item.category || ''} ${item.tags?.join(' ') || ''}`.toLowerCase();
+        return followedKeywords.some(keyword => text.includes(String(keyword).toLowerCase()));
+      })
+      : [];
+    const source = followed.length ? followed : base;
     return source.slice(0, 6).map(item => ({
       title: item.title || 'Global technology signal',
       source: item.source || 'Global Tech Radar',
       category: CATEGORY_LABELS[item.category] || item.category || '热门资讯',
+      url: item.url || '',
     }));
-  }, [dashboardItems, items]);
+  }, [dashboardItems, items, followedKeywords]);
+
+  useEffect(() => {
+    if (!isFullscreen) return undefined;
+    const el = tickerTrackRef.current;
+    if (!el) return undefined;
+    const timer = setInterval(() => {
+      const maxScroll = el.scrollWidth - el.clientWidth;
+      if (maxScroll <= 0) return;
+      if (el.scrollLeft >= maxScroll - 8) el.scrollTo({ left: 0, behavior: 'smooth' });
+      else el.scrollBy({ left: Math.min(320, el.clientWidth * 0.55), behavior: 'smooth' });
+    }, 3600);
+    return () => clearInterval(timer);
+  }, [isFullscreen, tickerItems.length]);
+
+  const scrollTicker = useCallback((direction) => {
+    const el = tickerTrackRef.current;
+    if (!el) return;
+    el.scrollBy({ left: direction * Math.min(360, el.clientWidth * 0.65), behavior: 'smooth' });
+  }, []);
 
   const handlePointClick = (point) => { if (point.items && point.items.length > 0) setSelectedCity(point); };
   const handleClosePanel = () => setSelectedCity(null);
@@ -781,17 +819,33 @@ function GlobeContent({ items, isFullscreen, onClose }) {
                 <path d="M12 2c0 4-3 6-3 10 0 3 1.5 5 3 7 1.5-2 3-4 3-7 0-4-3-6-3-10z" />
                 <path d="M8 14c-1.5 1-3 3-3 5a5 5 0 0 0 10 0c0-2-1.5-4-3-5" />
               </svg>
-              <span>热门资讯</span>
+              <span>????</span>
             </div>
-            <div className="globe-hot-track">
+            <button className="globe-hot-nav" type="button" onClick={() => scrollTicker(-1)} aria-label="???????">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="15 18 9 12 15 6" />
+              </svg>
+            </button>
+            <div className="globe-hot-track" ref={tickerTrackRef}>
               {tickerItems.map((item, idx) => (
-                <div className="globe-hot-chip" key={`${item.title}-${idx}`}>
+                <button
+                  className="globe-hot-chip"
+                  key={`${item.title}-${idx}`}
+                  type="button"
+                  onClick={() => item.url && window.open(item.url, '_blank')}
+                  title={item.title}
+                >
                   <strong>{item.category}</strong>
                   <span>{item.title}</span>
                   <em>{item.source}</em>
-                </div>
+                </button>
               ))}
             </div>
+            <button className="globe-hot-nav" type="button" onClick={() => scrollTicker(1)} aria-label="???????">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="9 18 15 12 9 6" />
+              </svg>
+            </button>
           </div>
           <div className="globe-topbar-date">
             <span className="globe-date-label">SELECTED DATE</span>
