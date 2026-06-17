@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 
 // AI精灵助手组件 - Agent系统 + 历史记录 + 自适应窗口
-export default function AiElf({ llmConfig, avatarImage, elfName, onExportToMaterials, agents, currentAgent, onChangeAgent }) {
+export default function AiElf({ llmConfig, avatarImage, elfName, onExportToMaterials, agents, currentAgent, onChangeAgent, externalQuotedContext }) {
   const [isOpen, setIsOpen] = useState(false);
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
@@ -73,6 +73,18 @@ export default function AiElf({ llmConfig, avatarImage, elfName, onExportToMater
 
   // 当前Agent的历史记录（多个对话窗口）
   const historySessions = agentHistory[activeAgentId] || [];
+
+  useEffect(() => {
+    if (!externalQuotedContext) return;
+    setQuotedContext({
+      title: externalQuotedContext.title || '外部上下文',
+      content: externalQuotedContext.content || ''
+    });
+    if (externalQuotedContext.suggestedPrompt) {
+      setInputText(externalQuotedContext.suggestedPrompt);
+    }
+    setIsOpen(true);
+  }, [externalQuotedContext?.id]);
 
   // 生成Agent专属的分析Prompt
   const buildAnalysisPrompt = (itemData, pageContent) => {
@@ -438,7 +450,9 @@ ${baseContent}
   const sendMessage = async (text = inputText, itemData = null) => {
     if (!text.trim() && !itemData) return;
 
-    let messageText = text;
+    let messageText = quotedContext
+      ? `【引用上下文】\n${quotedContext.content}\n\n【用户问题】\n${text}`
+      : text;
 
     if (itemData) {
       setIsLoading(true);
@@ -457,6 +471,7 @@ ${baseContent}
       [activeAgentId]: [...(prev[activeAgentId] || []), newMessage]
     }));
     setInputText('');
+    setQuotedContext(null);
     setIsLoading(true);
 
     try {
@@ -1154,7 +1169,7 @@ ${baseContent}
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="12" height="12">
                       <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
                     </svg>
-                    <span>引用上下文</span>
+                    <span>{quotedContext.title || '引用上下文'}</span>
                   </div>
                   <div className="ai-elf-quoted-content">{quotedContext.content}</div>
                   <button

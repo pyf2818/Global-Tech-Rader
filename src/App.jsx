@@ -810,6 +810,7 @@ function App() {
   const [readingHistory, setReadingHistory] = useState(() => loadLS('readingHistory', []));
   const [translations, setTranslations] = useState(() => loadLS('translations', {}));
   const [aiInsights, setAiInsights] = useState({ loading: false, data: null, error: '' });
+  const [elfQuotedContext, setElfQuotedContext] = useState(null);
   const [translationOpen, setTranslationOpen] = useState({});
   const [translatingItems, setTranslatingItems] = useState({});
   const [navGroupOpen, setNavGroupOpen] = useState({ core: true, create: true, advanced: false });
@@ -1748,7 +1749,48 @@ function App() {
         else if (age < 24) score += 2; // 24小时内
         // 超过24小时不加分
 
-        return { ...item, mustReadScore: score };
+        const recommendationReasons = [];
+        const recommendationScoreParts = {};
+        if (selectedInterests.includes(item.category)) {
+          recommendationReasons.push('匹配你的关注领域');
+          recommendationScoreParts.interest = 30;
+        }
+        if (followKeywords.some(kw => `${item.title} ${item.summary}`.toLowerCase().includes(kw.toLowerCase()))) {
+          recommendationReasons.push('命中你的追踪关键词');
+          recommendationScoreParts.keyword = 20;
+        }
+        if ((categoryScore / maxCategoryPop) >= 0.7) {
+          recommendationReasons.push('所在赛道今日热度高');
+          recommendationScoreParts.trend = Math.round((categoryScore / maxCategoryPop) * 10);
+        }
+        if (highWeightSources.some(s => item.source?.includes(s)) || mediumWeightSources.some(s => item.source?.includes(s))) {
+          recommendationReasons.push('来自高质量来源');
+          recommendationScoreParts.source = highWeightSources.some(s => item.source?.includes(s)) ? 10 : 5;
+        }
+        if (age < 6) {
+          recommendationReasons.push('发布时间较新');
+          recommendationScoreParts.freshness = age < 1 ? 15 : age < 3 ? 12 : 8;
+        }
+        if (bookmarkIds.has(item.id)) {
+          recommendationReasons.push('你已收藏，适合继续沉淀');
+          recommendationScoreParts.behavior = 15;
+        } else if (categoryReadCount > 0) {
+          recommendationReasons.push('符合你的历史阅读偏好');
+          recommendationScoreParts.behavior = Math.min(categoryReadCount * 2, 10);
+        }
+        if (item.imageUrl || item.videoUrl) {
+          recommendationReasons.push('素材形态更完整');
+          recommendationScoreParts.media = (item.imageUrl ? 5 : 0) + (item.videoUrl ? 3 : 0);
+        }
+        const uniqueReasons = [...new Set(recommendationReasons)].slice(0, 3);
+
+        return {
+          ...item,
+          mustReadScore: score,
+          recommendationScoreParts,
+          recommendationReasons: uniqueReasons,
+          recommendation: uniqueReasons.length ? uniqueReasons.join(' · ') : '综合热度、来源质量和新鲜度较高'
+        };
       })
       .sort((a, b) => b.mustReadScore - a.mustReadScore)
       .slice(0, 5);
@@ -1756,14 +1798,31 @@ function App() {
 
   const workbenchItems = useMemo(() => {
     const seen = new Set();
-    const primary = [...todayMustRead, ...selectedDateItems]
+    const enrichedDateItems = selectedDateItems
+      .filter(item => (item.mustReadScore || 0) > 0 || selectedInterests.includes(item.category) || item.sourceGradeLabel?.startsWith('S') || item.sourceGradeLabel?.startsWith('A'));
+    const fallbackDateItems = selectedDateItems.filter(item => !enrichedDateItems.includes(item));
+    const primary = [...todayMustRead, ...enrichedDateItems, ...fallbackDateItems]
       .filter(item => {
         if (!item?.id || seen.has(item.id)) return false;
         seen.add(item.id);
         return true;
+      })
+      .map(item => {
+        if (item.recommendation) return item;
+        const reasons = [];
+        if (selectedInterests.includes(item.category)) reasons.push('匹配你的关注领域');
+        if (followKeywords.some(kw => `${item.title} ${item.summary}`.toLowerCase().includes(kw.toLowerCase()))) reasons.push('命中你的追踪关键词');
+        if (item.sourceGradeLabel?.startsWith('S') || item.sourceGradeLabel?.startsWith('A')) reasons.push('来源质量较高');
+        const age = (Date.now() - new Date(item.publishedAt).getTime()) / (1000 * 60 * 60);
+        if (age < 6) reasons.push('发布时间较新');
+        return {
+          ...item,
+          recommendationReasons: reasons.slice(0, 3),
+          recommendation: reasons.length ? reasons.slice(0, 3).join(' · ') : '与所选日期和当前筛选条件相关'
+        };
       });
     return primary.slice(0, 12);
-  }, [todayMustRead, selectedDateItems]);
+  }, [todayMustRead, selectedDateItems, selectedInterests, followKeywords]);
 
   const workbenchStats = useMemo(() => {
     const gradeCounts = workbenchItems.reduce((acc, item) => {
@@ -1783,6 +1842,38 @@ function App() {
     '提炼 3 个可以写成文章或汇报的选题',
     '找出今天最值得持续追踪的公司和技术'
   ], []);
+
+  const buildWorkbenchContext = useCallback((prompt) => {
+    const topItems = workbenchItems.slice(0, 8);
+    const lines = topItems.map((item, idx) => {
+      const reasons = item.recommendationReasons?.length ? item.recommendationReasons.join('、') : item.recommendation || '综合推荐';
+      return `${idx + 1}. ${item.title}
+来源：${item.source || '未知'}｜分类：${item.category || '未分类'}｜质量：${item.sourceGradeLabel || '未评级'}｜推荐分：${Math.round(item.mustReadScore || 0)}
+推荐理由：${reasons}
+摘要：${item.summary || '暂无摘要'}
+链接：${item.url || ''}`;
+    }).join('\n\n');
+
+    return `${prompt}
+
+日期：${selectedNewsDate || new Date().toISOString().slice(0, 10)}
+关注领域：${selectedInterests.map(id => CATEGORIES.find(c => c.id === id)?.label || id).join('、') || '未设置'}
+追踪关键词：${followKeywords.join('、') || '未设置'}
+推荐统计：共 ${workbenchItems.length} 条，兴趣匹配 ${workbenchStats.focusMatches} 条，关键词命中 ${workbenchStats.keywordMatches} 条
+
+今日推荐资讯：
+${lines}`;
+  }, [workbenchItems, selectedNewsDate, selectedInterests, followKeywords, workbenchStats.focusMatches, workbenchStats.keywordMatches]);
+
+  const sendWorkbenchToElf = useCallback((prompt) => {
+    setElfQuotedContext({
+      id: Date.now(),
+      title: '今日情报工作台',
+      content: buildWorkbenchContext(prompt),
+      suggestedPrompt: prompt
+    });
+    showToast('已把今日情报发送到 AI 精灵');
+  }, [buildWorkbenchContext]);
 
   const calendarDays = useMemo(() => {
     const year = calendarDate.getFullYear();
@@ -3657,28 +3748,33 @@ ${signals}
                 {!loading && !error && workbenchItems.length > 0 && (
                   <div className="workbench-news-list">
                     {workbenchItems.map((item, i) => (
-                      <NewsItem
-                        key={item.id}
-                        item={item}
-                        index={i}
-                        viewMode="standard"
-                        isFocused={focusedIndex === i}
-                        isBookmarked={isBookmarked(item.id)}
-                        isInMaterials={isInMaterials(item.id)}
-                        onBookmark={() => toggleBookmark(item)}
-                        onAddMaterial={() => toggleMaterial(item)}
-                        onSummary={() => setExpandedSummary(p => ({ ...p, [item.id]: !p[item.id] }))}
-                        isSummaryOpen={expandedSummary[item.id]}
-                        summaryText={generateSummary(item)}
-                        isFollowed={followKeywords.some(kw => `${item.title} ${item.summary}`.toLowerCase().includes(kw.toLowerCase()))}
-                        onRead={() => recordReading(item)}
-                        showTranslation={translationOpen[item.id]}
-                        onToggleTranslation={() => setTranslationOpen(p => ({ ...p, [item.id]: !p[item.id] }))}
-                        onRequestTranslation={() => requestTranslation(item)}
-                        isTranslating={translatingItems[item.id]}
-                        translation={getTranslation(item)}
-                        onOpenLightbox={(src, title) => setLightbox({ open: true, src, title })}
-                      />
+                      <div key={item.id} className="workbench-news-card">
+                        <div className="workbench-reason-strip">
+                          <span className="reason-score">{item.mustReadScore ? `${Math.round(item.mustReadScore)} 分` : '入选'}</span>
+                          <span className="reason-text">{item.recommendation || '综合推荐'}</span>
+                        </div>
+                        <NewsItem
+                          item={item}
+                          index={i}
+                          viewMode="standard"
+                          isFocused={focusedIndex === i}
+                          isBookmarked={isBookmarked(item.id)}
+                          isInMaterials={isInMaterials(item.id)}
+                          onBookmark={() => toggleBookmark(item)}
+                          onAddMaterial={() => toggleMaterial(item)}
+                          onSummary={() => setExpandedSummary(p => ({ ...p, [item.id]: !p[item.id] }))}
+                          isSummaryOpen={expandedSummary[item.id]}
+                          summaryText={generateSummary(item)}
+                          isFollowed={followKeywords.some(kw => `${item.title} ${item.summary}`.toLowerCase().includes(kw.toLowerCase()))}
+                          onRead={() => recordReading(item)}
+                          showTranslation={translationOpen[item.id]}
+                          onToggleTranslation={() => setTranslationOpen(p => ({ ...p, [item.id]: !p[item.id] }))}
+                          onRequestTranslation={() => requestTranslation(item)}
+                          isTranslating={translatingItems[item.id]}
+                          translation={getTranslation(item)}
+                          onOpenLightbox={(src, title) => setLightbox({ open: true, src, title })}
+                        />
+                      </div>
                     ))}
                   </div>
                 )}
@@ -3691,17 +3787,13 @@ ${signals}
                   <p>{llmConfig.baseUrl ? `当前模型：${llmConfig.selectedModel || '未选择模型'}` : '配置大模型后，可基于今日资讯生成解读、简报和创作选题。'}</p>
                   <div className="ai-prompt-list">
                     {aiActionPrompts.map(prompt => (
-                      <button key={prompt} onClick={() => {
-                        const context = `${prompt}\n\n${workbenchItems.slice(0, 6).map((item, idx) => `${idx + 1}. ${item.title} - ${item.source}`).join('\n')}`;
-                        navigator.clipboard?.writeText(context);
-                        showToast('已复制 AI 提示词，可粘贴到右下角 AI 精灵');
-                      }}>
+                      <button key={prompt} onClick={() => sendWorkbenchToElf(prompt)}>
                         {prompt}
                       </button>
                     ))}
                   </div>
-                  <button className="ai-primary-action" onClick={() => llmConfig.baseUrl ? fetchAiInsights() : setShowLlmQuickConfig(true)}>
-                    {llmConfig.baseUrl ? '生成今日洞察' : '配置大模型'}
+                  <button className="ai-primary-action" onClick={() => llmConfig.baseUrl ? sendWorkbenchToElf('请基于今日推荐资讯生成一份结构化洞察：核心摘要、重点机会、潜在风险、建议我优先阅读哪三条。') : setShowLlmQuickConfig(true)}>
+                    {llmConfig.baseUrl ? '发送给 AI 精灵' : '配置大模型'}
                   </button>
                 </div>
 
@@ -5726,6 +5818,7 @@ ${signals}
         agents={agents}
         currentAgent={currentAgent}
         onChangeAgent={setCurrentAgent}
+        externalQuotedContext={elfQuotedContext}
         onExportToMaterials={(data) => {
         const { title, content } = data;
         addManualMaterial({

@@ -10205,10 +10205,52 @@ body {
   gap: 12px;
 }
 
+.workbench-news-card {
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  overflow: hidden;
+  background: rgba(18, 21, 28, 0.72);
+}
+
+.workbench-reason-strip {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 34px;
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--border-color);
+  background: rgba(34, 211, 238, 0.055);
+}
+
+.reason-score {
+  flex-shrink: 0;
+  padding: 3px 7px;
+  border-radius: 5px;
+  background: rgba(34, 211, 238, 0.14);
+  color: var(--accent-cyan);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.reason-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.ai-elf-quoted-content {
+  max-height: 170px;
+  overflow-y: auto;
+}
+
 .workbench-news-list .news-item {
   border-radius: 8px;
   padding: 16px;
-  background: rgba(18, 21, 28, 0.78);
+  background: transparent;
+  border: 0;
   transform: none;
 }
 
