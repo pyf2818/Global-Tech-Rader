@@ -5,6 +5,8 @@ import { formatRelative } from '../utils/format.js';
 import { renderMarkdownWithImages } from '../utils/markdown.jsx';
 
 export default function ArticleEditor({
+  editorFullscreen, setEditorFullscreen,
+  editorTextareaRef, imageInputRef,
   articles, setArticles,
   currentArticleId, setCurrentArticleId,
   editorTab, setEditorTab,
