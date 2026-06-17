@@ -9,15 +9,15 @@
     "preview": "vite preview --host 0.0.0.0"
   },
   "dependencies": {
-    "@vitejs/plugin-react": "latest",
-    "autoprefixer": "latest",
-    "postcss": "latest",
-    "react": "latest",
-    "react-dom": "latest",
+    "@vitejs/plugin-react": "^6.0.2",
+    "autoprefixer": "^10.5.0",
+    "postcss": "^8.5.15",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
     "react-globe.gl": "^2.38.0",
     "tailwindcss": "^3.4.17",
     "three": "^0.184.0",
-    "typescript": "latest",
-    "vite": "latest"
+    "typescript": "^6.0.3",
+    "vite": "^8.0.16"
   }
 }
