@@ -784,6 +784,12 @@ function App() {
   const [summaryCache, setSummaryCache] = useState(() => loadLS('summaryCache', {}));
   const [followKeywords, setFollowKeywords] = useState(() => loadLS('followKeywords', []));
   const [pinnedKeywords, setPinnedKeywords] = useState(() => loadLS('pinnedKeywords', []));
+  const [recommendationFeedback, setRecommendationFeedback] = useState(() => loadLS('recommendationFeedback', {
+    hiddenIds: [],
+    boostedCategories: {},
+    mutedSources: {},
+    trackedTerms: {}
+  }));
   const [newKeyword, setNewKeyword] = useState('');
   const [searchHistory, setSearchHistory] = useState(() => loadLS('searchHistory', []));
   const [searchOpen, setSearchOpen] = useState(false);
@@ -890,6 +896,7 @@ function App() {
   useEffect(() => { saveLS('summaryCache', summaryCache); }, [summaryCache]);
   useEffect(() => { saveLS('followKeywords', followKeywords); }, [followKeywords]);
   useEffect(() => { saveLS('pinnedKeywords', pinnedKeywords); }, [pinnedKeywords]);
+  useEffect(() => { saveLS('recommendationFeedback', recommendationFeedback); }, [recommendationFeedback]);
   useEffect(() => { saveLS('searchHistory', searchHistory); }, [searchHistory]);
   useEffect(() => { saveLS('viewMode', viewMode); }, [viewMode]);
   useEffect(() => { saveLS('recentVisits', recentVisits); }, [recentVisits]);
@@ -1798,31 +1805,55 @@ function App() {
 
   const workbenchItems = useMemo(() => {
     const seen = new Set();
+    const hiddenIds = new Set(recommendationFeedback.hiddenIds || []);
+    const boostedCategories = recommendationFeedback.boostedCategories || {};
+    const mutedSources = recommendationFeedback.mutedSources || {};
+    const trackedTerms = recommendationFeedback.trackedTerms || {};
     const enrichedDateItems = selectedDateItems
       .filter(item => (item.mustReadScore || 0) > 0 || selectedInterests.includes(item.category) || item.sourceGradeLabel?.startsWith('S') || item.sourceGradeLabel?.startsWith('A'));
     const fallbackDateItems = selectedDateItems.filter(item => !enrichedDateItems.includes(item));
     const primary = [...todayMustRead, ...enrichedDateItems, ...fallbackDateItems]
       .filter(item => {
-        if (!item?.id || seen.has(item.id)) return false;
+        if (!item?.id || seen.has(item.id) || hiddenIds.has(item.id)) return false;
         seen.add(item.id);
         return true;
       })
       .map(item => {
-        if (item.recommendation) return item;
+        const feedbackBoost = (boostedCategories[item.category] || 0) * 8;
+        const sourcePenalty = (mutedSources[item.source] || 0) * 12;
+        const trackedBoost = Object.keys(trackedTerms).some(term => `${item.title} ${item.summary}`.toLowerCase().includes(term.toLowerCase())) ? 14 : 0;
+        const feedbackScore = feedbackBoost + trackedBoost - sourcePenalty;
+        if (item.recommendation) {
+          const extraReasons = [];
+          if (feedbackBoost > 0) extraReasons.push('你要求更多类似内容');
+          if (trackedBoost > 0) extraReasons.push('匹配继续追踪主题');
+          if (sourcePenalty > 0) extraReasons.push('已降低此来源权重');
+          return {
+            ...item,
+            mustReadScore: (item.mustReadScore || 0) + feedbackScore,
+            recommendationReasons: [...new Set([...(item.recommendationReasons || []), ...extraReasons])].slice(0, 3),
+            recommendation: [...new Set([...(item.recommendationReasons || []), ...extraReasons])].slice(0, 3).join(' · ') || item.recommendation
+          };
+        }
         const reasons = [];
         if (selectedInterests.includes(item.category)) reasons.push('匹配你的关注领域');
         if (followKeywords.some(kw => `${item.title} ${item.summary}`.toLowerCase().includes(kw.toLowerCase()))) reasons.push('命中你的追踪关键词');
         if (item.sourceGradeLabel?.startsWith('S') || item.sourceGradeLabel?.startsWith('A')) reasons.push('来源质量较高');
         const age = (Date.now() - new Date(item.publishedAt).getTime()) / (1000 * 60 * 60);
         if (age < 6) reasons.push('发布时间较新');
+        if (feedbackBoost > 0) reasons.push('你要求更多类似内容');
+        if (trackedBoost > 0) reasons.push('匹配继续追踪主题');
+        if (sourcePenalty > 0) reasons.push('已降低此来源权重');
         return {
           ...item,
+          mustReadScore: Math.max(0, feedbackScore),
           recommendationReasons: reasons.slice(0, 3),
           recommendation: reasons.length ? reasons.slice(0, 3).join(' · ') : '与所选日期和当前筛选条件相关'
         };
-      });
+      })
+      .sort((a, b) => (b.mustReadScore || 0) - (a.mustReadScore || 0));
     return primary.slice(0, 12);
-  }, [todayMustRead, selectedDateItems, selectedInterests, followKeywords]);
+  }, [todayMustRead, selectedDateItems, selectedInterests, followKeywords, recommendationFeedback]);
 
   const workbenchStats = useMemo(() => {
     const gradeCounts = workbenchItems.reduce((acc, item) => {
@@ -1835,6 +1866,13 @@ function App() {
     const savedCount = workbenchItems.filter(item => isBookmarked(item.id) || isInMaterials(item.id)).length;
     return { gradeCounts, focusMatches, keywordMatches, savedCount };
   }, [workbenchItems, selectedInterests, followKeywords, bookmarks, materials]);
+
+  const feedbackLearningCount = useMemo(() => {
+    return (recommendationFeedback.hiddenIds || []).length
+      + Object.values(recommendationFeedback.boostedCategories || {}).reduce((sum, value) => sum + value, 0)
+      + Object.values(recommendationFeedback.mutedSources || {}).reduce((sum, value) => sum + value, 0)
+      + Object.values(recommendationFeedback.trackedTerms || {}).reduce((sum, value) => sum + value, 0);
+  }, [recommendationFeedback]);
 
   const aiActionPrompts = useMemo(() => [
     '把今日必读压缩成 5 分钟中文简报',
@@ -1874,6 +1912,69 @@ ${lines}`;
     });
     showToast('已把今日情报发送到 AI 精灵');
   }, [buildWorkbenchContext]);
+
+  const getFeedbackTerm = useCallback((item) => {
+    const tags = item.tags || [];
+    const preferredTag = tags.find(tag => tag && tag.length >= 2 && tag.length <= 24);
+    if (preferredTag) return preferredTag;
+    const titleWords = (item.title || '').match(/[A-Za-z][A-Za-z0-9-]{2,}|[\u4e00-\u9fa5]{2,6}/g) || [];
+    return titleWords[0] || item.category || item.source || '';
+  }, []);
+
+  const handleRecommendationFeedback = useCallback((item, action) => {
+    if (!item) return;
+    if (action === 'hide') {
+      setRecommendationFeedback(prev => ({
+        ...prev,
+        hiddenIds: [...new Set([...(prev.hiddenIds || []), item.id])]
+      }));
+      showToast('已减少这类不感兴趣内容');
+      return;
+    }
+
+    if (action === 'more-like-this') {
+      if (!item.category) return;
+      setRecommendationFeedback(prev => ({
+        ...prev,
+        boostedCategories: {
+          ...(prev.boostedCategories || {}),
+          [item.category]: ((prev.boostedCategories || {})[item.category] || 0) + 1
+        }
+      }));
+      if (item.category && !selectedInterests.includes(item.category)) {
+        setSelectedInterests(prev => [...new Set([...prev, item.category])]);
+      }
+      showToast('已提高类似内容权重');
+      return;
+    }
+
+    if (action === 'mute-source') {
+      if (!item.source) return;
+      setRecommendationFeedback(prev => ({
+        ...prev,
+        mutedSources: {
+          ...(prev.mutedSources || {}),
+          [item.source]: ((prev.mutedSources || {})[item.source] || 0) + 1
+        }
+      }));
+      showToast(`已降低 ${item.source || '该来源'} 的推荐权重`);
+      return;
+    }
+
+    if (action === 'track') {
+      const term = getFeedbackTerm(item);
+      if (!term) return;
+      setRecommendationFeedback(prev => ({
+        ...prev,
+        trackedTerms: {
+          ...(prev.trackedTerms || {}),
+          [term]: ((prev.trackedTerms || {})[term] || 0) + 1
+        }
+      }));
+      setFollowKeywords(prev => prev.includes(term) ? prev : [term, ...prev].slice(0, 20));
+      showToast(`已开始追踪「${term}」`);
+    }
+  }, [getFeedbackTerm, selectedInterests]);
 
   const calendarDays = useMemo(() => {
     const year = calendarDate.getFullYear();
@@ -3708,6 +3809,10 @@ ${signals}
                     <strong>{workbenchStats.savedCount}</strong>
                     <span>已沉淀</span>
                   </div>
+                  <div>
+                    <strong>{feedbackLearningCount}</strong>
+                    <span>学习反馈</span>
+                  </div>
                 </div>
               </section>
 
@@ -3752,6 +3857,12 @@ ${signals}
                         <div className="workbench-reason-strip">
                           <span className="reason-score">{item.mustReadScore ? `${Math.round(item.mustReadScore)} 分` : '入选'}</span>
                           <span className="reason-text">{item.recommendation || '综合推荐'}</span>
+                          <div className="feedback-actions">
+                            <button title="继续追踪这个主题" onClick={() => handleRecommendationFeedback(item, 'track')}>追踪</button>
+                            <button title="多推荐类似内容" onClick={() => handleRecommendationFeedback(item, 'more-like-this')}>更多类似</button>
+                            <button title="降低这个来源权重" onClick={() => handleRecommendationFeedback(item, 'mute-source')}>少看来源</button>
+                            <button title="不再推荐这条" onClick={() => handleRecommendationFeedback(item, 'hide')}>不感兴趣</button>
+                          </div>
                         </div>
                         <NewsItem
                           item={item}

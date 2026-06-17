@@ -10124,7 +10124,7 @@ body {
 
 .workbench-metrics {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(92px, 1fr));
   gap: 10px;
 }
 
@@ -10239,6 +10239,32 @@ body {
   white-space: nowrap;
   color: var(--text-secondary);
   font-size: 12px;
+}
+
+.feedback-actions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.feedback-actions button {
+  height: 24px;
+  padding: 0 8px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.02);
+  color: var(--text-muted);
+  font-size: 11px;
+  cursor: pointer;
+  transition: color 0.16s ease, border-color 0.16s ease, background 0.16s ease;
+}
+
+.feedback-actions button:hover {
+  color: var(--accent-cyan);
+  border-color: var(--border-active);
+  background: rgba(34, 211, 238, 0.08);
 }
 
 .ai-elf-quoted-content {
@@ -10386,5 +10412,17 @@ body {
 
   .workbench-ai {
     display: flex;
+  }
+
+  .workbench-reason-strip {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .feedback-actions {
+    width: 100%;
+    margin-left: 0;
+    overflow-x: auto;
+    padding-bottom: 2px;
   }
 }
