@@ -38,8 +38,9 @@ const MOTIVATIONAL_QUOTES = [
 ];
 
 const NAV_ITEMS = [
+  { id: 'today', label: '今日情报', icon: 'sparkle' },
   { id: 'all', label: '全部动态', icon: 'grid' },
-  { id: 'recommendations', label: '智能推荐', icon: 'sparkle' },
+  { id: 'recommendations', label: '推荐池', icon: 'sparkle' },
   { id: 'briefing', label: '今日态势', icon: 'document' },
   { id: 'tracker', label: '我的追踪', icon: 'follow' },
   { id: 'trending', label: '热门榜单', icon: 'fire' },
@@ -55,10 +56,9 @@ const NAV_ITEMS = [
 ];
 
 const NAV_GROUPS = [
-  { id: 'core', label: '资讯中心', items: ['all', 'recommendations', 'trending', 'github', 'custom-url'] },
-  { id: 'insight', label: '洞察分析', items: ['briefing', 'tracker', 'trends', 'reading-stats'] },
-  { id: 'create', label: '素材创作', items: ['materials', 'editor'] },
-  { id: 'manage', label: '管理沉淀', items: ['calendar', 'reading-list', 'knowledge-export'] }
+  { id: 'core', label: '核心工作台', items: ['today', 'all', 'recommendations'] },
+  { id: 'create', label: '沉淀创作', items: ['materials', 'editor', 'reading-list'] },
+  { id: 'advanced', label: '高级能力', items: ['briefing', 'tracker', 'trends', 'reading-stats', 'trending', 'github', 'custom-url', 'calendar', 'knowledge-export'] }
 ];
 
 const CATEGORIES = [
@@ -473,12 +473,13 @@ function App() {
   clearStaleLS();
   const [theme, setTheme] = useState(() => localStorage.getItem('theme') || 'dark');
   const [editorFullscreen, setEditorFullscreen] = useState(false);
-  const [nav, setNav] = useState('all');
+  const [nav, setNav] = useState('today');
   const [category, setCategory] = useState('all');
   const [categoryOpen, setCategoryOpen] = useState(false);
   const [verticalChannel, setVerticalChannel] = useState('all');
   const [mode, setMode] = useState('all');
   const [sourceFilter, setSourceFilter] = useState('all');
+  const [selectedNewsDate, setSelectedNewsDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [viewMode, setViewMode] = useState(() => loadLS('viewMode', 'standard'));
   const [query, setQuery] = useState('');
   const [items, setItems] = useState([]);
@@ -811,7 +812,7 @@ function App() {
   const [aiInsights, setAiInsights] = useState({ loading: false, data: null, error: '' });
   const [translationOpen, setTranslationOpen] = useState({});
   const [translatingItems, setTranslatingItems] = useState({});
-  const [navGroupOpen, setNavGroupOpen] = useState({ core: true, insight: true, manage: false });
+  const [navGroupOpen, setNavGroupOpen] = useState({ core: true, create: true, advanced: false });
   const [currentArticleId, setCurrentArticleId] = useState(null);
   const [materialFilter, setMaterialFilter] = useState('all');
   const [materialSearch, setMaterialSearch] = useState('');
@@ -976,7 +977,7 @@ function App() {
   }, []);
 
   useEffect(() => {
-    if (nav !== 'all' && nav !== 'recommendations') return;
+    if (nav !== 'all' && nav !== 'recommendations' && nav !== 'today') return;
     const el = feedRef.current;
     if (!el || !newsHasMore || loadingMore || loading) return;
     const observer = new IntersectionObserver(
@@ -997,7 +998,10 @@ function App() {
     let title = 'Global Tech Radar - 全球科技圈实时资讯聚合平台';
     let description = '聚合 AI、大模型、芯片、开源、科研、政策与投融资动态。';
     
-    if (nav === 'trending') {
+    if (nav === 'today') {
+      title = 'Global Tech Radar - 今日情报工作台';
+      description = 'AI 驱动的个人科技情报工作台，聚焦每日必读、个性推荐和大模型协作。';
+    } else if (nav === 'trending') {
       title = `Global Tech Radar - ${TRENDING_TYPES.find(t => t.id === trendingType)?.label || '热门榜单'}`;
       description = `24小时热点、7日全球财经、时政热议 - 全球科技圈实时资讯聚合平台。`;
     } else if (nav === 'github') {
@@ -1028,7 +1032,7 @@ function App() {
   }, [query]);
 
   useEffect(() => {
-    if (nav !== 'all') return;
+    if (nav !== 'all' && nav !== 'today') return;
     loadNews(blocked, false, debouncedQuery);
   }, [debouncedQuery, category, mode, sourceFilter]);
   useEffect(() => {
@@ -1168,6 +1172,24 @@ function App() {
   }, [filtered]);
 
   const sourceStats = useMemo(() => items.reduce((s, i) => ({ ...s, [i.region]: (s[i.region] || 0) + 1 }), { domestic: 0, overseas: 0, global: 0 }), [items]);
+
+  const availableNewsDates = useMemo(() => {
+    const dates = [...new Set(items.map(item => item.publishedAt?.slice(0, 10)).filter(Boolean))].sort((a, b) => b.localeCompare(a));
+    return dates.slice(0, 14);
+  }, [items]);
+
+  useEffect(() => {
+    if (!items.length || !availableNewsDates.length) return;
+    if (!availableNewsDates.includes(selectedNewsDate)) {
+      setSelectedNewsDate(availableNewsDates[0]);
+    }
+  }, [items.length, availableNewsDates, selectedNewsDate]);
+
+  const selectedDateItems = useMemo(() => {
+    if (!selectedNewsDate) return filtered;
+    const sameDay = filtered.filter(item => item.publishedAt?.slice(0, 10) === selectedNewsDate);
+    return sameDay.length > 0 ? sameDay : filtered;
+  }, [filtered, selectedNewsDate]);
 
   const regionCategoryMatrix = useMemo(() => {
     const regions = ['domestic', 'overseas', 'global'];
@@ -1731,6 +1753,36 @@ function App() {
       .sort((a, b) => b.mustReadScore - a.mustReadScore)
       .slice(0, 5);
   }, [items, followKeywords, readingHistory, bookmarks, selectedInterests]);
+
+  const workbenchItems = useMemo(() => {
+    const seen = new Set();
+    const primary = [...todayMustRead, ...selectedDateItems]
+      .filter(item => {
+        if (!item?.id || seen.has(item.id)) return false;
+        seen.add(item.id);
+        return true;
+      });
+    return primary.slice(0, 12);
+  }, [todayMustRead, selectedDateItems]);
+
+  const workbenchStats = useMemo(() => {
+    const gradeCounts = workbenchItems.reduce((acc, item) => {
+      const grade = item.sourceGradeLabel?.charAt(0) || item.grade || 'N/A';
+      acc[grade] = (acc[grade] || 0) + 1;
+      return acc;
+    }, {});
+    const focusMatches = workbenchItems.filter(item => selectedInterests.includes(item.category)).length;
+    const keywordMatches = workbenchItems.filter(item => followKeywords.some(kw => `${item.title} ${item.summary}`.toLowerCase().includes(kw.toLowerCase()))).length;
+    const savedCount = workbenchItems.filter(item => isBookmarked(item.id) || isInMaterials(item.id)).length;
+    return { gradeCounts, focusMatches, keywordMatches, savedCount };
+  }, [workbenchItems, selectedInterests, followKeywords, bookmarks, materials]);
+
+  const aiActionPrompts = useMemo(() => [
+    '把今日必读压缩成 5 分钟中文简报',
+    '解释这些资讯对我的关注领域有什么影响',
+    '提炼 3 个可以写成文章或汇报的选题',
+    '找出今天最值得持续追踪的公司和技术'
+  ], []);
 
   const calendarDays = useMemo(() => {
     const year = calendarDate.getFullYear();
@@ -3280,7 +3332,7 @@ ${signals}
       </aside>
 
       {/* Main */}
-      <main className="main">
+      <main className={`main ${nav === 'today' ? 'main-workbench' : ''}`}>
         <header className={`topbar ${nav === 'all' ? 'topbar-all' : ''} ${(nav === 'trending' || nav === 'recommendations') ? 'topbar-trending' : ''}`}>
           {nav === 'all' && (
             <div className="topbar-brand">
@@ -3493,7 +3545,7 @@ ${signals}
           </div>
         </header>
 
-        <div className="stats-bar">
+        {nav !== 'today' && <div className="stats-bar">
           {nav === 'all' && <><div className="stat-item"><span className="stat-value">{items.length}</span><span className="stat-label">资讯总数</span></div><div className="stat-item"><span className="stat-value highlight">{filtered.length}</span><span className="stat-label">筛选结果</span></div><div className="stat-item"><span className="stat-value live">{stats.sourceCount - stats.failedSources}</span><span className="stat-label">活跃源</span></div></>}
           {nav === 'trending' && <><div className="stat-item"><span className="stat-value highlight">{trendingItems.length}</span><span className="stat-label">热门榜单</span></div><div className="stat-item"><span className="stat-value live">热门</span><span className="stat-label">全网热搜</span></div></>}
           {nav === 'github' && <><div className="stat-item"><span className="stat-value highlight">{githubRepos.length}</span><span className="stat-label">热门项目</span></div><div className="stat-item"><span className="stat-value live">{GITHUB_PERIODS.find(p => p.id === githubSince)?.label || '周榜'}</span><span className="stat-label">当前榜单</span></div></>}
@@ -3502,9 +3554,179 @@ ${signals}
           {nav === 'recommendations' && <><div className="stat-item"><span className="stat-value highlight">{filtered.length}</span><span className="stat-label">推荐内容</span></div><div className="stat-item"><span className="stat-value live">{selectedInterests.length}</span><span className="stat-label">兴趣领域</span></div></>}
           <div className="stat-item time">{ICONS.clock}<span>{stats.updatedAt ? formatTime(stats.updatedAt) : '--'}</span></div>
           <button className="panel-toggle" onClick={() => setPanelCollapsed(c => !c)}>{panelCollapsed ? ICONS.chevronLeft : ICONS.chevronRight}</button>
-        </div>
+        </div>}
 
-        <div className="feed custom-scrollbar" ref={feedRef}>
+        <div className={`feed custom-scrollbar ${nav === 'today' ? 'feed-workbench' : ''}`} ref={feedRef}>
+          {nav === 'today' && (
+            <div className="workbench-shell">
+              <section className="workbench-left">
+                <div className="workbench-kicker">Personal Intelligence</div>
+                <h1 className="workbench-title">今日情报工作台</h1>
+                <p className="workbench-subtitle">少看一点，理解更深一点。系统会按日期、关注领域和来源质量帮你收敛到真正值得读的内容。</p>
+
+                <div className="date-manager">
+                  <div className="date-manager-head">
+                    <span>日期管理</span>
+                    <input
+                      type="date"
+                      value={selectedNewsDate}
+                      onChange={e => setSelectedNewsDate(e.target.value)}
+                    />
+                  </div>
+                  <div className="date-pill-row">
+                    {availableNewsDates.slice(0, 7).map(date => (
+                      <button
+                        key={date}
+                        className={`date-pill ${selectedNewsDate === date ? 'active' : ''}`}
+                        onClick={() => setSelectedNewsDate(date)}
+                      >
+                        <span>{date.slice(5)}</span>
+                        <small>{items.filter(item => item.publishedAt?.slice(0, 10) === date).length}</small>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="workbench-preferences">
+                  <div className="workbench-block-title">关注领域</div>
+                  <div className="interest-chip-list">
+                    {selectedInterests.length === 0 ? (
+                      <button className="interest-chip empty" onClick={() => setShowInterestModal(true)}>设置关注领域</button>
+                    ) : selectedInterests.slice(0, 6).map(id => {
+                      const cat = CATEGORIES.find(c => c.id === id);
+                      return <button key={id} className="interest-chip" onClick={() => setCategory(id)}>{cat?.label || id}</button>;
+                    })}
+                  </div>
+                  <button className="workbench-text-btn" onClick={() => setShowInterestModal(true)}>调整偏好</button>
+                </div>
+
+                <div className="workbench-metrics">
+                  <div>
+                    <strong>{workbenchItems.length}</strong>
+                    <span>推荐阅读</span>
+                  </div>
+                  <div>
+                    <strong>{workbenchStats.focusMatches}</strong>
+                    <span>兴趣匹配</span>
+                  </div>
+                  <div>
+                    <strong>{workbenchStats.keywordMatches}</strong>
+                    <span>关键词命中</span>
+                  </div>
+                  <div>
+                    <strong>{workbenchStats.savedCount}</strong>
+                    <span>已沉淀</span>
+                  </div>
+                </div>
+              </section>
+
+              <section className="workbench-center">
+                <div className="workbench-toolbar">
+                  <div>
+                    <div className="workbench-section-label">Daily Briefing</div>
+                    <h2>今天最值得看的 {workbenchItems.length} 条</h2>
+                  </div>
+                  <div className="workbench-toolbar-actions">
+                    <div className="search-wrap workbench-search">
+                      {ICONS.search}
+                      <input ref={searchInputRef} value={query} onChange={e => setQuery(e.target.value)} placeholder="搜索技术、公司、项目..." />
+                    </div>
+                    <button className="btn-refresh workbench-refresh" onClick={() => loadNews()}>
+                      {ICONS.refresh}
+                      <span>刷新</span>
+                    </button>
+                  </div>
+                </div>
+
+                <div className="workbench-filter-row">
+                  <button className={`filter-pill ${mode === 'all' ? 'active' : ''}`} onClick={() => setMode('all')}>全部</button>
+                  {MODES.filter(m => m.id !== 'all').map(m => <button key={m.id} className={`filter-pill ${mode === m.id ? 'active' : ''}`} onClick={() => setMode(m.id)}>{m.label}</button>)}
+                  <button className={`filter-pill ${regionFilter === 'all' ? 'active' : ''}`} onClick={() => setRegionFilter('all')}>全球</button>
+                  <button className={`filter-pill ${regionFilter === 'domestic' ? 'active' : ''}`} onClick={() => setRegionFilter('domestic')}>国内</button>
+                  <button className={`filter-pill ${regionFilter === 'overseas' ? 'active' : ''}`} onClick={() => setRegionFilter('overseas')}>海外</button>
+                </div>
+
+                {loading && <div className="feed-list">{Array.from({ length: 5 }).map((_, i) => <SkeletonCard key={i} viewMode="standard" />)}</div>}
+                {error && <div className="error-state"><p>加载失败: {error}</p><button onClick={() => loadNews()}>重试</button></div>}
+                {!loading && !error && workbenchItems.length === 0 && (
+                  <div className="empty-state">
+                    <p>当前日期还没有匹配资讯</p>
+                    <button onClick={() => { setQuery(''); setCategory('all'); setMode('all'); setSourceFilter('all'); }}>重置筛选</button>
+                  </div>
+                )}
+                {!loading && !error && workbenchItems.length > 0 && (
+                  <div className="workbench-news-list">
+                    {workbenchItems.map((item, i) => (
+                      <NewsItem
+                        key={item.id}
+                        item={item}
+                        index={i}
+                        viewMode="standard"
+                        isFocused={focusedIndex === i}
+                        isBookmarked={isBookmarked(item.id)}
+                        isInMaterials={isInMaterials(item.id)}
+                        onBookmark={() => toggleBookmark(item)}
+                        onAddMaterial={() => toggleMaterial(item)}
+                        onSummary={() => setExpandedSummary(p => ({ ...p, [item.id]: !p[item.id] }))}
+                        isSummaryOpen={expandedSummary[item.id]}
+                        summaryText={generateSummary(item)}
+                        isFollowed={followKeywords.some(kw => `${item.title} ${item.summary}`.toLowerCase().includes(kw.toLowerCase()))}
+                        onRead={() => recordReading(item)}
+                        showTranslation={translationOpen[item.id]}
+                        onToggleTranslation={() => setTranslationOpen(p => ({ ...p, [item.id]: !p[item.id] }))}
+                        onRequestTranslation={() => requestTranslation(item)}
+                        isTranslating={translatingItems[item.id]}
+                        translation={getTranslation(item)}
+                        onOpenLightbox={(src, title) => setLightbox({ open: true, src, title })}
+                      />
+                    ))}
+                  </div>
+                )}
+              </section>
+
+              <section className="workbench-ai">
+                <div className="ai-command-card">
+                  <div className="workbench-section-label">AI Copilot</div>
+                  <h2>让模型帮你读懂，而不是自己硬刷</h2>
+                  <p>{llmConfig.baseUrl ? `当前模型：${llmConfig.selectedModel || '未选择模型'}` : '配置大模型后，可基于今日资讯生成解读、简报和创作选题。'}</p>
+                  <div className="ai-prompt-list">
+                    {aiActionPrompts.map(prompt => (
+                      <button key={prompt} onClick={() => {
+                        const context = `${prompt}\n\n${workbenchItems.slice(0, 6).map((item, idx) => `${idx + 1}. ${item.title} - ${item.source}`).join('\n')}`;
+                        navigator.clipboard?.writeText(context);
+                        showToast('已复制 AI 提示词，可粘贴到右下角 AI 精灵');
+                      }}>
+                        {prompt}
+                      </button>
+                    ))}
+                  </div>
+                  <button className="ai-primary-action" onClick={() => llmConfig.baseUrl ? fetchAiInsights() : setShowLlmQuickConfig(true)}>
+                    {llmConfig.baseUrl ? '生成今日洞察' : '配置大模型'}
+                  </button>
+                </div>
+
+                <div className="quality-card">
+                  <div className="workbench-block-title">质量等级</div>
+                  <div className="quality-grid">
+                    {['S', 'A', 'B', 'C', 'D'].map(grade => (
+                      <div key={grade} className={`quality-item grade-${grade.toLowerCase()}`}>
+                        <strong>{workbenchStats.gradeCounts[grade] || 0}</strong>
+                        <span>{grade} 级来源</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="next-actions-card">
+                  <div className="workbench-block-title">下一步</div>
+                  <button onClick={() => setNav('editor')}>写一篇情报短文</button>
+                  <button onClick={() => setNav('materials')}>查看素材库</button>
+                  <button onClick={() => setShowSettings(true)}>管理来源质量</button>
+                </div>
+              </section>
+            </div>
+          )}
+
           {/* ALL NEWS */}
           {nav === 'all' && (
             <>
@@ -5034,7 +5256,7 @@ ${signals}
       </main>
 
       {/* Right Panel */}
-      <aside className={`panel ${panelCollapsed ? 'collapsed' : ''}`}>
+      {nav !== 'today' && <aside className={`panel ${panelCollapsed ? 'collapsed' : ''}`}>
         {!panelCollapsed && (
           <>
             <section className="panel-section follow-panel-section">
@@ -5276,7 +5498,7 @@ ${signals}
             </section>
           </>
         )}
-      </aside>
+      </aside>}
 
       {/* Settings Modal */}
       {/* Lightbox */}
