@@ -107,11 +107,21 @@
     <script>
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/sw.js').then((reg) => {
-            console.log('SW registered:', reg.scope);
-          }).catch((err) => {
-            console.log('SW registration failed:', err);
-          });
+          const isLocal = ['localhost', '127.0.0.1', '0.0.0.0'].includes(location.hostname);
+          if (isLocal) {
+            navigator.serviceWorker.getRegistrations()
+              .then((regs) => Promise.all(regs.map((reg) => reg.unregister())))
+              .then(() => caches?.delete?.('tech-radar-v1'))
+              .catch((err) => console.log('SW cleanup failed:', err));
+            return;
+          }
+          navigator.serviceWorker.register('/sw.js')
+            .then((reg) => {
+              console.log('SW registered:', reg.scope);
+            })
+            .catch((err) => {
+              console.log('SW registration failed:', err);
+            });
         });
       }
     </script>

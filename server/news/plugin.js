@@ -11,7 +11,7 @@ export function newsPlugin() {
   return {
     name: 'global-tech-news-api',
     configureServer(server) {
-      server.middlewares.use(async (req, res, next) => {
+      const handleApiRequest = async (req, res, next) => {
         const requestUrl = new URL(req.url, 'http://localhost');
 
         if (requestUrl.pathname === '/api/meta') {
@@ -435,7 +435,23 @@ ${items.map((i, idx) => {
           return sendJson(res, { ok: false, message: 'Reserved extension endpoint.' }, 501);
         }
 
-        next();
+        return next();
+      };
+
+      server.middlewares.use(async (req, res, next) => {
+        try {
+          return await handleApiRequest(req, res, next);
+        } catch (error) {
+          console.error('[newsPlugin] API middleware error:', error);
+          if (!res.headersSent) {
+            return sendJson(res, {
+              ok: false,
+              error: error?.message || 'Internal API error',
+              path: req.url
+            }, 500);
+          }
+          res.end();
+        }
       });
     }
   };
