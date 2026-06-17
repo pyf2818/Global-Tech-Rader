@@ -162,6 +162,17 @@ const LLM_PRESETS = [
 
 const DEFAULT_AGENTS = [
   {
+    id: 'orchestrator',
+    name: '情报总控',
+    description: '统筹筛选、解读、追踪和创作任务',
+    icon: 'sparkle',
+    avatar: '',
+    tags: ['任务编排', '全局判断'],
+    systemPrompt: '你是用户的个人情报智能体总控。你要基于用户画像、今日资讯、历史反馈和当前任务，调度不同分析视角完成判断。输出必须包含：一句话结论、优先级、关键依据、下一步动作。不要泛泛聊天，要像一个懂用户目标的情报工作伙伴。',
+    category: '指挥',
+    isDefault: true
+  },
+  {
     id: 'analyst',
     name: '资讯分析师',
     description: '对资讯进行结构化分析，提炼核心要点',
@@ -203,6 +214,39 @@ const DEFAULT_AGENTS = [
     tags: ['写作辅助', '文案创作'],
     systemPrompt: '你是一位专业写作助手。擅长润色、改写、创作各类文案。保持专业、简洁的风格，突出核心信息。',
     category: '写作',
+    isDefault: true
+  },
+  {
+    id: 'memory-agent',
+    name: '追踪记忆官',
+    description: '记住关注领域、反馈和长期追踪线索',
+    icon: 'bookmark',
+    avatar: '',
+    tags: ['长期记忆', '偏好学习'],
+    systemPrompt: '你是用户的追踪记忆智能体。你的任务是把用户的关注领域、历史反馈、收藏、追踪关键词和今日新信号连接起来。回答时要说明：这与用户过去关注的什么有关、是否应该持续追踪、下次推荐应该如何调整。',
+    category: '记忆',
+    isDefault: true
+  },
+  {
+    id: 'risk-scout',
+    name: '风险雷达',
+    description: '识别政策、市场、安全和竞争风险',
+    icon: 'alert',
+    avatar: '',
+    tags: ['风险识别', '预警判断'],
+    systemPrompt: '你是风险雷达智能体。你要从资讯中识别政策监管、市场变化、竞争格局、安全事件和技术路线风险。输出要克制、具体，区分事实、推断和不确定性，并给出需要继续观察的触发信号。',
+    category: '风险',
+    isDefault: true
+  },
+  {
+    id: 'creation-agent',
+    name: '创作转化官',
+    description: '把资讯转化为选题、素材和文章结构',
+    icon: 'document',
+    avatar: '',
+    tags: ['选题生成', '素材沉淀'],
+    systemPrompt: '你是创作转化智能体。你要把资讯转化为可写的观点、标题、短文结构、汇报提纲或素材卡片。输出要可直接进入创作中心，避免空泛总结。',
+    category: '创作',
     isDefault: true
   }
 ];
@@ -291,7 +335,7 @@ const SCROLLING_NEWS_ITEMS = [
   }
 ];
 
-const AGENT_CATEGORIES = ['全部', '分析', '技术', '商业', '创作', '语言', '教育', '思辨'];
+const AGENT_CATEGORIES = ['全部', '指挥', '分析', '技术', '商业', '创作', '记忆', '风险', '语言', '教育', '思辨'];
 
 const MODES = [
   { id: 'all', label: '全部' },
@@ -530,9 +574,9 @@ function App() {
   });
   const [currentAgent, setCurrentAgent] = useState(() => {
     try {
-      return localStorage.getItem('elfCurrentAgent') || 'analyst';
+      return localStorage.getItem('elfCurrentAgent') || 'orchestrator';
     } catch {
-      return 'analyst';
+      return 'orchestrator';
     }
   });
   const [showAgentForm, setShowAgentForm] = useState(false);
@@ -1958,12 +2002,59 @@ function App() {
     ];
   }, [selectedDateItems, items, workbenchItems, feedbackLearningCount, followKeywords, selectedInterests, workbenchAiInsight, bookmarks, materials]);
 
-  const aiActionPrompts = useMemo(() => [
-    '把今日必读压缩成 5 分钟中文简报',
-    '解释这些资讯对我的关注领域有什么影响',
-    '提炼 3 个可以写成文章或汇报的选题',
-    '找出今天最值得持续追踪的公司和技术'
+  const intelligenceProfile = useMemo(() => {
+    const focusLabels = selectedInterests.map(id => CATEGORIES.find(c => c.id === id)?.label || id);
+    const boosted = Object.entries(recommendationFeedback.boostedCategories || {})
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 3)
+      .map(([id]) => CATEGORIES.find(c => c.id === id)?.label || id);
+    const muted = Object.keys(recommendationFeedback.mutedSources || {}).slice(0, 3);
+    const tracked = [...new Set([...followKeywords, ...Object.keys(recommendationFeedback.trackedTerms || {})])].slice(0, 8);
+
+    return {
+      focusLabels,
+      boosted,
+      muted,
+      tracked,
+      depth: workbenchItems.length > 0 && workbenchStats.focusMatches / Math.max(workbenchItems.length, 1) > 0.5 ? '深度聚焦' : '探索校准',
+      outputGoal: materials.length > bookmarks.length ? '素材沉淀' : '阅读判断'
+    };
+  }, [selectedInterests, recommendationFeedback, followKeywords, workbenchItems.length, workbenchStats.focusMatches, materials.length, bookmarks.length]);
+
+  const intelligenceMissions = useMemo(() => [
+    {
+      id: 'briefing',
+      agentId: 'orchestrator',
+      label: '生成今日作战简报',
+      prompt: '请作为情报总控，基于今日推荐生成一份个人作战简报：一句话总判断、三个最重要信号、优先阅读顺序、今天应该采取的下一步动作。'
+    },
+    {
+      id: 'impact',
+      agentId: 'analyst',
+      label: '解释对我的影响',
+      prompt: '请结合我的关注画像，解释今日资讯对我关注领域的影响：哪些是真机会，哪些只是噪声，哪些需要进一步验证。'
+    },
+    {
+      id: 'memory',
+      agentId: 'memory-agent',
+      label: '更新追踪记忆',
+      prompt: '请作为追踪记忆官，把今日资讯和我的历史偏好连接起来：应新增哪些追踪关键词、降低哪些来源权重、下次推荐应如何调整。'
+    },
+    {
+      id: 'risk',
+      agentId: 'risk-scout',
+      label: '扫描潜在风险',
+      prompt: '请作为风险雷达，找出今日资讯中的政策、市场、技术路线、安全和竞争风险，并区分确定事实、合理推断和仍需观察的信号。'
+    },
+    {
+      id: 'creation',
+      agentId: 'creation-agent',
+      label: '转成创作选题',
+      prompt: '请作为创作转化官，从今日资讯中提炼 5 个可写选题，每个选题给出标题、核心观点、素材来源和适合的文章结构。'
+    }
   ], []);
+
+  const aiActionPrompts = useMemo(() => intelligenceMissions.slice(0, 4), [intelligenceMissions]);
 
   const buildWorkbenchContext = useCallback((prompt) => {
     const topItems = workbenchItems.slice(0, 8);
@@ -1981,20 +2072,29 @@ function App() {
 日期：${selectedNewsDate || new Date().toISOString().slice(0, 10)}
 关注领域：${selectedInterests.map(id => CATEGORIES.find(c => c.id === id)?.label || id).join('、') || '未设置'}
 追踪关键词：${followKeywords.join('、') || '未设置'}
+用户画像：
+- 当前深度：${intelligenceProfile.depth}
+- 输出目标：${intelligenceProfile.outputGoal}
+- 重点关注：${intelligenceProfile.focusLabels.join('、') || '未设置'}
+- 最近强化：${intelligenceProfile.boosted.join('、') || '暂无'}
+- 降权来源：${intelligenceProfile.muted.join('、') || '暂无'}
+- 记忆关键词：${intelligenceProfile.tracked.join('、') || '暂无'}
 推荐统计：共 ${workbenchItems.length} 条，兴趣匹配 ${workbenchStats.focusMatches} 条，关键词命中 ${workbenchStats.keywordMatches} 条
 
 今日推荐资讯：
 ${lines}`;
-  }, [workbenchItems, selectedNewsDate, selectedInterests, followKeywords, workbenchStats.focusMatches, workbenchStats.keywordMatches]);
+  }, [workbenchItems, selectedNewsDate, selectedInterests, followKeywords, intelligenceProfile, workbenchStats.focusMatches, workbenchStats.keywordMatches]);
 
-  const sendWorkbenchToElf = useCallback((prompt) => {
+  const sendWorkbenchToElf = useCallback((prompt, agentId = 'orchestrator') => {
+    if (agentId) setCurrentAgent(agentId);
     setElfQuotedContext({
       id: Date.now(),
       title: '今日情报工作台',
+      agentId,
       content: buildWorkbenchContext(prompt),
       suggestedPrompt: prompt
     });
-    showToast('已把今日情报发送到 AI 精灵');
+    showToast('已把今日情报交给智能体');
   }, [buildWorkbenchContext]);
 
   const getFeedbackTerm = useCallback((item) => {
@@ -4017,6 +4117,20 @@ ${signals}
                   <div className="workbench-section-label">Agent Ecosystem</div>
                   <h2>你的个人情报智能体正在协作</h2>
                   <p>{llmConfig.baseUrl ? `当前模型：${llmConfig.selectedModel || '已连接模型'}` : '配置大模型后，智能体可把今日资讯转化为简报、洞察和创作素材。'}</p>
+                  <div className="agent-profile-strip">
+                    <div>
+                      <span>理解模式</span>
+                      <strong>{intelligenceProfile.depth}</strong>
+                    </div>
+                    <div>
+                      <span>输出目标</span>
+                      <strong>{intelligenceProfile.outputGoal}</strong>
+                    </div>
+                    <div>
+                      <span>记忆信号</span>
+                      <strong>{intelligenceProfile.tracked.length}</strong>
+                    </div>
+                  </div>
                   <div className="agent-status-list">
                     {intelligenceAgents.map(agent => (
                       <div key={agent.name} className={`agent-status-item tone-${agent.tone}`}>
@@ -4028,19 +4142,36 @@ ${signals}
                       </div>
                     ))}
                   </div>
-                  <button className="ai-primary-action" onClick={() => llmConfig.baseUrl ? sendWorkbenchToElf('请扮演我的个人情报智能体团队，基于今日推荐生成：1）一句话判断；2）三个关键机会；3）两个潜在风险；4）建议优先读的三条；5）可转化为创作的选题。') : setShowLlmQuickConfig(true)}>
+                  <button className="ai-primary-action" onClick={() => llmConfig.baseUrl ? sendWorkbenchToElf('请扮演我的个人情报智能体团队，基于今日推荐生成：1）一句话判断；2）三个关键机会；3）两个潜在风险；4）建议优先读的三条；5）可转化为创作的选题。', 'orchestrator') : setShowLlmQuickConfig(true)}>
                     {llmConfig.baseUrl ? '召集智能体生成洞察' : '配置大模型'}
                   </button>
                 </div>
 
                 <div className="ai-command-card compact">
-                  <div className="workbench-block-title">智能体动作</div>
-                  <div className="ai-prompt-list">
-                    {aiActionPrompts.map(prompt => (
-                      <button key={prompt} onClick={() => sendWorkbenchToElf(prompt)}>
-                        {prompt}
+                  <div className="workbench-block-title">AI 指挥台</div>
+                  <div className="ai-mission-list">
+                    {aiActionPrompts.map(mission => (
+                      <button key={mission.id} onClick={() => sendWorkbenchToElf(mission.prompt, mission.agentId)}>
+                        <span>{mission.label}</span>
+                        <small>{agents.find(agent => agent.id === mission.agentId)?.name || '智能体'}</small>
                       </button>
                     ))}
+                  </div>
+                </div>
+
+                <div className="agent-memory-card">
+                  <div className="workbench-block-title">个人情报记忆</div>
+                  <div className="agent-memory-row">
+                    <span>关注</span>
+                    <strong>{intelligenceProfile.focusLabels.slice(0, 3).join('、') || '待设置'}</strong>
+                  </div>
+                  <div className="agent-memory-row">
+                    <span>追踪</span>
+                    <strong>{intelligenceProfile.tracked.slice(0, 3).join('、') || '暂无'}</strong>
+                  </div>
+                  <div className="agent-memory-row">
+                    <span>少看</span>
+                    <strong>{intelligenceProfile.muted.slice(0, 2).join('、') || '暂无'}</strong>
                   </div>
                 </div>
 
@@ -6066,6 +6197,8 @@ ${signals}
         currentAgent={currentAgent}
         onChangeAgent={setCurrentAgent}
         externalQuotedContext={elfQuotedContext}
+        intelligenceProfile={intelligenceProfile}
+        intelligenceMissions={intelligenceMissions}
         onExportToMaterials={(data) => {
         const { title, content } = data;
         addManualMaterial({

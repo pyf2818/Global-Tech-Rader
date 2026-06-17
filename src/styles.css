@@ -5171,6 +5171,77 @@ body {
 .ai-elf-chat-body::-webkit-scrollbar { width: 4px; }
 .ai-elf-chat-body::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.1); border-radius: 2px; }
 
+.ai-elf-mission-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid var(--accent-cyan-border);
+  border-radius: 12px;
+  background: var(--surface-workbench-ai);
+}
+
+.ai-elf-mission-panel strong {
+  display: block;
+  margin-top: 3px;
+  color: var(--text-primary);
+  font-size: 14px;
+  line-height: 1.35;
+}
+
+.ai-elf-mission-kicker {
+  color: var(--accent-cyan);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+}
+
+.ai-elf-mission-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.ai-elf-mission-grid button,
+.ai-elf-input-suggestions button {
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: var(--surface-workbench-control);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: border-color 0.18s ease, color 0.18s ease, background 0.18s ease;
+}
+
+.ai-elf-mission-grid button {
+  min-width: 0;
+  padding: 9px;
+  text-align: left;
+}
+
+.ai-elf-mission-grid button:hover,
+.ai-elf-input-suggestions button:hover {
+  border-color: var(--border-active);
+  color: var(--text-primary);
+  background: var(--accent-cyan-soft);
+}
+
+.ai-elf-mission-grid span {
+  display: block;
+  overflow: hidden;
+  color: var(--text-primary);
+  font-size: 12px;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ai-elf-mission-grid small {
+  display: block;
+  margin-top: 4px;
+  color: var(--accent-cyan);
+  font-size: 10px;
+}
+
 /* 空状态 */
 .ai-elf-chat-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; color: var(--text-muted); padding: 40px 20px; flex: 1; }
 .ai-elf-chat-empty p { margin: 4px 0; font-size: 13px; }
@@ -5296,6 +5367,18 @@ body {
 .ai-elf-send-btn:hover:not(:disabled) { transform: scale(1.05); box-shadow: 0 0 15px rgba(34, 211, 238, 0.3); }
 .ai-elf-send-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 .ai-elf-send-btn svg { width: 16px; height: 16px; }
+
+.ai-elf-input-suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.ai-elf-input-suggestions button {
+  padding: 6px 9px;
+  font-size: 11px;
+  font-weight: 700;
+}
 
 /* 历史面板 */
 .ai-elf-history-panel { position: absolute; top: 48px; left: 0; right: 0; bottom: 0; background: var(--bg-primary); z-index: 10; display: flex; flex-direction: column; animation: ai-elf-slide-in 0.2s ease; }
@@ -5830,6 +5913,86 @@ body {
   font-size: 10px;
   color: var(--accent-cyan);
   white-space: nowrap;
+}
+
+.ai-elf-os-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.ai-elf-os-metrics div {
+  min-width: 0;
+  padding: 7px 4px;
+  border: 1px solid var(--border-color);
+  border-radius: 7px;
+  background: var(--bg-primary);
+}
+
+.ai-elf-os-metrics strong {
+  display: block;
+  color: var(--text-primary);
+  font-size: 14px;
+  line-height: 1;
+}
+
+.ai-elf-os-metrics span {
+  display: block;
+  margin-top: 4px;
+  color: var(--text-muted);
+  font-size: 9px;
+}
+
+.ai-elf-memory-panel {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border-color);
+  background: var(--bg-primary);
+}
+
+.ai-elf-memory-title {
+  margin-bottom: 7px;
+  color: var(--accent-cyan);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.ai-elf-memory-line {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 5px;
+  font-size: 11px;
+}
+
+.ai-elf-memory-line span {
+  color: var(--text-muted);
+}
+
+.ai-elf-memory-line strong {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-secondary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ai-elf-memory-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 8px;
+}
+
+.ai-elf-memory-tags span {
+  padding: 2px 6px;
+  border-radius: 5px;
+  background: var(--accent-cyan-soft);
+  color: var(--accent-cyan);
+  font-size: 10px;
+  font-weight: 700;
 }
 
 /* 边栏头部 */
@@ -10074,6 +10237,7 @@ body {
 .ai-daily-insight,
 .agent-ecosystem-card,
 .ai-command-card,
+.agent-memory-card,
 .quality-card,
 .next-actions-card {
   background: var(--surface-workbench);
@@ -10518,6 +10682,41 @@ body {
   margin: 16px 0;
 }
 
+.agent-profile-strip {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.agent-profile-strip div {
+  min-width: 0;
+  padding: 9px;
+  border: 1px solid var(--border-color);
+  border-radius: 7px;
+  background: var(--surface-workbench-control);
+}
+
+.agent-profile-strip span,
+.agent-memory-row span,
+.ai-mission-list small {
+  display: block;
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.agent-profile-strip strong,
+.agent-memory-row strong {
+  display: block;
+  margin-top: 3px;
+  color: var(--text-primary);
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .agent-status-item {
   padding: 11px;
   border: 1px solid var(--border-color);
@@ -10568,7 +10767,8 @@ body {
   margin: 0;
 }
 
-.ai-prompt-list {
+.ai-prompt-list,
+.ai-mission-list {
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -10576,6 +10776,7 @@ body {
 }
 
 .ai-prompt-list button,
+.ai-mission-list button,
 .next-actions-card button {
   width: 100%;
   padding: 10px 11px;
@@ -10585,12 +10786,32 @@ body {
 }
 
 .ai-prompt-list button:hover,
+.ai-mission-list button:hover,
 .next-actions-card button:hover,
 .interest-chip:hover,
 .workbench-text-btn:hover,
 .date-pill:hover {
   border-color: var(--border-active);
   color: var(--text-primary);
+}
+
+.ai-mission-list button {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+
+.ai-mission-list button span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ai-mission-list small {
+  color: var(--accent-cyan);
+  flex-shrink: 0;
 }
 
 .ai-primary-action {
@@ -10635,6 +10856,23 @@ body {
   display: flex;
   flex-direction: column;
   gap: 8px;
+}
+
+.agent-memory-card {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.agent-memory-row {
+  display: grid;
+  grid-template-columns: 46px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  padding: 8px 9px;
+  border: 1px solid var(--border-color);
+  border-radius: 7px;
+  background: var(--surface-workbench-control);
 }
 
 @media (max-width: 1500px) {

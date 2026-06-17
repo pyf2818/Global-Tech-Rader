@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 
 // AI精灵助手组件 - Agent系统 + 历史记录 + 自适应窗口
-export default function AiElf({ llmConfig, avatarImage, elfName, onExportToMaterials, agents, currentAgent, onChangeAgent, externalQuotedContext }) {
+export default function AiElf({ llmConfig, avatarImage, elfName, onExportToMaterials, agents, currentAgent, onChangeAgent, externalQuotedContext, intelligenceProfile, intelligenceMissions }) {
   const [isOpen, setIsOpen] = useState(false);
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
@@ -74,8 +74,27 @@ export default function AiElf({ llmConfig, avatarImage, elfName, onExportToMater
   // 当前Agent的历史记录（多个对话窗口）
   const historySessions = agentHistory[activeAgentId] || [];
 
+  const profile = intelligenceProfile || {};
+  const missions = Array.isArray(intelligenceMissions) ? intelligenceMissions : [];
+  const activeAgentSessions = historySessions.length;
+
+  const runMission = (mission) => {
+    if (!mission) return;
+    if (mission.agentId) handleChangeAgent(mission.agentId);
+    setInputText(mission.prompt || mission.label || '');
+  };
+
+  useEffect(() => {
+    if (currentAgent && currentAgent !== activeAgentId) {
+      setActiveAgentId(currentAgent);
+    }
+  }, [currentAgent, activeAgentId]);
+
   useEffect(() => {
     if (!externalQuotedContext) return;
+    if (externalQuotedContext.agentId) {
+      handleChangeAgent(externalQuotedContext.agentId);
+    }
     setQuotedContext({
       title: externalQuotedContext.title || '外部上下文',
       content: externalQuotedContext.content || ''
@@ -886,9 +905,23 @@ ${baseContent}
                     <span key={i} className="ai-elf-sidebar-tag">{tag}</span>
                   ))}
                 </div>
+                <div className="ai-elf-os-metrics">
+                  <div><strong>{agents.length}</strong><span>智能体</span></div>
+                  <div><strong>{activeAgentSessions}</strong><span>会话</span></div>
+                  <div><strong>{profile?.tracked?.length || 0}</strong><span>记忆</span></div>
+                </div>
+              </div>
+              <div className="ai-elf-memory-panel">
+                <div className="ai-elf-memory-title">个人画像</div>
+                <div className="ai-elf-memory-line"><span>模式</span><strong>{profile.depth || '探索校准'}</strong></div>
+                <div className="ai-elf-memory-line"><span>目标</span><strong>{profile.outputGoal || '阅读判断'}</strong></div>
+                <div className="ai-elf-memory-tags">
+                  {(profile.focusLabels || []).slice(0, 3).map(label => <span key={label}>{label}</span>)}
+                  {!(profile.focusLabels || []).length && <span>待设置关注</span>}
+                </div>
               </div>
               <div className="ai-elf-sidebar-header">
-                <span>Agent列表</span>
+                <span>智能体生态</span>
               </div>
               <div className="ai-elf-sidebar-content">
                 {agents.map(agent => (
@@ -1045,6 +1078,22 @@ ${baseContent}
 
             {/* 聊天内容区域 */}
             <div className="ai-elf-chat-body">
+              {missions.length > 0 && (
+                <div className="ai-elf-mission-panel">
+                  <div>
+                    <span className="ai-elf-mission-kicker">INTELLIGENCE OS</span>
+                    <strong>{elfName || 'AI精灵'} 已接入你的今日情报上下文</strong>
+                  </div>
+                  <div className="ai-elf-mission-grid">
+                    {missions.slice(0, 4).map(mission => (
+                      <button key={mission.id} onClick={() => runMission(mission)}>
+                        <span>{mission.label}</span>
+                        <small>{agents.find(agent => agent.id === mission.agentId)?.name || '智能体'}</small>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
               {messages.length === 0 && (
                 <div className="ai-elf-chat-empty">
                   <img
@@ -1058,9 +1107,9 @@ ${baseContent}
                       marginBottom: 12
                     }}
                   />
-                  <p>你好！我是{activeAgent?.name || 'AI精灵'}</p>
+                  <p>{activeAgent?.name || 'AI精灵'}待命中</p>
                   <p>{activeAgent?.description || '拖拽资讯卡片到此处'}</p>
-                  <p>让我帮你做专业分析</p>
+                  <p>我会结合你的关注、反馈和今日情报一起判断</p>
                 </div>
               )}
               {messages.map((msg, index) => (
@@ -1186,7 +1235,7 @@ ${baseContent}
               )}
               <textarea
                 className="ai-elf-chat-input"
-                placeholder={quotedContext ? `基于以上分析继续探讨...` : `与${activeAgent?.name}对话...`}
+                placeholder={quotedContext ? `基于以上情报继续追问...` : `给${activeAgent?.name}下达任务，例如：只解释对我的影响 / 生成选题 / 更新追踪记忆`}
                 value={inputText}
                 onChange={(e) => setInputText(e.target.value)}
                 onKeyDown={(e) => {
@@ -1197,6 +1246,15 @@ ${baseContent}
                 }}
                 rows={2}
               />
+              {missions.length > 0 && !quotedContext && (
+                <div className="ai-elf-input-suggestions">
+                  {missions.slice(0, 3).map(mission => (
+                    <button key={mission.id} onClick={() => runMission(mission)}>
+                      {mission.label}
+                    </button>
+                  ))}
+                </div>
+              )}
               <button
                 className="ai-elf-send-btn"
                 onClick={() => sendMessage()}
