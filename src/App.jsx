@@ -1874,6 +1874,90 @@ function App() {
       + Object.values(recommendationFeedback.trackedTerms || {}).reduce((sum, value) => sum + value, 0);
   }, [recommendationFeedback]);
 
+  const getRecommendationLevel = useCallback((score = 0) => {
+    if (score >= 90) return { label: '强推荐', tone: 'strong' };
+    if (score >= 55) return { label: '值得看', tone: 'good' };
+    if (score >= 15) return { label: '可略读', tone: 'light' };
+    return { label: '入选', tone: 'neutral' };
+  }, []);
+
+  const buildAiJudgement = useCallback((item) => {
+    const reasons = item.recommendationReasons || [];
+    const title = item.title || '';
+    if (reasons.some(reason => reason.includes('追踪'))) return '与你的长期追踪主题相关，适合继续观察后续变化。';
+    if (reasons.some(reason => reason.includes('关注'))) return '命中你的核心关注领域，建议优先判断它是否会形成趋势。';
+    if (item.sourceGradeLabel?.startsWith('S') || item.sourceGradeLabel?.startsWith('A')) return '来源质量较高，适合作为今天的可信参考材料。';
+    if (/regulat|policy|安全|治理|risk|ban|law/i.test(`${title} ${item.summary || ''}`)) return '可能涉及监管、风险或安全变化，建议结合业务影响阅读。';
+    if (/agent|model|芯片|算力|cloud|AI/i.test(`${title} ${item.summary || ''}`)) return '反映技术和产业落地方向，可沉淀为选题或观察点。';
+    return '与今天的技术动态相关，可快速浏览后决定是否沉淀。';
+  }, []);
+
+  const workbenchAiInsight = useMemo(() => {
+    const topItems = workbenchItems.slice(0, 3);
+    const categoryCounts = workbenchItems.reduce((acc, item) => {
+      const label = CATEGORIES.find(cat => cat.id === item.category)?.label || item.category || '综合科技';
+      acc[label] = (acc[label] || 0) + 1;
+      return acc;
+    }, {});
+    const leadingCategories = Object.entries(categoryCounts).sort((a, b) => b[1] - a[1]).slice(0, 2).map(([label]) => label);
+    const highQualityCount = workbenchItems.filter(item => item.sourceGradeLabel?.startsWith('S') || item.sourceGradeLabel?.startsWith('A')).length;
+    const trackedCount = workbenchStats.keywordMatches;
+    const opportunity = leadingCategories.length
+      ? `${leadingCategories.join('、')} 是今天最集中的信号，适合优先建立持续观察。`
+      : '今天的资讯较分散，建议先从高质量来源快速扫读。';
+    const risk = workbenchItems.some(item => /regulat|policy|治理|安全|risk|ban|case|law/i.test(`${item.title} ${item.summary || ''}`))
+      ? '今日出现监管、治理或安全相关信号，建议标记为风险观察。'
+      : highQualityCount >= 4
+        ? '高质量来源占比较高，适合沉淀成可靠参考。'
+        : '部分来源质量偏弱，建议优先看高等级来源。';
+    const oneLine = leadingCategories.length
+      ? `今天主要围绕 ${leadingCategories.join('、')} 展开，系统已按你的偏好收敛为 ${workbenchItems.length} 条。`
+      : `系统已从当前日期资讯中收敛出 ${workbenchItems.length} 条，适合快速建立今日判断。`;
+
+    return {
+      oneLine,
+      opportunity,
+      risk,
+      topItems,
+      leadingCategories,
+      highQualityCount,
+      trackedCount
+    };
+  }, [workbenchItems, workbenchStats.keywordMatches]);
+
+  const intelligenceAgents = useMemo(() => {
+    const sourcePoolCount = selectedDateItems.length || items.length;
+    const filteredOutCount = Math.max(sourcePoolCount - workbenchItems.length, 0);
+    const creationReadyCount = workbenchItems.filter(item => isBookmarked(item.id) || isInMaterials(item.id) || item.imageUrl || (item.summary || '').length > 80).length;
+    const memorySignals = feedbackLearningCount + followKeywords.length + selectedInterests.length;
+    return [
+      {
+        name: '情报筛选 Agent',
+        status: `${filteredOutCount} 条已过滤`,
+        detail: `从 ${sourcePoolCount} 条候选中保留 ${workbenchItems.length} 条，优先看高匹配和高质量来源。`,
+        tone: 'cyan'
+      },
+      {
+        name: '解读分析 Agent',
+        status: `${workbenchAiInsight.leadingCategories.length || 1} 个主信号`,
+        detail: workbenchAiInsight.oneLine,
+        tone: 'blue'
+      },
+      {
+        name: '追踪记忆 Agent',
+        status: `${memorySignals} 个用户信号`,
+        detail: `已结合关注领域、追踪关键词和 ${feedbackLearningCount} 次反馈调整推荐。`,
+        tone: 'amber'
+      },
+      {
+        name: '创作转化 Agent',
+        status: `${creationReadyCount} 条可转化`,
+        detail: '可把今日资讯生成简报、选题、文章草稿或素材库条目。',
+        tone: 'green'
+      }
+    ];
+  }, [selectedDateItems, items, workbenchItems, feedbackLearningCount, followKeywords, selectedInterests, workbenchAiInsight, bookmarks, materials]);
+
   const aiActionPrompts = useMemo(() => [
     '把今日必读压缩成 5 分钟中文简报',
     '解释这些资讯对我的关注领域有什么影响',
@@ -3844,6 +3928,34 @@ ${signals}
                   <button className={`filter-pill ${regionFilter === 'overseas' ? 'active' : ''}`} onClick={() => setRegionFilter('overseas')}>海外</button>
                 </div>
 
+                {!loading && !error && workbenchItems.length > 0 && (
+                  <div className="ai-daily-insight">
+                    <div className="ai-daily-main">
+                      <div className="workbench-section-label">AI Daily Insight</div>
+                      <h3>{workbenchAiInsight.oneLine}</h3>
+                      <div className="ai-signal-grid">
+                        <div>
+                          <span>机会</span>
+                          <p>{workbenchAiInsight.opportunity}</p>
+                        </div>
+                        <div>
+                          <span>风险/判断</span>
+                          <p>{workbenchAiInsight.risk}</p>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="ai-priority-list">
+                      <span>优先阅读</span>
+                      {workbenchAiInsight.topItems.map((item, index) => (
+                        <button key={item.id} onClick={() => recordReading(item)}>
+                          <strong>{index + 1}</strong>
+                          <span>{item.title}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 {loading && <div className="feed-list">{Array.from({ length: 5 }).map((_, i) => <SkeletonCard key={i} viewMode="standard" />)}</div>}
                 {error && <div className="error-state"><p>加载失败: {error}</p><button onClick={() => loadNews()}>重试</button></div>}
                 {!loading && !error && workbenchItems.length === 0 && (
@@ -3857,7 +3969,10 @@ ${signals}
                     {workbenchItems.map((item, i) => (
                       <div key={item.id} className="workbench-news-card">
                         <div className="workbench-reason-strip">
-                          <span className="reason-score">{item.mustReadScore ? `${Math.round(item.mustReadScore)} 分` : '入选'}</span>
+                          <span className={`reason-score level-${getRecommendationLevel(item.mustReadScore).tone}`}>
+                            {getRecommendationLevel(item.mustReadScore).label}
+                            {item.mustReadScore ? <small>{Math.round(item.mustReadScore)}分</small> : null}
+                          </span>
                           <span className="reason-text">{item.recommendation || '综合推荐'}</span>
                           <div className="feedback-actions">
                             <button title="继续追踪这个主题" onClick={() => handleRecommendationFeedback(item, 'track')}>追踪</button>
@@ -3865,6 +3980,10 @@ ${signals}
                             <button title="降低这个来源权重" onClick={() => handleRecommendationFeedback(item, 'mute-source')}>少看来源</button>
                             <button title="不再推荐这条" onClick={() => handleRecommendationFeedback(item, 'hide')}>不感兴趣</button>
                           </div>
+                        </div>
+                        <div className="ai-card-judgement">
+                          <span>AI 判断</span>
+                          <p>{buildAiJudgement(item)}</p>
                         </div>
                         <NewsItem
                           item={item}
@@ -3894,10 +4013,28 @@ ${signals}
               </section>
 
               <section className="workbench-ai">
-                <div className="ai-command-card">
-                  <div className="workbench-section-label">AI Copilot</div>
-                  <h2>让模型帮你读懂，而不是自己硬刷</h2>
-                  <p>{llmConfig.baseUrl ? `当前模型：${llmConfig.selectedModel || '未选择模型'}` : '配置大模型后，可基于今日资讯生成解读、简报和创作选题。'}</p>
+                <div className="agent-ecosystem-card">
+                  <div className="workbench-section-label">Agent Ecosystem</div>
+                  <h2>你的个人情报智能体正在协作</h2>
+                  <p>{llmConfig.baseUrl ? `当前模型：${llmConfig.selectedModel || '已连接模型'}` : '配置大模型后，智能体可把今日资讯转化为简报、洞察和创作素材。'}</p>
+                  <div className="agent-status-list">
+                    {intelligenceAgents.map(agent => (
+                      <div key={agent.name} className={`agent-status-item tone-${agent.tone}`}>
+                        <div>
+                          <strong>{agent.name}</strong>
+                          <span>{agent.status}</span>
+                        </div>
+                        <p>{agent.detail}</p>
+                      </div>
+                    ))}
+                  </div>
+                  <button className="ai-primary-action" onClick={() => llmConfig.baseUrl ? sendWorkbenchToElf('请扮演我的个人情报智能体团队，基于今日推荐生成：1）一句话判断；2）三个关键机会；3）两个潜在风险；4）建议优先读的三条；5）可转化为创作的选题。') : setShowLlmQuickConfig(true)}>
+                    {llmConfig.baseUrl ? '召集智能体生成洞察' : '配置大模型'}
+                  </button>
+                </div>
+
+                <div className="ai-command-card compact">
+                  <div className="workbench-block-title">智能体动作</div>
                   <div className="ai-prompt-list">
                     {aiActionPrompts.map(prompt => (
                       <button key={prompt} onClick={() => sendWorkbenchToElf(prompt)}>
@@ -3905,9 +4042,6 @@ ${signals}
                       </button>
                     ))}
                   </div>
-                  <button className="ai-primary-action" onClick={() => llmConfig.baseUrl ? sendWorkbenchToElf('请基于今日推荐资讯生成一份结构化洞察：核心摘要、重点机会、潜在风险、建议我优先阅读哪三条。') : setShowLlmQuickConfig(true)}>
-                    {llmConfig.baseUrl ? '发送给 AI 精灵' : '配置大模型'}
-                  </button>
                 </div>
 
                 <div className="quality-card">
