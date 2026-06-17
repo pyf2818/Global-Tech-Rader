@@ -3751,10 +3751,12 @@ ${signals}
         <div className={`feed custom-scrollbar ${nav === 'today' ? 'feed-workbench' : ''}`} ref={feedRef}>
           {nav === 'today' && (
             <div className="workbench-shell">
-              <section className="workbench-left">
-                <div className="workbench-kicker">Personal Intelligence</div>
-                <h1 className="workbench-title">今日情报工作台</h1>
-                <p className="workbench-subtitle">少看一点，理解更深一点。系统会按日期、关注领域和来源质量帮你收敛到真正值得读的内容。</p>
+              <section className="workbench-overview">
+                <div className="workbench-hero-copy">
+                  <div className="workbench-kicker">Personal Intelligence</div>
+                  <h1 className="workbench-title">今日情报工作台</h1>
+                  <p className="workbench-subtitle">少看一点，理解更深一点。系统会按日期、关注领域和来源质量帮你收敛到真正值得读的内容。</p>
+                </div>
 
                 <div className="date-manager">
                   <div className="date-manager-head">
@@ -3816,7 +3818,7 @@ ${signals}
                 </div>
               </section>
 
-              <section className="workbench-center">
+              <section className="workbench-feed-panel">
                 <div className="workbench-toolbar">
                   <div>
                     <div className="workbench-section-label">Daily Briefing</div>
