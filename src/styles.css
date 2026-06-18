@@ -758,6 +758,19 @@ body {
   line-height: 1.45;
 }
 
+.workflow-trace-step pre {
+  max-height: 96px;
+  overflow: auto;
+  margin: 8px 0 0;
+  padding: 8px;
+  border: 1px solid var(--border-color);
+  border-radius: 7px;
+  background: var(--surface-workbench-control);
+  color: var(--text-secondary);
+  white-space: pre-wrap;
+  font: 11px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
 .workflow-trace-step em {
   color: var(--text-muted);
   font-style: normal;

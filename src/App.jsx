@@ -2718,36 +2718,98 @@ ${lines}`;
 3. 输出下一步动作，能进入追踪、阅读或创作。
 4. 回答结构清晰，避免泛泛总结。`;
 
+    const setTraceStep = (nodeId, patch) => {
+      setAgentWorkflowRun(prev => ({
+        ...prev,
+        trace: prev.trace.map(step => step.nodeId === nodeId ? { ...step, ...patch } : step)
+      }));
+    };
+
+    const runLocalNode = (node, previousOutput) => {
+      const sourceItems = scopedAgentItems.slice(0, 5).map((item, index) => `${index + 1}. ${item.title}｜${item.source}｜${item.recommendation || '综合推荐'}`).join('\n');
+      if (node.type === 'input') {
+        return `已载入输入上下文：\n- 日期：${selectedNewsDate}\n- 范围：${agentWorkflowScope}\n- 推荐资讯：${scopedAgentItems.length} 条\n- 关注领域：${intelligenceProfile.focusLabels.join('、') || '未设置'}\n\n优先素材：\n${sourceItems || '暂无'}`;
+      }
+      if (node.type === 'classifier') {
+        return `分类结果：\n- 必读：${scopedAgentItems.slice(0, 3).map(item => item.title).join('；') || '暂无'}\n- 追踪：${intelligenceProfile.tracked.join('、') || '暂无'}\n- 素材：${scopedAgentItems.filter(item => item.imageUrl || item.videoUrl).length} 条具备多媒体线索\n\n依据上一节点：\n${previousOutput.slice(0, 600)}`;
+      }
+      if (node.type === 'condition') {
+        return `条件判断：${scopedAgentItems.length > 0 ? '继续执行输出链路' : '当前没有足够资讯，建议先刷新每日汇报'}。\n条件依据：${node.prompt}`;
+      }
+      if (node.type === 'skill') {
+        return `工具节点模拟执行：\n- 已整理 ${scopedAgentItems.length} 条推荐资讯\n- 已检查素材库 ${materials.length} 条\n- 已准备导出结构和引用上下文\n\n工具说明：${node.prompt}`;
+      }
+      if (node.type === 'reply') {
+        return `${node.prompt}\n\n固定回复基于上一节点：\n${previousOutput.slice(0, 700)}`;
+      }
+      if (node.type === 'output') {
+        return `输出节点完成：\n- 任务：${selectedMission.label}\n- 工作流：${agentWorkflowDraft.name}\n- 建议沉淀到素材库与内容创作\n\n最终输入摘要：\n${previousOutput.slice(0, 900)}`;
+      }
+      return `${node.title} 已处理。\n${previousOutput.slice(0, 700)}`;
+    };
+
     try {
-      const response = await fetch('/api/ai-generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          baseUrl: llmConfig.baseUrl,
-          apiKey: llmConfig.apiKey,
-          model: llmConfig.selectedModel,
-          action: 'chat',
-          content: `${buildWorkbenchContext(prompt)}
+      let previousOutput = buildWorkbenchContext(prompt);
+      const nodeOutputs = [];
 
-工作流蓝图：
+      for (let index = 0; index < workflowNodes.length; index++) {
+        const node = workflowNodes[index];
+        setAgentWorkflowRun(prev => ({
+          ...prev,
+          trace: prev.trace.map(step => {
+            if (step.nodeId === node.id) return { ...step, status: 'running' };
+            if (step.status === 'running') return { ...step, status: 'completed' };
+            return step;
+          })
+        }));
+
+        let output = '';
+        if (node.type === 'llm') {
+          const response = await fetch('/api/ai-generate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              baseUrl: llmConfig.baseUrl,
+              apiKey: llmConfig.apiKey,
+              model: llmConfig.selectedModel,
+              action: 'chat',
+              content: `工作流任务：${prompt}
+
+当前节点：${node.title}
+节点职责：${node.role}
+节点指令：${node.prompt}
+
+上游输出：
+${previousOutput}
+
+完整蓝图：
 ${blueprintSummary}`,
-          systemPrompt,
-          messages: [
-            {
-              role: 'user',
-              content: `${prompt}
+              systemPrompt,
+              messages: [
+                { role: 'user', content: previousOutput.slice(-6000) }
+              ]
+            })
+          });
+          const data = await response.json();
+          if (data.error) throw new Error(data.error);
+          output = data.content || `${node.title} 暂无输出`;
+        } else {
+          output = runLocalNode(node, previousOutput);
+        }
 
-当前工作流蓝图：
-${blueprintSummary}`
-            }
-          ]
-        })
-      });
-      const data = await response.json();
-      if (data.error) throw new Error(data.error);
+        nodeOutputs.push({ nodeId: node.id, title: node.title, type: node.type, output });
+        previousOutput = output;
+        setTraceStep(node.id, {
+          status: 'completed',
+          detail: output.slice(0, 220),
+          output
+        });
+      }
+
+      const finalContent = nodeOutputs.map((item, index) => `## ${index + 1}. ${item.title}\n\n${item.output}`).join('\n\n---\n\n');
       setAgentWorkflowResult({
         loading: false,
-        content: data.content || '暂无结果',
+        content: finalContent || previousOutput || '暂无结果',
         error: '',
         missionId: selectedMission.id
       });
@@ -2755,11 +2817,7 @@ ${blueprintSummary}`
         ...prev,
         status: 'completed',
         finishedAt: new Date().toISOString(),
-        trace: prev.trace.map((step, index) => ({
-          ...step,
-          status: 'completed',
-          detail: index === prev.trace.length - 1 ? '已生成可沉淀输出。' : step.detail
-        }))
+        trace: prev.trace.map(step => step.status === 'completed' ? step : { ...step, status: 'completed' })
       }));
     } catch (e) {
       setAgentWorkflowResult({
@@ -2779,7 +2837,7 @@ ${blueprintSummary}`
         }))
       }));
     }
-  }, [agents, intelligenceMissions, llmConfig, buildWorkbenchContext, enabledWorkflowNodes, agentWorkflowDraft.nodes]);
+  }, [agents, intelligenceMissions, llmConfig, buildWorkbenchContext, enabledWorkflowNodes, agentWorkflowDraft.nodes, agentWorkflowDraft.name, scopedAgentItems, selectedNewsDate, agentWorkflowScope, intelligenceProfile.focusLabels, intelligenceProfile.tracked, materials.length]);
 
   const getFeedbackTerm = useCallback((item) => {
     const tags = item.tags || [];
@@ -5314,6 +5372,7 @@ ${signals}
                           <div>
                             <strong>{step.title}</strong>
                             <p>{step.detail}</p>
+                            {step.output && <pre>{step.output.slice(0, 420)}</pre>}
                           </div>
                           <em>{step.status}</em>
                         </div>
