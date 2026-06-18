@@ -466,7 +466,7 @@ const GITHUB_PERIODS = [
 
 const REGION_MAP = { domestic: '国内', overseas: '海外', global: '全球' };
 const MODE_MAP = { flash: '快讯', deep: '深度', technical: '干货' };
-const MATERIAL_TYPES = { quote: '金句', data: '数据', case: '案例', viewpoint: '观点', chart: '图表' };
+const MATERIAL_TYPES = { quote: '金句', data: '数据', case: '案例', viewpoint: '观点', chart: '图表', project: '项目' };
 const ARTICLE_STATUS = { draft: '草稿', published: '已发布', archived: '已归档' };
 const ARTICLE_TEMPLATES = { blank: '空白', briefing: '每日简报', analysis: '深度分析', tech: '技术解读' };
 const ARTICLE_TEMPLATE_CONTENT = {
@@ -3275,13 +3275,13 @@ ${blueprintSummary}`,
     }
   }, [agents, intelligenceMissions, llmConfig, buildWorkbenchContext, enabledWorkflowNodes, agentWorkflowDraft.nodes, agentWorkflowDraft.name, scopedAgentItems, selectedNewsDate, agentWorkflowScope, intelligenceProfile.focusLabels, intelligenceProfile.tracked, bookmarks, materials, selectedInterests, createWorkflowActions]);
 
-  const getFeedbackTerm = useCallback((item) => {
+  function getFeedbackTerm(item) {
     const tags = item.tags || [];
     const preferredTag = tags.find(tag => tag && tag.length >= 2 && tag.length <= 24);
     if (preferredTag) return preferredTag;
     const titleWords = (item.title || '').match(/[A-Za-z][A-Za-z0-9-]{2,}|[\u4e00-\u9fa5]{2,6}/g) || [];
     return titleWords[0] || item.category || item.source || '';
-  }, []);
+  }
 
   const handleRecommendationFeedback = useCallback((item, action) => {
     if (!item) return;
@@ -3336,7 +3336,7 @@ ${blueprintSummary}`,
       setFollowKeywords(prev => prev.includes(term) ? prev : [term, ...prev].slice(0, 20));
       showToast(`已开始追踪「${term}」`);
     }
-  }, [getFeedbackTerm, selectedInterests]);
+  }, [selectedInterests]);
 
   const calendarDays = useMemo(() => {
     const year = calendarDate.getFullYear();
@@ -3689,6 +3689,8 @@ ${blueprintSummary}`,
 
   // 根据内容智能判断素材类型
   function detectMaterialType(item) {
+    if (item.materialType) return item.materialType;
+    if (item.source === 'GitHub' || item.category === 'open-source' || item.fullName) return 'project';
     if (item.category) {
       const catMap = {
         'ai-models': 'data', 'ai-apps': 'data', 'ai-tools': 'data',
@@ -3714,15 +3716,24 @@ ${blueprintSummary}`,
       setTimeout(() => toast.remove(), 2000);
     } else {
       const detectedType = type || detectMaterialType(item);
+      const tags = Array.from(new Set([
+        ...(item.tags || []),
+        ...(item.topics || []),
+        item.language,
+        item.category
+      ].filter(Boolean)));
       const newMaterial = {
         id: Date.now(),
         type: detectedType,
         title: item.title,
         content: item.summary || item.title,
-        fullContent: item.content || item.summary || item.title,
+        fullContent: item.fullContent || item.content || item.summary || item.title,
         source: item.source,
         url: item.url,
-        tags: item.tags || [],
+        tags,
+        imageUrl: item.imageUrl || '',
+        insight: item.insight || null,
+        metadata: item.metadata || null,
         originalItemId: item.id,
         note,
         createdAt: new Date().toISOString()
@@ -3736,17 +3747,21 @@ ${blueprintSummary}`,
     }
   }
 
-  function addManualMaterial({ title, content, type, source, url, tags, note, spaceId }) {
+  function addManualMaterial({ title, content, type, source, url, tags, note, spaceId, imageUrl, fullContent, insight, metadata }) {
     const newMaterial = {
       id: Date.now(),
       type,
       title,
       content,
+      fullContent: fullContent || content,
       source: source || '手动添加',
       url: url || '',
-      tags: tags ? tags.split(',').map(t => t.trim()).filter(Boolean) : [],
+      tags: Array.isArray(tags) ? tags : (tags ? tags.split(',').map(t => t.trim()).filter(Boolean) : []),
       note,
       spaceId: spaceId ? Number(spaceId) : null,
+      imageUrl: imageUrl || '',
+      insight: insight || null,
+      metadata: metadata || null,
       createdAt: new Date().toISOString()
     };
     setMaterials(prev => [...prev, newMaterial]);
@@ -4342,10 +4357,13 @@ ${signals}
     if (materialSearch) {
       const q = materialSearch.toLowerCase();
       result = result.filter(m => 
+        (m.title || '').toLowerCase().includes(q) ||
         (m.content || '').toLowerCase().includes(q) || 
+        (m.fullContent || '').toLowerCase().includes(q) ||
         (m.source || '').toLowerCase().includes(q) || 
         (m.tags || []).some(t => t.toLowerCase().includes(q)) ||
-        (m.note || '').toLowerCase().includes(q)
+        (m.note || '').toLowerCase().includes(q) ||
+        (m.insight && JSON.stringify(m.insight).toLowerCase().includes(q))
       );
     }
     if (materialTags.length > 0) {
@@ -6027,7 +6045,7 @@ ${signals}
             <>
               <div className="section-header"><h2 className="section-title">{ICONS.github} GitHub {GITHUB_PERIODS.find(p => p.id === githubSince)?.label || '周榜'}热门项目</h2><p className="section-desc">{githubSince === 'daily' ? '今日增星最多的开源项目' : githubSince === 'monthly' ? '本月增星最多的开源项目' : '本周增星最多的开源项目'}（实时同步）</p></div>
                {githubLoading && <div className="github-grid">{Array.from({ length: 6 }).map((_, i) => <article key={i} className="github-card skeleton"><div className="skeleton-gh-header" /><div className="skeleton-gh-desc" /><div className="skeleton-gh-stats" /></article>)}</div>}
-               <div className="github-grid">{githubRepos.map((repo, i) => <GithubRepoCard key={repo.id} repo={repo} index={i} since={githubSince} isBookmarked={isBookmarked(repo.url)} isInMaterials={isInMaterials(repo.id)} onBookmark={() => toggleBookmark({ id: repo.url, title: repo.fullName, url: repo.url, source: 'GitHub', summary: repo.description, tags: [repo.language].filter(Boolean), region: 'global', mode: 'deep', publishedAt: new Date().toISOString(), category: 'open-source' })} onAddMaterial={() => toggleMaterial({ id: repo.id, title: repo.fullName, url: repo.url, source: 'GitHub', summary: repo.description, tags: [repo.language].filter(Boolean) })} showTranslation={translationOpen[repo.id]} onToggleTranslation={() => setTranslationOpen(p => ({ ...p, [repo.id]: !p[repo.id] }))} translation={getTranslation({ id: repo.id, title: repo.fullName, summary: repo.description })} onOpenLightbox={(src, title) => setLightbox({ open: true, src, title })} />)}</div>
+               <div className="github-grid">{githubRepos.map((repo, i) => <GithubRepoCard key={repo.id} repo={repo} index={i} since={githubSince} isBookmarked={isBookmarked(repo.url)} isInMaterials={isInMaterials(repo.id)} onBookmark={() => toggleBookmark({ id: repo.url, title: repo.fullName, url: repo.url, source: 'GitHub', summary: repo.description, tags: [repo.language].filter(Boolean), region: 'global', mode: 'deep', publishedAt: new Date().toISOString(), category: 'open-source' })} onAddMaterial={() => toggleMaterial(buildGithubMaterial(repo, githubSince), 'project', `GitHub ${GITHUB_PERIODS.find(p => p.id === githubSince)?.label || '周榜'}项目观察`)} showTranslation={translationOpen[repo.id]} onToggleTranslation={() => setTranslationOpen(p => ({ ...p, [repo.id]: !p[repo.id] }))} translation={getTranslation({ id: repo.id, title: repo.fullName, summary: repo.description })} onOpenLightbox={(src, title) => setLightbox({ open: true, src, title })} />)}</div>
             </>
            )}
 
@@ -7239,7 +7257,7 @@ ${signals}
                 ) : (
                   <div className="materials-grid">
                     {filteredMaterials.map(m => (
-                      <div key={m.id} className={`material-card ${m.starred ? 'starred' : ''} ${selectedMaterials.includes(m.id) ? 'selected' : ''}`}>
+                      <div key={m.id} className={`material-card material-${m.type} ${m.starred ? 'starred' : ''} ${selectedMaterials.includes(m.id) ? 'selected' : ''}`}>
                         <div className="material-header">
                           <span className={`material-type-badge type-${m.type}`}>{MATERIAL_TYPES[m.type] || m.type}</span>
                           <div className="material-header-actions">
@@ -7260,6 +7278,18 @@ ${signals}
                           </label>
                         </div>
                         {m.title && <p className="material-title">{m.title}</p>}
+                        {m.imageUrl && (
+                          <button className="material-image" onClick={() => setLightbox({ open: true, src: m.imageUrl, title: m.title })} title="查看素材图片">
+                            <img src={m.imageUrl} alt={m.title || '素材图片'} loading="lazy" onError={e => { e.currentTarget.parentElement.style.display = 'none'; }} />
+                          </button>
+                        )}
+                        {m.insight && (
+                          <div className="material-insight">
+                            {m.insight.scenario && <p><span>场景</span>{m.insight.scenario}</p>}
+                            {m.insight.value && <p><span>价值</span>{m.insight.value}</p>}
+                            {m.insight.difficulty && <p><span>难度</span>{m.insight.difficulty}</p>}
+                          </div>
+                        )}
                         <p className="material-content">{m.fullContent || m.content}</p>
                         {m.url && (
                           <a className="material-link" href={m.url} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}>
@@ -9220,27 +9250,96 @@ function inferGithubScenario(repo = {}) {
   return '适合进一步评估项目 README、示例和社区活跃度后，沉淀为工具库或创作素材。';
 }
 
+function inferGithubAudience(repo = {}) {
+  const text = `${repo.fullName || ''} ${repo.description || ''} ${(repo.topics || []).join(' ')} ${repo.readmeIntro || ''}`.toLowerCase();
+  if (/(agent|llm|rag|prompt|model|embedding|inference|ai)/.test(text)) return 'AI 产品、知识库、智能体开发者';
+  if (/(data|etl|analytics|dashboard|sql|warehouse|pipeline)/.test(text)) return '数据团队、增长分析、运营效率团队';
+  if (/(ui|react|vue|component|design|frontend|css|tailwind)/.test(text)) return '前端工程、设计系统、原型团队';
+  if (/(api|backend|database|postgres|redis|auth|server)/.test(text)) return '后端工程、平台工程、SaaS 基础设施团队';
+  if (/(security|scan|vulnerability|encrypt|privacy|malware)/.test(text)) return '安全、合规、企业 IT 风险团队';
+  return '技术负责人、产品经理、效率工具探索者';
+}
+
+function inferGithubDifficulty(repo = {}) {
+  const text = `${repo.description || ''} ${repo.readmeIntro || ''} ${(repo.topics || []).join(' ')}`.toLowerCase();
+  const hasTutorial = Boolean(repo.tutorial);
+  const stars = repo.totalStars || 0;
+  if (hasTutorial && stars > 1000 && /(cli|app|template|starter|ui|component|tool)/.test(text)) return '低：可先用示例或模板验证';
+  if (/(framework|platform|database|infrastructure|kubernetes|distributed|compiler|runtime)/.test(text)) return '高：需要评估架构、部署和维护成本';
+  if (hasTutorial || stars > 500) return '中：适合做小范围 PoC';
+  return '中高：建议先阅读 README 和 issue 活跃度';
+}
+
+function inferGithubValue(repo = {}) {
+  const text = `${repo.description || ''} ${repo.readmeIntro || ''} ${(repo.topics || []).join(' ')}`.toLowerCase();
+  if (/(agent|workflow|automation|rag|assistant|copilot)/.test(text)) return '可增强智能化工作流，适合作为万般硅川的智能体能力参考。';
+  if (/(visualization|dashboard|chart|analytics|data)/.test(text)) return '可提升信息解释和数据可视化表达，适合作为情报讲解组件参考。';
+  if (/(template|starter|boilerplate|component|ui)/.test(text)) return '可加速产品界面与工程原型搭建，适合沉淀到素材库复用。';
+  if (/(security|privacy|auth|scan)/.test(text)) return '可补强平台可信、安全和权限治理能力。';
+  return '值得关注其解决的问题、社区反馈和可迁移能力，优先沉淀为项目观察素材。';
+}
+
+function buildGithubMaterial(repo = {}, since = 'weekly') {
+  const scenario = inferGithubScenario(repo);
+  const audience = inferGithubAudience(repo);
+  const difficulty = inferGithubDifficulty(repo);
+  const value = inferGithubValue(repo);
+  const periodLabel = GITHUB_PERIODS.find(p => p.id === since)?.label || '周榜';
+  const tags = Array.from(new Set([repo.language, ...(repo.topics || []), 'GitHub', '开源项目'].filter(Boolean)));
+  const readmeIntro = repo.readmeIntro || repo.description || '';
+  const tutorial = repo.tutorial ? `\n\n上手线索：\n${repo.tutorial}` : '';
+  const fullContent = [
+    `项目：${repo.fullName}`,
+    `榜单：GitHub ${periodLabel}`,
+    `简介：${repo.description || '暂无描述'}`,
+    readmeIntro ? `README 摘要：${readmeIntro}` : '',
+    `应用场景：${scenario}`,
+    `适合对象：${audience}`,
+    `价值判断：${value}`,
+    `落地难度：${difficulty}`,
+    tutorial
+  ].filter(Boolean).join('\n');
+
+  return {
+    id: repo.id,
+    title: repo.fullName,
+    url: repo.url,
+    source: 'GitHub',
+    summary: `${repo.description || repo.fullName}。${value}`,
+    fullContent,
+    imageUrl: repo.imageUrl || '',
+    tags,
+    topics: repo.topics || [],
+    language: repo.language || '',
+    category: 'open-source',
+    materialType: 'project',
+    insight: { scenario, audience, difficulty, value, readmeIntro, tutorial: repo.tutorial || '' },
+    metadata: {
+      period: since,
+      totalStars: repo.totalStars || 0,
+      forks: repo.forks || 0,
+      homepage: repo.homepage || '',
+      openIssues: repo.openIssues || 0
+    }
+  };
+}
+
 function GithubRepoCard({ repo, index, since = 'weekly', isBookmarked = false, isInMaterials = false, onBookmark, onAddMaterial, showTranslation, onToggleTranslation, translation, onOpenLightbox }) {
   const [tutorialExpanded, setTutorialExpanded] = useState(false);
   const tutorialLines = repo.tutorial ? repo.tutorial.split('\n') : [];
   const hasLongTutorial = tutorialLines.length > 4;
   const isEnglish = /^[a-zA-Z0-9\s\-.,!?':\(\)\[\]{}]+$/.test(repo.fullName) || /^[a-zA-Z0-9\s\-.,!?':\(\)\[\]{}]+$/.test(repo.description);
   const scenarioText = inferGithubScenario(repo);
+  const audienceText = inferGithubAudience(repo);
+  const valueText = inferGithubValue(repo);
+  const difficultyText = inferGithubDifficulty(repo);
+  const readmeIntro = repo.readmeIntro && repo.readmeIntro !== repo.description ? repo.readmeIntro : '';
+  const periodValue = repo.starsToday || repo.starsThisWeek || repo.starsThisMonth || 0;
+  const periodLabel = GITHUB_PERIODS.find(p => p.id === since)?.label || '周榜';
 
   // 拖拽开始 - 生成兼容 AI Elf 的数据格式
   const handleDragStart = (e) => {
-    const dragItem = {
-      id: repo.id || repo.url,
-      title: repo.fullName,
-      url: repo.url,
-      summary: repo.description,
-      source: 'GitHub',
-      tags: [repo.language].filter(Boolean),
-      region: 'global',
-      mode: 'deep',
-      publishedAt: new Date().toISOString(),
-      category: 'open-source'
-    };
+    const dragItem = buildGithubMaterial(repo, since);
     e.dataTransfer.setData('application/json', JSON.stringify(dragItem));
     e.dataTransfer.effectAllowed = 'copy';
   };
@@ -9260,9 +9359,24 @@ function GithubRepoCard({ repo, index, since = 'weekly', isBookmarked = false, i
         </div>
       )}
       <p className="gh-desc">{repo.description}</p>
+      {readmeIntro && <p className="gh-readme-intro">{readmeIntro}</p>}
       <div className="gh-scenario">
         <span>应用场景</span>
         <p>{scenarioText}</p>
+      </div>
+      <div className="gh-intel-grid">
+        <div>
+          <span>适合谁</span>
+          <strong>{audienceText}</strong>
+        </div>
+        <div>
+          <span>落地难度</span>
+          <strong>{difficultyText}</strong>
+        </div>
+      </div>
+      <div className="gh-value">
+        <span>价值判断</span>
+        <p>{valueText}</p>
       </div>
       {showTranslation && translation && <p className="gh-translation">{translation.title}{translation.summary ? ` - ${translation.summary}` : ''}</p>}
       {repo.tutorial && <div className="gh-tutorial">
@@ -9273,6 +9387,7 @@ function GithubRepoCard({ repo, index, since = 'weekly', isBookmarked = false, i
       {repo.topics?.length > 0 && <div className="gh-topics">{repo.topics.slice(0, 4).map(t => <span key={t} className="gh-topic">{t}</span>)}</div>}
       <div className="gh-card-stats">
         <span className="gh-stat">{ICONS.star}<span className="gh-stat-val">{formatStars(repo.totalStars)}</span><span className="gh-stat-label">stars</span></span>
+        <span className="gh-stat"><span className="gh-stat-val">+{formatStars(periodValue)}</span><span className="gh-stat-label">{periodLabel}</span></span>
         <span className="gh-stat">{ICONS.fork}<span className="gh-stat-val">{formatStars(repo.forks)}</span><span className="gh-stat-label">forks</span></span>
       </div>
       <div className="gh-card-actions">
