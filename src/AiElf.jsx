@@ -77,11 +77,80 @@ export default function AiElf({ llmConfig, avatarImage, elfName, onExportToMater
   const profile = intelligenceProfile || {};
   const missions = Array.isArray(intelligenceMissions) ? intelligenceMissions : [];
   const activeAgentSessions = historySessions.length;
+  const formatProfileList = (value, fallback = '暂无') => Array.isArray(value) && value.length ? value.join('、') : fallback;
+  const agentById = (id) => agents.find(agent => agent.id === id);
+  const relayAgents = ['orchestrator', 'memory-agent', 'risk-scout', 'creation-agent', 'analyst']
+    .map(agentById)
+    .filter(agent => agent && agent.id !== activeAgentId);
+
+  const buildPersonalContext = () => `【用户画像】
+- 当前深度：${profile.depth || '探索校准'}
+- 输出目标：${profile.outputGoal || '阅读判断'}
+- 重点关注：${formatProfileList(profile.focusLabels, '未设置')}
+- 最近强化：${formatProfileList(profile.boosted)}
+- 降权来源：${formatProfileList(profile.muted)}
+- 追踪记忆：${formatProfileList(profile.tracked)}
+
+【协作要求】
+1. 先判断这件事对用户是否重要，不要平均用力。
+2. 明确区分事实、推断和建议。
+3. 尽量给出下一步动作，让用户能继续阅读、追踪或创作。
+4. 如果任务更适合其他智能体，要在回答末尾说明建议接力给谁。`;
+
+  const buildAgenticSystemPrompt = () => {
+    const basePrompt = activeAgent?.systemPrompt || '';
+    const missionText = missions.slice(0, 5).map(mission => {
+      const missionAgent = agentById(mission.agentId);
+      return `- ${mission.label}：${missionAgent?.name || '智能体'}`;
+    }).join('\n') || '- 暂无预设任务';
+
+    return `${basePrompt}
+
+${buildPersonalContext()}
+
+【当前智能体】
+- 名称：${activeAgent?.name || 'AI精灵'}
+- 专长：${activeAgent?.description || '综合分析'}
+- 可接力任务：
+${missionText}`;
+  };
 
   const runMission = (mission) => {
     if (!mission) return;
     if (mission.agentId) handleChangeAgent(mission.agentId);
     setInputText(mission.prompt || mission.label || '');
+  };
+
+  const buildRelayPrompt = (targetAgent, sourceMessage) => {
+    const name = targetAgent?.name || '智能体';
+    if (targetAgent?.id === 'memory-agent') {
+      return '请基于上一个智能体的分析更新我的追踪记忆：应该新增哪些关键词、强化哪些领域、降低哪些来源或主题权重？请给出可执行的推荐调整。';
+    }
+    if (targetAgent?.id === 'risk-scout') {
+      return '请基于上一个智能体的分析继续做风险扫描：区分事实、推断和不确定性，列出需要持续观察的触发信号。';
+    }
+    if (targetAgent?.id === 'creation-agent') {
+      return '请把上一个智能体的分析转化为可创作资产：给出选题、标题、核心观点、文章结构和可放入素材库的摘要卡片。';
+    }
+    if (targetAgent?.id === 'orchestrator') {
+      return '请作为情报总控整合上一个智能体的分析，给出一句话判断、优先级、下一步动作和是否需要继续接力。';
+    }
+    return `请作为${name}，基于上一个智能体的分析继续深入，输出更贴近我个人关注和当前任务的判断。`;
+  };
+
+  const handoffToAgent = (targetAgentId, sourceMessage) => {
+    const targetAgent = agentById(targetAgentId);
+    if (!targetAgent || !sourceMessage) return;
+    const sourceAgentName = activeAgent?.name || '上一位智能体';
+    handleChangeAgent(targetAgent.id);
+    setQuotedContext({
+      title: `智能体接力：${sourceAgentName} → ${targetAgent.name}`,
+      content: sourceMessage.content.slice(0, 180) + (sourceMessage.content.length > 180 ? '...' : ''),
+      fullContent: sourceMessage.content
+    });
+    setInputText(buildRelayPrompt(targetAgent, sourceMessage));
+    setIsOpen(true);
+    setTimeout(() => document.querySelector('.ai-elf-chat-input')?.focus(), 50);
   };
 
   useEffect(() => {
@@ -469,8 +538,9 @@ ${baseContent}
   const sendMessage = async (text = inputText, itemData = null) => {
     if (!text.trim() && !itemData) return;
 
+    const quotedContent = quotedContext?.fullContent || quotedContext?.content || '';
     let messageText = quotedContext
-      ? `【引用上下文】\n${quotedContext.content}\n\n【用户问题】\n${text}`
+      ? `【引用上下文】\n${quotedContent}\n\n【用户问题】\n${text}`
       : text;
 
     if (itemData) {
@@ -507,7 +577,7 @@ ${baseContent}
         return;
       }
 
-      const systemPrompt = activeAgent?.systemPrompt || '';
+      const systemPrompt = buildAgenticSystemPrompt();
 
       const currentMessages = agentMessages[activeAgentId] || [];
 
@@ -1176,6 +1246,17 @@ ${baseContent}
                           </svg>
                           继续深入
                         </button>
+                        {relayAgents.slice(0, 4).map(agent => (
+                          <button
+                            key={agent.id}
+                            className="ai-elf-action-btn ai-elf-handoff-btn"
+                            onClick={() => handoffToAgent(agent.id, msg)}
+                            title={`交给${agent.name}继续处理`}
+                          >
+                            <span>交给</span>
+                            <strong>{agent.name.replace(/智能体|Agent/g, '').slice(0, 6)}</strong>
+                          </button>
+                        ))}
                       </div>
                     )}
                     <div className="ai-elf-message-time">

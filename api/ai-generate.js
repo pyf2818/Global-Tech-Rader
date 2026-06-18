@@ -17,7 +17,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { baseUrl = '', apiKey = '', model = '', action = '', content = '' } = body;
+    const { baseUrl = '', apiKey = '', model = '', action = '', content = '', messages = [], systemPrompt = '' } = body;
     if (!baseUrl || !model) {
       res.setHeader('Content-Type', 'application/json');
       return res.end(JSON.stringify({ error: 'baseUrl and model are required' }, null, 400));
@@ -41,18 +41,41 @@ export default async function handler(req, res) {
       summary: `请为以下文章生成一段简洁的摘要（不超过 100 字）：\n\n${content}`
     };
 
-    const prompt = prompts[action] || `请根据以下要求处理内容：\n要求：${action}\n内容：${content}`;
+    let apiMessages;
+    if (action === 'chat' && Array.isArray(messages) && messages.length > 0) {
+      apiMessages = [];
+      if (systemPrompt) {
+        apiMessages.push({ role: 'system', content: systemPrompt });
+      }
+      messages.slice(-20).forEach(msg => {
+        if (msg?.role && msg?.content) {
+          apiMessages.push({ role: msg.role, content: msg.content });
+        }
+      });
+      apiMessages.push({ role: 'user', content });
+    } else {
+      const prompt = prompts[action] || `请根据以下要求处理内容：\n要求：${action}\n内容：${content}`;
+      apiMessages = [];
+      if (systemPrompt) {
+        apiMessages.push({ role: 'system', content: systemPrompt });
+      }
+      apiMessages.push({ role: 'user', content: prompt });
+    }
 
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 30000);
     const response = await fetch(apiUrl, {
       method: 'POST',
       headers,
       body: JSON.stringify({
         model,
-        messages: [{ role: 'user', content: prompt }],
+        messages: apiMessages,
         max_tokens: 1500,
         temperature: 0.7
-      })
+      }),
+      signal: controller.signal
     });
+    clearTimeout(timeout);
 
     if (!response.ok) {
       const errText = await response.text().catch(() => '');

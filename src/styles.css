@@ -5279,7 +5279,7 @@ body {
 .ai-elf-message-time { font-size: 11px; color: var(--text-muted); margin-top: 4px; padding: 0 4px; }
 
 /* AI精灵消息操作按钮 */
-.ai-elf-message-actions { display: flex; gap: 6px; margin-top: 6px; padding: 0 4px; }
+.ai-elf-message-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; padding: 0 4px; }
 .ai-elf-action-btn {
   display: inline-flex;
   align-items: center;
@@ -5297,6 +5297,20 @@ body {
   border-color: var(--accent-cyan);
   color: var(--accent-cyan);
   background: rgba(34, 211, 238, 0.08);
+}
+.ai-elf-handoff-btn {
+  background: var(--surface-workbench-control);
+}
+.ai-elf-handoff-btn span {
+  color: var(--text-muted);
+}
+.ai-elf-handoff-btn strong {
+  color: var(--text-primary);
+  font-size: 11px;
+  font-weight: 800;
+}
+.ai-elf-handoff-btn:hover strong {
+  color: var(--accent-cyan);
 }
 
 /* 加载动画 */
