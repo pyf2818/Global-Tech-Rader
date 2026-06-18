@@ -4,6 +4,10 @@ import AiElf from './AiElf.jsx';
 import SettingsModal from './components/SettingsModal.jsx';
 import ArticleEditor from './components/ArticleEditor.jsx';
 
+const PRODUCT_NAME = '万般硅川';
+const PRODUCT_TAGLINE = '高质量多领域智能资讯生态';
+const PRODUCT_DESCRIPTION = '面向 AI 时代的个人情报、开源发现、智能体创作与知识资产平台。';
+
 const MOTIVATIONAL_QUOTES = [
   '保持饥饿',
   '保持愚蠢',
@@ -38,7 +42,7 @@ const MOTIVATIONAL_QUOTES = [
 ];
 
 const NAV_ITEMS = [
-  { id: 'today', label: '今日情报', icon: 'sparkle' },
+  { id: 'today', label: '每日汇报', icon: 'sparkle' },
   { id: 'all', label: '全部动态', icon: 'grid' },
   { id: 'recommendations', label: '推荐池', icon: 'sparkle' },
   { id: 'briefing', label: '今日态势', icon: 'document' },
@@ -47,7 +51,11 @@ const NAV_ITEMS = [
   { id: 'github', label: 'GitHub 热门', icon: 'github' },
   { id: 'custom-url', label: '自定义抓取', icon: 'link' },
   { id: 'materials', label: '素材库', icon: 'layers' },
-  { id: 'editor', label: '创作中心', icon: 'edit' },
+  { id: 'studio', label: '智创中心', icon: 'edit' },
+  { id: 'agents', label: '智能体', icon: 'bot' },
+  { id: 'editor', label: '内容创作', icon: 'edit' },
+  { id: 'square', label: '用户广场', icon: 'user' },
+  { id: 'profile-center', label: '用户画像', icon: 'target' },
   { id: 'calendar', label: '日历管理', icon: 'calendar' },
   { id: 'reading-list', label: '阅读列表', icon: 'bookmark' },
   { id: 'trends', label: '赛道矩阵', icon: 'chart' },
@@ -56,36 +64,46 @@ const NAV_ITEMS = [
 ];
 
 const PRIMARY_NAV_ITEMS = [
-  { id: 'today', label: '今日', desc: '每日判断', icon: 'sparkle', nav: 'today' },
-  { id: 'tracker', label: '追踪', desc: '偏好记忆', icon: 'follow', nav: 'tracker' },
-  { id: 'create', label: '创作', desc: '素材文章', icon: 'edit', nav: 'editor' },
-  { id: 'agents', label: '智能体', desc: 'AI协作', icon: 'bot', nav: 'agents' }
+  { id: 'today', label: '每日汇报', desc: '精准推荐', icon: 'sparkle', nav: 'today' },
+  { id: 'all', label: '全部动态', desc: '扩展视野', icon: 'grid', nav: 'all' },
+  { id: 'github', label: 'GitHub 热门', desc: '三榜项目', icon: 'github', nav: 'github' },
+  { id: 'studio', label: '智创中心', desc: '素材智能体创作', icon: 'edit', nav: 'studio' },
+  { id: 'square', label: '用户广场', desc: '分享交流', icon: 'user', nav: 'square' },
+  { id: 'profile-center', label: '用户画像', desc: '越用越懂你', icon: 'target', nav: 'profile-center' }
 ];
 
 const NAV_CONTEXT_SECTIONS = {
   today: {
-    label: '今日工作流',
-    items: ['today', 'recommendations']
+    label: '智能推荐',
+    items: ['today']
   },
-  tracker: {
-    label: '追踪与画像',
-    items: ['tracker', 'calendar']
+  all: {
+    label: '多领域资讯',
+    items: ['all']
   },
-  create: {
-    label: '沉淀创作',
-    items: ['editor', 'materials']
+  github: {
+    label: '开源发现',
+    items: ['github']
   },
-  agents: {
-    label: '智能协作',
-    items: []
+  studio: {
+    label: '智创中心',
+    items: ['materials', 'agents', 'editor']
+  },
+  square: {
+    label: '社区生态',
+    items: ['square']
+  },
+  'profile-center': {
+    label: '个人生态',
+    items: ['profile-center']
   },
   tools: {
-    label: '更多工具',
-    items: ['trending', 'github', 'custom-url']
+    label: '隐藏工具',
+    items: ['recommendations', 'briefing', 'tracker', 'trends', 'reading-stats', 'calendar', 'reading-list', 'knowledge-export', 'trending', 'custom-url']
   }
 };
 
-const MORE_NAV_ITEMS = ['all', 'briefing', 'trends', 'reading-stats', 'reading-list', 'knowledge-export', 'trending', 'github', 'custom-url'];
+const MORE_NAV_ITEMS = ['recommendations', 'briefing', 'tracker', 'trends', 'reading-stats', 'calendar', 'reading-list', 'knowledge-export', 'trending', 'custom-url'];
 
 const CATEGORIES = [
   { id: 'ai-models', label: 'AI 大模型', icon: 'cpu' },
@@ -679,6 +697,9 @@ function App() {
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [profileForm, setProfileForm] = useState({ displayName: '', signature: '' });
+  const [domainPriorities, setDomainPriorities] = useState(() => loadLS('domainPriorities', {}));
+  const [sourcePriorities, setSourcePriorities] = useState(() => loadLS('sourcePriorities', {}));
+  const [dailyProfileSnapshots, setDailyProfileSnapshots] = useState(() => loadLS('dailyProfileSnapshots', []));
 
   // 打开资料弹窗时预填充表单
   useEffect(() => {
@@ -704,6 +725,9 @@ function App() {
   useEffect(() => {
     localStorage.setItem('selectedInterests', JSON.stringify(selectedInterests));
   }, [selectedInterests]);
+  useEffect(() => { saveLS('domainPriorities', domainPriorities); }, [domainPriorities]);
+  useEffect(() => { saveLS('sourcePriorities', sourcePriorities); }, [sourcePriorities]);
+  useEffect(() => { saveLS('dailyProfileSnapshots', dailyProfileSnapshots); }, [dailyProfileSnapshots]);
 
   // 认证函数
   const handleRegister = async () => {
@@ -1090,24 +1114,33 @@ function App() {
 
   // Dynamic page title and description based on current navigation
   useEffect(() => {
-    let title = 'Global Tech Radar - 全球科技圈实时资讯聚合平台';
-    let description = '聚合 AI、大模型、芯片、开源、科研、政策与投融资动态。';
+    let title = `${PRODUCT_NAME} - ${PRODUCT_TAGLINE}`;
+    let description = PRODUCT_DESCRIPTION;
     
     if (nav === 'today') {
-      title = 'Global Tech Radar - 今日情报工作台';
-      description = 'AI 驱动的个人科技情报工作台，聚焦每日必读、个性推荐和大模型协作。';
+      title = `${PRODUCT_NAME} - 每日汇报`;
+      description = '根据用户画像、阅读行为、信号源质量和大模型协作生成每日高质量情报汇报。';
     } else if (nav === 'trending') {
-      title = `Global Tech Radar - ${TRENDING_TYPES.find(t => t.id === trendingType)?.label || '热门榜单'}`;
-      description = `24小时热点、7日全球财经、时政热议 - 全球科技圈实时资讯聚合平台。`;
+      title = `${PRODUCT_NAME} - ${TRENDING_TYPES.find(t => t.id === trendingType)?.label || '热门榜单'}`;
+      description = '隐藏工具中的热点榜单，用于补充观察公共热度。';
     } else if (nav === 'github') {
-      title = 'Global Tech Radar - GitHub 热门项目';
-      description = '全球GitHub热门开源项目实时追踪，聚合最新技术趋势。';
+      title = `${PRODUCT_NAME} - GitHub 热门项目`;
+      description = '收集 GitHub 日榜、周榜、月榜明星项目，结合图片和应用场景帮助判断项目价值。';
+    } else if (nav === 'studio') {
+      title = `${PRODUCT_NAME} - 智创中心`;
+      description = '聚合素材库、智能体工作流和内容创作，沉淀个人知识资产。';
+    } else if (nav === 'square') {
+      title = `${PRODUCT_NAME} - 用户广场`;
+      description = '分享文章、智能体和每日汇报，提供点赞、收藏、关注和评论等交流能力。';
+    } else if (nav === 'profile-center') {
+      title = `${PRODUCT_NAME} - 用户画像`;
+      description = '管理关注领域、阅读记录、收藏资讯、领域优先级和信号源优先级。';
     } else if (nav === 'all') {
       if (verticalChannel !== 'all') {
         const channel = VERTICAL_CHANNELS.find(ch => ch.id === verticalChannel);
         if (channel) {
-          title = `Global Tech Radar - ${channel.label}`;
-          description = `${channel.description} - 全球科技圈实时资讯聚合平台。`;
+          title = `${PRODUCT_NAME} - ${channel.label}`;
+          description = `${channel.description} - 多领域高质量资讯平台。`;
         }
       }
     }
@@ -1747,7 +1780,7 @@ function App() {
   // 今日必读：多维度推荐算法
   const todayMustRead = useMemo(() => {
     const readIds = new Set(readingHistory.map(h => h.id));
-    const bookmarkIds = new Set(bookmarks.map(b => b.id));
+    const bookmarkIds = new Set(bookmarks.map(b => b.itemId || b.id));
     
     // 领域热度统计（基于当前所有文章）
     const categoryPopularity = new Map();
@@ -1780,6 +1813,10 @@ function App() {
         let score = 0;
         
         // 1. 领域匹配分数（用户关注领域）
+        const domainPriority = Number(domainPriorities[item.category] || 0);
+        if (domainPriority > 0) {
+          score += (domainPriority - 3) * 6;
+        }
         if (selectedInterests && selectedInterests.length > 0) {
           if (selectedInterests.includes(item.category)) {
             score += 30; // 直接匹配用户关注的领域
@@ -1827,12 +1864,18 @@ function App() {
         if (highWeightSources.some(s => item.source?.includes(s))) score += 10;
         const mediumWeightSources = ['IEEE', 'Nature', 'Science', 'MIT', 'Stanford', 'Berkeley'];
         if (mediumWeightSources.some(s => item.source?.includes(s))) score += 5;
+        const sourcePriority = Number(sourcePriorities[item.source] || 0);
+        if (sourcePriority > 0) {
+          score += (sourcePriority - 3) * 5;
+        }
 
         // 5. 互动热度（基于用户行为）
         if (bookmarkIds.has(item.id)) score += 15; // 已收藏
         // 阅读历史中该类别的阅读频率
         const categoryReadCount = readingHistory.filter(h => h.category === item.category).length;
         if (categoryReadCount > 0) score += Math.min(categoryReadCount * 2, 10);
+        const sourceReadCount = readingHistory.filter(h => h.source === item.source).length;
+        if (sourceReadCount > 0) score += Math.min(sourceReadCount * 1.5, 8);
 
         // 6. 新鲜度
         const age = (Date.now() - new Date(item.publishedAt).getTime()) / (1000 * 60 * 60);
@@ -1849,6 +1892,10 @@ function App() {
           recommendationReasons.push('匹配你的关注领域');
           recommendationScoreParts.interest = 30;
         }
+        if (domainPriority >= 4) {
+          recommendationReasons.push('画像提高了该领域优先级');
+          recommendationScoreParts.domainPriority = (domainPriority - 3) * 6;
+        }
         if (followKeywords.some(kw => `${item.title} ${item.summary}`.toLowerCase().includes(kw.toLowerCase()))) {
           recommendationReasons.push('命中你的追踪关键词');
           recommendationScoreParts.keyword = 20;
@@ -1861,6 +1908,10 @@ function App() {
           recommendationReasons.push('来自高质量来源');
           recommendationScoreParts.source = highWeightSources.some(s => item.source?.includes(s)) ? 10 : 5;
         }
+        if (sourcePriority >= 4) {
+          recommendationReasons.push('来自你高信任信号源');
+          recommendationScoreParts.sourcePriority = (sourcePriority - 3) * 5;
+        }
         if (age < 6) {
           recommendationReasons.push('发布时间较新');
           recommendationScoreParts.freshness = age < 1 ? 15 : age < 3 ? 12 : 8;
@@ -1870,7 +1921,7 @@ function App() {
           recommendationScoreParts.behavior = 15;
         } else if (categoryReadCount > 0) {
           recommendationReasons.push('符合你的历史阅读偏好');
-          recommendationScoreParts.behavior = Math.min(categoryReadCount * 2, 10);
+          recommendationScoreParts.behavior = Math.min(categoryReadCount * 2, 10) + Math.min(sourceReadCount * 1.5, 8);
         }
         if (item.imageUrl || item.videoUrl) {
           recommendationReasons.push('素材形态更完整');
@@ -1888,7 +1939,7 @@ function App() {
       })
       .sort((a, b) => b.mustReadScore - a.mustReadScore)
       .slice(0, 5);
-  }, [items, followKeywords, readingHistory, bookmarks, selectedInterests]);
+  }, [items, followKeywords, readingHistory, bookmarks, selectedInterests, domainPriorities, sourcePriorities]);
 
   const workbenchItems = useMemo(() => {
     const seen = new Set();
@@ -2064,6 +2115,147 @@ function App() {
     };
   }, [selectedInterests, recommendationFeedback, followKeywords, workbenchItems.length, workbenchStats.focusMatches, materials.length, bookmarks.length]);
 
+  const studioModules = useMemo(() => [
+    {
+      id: 'materials',
+      title: '素材库',
+      desc: '收集资讯卡片、每日汇报、本地上传与创作片段，按空间和标签形成可复用资产。',
+      metric: `${materials.length} 条素材`,
+      action: '进入素材库',
+      nav: 'materials',
+      icon: 'layers'
+    },
+    {
+      id: 'agents',
+      title: '智能体工作流',
+      desc: '用输入、大模型 Prompt、工具 Skills、条件分支、分类判断和输出节点编排协作流程。',
+      metric: `${agents.length} 个智能体`,
+      action: '搭建工作流',
+      nav: 'agents',
+      icon: 'bot'
+    },
+    {
+      id: 'editor',
+      title: '内容创作',
+      desc: '联动素材库和智能体，把情报、观点和资料沉淀成文章、报告与私有知识库资产。',
+      metric: `${articles.length} 篇文章`,
+      action: '开始写作',
+      nav: 'editor',
+      icon: 'edit'
+    }
+  ], [materials.length, agents.length, articles.length]);
+
+  const workflowNodeTypes = useMemo(() => [
+    { type: '输入', desc: '接收资讯、素材、文件或人工指令' },
+    { type: '大模型 Prompt', desc: '调用已配置模型执行分析与生成' },
+    { type: '工具 Skills', desc: '接入搜索、整理、导出、格式化等能力' },
+    { type: '条件语句', desc: '按质量、领域、置信度分流任务' },
+    { type: '分类语句', desc: '识别主题、应用场景、风险等级' },
+    { type: '指定回复', desc: '沉淀可复用的固定输出结构' },
+    { type: '输出', desc: '导出到素材库、文章或本地知识库' }
+  ], []);
+
+  const squareSeedItems = useMemo(() => [
+    {
+      id: 'briefing-share',
+      type: '每日汇报',
+      title: workbenchAiInsight.oneLine || '今日智能汇报',
+      author: user?.displayName || user?.username || '万般硅川用户',
+      likes: Math.max(8, workbenchItems.length + selectedInterests.length),
+      saves: Math.max(3, materials.length),
+      comments: Math.max(2, followKeywords.length),
+      tag: '情报判断'
+    },
+    {
+      id: 'agent-share',
+      type: '智能体',
+      title: '个人情报智能体工作流模板',
+      author: '系统推荐',
+      likes: agents.length * 3,
+      saves: Math.max(6, agents.length),
+      comments: 4,
+      tag: 'Agent Workflow'
+    },
+    {
+      id: 'article-share',
+      type: '文章',
+      title: articles[0]?.title || '从高质量资讯到个人知识资产',
+      author: user?.displayName || user?.username || '创作者',
+      likes: Math.max(5, articles.length * 2),
+      saves: Math.max(2, bookmarks.length),
+      comments: 3,
+      tag: '智创中心'
+    }
+  ], [workbenchAiInsight.oneLine, workbenchItems.length, selectedInterests.length, materials.length, followKeywords.length, agents.length, articles, bookmarks.length, user]);
+
+  const profilePriorityItems = useMemo(() => {
+    const base = selectedInterests.length ? selectedInterests : CATEGORIES.slice(0, 6).map(c => c.id);
+    return base.slice(0, 8).map((id, index) => {
+      const category = CATEGORIES.find(c => c.id === id);
+      return {
+        id,
+        label: category?.label || id,
+        priority: domainPriorities[id] || Math.max(1, 5 - index),
+        icon: category?.icon || 'target'
+      };
+    });
+  }, [selectedInterests, domainPriorities]);
+
+  const sourcePriorityItems = useMemo(() => {
+    const fallbackSources = Array.isArray(insightData.sourceQuality) ? insightData.sourceQuality : [];
+    const sources = readingProfile.topSources.length
+      ? readingProfile.topSources
+      : fallbackSources.slice(0, 5).map(source => ({ name: source.name, count: source.count }));
+    return sources.slice(0, 6).map((source, index) => ({
+      name: source.name,
+      count: source.count || 0,
+      priority: sourcePriorities[source.name] || Math.max(1, 5 - index)
+    }));
+  }, [readingProfile.topSources, insightData.sourceQuality, sourcePriorities]);
+
+  const todayProfileSnapshot = useMemo(() => ({
+    date: selectedNewsDate,
+    focus: intelligenceProfile.focusLabels.slice(0, 5),
+    tracked: intelligenceProfile.tracked.slice(0, 5),
+    depth: intelligenceProfile.depth,
+    outputGoal: intelligenceProfile.outputGoal,
+    reads: readingHistory.length,
+    saved: bookmarks.length,
+    materials: materials.length,
+    sources: sourcePriorityItems.slice(0, 3).map(s => s.name)
+  }), [selectedNewsDate, intelligenceProfile, readingHistory.length, bookmarks.length, materials.length, sourcePriorityItems]);
+
+  const profileCalibrationSignals = useMemo(() => {
+    const highDomainCount = profilePriorityItems.filter(item => item.priority >= 4).length;
+    const highSourceCount = sourcePriorityItems.filter(item => item.priority >= 4).length;
+    const clickedCategories = [...new Set(readingHistory.map(item => item.category).filter(Boolean))].length;
+    return [
+      { label: '高优先领域', value: highDomainCount, desc: '优先影响每日汇报排序' },
+      { label: '高信任来源', value: highSourceCount, desc: '提高对应信号源权重' },
+      { label: '阅读领域记忆', value: clickedCategories, desc: '从点击行为学习偏好' },
+      { label: '收藏沉淀', value: bookmarks.length, desc: '强化可复用主题和来源' }
+    ];
+  }, [profilePriorityItems, sourcePriorityItems, readingHistory, bookmarks.length]);
+
+  useEffect(() => {
+    if (!todayProfileSnapshot.date) return;
+    setDailyProfileSnapshots(prev => {
+      const existing = prev.find(item => item.date === todayProfileSnapshot.date);
+      if (existing && !existing.auto) return prev;
+      const nextSnapshot = { ...todayProfileSnapshot, generatedAt: new Date().toISOString(), auto: true };
+      if (existing) {
+        const comparableExisting = { ...existing, generatedAt: undefined };
+        const comparableNext = { ...nextSnapshot, generatedAt: undefined };
+        if (JSON.stringify(comparableExisting) === JSON.stringify(comparableNext)) return prev;
+      }
+      const next = [
+        nextSnapshot,
+        ...prev.filter(item => item.date !== todayProfileSnapshot.date)
+      ].slice(0, 30);
+      return next;
+    });
+  }, [todayProfileSnapshot]);
+
   const intelligenceMissions = useMemo(() => [
     {
       id: 'briefing',
@@ -2157,6 +2349,17 @@ ${lines}`;
     });
     showToast('已把今日情报交给智能体');
   }, [buildWorkbenchContext]);
+
+  const generateDailyProfileSnapshot = useCallback(() => {
+    setDailyProfileSnapshots(prev => {
+      const next = [
+        { ...todayProfileSnapshot, generatedAt: new Date().toISOString() },
+        ...prev.filter(item => item.date !== todayProfileSnapshot.date)
+      ].slice(0, 30);
+      return next;
+    });
+    showToast('今日用户画像已记录');
+  }, [todayProfileSnapshot]);
 
   const runAgentWorkflow = useCallback(async (mission, customPrompt = '') => {
     const selectedMission = mission || intelligenceMissions[0];
@@ -3636,19 +3839,22 @@ ${signals}
   const navToPrimary = {
     today: 'today',
     recommendations: 'today',
-    all: 'today',
+    all: 'all',
     briefing: 'today',
-    tracker: 'tracker',
-    trends: 'tracker',
-    'reading-stats': 'tracker',
-    calendar: 'tracker',
-    editor: 'create',
-    materials: 'create',
-    'reading-list': 'create',
-    'knowledge-export': 'create',
-    agents: 'agents',
+    tracker: 'profile-center',
+    trends: 'profile-center',
+    'reading-stats': 'profile-center',
+    calendar: 'profile-center',
+    studio: 'studio',
+    editor: 'studio',
+    materials: 'studio',
+    'reading-list': 'studio',
+    'knowledge-export': 'studio',
+    agents: 'studio',
+    square: 'square',
+    'profile-center': 'profile-center',
     trending: 'tools',
-    github: 'tools',
+    github: 'github',
     'custom-url': 'tools'
   };
   const activePrimaryNav = navToPrimary[nav] || 'today';
@@ -3670,9 +3876,12 @@ ${signals}
     setFocusedIndex(-1);
     setMobileMenuOpen(false);
   };
+  const wideWorkspaceNavs = ['today', 'studio', 'agents', 'editor', 'materials', 'square', 'profile-center'];
+  const showRightPanel = !wideWorkspaceNavs.includes(nav);
+  const showStatsBar = showRightPanel && nav !== 'today';
 
   return (
-    <div className={`app ${sidebarCollapsed ? 'sidebar-collapsed' : ''} ${panelCollapsed ? 'panel-collapsed' : ''} ${editorFullscreen ? 'editor-fullscreen' : ''}`}>
+    <div className={`app ${sidebarCollapsed ? 'sidebar-collapsed' : ''} ${panelCollapsed ? 'panel-collapsed' : ''} ${!showRightPanel ? 'no-right-panel' : ''} ${editorFullscreen ? 'editor-fullscreen' : ''}`}>
       <div className="particle-layer" aria-hidden="true">
         {Array.from({ length: 24 }).map((_, i) => <span key={i} className="particle" style={{ '--i': i }} />)}
       </div>
@@ -3754,7 +3963,12 @@ ${signals}
                 </g>
               </svg>
             </div>
-            <span className="logo-text">{motivationalQuote}</span>
+            {!sidebarCollapsed && (
+              <span className="logo-copy">
+                <span className="logo-text">{PRODUCT_NAME}</span>
+                <small>{PRODUCT_TAGLINE}</small>
+              </span>
+            )}
           </div>
           <button className="collapse-btn" onClick={() => setSidebarCollapsed(c => !c)} title={sidebarCollapsed ? '展开' : '收起'}>
             {sidebarCollapsed ? ICONS.chevronRight : ICONS.chevronLeft}
@@ -3800,7 +4014,7 @@ ${signals}
             </div>
           )}
 
-          {!sidebarCollapsed && activePrimaryNav === 'agents' && (
+          {!sidebarCollapsed && nav === 'agents' && (
             <div className="nav-context-group agent-nav-summary">
               <div className="nav-group-title-static">智能体生态</div>
               {agents.slice(0, 5).map(agent => (
@@ -3844,7 +4058,7 @@ ${signals}
             </div>
           )}
 
-          {!sidebarCollapsed && activePrimaryNav === 'tracker' && (
+          {!sidebarCollapsed && activePrimaryNav === 'profile-center' && (
             <div className="nav-group nav-follow-group">
               <button className="nav-group-toggle" onClick={() => setShowFollowDropdown(v => !v)}>
                 <span className="nav-group-title">追踪关键词</span>
@@ -3916,7 +4130,7 @@ ${signals}
         <header className={`topbar ${nav === 'all' ? 'topbar-all' : ''} ${(nav === 'trending' || nav === 'recommendations') ? 'topbar-trending' : ''}`}>
           {nav === 'all' && (
             <div className="topbar-brand">
-              <span className="brand-title">Tech Radar</span>
+              <span className="brand-title">{PRODUCT_NAME}</span>
               <span className="brand-theme-icon" aria-hidden="true">{theme === 'light' ? ICONS.sun : ICONS.moon}</span>
             </div>
           )}
@@ -4125,7 +4339,7 @@ ${signals}
           </div>
         </header>
 
-        {nav !== 'today' && <div className="stats-bar">
+        {showStatsBar && <div className="stats-bar">
           {nav === 'all' && <><div className="stat-item"><span className="stat-value">{items.length}</span><span className="stat-label">资讯总数</span></div><div className="stat-item"><span className="stat-value highlight">{filtered.length}</span><span className="stat-label">筛选结果</span></div><div className="stat-item"><span className="stat-value live">{stats.sourceCount - stats.failedSources}</span><span className="stat-label">活跃源</span></div></>}
           {nav === 'trending' && <><div className="stat-item"><span className="stat-value highlight">{trendingItems.length}</span><span className="stat-label">热门榜单</span></div><div className="stat-item"><span className="stat-value live">热门</span><span className="stat-label">全网热搜</span></div></>}
           {nav === 'github' && <><div className="stat-item"><span className="stat-value highlight">{githubRepos.length}</span><span className="stat-label">热门项目</span></div><div className="stat-item"><span className="stat-value live">{GITHUB_PERIODS.find(p => p.id === githubSince)?.label || '周榜'}</span><span className="stat-label">当前榜单</span></div></>}
@@ -4249,6 +4463,16 @@ ${signals}
                         </button>
                       ))}
                     </div>
+                  </div>
+                )}
+
+                {!loading && !error && (
+                  <div className="workbench-profile-strip">
+                    <span>{ICONS.sparkles} 画像已参与推荐</span>
+                    <em>领域权重 {profilePriorityItems.filter(item => item.priority >= 4).length}</em>
+                    <em>信任来源 {sourcePriorityItems.filter(item => item.priority >= 4).length}</em>
+                    <em>阅读记忆 {readingHistory.length}</em>
+                    <button onClick={() => goNav('profile-center')}>校准画像</button>
                   </div>
                 )}
 
@@ -4388,6 +4612,67 @@ ${signals}
                   <button className="primary" onClick={() => goNav('agents')}>运行智能体工作流</button>
                   <button onClick={() => setNav('editor')}>沉淀为创作</button>
                   <button onClick={() => { setSettingsTab('sources'); setShowSettings(true); }}>优化来源质量</button>
+                </div>
+              </section>
+            </div>
+          )}
+
+          {nav === 'studio' && (
+            <div className="product-page studio-page">
+              <section className="product-hero studio-hero">
+                <div>
+                  <div className="workbench-kicker">Creation Intelligence</div>
+                  <h1>智创中心</h1>
+                  <p>把每日汇报、资讯卡片、本地资料和智能体工作流汇入同一个创作空间，形成可持续积累的个人知识资产。</p>
+                </div>
+                <div className="product-hero-actions">
+                  <button className="ai-primary-action" onClick={() => goNav('agents')}>搭建智能体工作流</button>
+                  <button className="secondary-action" onClick={() => goNav('editor')}>进入内容创作</button>
+                </div>
+              </section>
+
+              <section className="studio-module-grid">
+                {studioModules.map(module => (
+                  <button key={module.id} className="studio-module-card" onClick={() => goNav(module.nav)}>
+                    <span className="studio-module-icon">{ICONS[module.icon]}</span>
+                    <span className="studio-module-title">{module.title}</span>
+                    <span className="studio-module-desc">{module.desc}</span>
+                    <span className="studio-module-meta">
+                      <strong>{module.metric}</strong>
+                      <em>{module.action}</em>
+                    </span>
+                  </button>
+                ))}
+              </section>
+
+              <section className="workflow-builder-preview">
+                <div className="section-header">
+                  <h2 className="section-title">{ICONS.bot} 可视化智能体工作流</h2>
+                  <p className="section-desc">第一阶段先建立清晰的工作流语言；下一阶段会把这些节点做成可拖拽编排画布。</p>
+                </div>
+                <div className="workflow-node-strip">
+                  {workflowNodeTypes.map((node, index) => (
+                    <div key={node.type} className="workflow-node-card">
+                      <span>{String(index + 1).padStart(2, '0')}</span>
+                      <strong>{node.type}</strong>
+                      <p>{node.desc}</p>
+                    </div>
+                  ))}
+                </div>
+              </section>
+
+              <section className="studio-asset-row">
+                <div className="studio-asset-panel">
+                  <span>最近素材</span>
+                  <strong>{materials[0]?.title || '还没有沉淀素材'}</strong>
+                  <p>{materials[0]?.summary || '从资讯卡片、每日汇报或本地上传开始收集，素材会成为智能体和文章创作的上下文。'}</p>
+                  <button onClick={() => goNav('materials')}>管理素材库</button>
+                </div>
+                <div className="studio-asset-panel">
+                  <span>创作资产</span>
+                  <strong>{articles[0]?.title || '准备你的第一篇内容'}</strong>
+                  <p>{articles.length ? `当前已有 ${articles.length} 篇文章，可继续导出为本地知识库资产。` : '内容创作区会保留大空间编辑体验，并联动素材库与智能体输出。'}</p>
+                  <button onClick={() => goNav('editor')}>打开编辑器</button>
                 </div>
               </section>
             </div>
@@ -4651,6 +4936,160 @@ ${signals}
                <div className="github-grid">{githubRepos.map((repo, i) => <GithubRepoCard key={repo.id} repo={repo} index={i} since={githubSince} isBookmarked={isBookmarked(repo.url)} isInMaterials={isInMaterials(repo.id)} onBookmark={() => toggleBookmark({ id: repo.url, title: repo.fullName, url: repo.url, source: 'GitHub', summary: repo.description, tags: [repo.language].filter(Boolean), region: 'global', mode: 'deep', publishedAt: new Date().toISOString(), category: 'open-source' })} onAddMaterial={() => toggleMaterial({ id: repo.id, title: repo.fullName, url: repo.url, source: 'GitHub', summary: repo.description, tags: [repo.language].filter(Boolean) })} showTranslation={translationOpen[repo.id]} onToggleTranslation={() => setTranslationOpen(p => ({ ...p, [repo.id]: !p[repo.id] }))} translation={getTranslation({ id: repo.id, title: repo.fullName, summary: repo.description })} onOpenLightbox={(src, title) => setLightbox({ open: true, src, title })} />)}</div>
             </>
            )}
+
+          {nav === 'square' && (
+            <div className="product-page square-page">
+              <section className="product-hero square-hero">
+                <div>
+                  <div className="workbench-kicker">Community Intelligence</div>
+                  <h1>用户广场</h1>
+                  <p>分享文章、每日汇报和智能体工作流，让用户之间围绕高质量信息交流、收藏、关注和评论。</p>
+                </div>
+                <div className="product-hero-actions">
+                  <button className="ai-primary-action" onClick={() => goNav('editor')}>发布文章</button>
+                  <button className="secondary-action" onClick={() => goNav('agents')}>分享智能体</button>
+                </div>
+              </section>
+
+              <section className="square-layout">
+                <div className="square-feed">
+                  {squareSeedItems.map(item => (
+                    <article key={item.id} className="square-post">
+                      <div className="square-post-head">
+                        <span className="square-post-type">{item.type}</span>
+                        <span className="square-post-tag">{item.tag}</span>
+                      </div>
+                      <h2>{item.title}</h2>
+                      <p>由 {item.author} 分享。后续会接入真实用户、评论线程、关注关系和公开/私密发布权限。</p>
+                      <div className="square-post-actions">
+                        <button>{ICONS.heart}<span>{item.likes}</span></button>
+                        <button>{ICONS.bookmark}<span>{item.saves}</span></button>
+                        <button>{ICONS.document}<span>{item.comments}</span></button>
+                        <button onClick={() => showToast('关注能力将在社区阶段接入')}>{ICONS.follow}<span>关注</span></button>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+                <aside className="square-side">
+                  <div>
+                    <span>社区方向</span>
+                    <strong>先沉淀价值，再扩展社交</strong>
+                    <p>广场不做泛信息流，优先分享文章、智能体、工作流和高质量每日汇报。</p>
+                  </div>
+                  <div>
+                    <span>基础互动</span>
+                    <strong>点赞 / 收藏 / 关注 / 评论</strong>
+                    <p>第一阶段先完成入口和对象模型，下一阶段再接入真实后端关系数据。</p>
+                  </div>
+                </aside>
+              </section>
+            </div>
+          )}
+
+          {nav === 'profile-center' && (
+            <div className="product-page profile-center-page">
+              <section className="product-hero profile-hero">
+                <div>
+                  <div className="workbench-kicker">Personal Intelligence Memory</div>
+                  <h1>用户画像</h1>
+                  <p>设置关注领域、领域优先级、信号源优先级，并按日期记录每日 AI 画像，让系统越用越懂你。</p>
+                </div>
+                <div className="product-hero-actions">
+                  <button className="ai-primary-action" onClick={generateDailyProfileSnapshot}>生成今日画像</button>
+                  <button className="secondary-action" onClick={() => setShowInterestModal(true)}>调整关注领域</button>
+                </div>
+              </section>
+
+              <section className="profile-summary-grid">
+                <div><span>关注领域</span><strong>{selectedInterests.length}</strong><p>{intelligenceProfile.focusLabels.slice(0, 4).join('、') || '尚未设置'}</p></div>
+                <div><span>阅读点击</span><strong>{readingHistory.length}</strong><p>近 100 条点击记录用于校准推荐</p></div>
+                <div><span>收藏资讯</span><strong>{bookmarks.length}</strong><p>收藏会提高相似主题和来源权重</p></div>
+                <div><span>每日画像</span><strong>{dailyProfileSnapshots.length}</strong><p>按日期保留 AI 对你的理解变化</p></div>
+              </section>
+
+              <section className="profile-control-layout">
+                <div className="profile-control-panel">
+                  <div className="section-header">
+                    <h2 className="section-title">{ICONS.target} 领域优先级</h2>
+                    <p className="section-desc">数值越高，每日汇报越优先推荐该领域的高质量信息。</p>
+                  </div>
+                  <div className="priority-list">
+                    {profilePriorityItems.map(item => (
+                      <label key={item.id} className="priority-row">
+                        <span>{ICONS[item.icon]} {item.label}</span>
+                        <input
+                          type="range"
+                          min="1"
+                          max="5"
+                          value={item.priority}
+                          onChange={e => setDomainPriorities(prev => ({ ...prev, [item.id]: Number(e.target.value) }))}
+                        />
+                        <strong>{item.priority}</strong>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="profile-control-panel">
+                  <div className="section-header">
+                    <h2 className="section-title">{ICONS.layers} 信号源优先级</h2>
+                    <p className="section-desc">结合阅读、收藏和来源健康度，手动校准你更信任的来源。</p>
+                  </div>
+                  <div className="priority-list">
+                    {sourcePriorityItems.map(item => (
+                      <label key={item.name} className="priority-row">
+                        <span>{item.name}</span>
+                        <input
+                          type="range"
+                          min="1"
+                          max="5"
+                          value={item.priority}
+                          onChange={e => setSourcePriorities(prev => ({ ...prev, [item.name]: Number(e.target.value) }))}
+                        />
+                        <strong>{item.priority}</strong>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              </section>
+
+              <section className="profile-calibration-panel">
+                <div className="section-header">
+                  <h2 className="section-title">{ICONS.sparkles} 推荐校准状态</h2>
+                  <p className="section-desc">这些信号已经接入每日汇报排序，让系统从“你设置了什么、读了什么、收藏了什么”里持续学习。</p>
+                </div>
+                <div className="profile-calibration-grid">
+                  {profileCalibrationSignals.map(signal => (
+                    <div key={signal.label} className="profile-calibration-card">
+                      <span>{signal.label}</span>
+                      <strong>{signal.value}</strong>
+                      <p>{signal.desc}</p>
+                    </div>
+                  ))}
+                </div>
+              </section>
+
+              <section className="profile-memory-panel">
+                <div className="section-header">
+                  <h2 className="section-title">{ICONS.calendar} 每日 AI 画像记录</h2>
+                  <p className="section-desc">每日记录会保留系统对你的关注领域、追踪关键词和输出目标的理解。</p>
+                </div>
+                {dailyProfileSnapshots.length === 0 ? (
+                  <div className="empty-state"><p>还没有画像记录</p><button onClick={generateDailyProfileSnapshot}>生成第一条记录</button></div>
+                ) : (
+                  <div className="profile-snapshot-list">
+                    {dailyProfileSnapshots.map(snapshot => (
+                      <article key={snapshot.date} className="profile-snapshot">
+                        <span>{snapshot.date}</span>
+                        <strong>{snapshot.depth} · {snapshot.outputGoal}</strong>
+                        <p>关注：{snapshot.focus.join('、') || '未设置'}；追踪：{snapshot.tracked.join('、') || '暂无'}；来源：{snapshot.sources.join('、') || '暂无'}</p>
+                      </article>
+                    ))}
+                  </div>
+                )}
+              </section>
+            </div>
+          )}
 
           {/* READING LIST - 阅读列表 */}
           {nav === 'reading-list' && (
@@ -6052,7 +6491,7 @@ ${signals}
       </main>
 
       {/* Right Panel */}
-      {nav !== 'today' && <aside className={`panel ${panelCollapsed ? 'collapsed' : ''}`}>
+      {showRightPanel && <aside className={`panel ${panelCollapsed ? 'collapsed' : ''}`}>
         {!panelCollapsed && (
           <>
             <section className="panel-section follow-panel-section">
@@ -7667,11 +8106,32 @@ function TrendLineChart({ labels = [], series = [] }) {
   );
 }
 
+function inferGithubScenario(repo = {}) {
+  const text = `${repo.fullName || ''} ${repo.description || ''} ${(repo.topics || []).join(' ')} ${repo.readmeIntro || ''}`.toLowerCase();
+  const language = (repo.language || '').toLowerCase();
+  const rules = [
+    { test: /(agent|llm|rag|prompt|openai|anthropic|model|inference|embedding|ai)/, scenario: '适合构建 AI 应用、智能体工作流、知识库问答或模型推理组件。' },
+    { test: /(data|etl|warehouse|analytics|visualization|dashboard|bi|sql|pipeline)/, scenario: '适合数据采集、分析看板、指标体系和企业内部数据流程。' },
+    { test: /(ui|component|react|vue|svelte|design|css|tailwind|frontend)/, scenario: '适合前端产品界面、设计系统、组件库或交互原型开发。' },
+    { test: /(api|server|backend|database|postgres|redis|queue|auth|microservice)/, scenario: '适合后端服务、API 平台、权限系统和工程基础设施建设。' },
+    { test: /(security|scan|vulnerability|auth|encrypt|malware|policy|privacy)/, scenario: '适合安全检测、权限治理、合规审计和风险监控场景。' },
+    { test: /(robot|vision|camera|3d|slam|drone|autonomous|opencv)/, scenario: '适合视觉识别、机器人控制、空间感知和多模态硬件应用。' },
+    { test: /(cli|terminal|devtool|debug|testing|benchmark|deploy|ci|cd)/, scenario: '适合开发者工具、自动化测试、部署流水线和工程效率提升。' }
+  ];
+  const matched = rules.find(rule => rule.test.test(text));
+  if (matched) return matched.scenario;
+  if (['python', 'jupyter notebook'].includes(language)) return '适合算法验证、数据处理、自动化脚本或研究原型。';
+  if (['typescript', 'javascript'].includes(language)) return '适合 Web 产品、开发工具、轻量服务或前端工程化场景。';
+  if (['go', 'rust'].includes(language)) return '适合高性能服务、基础设施、命令行工具或云原生组件。';
+  return '适合进一步评估项目 README、示例和社区活跃度后，沉淀为工具库或创作素材。';
+}
+
 function GithubRepoCard({ repo, index, since = 'weekly', isBookmarked = false, isInMaterials = false, onBookmark, onAddMaterial, showTranslation, onToggleTranslation, translation, onOpenLightbox }) {
   const [tutorialExpanded, setTutorialExpanded] = useState(false);
   const tutorialLines = repo.tutorial ? repo.tutorial.split('\n') : [];
   const hasLongTutorial = tutorialLines.length > 4;
   const isEnglish = /^[a-zA-Z0-9\s\-.,!?':\(\)\[\]{}]+$/.test(repo.fullName) || /^[a-zA-Z0-9\s\-.,!?':\(\)\[\]{}]+$/.test(repo.description);
+  const scenarioText = inferGithubScenario(repo);
 
   // 拖拽开始 - 生成兼容 AI Elf 的数据格式
   const handleDragStart = (e) => {
@@ -7706,6 +8166,10 @@ function GithubRepoCard({ repo, index, since = 'weekly', isBookmarked = false, i
         </div>
       )}
       <p className="gh-desc">{repo.description}</p>
+      <div className="gh-scenario">
+        <span>应用场景</span>
+        <p>{scenarioText}</p>
+      </div>
       {showTranslation && translation && <p className="gh-translation">{translation.title}{translation.summary ? ` - ${translation.summary}` : ''}</p>}
       {repo.tutorial && <div className="gh-tutorial">
         <span className="gh-tutorial-label">使用教程</span>
