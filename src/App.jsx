@@ -675,7 +675,15 @@ function App() {
   const [newAgent, setNewAgent] = useState({ name: '', description: '', systemPrompt: '', category: '分析', avatar: '' });
   const [agentFilter, setAgentFilter] = useState('全部');
   const [agentPromptRefining, setAgentPromptRefining] = useState(false);
-  const [agentWorkflowResult, setAgentWorkflowResult] = useState({ loading: false, content: '', error: '', missionId: '' });
+  const [agentWorkflowResult, setAgentWorkflowResult] = useState(() => {
+    const saved = loadLS('agentWorkflowResult', null);
+    return {
+      loading: false,
+      content: saved?.content || '',
+      error: saved?.error || '',
+      missionId: saved?.missionId || ''
+    };
+  });
   const [agentWorkflowRun, setAgentWorkflowRun] = useState(() => loadLS('agentWorkflowRun', {
     id: '',
     status: 'idle',
@@ -684,6 +692,7 @@ function App() {
     finishedAt: '',
     trace: []
   }));
+  const [agentWorkflowHistory, setAgentWorkflowHistory] = useState(() => loadLS('agentWorkflowHistory', []));
   const [agentWorkflowPrompt, setAgentWorkflowPrompt] = useState('');
   const [agentWorkflowScope, setAgentWorkflowScope] = useState('daily');
   const [agentWorkflowDraft, setAgentWorkflowDraft] = useState(() => {
@@ -1102,6 +1111,10 @@ function App() {
   useEffect(() => { saveLS('agentWorkflowTemplates', workflowTemplates); }, [workflowTemplates]);
   useEffect(() => { saveLS('activeWorkflowId', activeWorkflowId); }, [activeWorkflowId]);
   useEffect(() => { saveLS('agentWorkflowRun', agentWorkflowRun); }, [agentWorkflowRun]);
+  useEffect(() => {
+    if (!agentWorkflowResult.loading) saveLS('agentWorkflowResult', agentWorkflowResult);
+  }, [agentWorkflowResult]);
+  useEffect(() => { saveLS('agentWorkflowHistory', agentWorkflowHistory); }, [agentWorkflowHistory]);
   useEffect(() => { saveLS('selectedWorkflowNodeId', selectedWorkflowNodeId); }, [selectedWorkflowNodeId]);
 
   const fetchAiInsights = async () => {
@@ -2657,6 +2670,31 @@ ${lines}`;
     showToast('今日用户画像已记录');
   }, [todayProfileSnapshot]);
 
+  const restoreAgentWorkflowHistory = useCallback((record) => {
+    if (!record) return;
+    setAgentWorkflowResult({
+      loading: false,
+      content: record.content || '',
+      error: record.error || '',
+      missionId: record.missionId || ''
+    });
+    setAgentWorkflowRun({
+      id: record.id || '',
+      status: record.status || 'completed',
+      missionLabel: record.missionLabel || '历史运行',
+      startedAt: record.startedAt || '',
+      finishedAt: record.finishedAt || '',
+      trace: record.trace || []
+    });
+    setAgentWorkflowPrompt(record.prompt || '');
+    showToast('已恢复工作流历史结果');
+  }, []);
+
+  const clearAgentWorkflowHistory = useCallback(() => {
+    setAgentWorkflowHistory([]);
+    showToast('已清空工作流运行历史');
+  }, []);
+
   const runAgentWorkflow = useCallback(async (mission, customPrompt = '') => {
     const selectedMission = mission || intelligenceMissions[0];
     if (!selectedMission) return;
@@ -2688,7 +2726,8 @@ ${lines}`;
       trace: baseTrace
     });
 
-    if (!llmConfig.baseUrl || !llmConfig.selectedModel) {
+    const requiresLlm = workflowNodes.some(node => node.type === 'llm');
+    if (requiresLlm && (!llmConfig.baseUrl || !llmConfig.selectedModel)) {
       setAgentWorkflowResult({
         loading: false,
         content: '',
@@ -2718,42 +2757,164 @@ ${lines}`;
 3. 输出下一步动作，能进入追踪、阅读或创作。
 4. 回答结构清晰，避免泛泛总结。`;
 
+    let localTrace = baseTrace.map(step => ({ ...step }));
+    let activeNodeId = '';
+
     const setTraceStep = (nodeId, patch) => {
+      localTrace = localTrace.map(step => step.nodeId === nodeId ? { ...step, ...patch } : step);
       setAgentWorkflowRun(prev => ({
         ...prev,
         trace: prev.trace.map(step => step.nodeId === nodeId ? { ...step, ...patch } : step)
       }));
     };
 
+    const getCategoryLabel = (categoryId) => CATEGORIES.find(c => c.id === categoryId)?.label || categoryId || '未分类';
+    const trackedTerms = intelligenceProfile.tracked || [];
+    const mediaItems = scopedAgentItems.filter(item => item.imageUrl || item.videoUrl);
+    const savedScopedItems = scopedAgentItems.filter(item =>
+      bookmarks.some(b => b.itemId === item.id) || materials.some(m => m.originalItemId === item.id)
+    );
+    const materialCandidates = scopedAgentItems.filter(item => !materials.some(m => m.originalItemId === item.id)).slice(0, 5);
+    const formatItemLine = (item, index) => {
+      const score = Number.isFinite(item.mustReadScore) ? Math.round(item.mustReadScore) : 0;
+      return `${index + 1}. ${item.title}｜${item.source || '未知来源'}｜${getCategoryLabel(item.category)}｜推荐分 ${score}`;
+    };
+    const formatItemLinks = (list) => list.map((item, index) => `${index + 1}. ${item.title}（${item.source || '未知来源'}）${item.url ? `\n   ${item.url}` : ''}`).join('\n');
+
     const runLocalNode = (node, previousOutput) => {
-      const sourceItems = scopedAgentItems.slice(0, 5).map((item, index) => `${index + 1}. ${item.title}｜${item.source}｜${item.recommendation || '综合推荐'}`).join('\n');
+      const sourceItems = scopedAgentItems.slice(0, 5).map(formatItemLine).join('\n');
       if (node.type === 'input') {
-        return `已载入输入上下文：\n- 日期：${selectedNewsDate}\n- 范围：${agentWorkflowScope}\n- 推荐资讯：${scopedAgentItems.length} 条\n- 关注领域：${intelligenceProfile.focusLabels.join('、') || '未设置'}\n\n优先素材：\n${sourceItems || '暂无'}`;
+        const categoryMap = scopedAgentItems.reduce((acc, item) => {
+          const key = getCategoryLabel(item.category);
+          acc[key] = (acc[key] || 0) + 1;
+          return acc;
+        }, {});
+        return {
+          output: `已载入输入上下文：\n- 日期：${selectedNewsDate}\n- 范围：${agentWorkflowScope}\n- 推荐资讯：${scopedAgentItems.length} 条\n- 关注领域：${intelligenceProfile.focusLabels.join('、') || '未设置'}\n- 收藏/素材命中：${savedScopedItems.length} 条\n- 多媒体线索：${mediaItems.length} 条\n\n领域分布：${Object.entries(categoryMap).map(([name, count]) => `${name} ${count}`).join('、') || '暂无'}\n\n优先素材：\n${sourceItems || '暂无'}`,
+          structured: {
+            date: selectedNewsDate,
+            scope: agentWorkflowScope,
+            itemCount: scopedAgentItems.length,
+            focus: intelligenceProfile.focusLabels,
+            categories: categoryMap,
+            mediaCount: mediaItems.length,
+            savedCount: savedScopedItems.length
+          }
+        };
       }
       if (node.type === 'classifier') {
-        return `分类结果：\n- 必读：${scopedAgentItems.slice(0, 3).map(item => item.title).join('；') || '暂无'}\n- 追踪：${intelligenceProfile.tracked.join('、') || '暂无'}\n- 素材：${scopedAgentItems.filter(item => item.imageUrl || item.videoUrl).length} 条具备多媒体线索\n\n依据上一节点：\n${previousOutput.slice(0, 600)}`;
+        const mustRead = scopedAgentItems
+          .filter(item => (item.mustReadScore || 0) >= 65 || item.sourceGradeLabel?.startsWith('S') || item.sourceGradeLabel?.startsWith('A'))
+          .slice(0, 4);
+        const followUp = scopedAgentItems
+          .filter(item => trackedTerms.some(term => `${item.title} ${item.summary}`.toLowerCase().includes(term.toLowerCase())))
+          .slice(0, 4);
+        const materialReady = scopedAgentItems
+          .filter(item => item.imageUrl || item.videoUrl || (item.summary || '').length > 100 || savedScopedItems.some(saved => saved.id === item.id))
+          .slice(0, 5);
+        const creationReady = scopedAgentItems
+          .filter(item => (item.summary || '').length > 120 || (item.recommendationReasons || []).some(reason => /创作|机会|应用|落地|风险/.test(reason)))
+          .slice(0, 4);
+        const ignore = scopedAgentItems
+          .filter(item => (item.mustReadScore || 0) < 25 && !selectedInterests.includes(item.category))
+          .slice(0, 3);
+        return {
+          output: `分类结果：\n- 必读：${mustRead.map(item => item.title).join('；') || '暂无'}\n- 追踪：${followUp.map(item => item.title).join('；') || trackedTerms.join('、') || '暂无'}\n- 素材：${materialReady.map(item => item.title).join('；') || '暂无'}\n- 创作：${creationReady.map(item => item.title).join('；') || '暂无'}\n- 降噪：${ignore.map(item => item.title).join('；') || '暂无'}\n\n依据上一节点：\n${previousOutput.slice(0, 600)}`,
+          structured: {
+            mustRead: mustRead.map(item => item.id),
+            followUp: followUp.map(item => item.id),
+            materialReady: materialReady.map(item => item.id),
+            creationReady: creationReady.map(item => item.id),
+            ignore: ignore.map(item => item.id)
+          }
+        };
       }
       if (node.type === 'condition') {
-        return `条件判断：${scopedAgentItems.length > 0 ? '继续执行输出链路' : '当前没有足够资讯，建议先刷新每日汇报'}。\n条件依据：${node.prompt}`;
+        const conditionText = `${node.role || ''} ${node.prompt || ''}`;
+        const minMatch = conditionText.match(/(?:至少|不少于|>=)\s*(\d+)/);
+        const minItems = minMatch ? Number(minMatch[1]) : 1;
+        const requiresMaterial = /素材|material/i.test(conditionText);
+        const requiresMedia = /图片|视频|多媒体|media/i.test(conditionText);
+        const checks = [
+          { label: `资讯数量不少于 ${minItems} 条`, passed: scopedAgentItems.length >= minItems },
+          { label: '素材库存在可用材料', passed: !requiresMaterial || materials.length > 0 },
+          { label: '存在图片/视频线索', passed: !requiresMedia || mediaItems.length > 0 }
+        ];
+        const shouldContinue = checks.every(check => check.passed);
+        return {
+          output: `条件判断：${shouldContinue ? '通过，继续执行后续链路' : '未通过，后续节点将跳过'}。\n${checks.map(check => `- ${check.passed ? '通过' : '未通过'}：${check.label}`).join('\n')}\n\n条件依据：${node.prompt}`,
+          shouldContinue,
+          structured: { checks, action: shouldContinue ? 'continue' : 'skip-rest' }
+        };
       }
       if (node.type === 'skill') {
-        return `工具节点模拟执行：\n- 已整理 ${scopedAgentItems.length} 条推荐资讯\n- 已检查素材库 ${materials.length} 条\n- 已准备导出结构和引用上下文\n\n工具说明：${node.prompt}`;
+        const imageUrls = mediaItems.map(item => item.imageUrl).filter(Boolean);
+        const duplicateImages = imageUrls.filter((url, index) => imageUrls.indexOf(url) !== index);
+        const evidenceLinks = scopedAgentItems.slice(0, 6);
+        const mediaAudit = [
+          `图片线索 ${imageUrls.length} 条`,
+          `视频线索 ${mediaItems.filter(item => item.videoUrl).length} 条`,
+          `缺少多媒体 ${Math.max(0, scopedAgentItems.length - mediaItems.length)} 条`,
+          `重复图片 ${new Set(duplicateImages).size} 条`
+        ].join('；');
+        const candidateLines = materialCandidates.slice(0, 4).map((item, index) => {
+          const type = item.imageUrl ? '图文素材' : (item.summary || '').length > 120 ? '观点素材' : '线索素材';
+          return `${index + 1}. ${type}｜${item.title}`;
+        }).join('\n');
+        return {
+          output: `工具 Skills 执行结果：\n- 证据包：已整理 ${evidenceLinks.length} 条可引用链接\n- 多媒体审计：${mediaAudit}\n- 素材候选：${materialCandidates.length} 条可沉淀\n- 导出准备：已生成“来源、摘要、链接、应用场景”字段\n\n素材候选：\n${candidateLines || '暂无新的素材候选'}\n\n参考链接：\n${formatItemLinks(evidenceLinks) || '暂无'}\n\n工具说明：${node.prompt}`,
+          structured: {
+            evidenceLinks: evidenceLinks.map(item => ({ title: item.title, source: item.source, url: item.url })),
+            mediaAudit: {
+              imageCount: imageUrls.length,
+              videoCount: mediaItems.filter(item => item.videoUrl).length,
+              missingMediaCount: Math.max(0, scopedAgentItems.length - mediaItems.length),
+              duplicateImageCount: new Set(duplicateImages).size
+            },
+            materialCandidates: materialCandidates.map(item => item.id)
+          }
+        };
       }
       if (node.type === 'reply') {
-        return `${node.prompt}\n\n固定回复基于上一节点：\n${previousOutput.slice(0, 700)}`;
+        return {
+          output: `${node.prompt}\n\n固定回复基于上一节点：\n${previousOutput.slice(0, 700)}`,
+          structured: { mode: 'fixed-reply' }
+        };
       }
       if (node.type === 'output') {
-        return `输出节点完成：\n- 任务：${selectedMission.label}\n- 工作流：${agentWorkflowDraft.name}\n- 建议沉淀到素材库与内容创作\n\n最终输入摘要：\n${previousOutput.slice(0, 900)}`;
+        const topReads = scopedAgentItems.slice(0, 3);
+        const followActions = [...new Set([
+          ...trackedTerms,
+          ...scopedAgentItems.slice(0, 3).flatMap(item => item.tags || [])
+        ])].filter(Boolean).slice(0, 6);
+        return {
+          output: `输出节点完成：\n- 任务：${selectedMission.label}\n- 工作流：${agentWorkflowDraft.name}\n- 优先阅读：${topReads.map(item => item.title).join('；') || '暂无'}\n- 建议追踪：${followActions.join('、') || '暂无'}\n- 素材沉淀：${materialCandidates.slice(0, 3).map(item => item.title).join('；') || '暂无'}\n- 创作转化：可导出到内容创作，形成私有知识库资产\n\n参考链接：\n${formatItemLinks(topReads) || '暂无'}\n\n最终输入摘要：\n${previousOutput.slice(0, 900)}`,
+          structured: {
+            topReads: topReads.map(item => item.id),
+            followActions,
+            materialCandidates: materialCandidates.slice(0, 3).map(item => item.id)
+          }
+        };
       }
-      return `${node.title} 已处理。\n${previousOutput.slice(0, 700)}`;
+      return {
+        output: `${node.title} 已处理。\n${previousOutput.slice(0, 700)}`,
+        structured: { type: node.type }
+      };
     };
 
     try {
       let previousOutput = buildWorkbenchContext(prompt);
       const nodeOutputs = [];
+      let haltedByCondition = null;
 
       for (let index = 0; index < workflowNodes.length; index++) {
         const node = workflowNodes[index];
+        activeNodeId = node.id;
+        localTrace = localTrace.map(step => {
+          if (step.nodeId === node.id) return { ...step, status: 'running' };
+          if (step.status === 'running') return { ...step, status: 'completed' };
+          return step;
+        });
         setAgentWorkflowRun(prev => ({
           ...prev,
           trace: prev.trace.map(step => {
@@ -2764,6 +2925,8 @@ ${lines}`;
         }));
 
         let output = '';
+        let structured = null;
+        let shouldContinue = true;
         if (node.type === 'llm') {
           const response = await fetch('/api/ai-generate', {
             method: 'POST',
@@ -2794,19 +2957,42 @@ ${blueprintSummary}`,
           if (data.error) throw new Error(data.error);
           output = data.content || `${node.title} 暂无输出`;
         } else {
-          output = runLocalNode(node, previousOutput);
+          const localResult = runLocalNode(node, previousOutput);
+          output = typeof localResult === 'string' ? localResult : localResult.output;
+          structured = typeof localResult === 'string' ? null : localResult.structured;
+          shouldContinue = typeof localResult === 'string' ? true : localResult.shouldContinue !== false;
         }
 
-        nodeOutputs.push({ nodeId: node.id, title: node.title, type: node.type, output });
+        nodeOutputs.push({ nodeId: node.id, title: node.title, type: node.type, output, structured });
         previousOutput = output;
         setTraceStep(node.id, {
           status: 'completed',
           detail: output.slice(0, 220),
-          output
+          output,
+          structured
         });
+
+        if (node.type === 'condition' && !shouldContinue) {
+          haltedByCondition = node;
+          localTrace = localTrace.map(step => {
+            if (step.status === 'queued') {
+              return { ...step, status: 'skipped', detail: '条件未通过，已跳过。' };
+            }
+            return step;
+          });
+          setAgentWorkflowRun(prev => ({
+            ...prev,
+            trace: prev.trace.map(step => step.status === 'queued' ? { ...step, status: 'skipped', detail: '条件未通过，已跳过。' } : step)
+          }));
+          break;
+        }
       }
 
-      const finalContent = nodeOutputs.map((item, index) => `## ${index + 1}. ${item.title}\n\n${item.output}`).join('\n\n---\n\n');
+      const finalContent = [
+        ...nodeOutputs.map((item, index) => `## ${index + 1}. ${item.title}\n\n${item.output}`),
+        haltedByCondition ? `## 条件分支\n\n“${haltedByCondition.title}”未通过，后续节点已跳过。你可以调整条件、扩大资讯范围或补充素材后重新运行。` : ''
+      ].filter(Boolean).join('\n\n---\n\n');
+      const finishedAt = new Date().toISOString();
       setAgentWorkflowResult({
         loading: false,
         content: finalContent || previousOutput || '暂无结果',
@@ -2816,10 +3002,30 @@ ${blueprintSummary}`,
       setAgentWorkflowRun(prev => ({
         ...prev,
         status: 'completed',
-        finishedAt: new Date().toISOString(),
-        trace: prev.trace.map(step => step.status === 'completed' ? step : { ...step, status: 'completed' })
+        finishedAt,
+        trace: localTrace.map(step => {
+          if (step.status === 'running') return { ...step, status: 'completed' };
+          if (step.status === 'queued') return { ...step, status: haltedByCondition ? 'skipped' : 'completed' };
+          return step;
+        })
       }));
+      setAgentWorkflowHistory(prev => [{
+        id: runId,
+        status: 'completed',
+        missionId: selectedMission.id,
+        missionLabel: selectedMission.label,
+        workflowName: agentWorkflowDraft.name,
+        prompt,
+        scope: agentWorkflowScope,
+        startedAt,
+        finishedAt,
+        content: finalContent || previousOutput || '暂无结果',
+        trace: localTrace,
+        nodeOutputs,
+        haltedByCondition: haltedByCondition?.title || ''
+      }, ...prev.filter(item => item.id !== runId)].slice(0, 12));
     } catch (e) {
+      const failedAt = new Date().toISOString();
       setAgentWorkflowResult({
         loading: false,
         content: '',
@@ -2829,15 +3035,36 @@ ${blueprintSummary}`,
       setAgentWorkflowRun(prev => ({
         ...prev,
         status: 'failed',
-        finishedAt: new Date().toISOString(),
-        trace: prev.trace.map((step, index) => ({
-          ...step,
-          status: index === 0 ? 'failed' : step.status === 'queued' ? 'skipped' : step.status,
-          detail: index === 0 ? (e.message || '智能体工作流运行失败') : step.detail
-        }))
+        finishedAt: failedAt,
+        trace: prev.trace.map(step => {
+          if (step.nodeId === activeNodeId || step.status === 'running') {
+            return { ...step, status: 'failed', detail: e.message || '智能体工作流运行失败' };
+          }
+          if (step.status === 'queued') return { ...step, status: 'skipped' };
+          return step;
+        })
       }));
+      setAgentWorkflowHistory(prev => [{
+        id: runId,
+        status: 'failed',
+        missionId: selectedMission.id,
+        missionLabel: selectedMission.label,
+        workflowName: agentWorkflowDraft.name,
+        prompt,
+        scope: agentWorkflowScope,
+        startedAt,
+        finishedAt: failedAt,
+        content: '',
+        error: e.message || '智能体工作流运行失败',
+        trace: localTrace.map(step => {
+          if (step.nodeId === activeNodeId || step.status === 'running') return { ...step, status: 'failed', detail: e.message || '智能体工作流运行失败' };
+          if (step.status === 'queued') return { ...step, status: 'skipped' };
+          return step;
+        }),
+        nodeOutputs: []
+      }, ...prev.filter(item => item.id !== runId)].slice(0, 12));
     }
-  }, [agents, intelligenceMissions, llmConfig, buildWorkbenchContext, enabledWorkflowNodes, agentWorkflowDraft.nodes, agentWorkflowDraft.name, scopedAgentItems, selectedNewsDate, agentWorkflowScope, intelligenceProfile.focusLabels, intelligenceProfile.tracked, materials.length]);
+  }, [agents, intelligenceMissions, llmConfig, buildWorkbenchContext, enabledWorkflowNodes, agentWorkflowDraft.nodes, agentWorkflowDraft.name, scopedAgentItems, selectedNewsDate, agentWorkflowScope, intelligenceProfile.focusLabels, intelligenceProfile.tracked, bookmarks, materials, selectedInterests]);
 
   const getFeedbackTerm = useCallback((item) => {
     const tags = item.tags || [];
@@ -5379,6 +5606,31 @@ ${signals}
                       ))}
                     </div>
                   </div>
+                  {agentWorkflowHistory.length > 0 && (
+                    <div className="workflow-memory-panel">
+                      <div className="workflow-memory-head">
+                        <div>
+                          <span>任务记忆</span>
+                          <strong>{agentWorkflowHistory.length} 次运行</strong>
+                        </div>
+                        <button onClick={clearAgentWorkflowHistory}>清空</button>
+                      </div>
+                      <div className="workflow-memory-list">
+                        {agentWorkflowHistory.slice(0, 4).map(record => (
+                          <button
+                            type="button"
+                            key={record.id}
+                            className={`workflow-memory-item status-${record.status || 'completed'}`}
+                            onClick={() => restoreAgentWorkflowHistory(record)}
+                          >
+                            <span>{record.missionLabel || '历史任务'}</span>
+                            <strong>{record.workflowName || agentWorkflowDraft.name}</strong>
+                            <em>{record.finishedAt ? new Date(record.finishedAt).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }) : '未完成'}</em>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                   {agentWorkflowResult.loading && <div className="agent-result-loading"><div className="spinner" /><span>智能体正在处理今日情报...</span></div>}
                   {!agentWorkflowResult.loading && agentWorkflowResult.error && (
                     <div className="agent-result-error">

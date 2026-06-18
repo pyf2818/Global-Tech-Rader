@@ -793,6 +793,102 @@ body {
 .workflow-trace-step.status-skipped {
   opacity: 0.62;
 }
+
+.workflow-memory-panel {
+  margin-bottom: 12px;
+  padding: 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  background: var(--surface-workbench-control);
+}
+
+.workflow-memory-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.workflow-memory-head span,
+.workflow-memory-item span {
+  display: block;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.workflow-memory-head strong {
+  display: block;
+  margin-top: 3px;
+  color: var(--text-primary);
+  font-size: 13px;
+}
+
+.workflow-memory-head button {
+  min-height: 28px;
+  padding: 0 9px;
+  border: 1px solid var(--border-color);
+  border-radius: 7px;
+  background: var(--bg-primary);
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.workflow-memory-head button:hover {
+  border-color: var(--border-active);
+  color: var(--accent-cyan);
+}
+
+.workflow-memory-list {
+  display: grid;
+  gap: 7px;
+}
+
+.workflow-memory-item {
+  width: 100%;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 4px 10px;
+  padding: 10px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  text-align: left;
+  cursor: pointer;
+}
+
+.workflow-memory-item:hover {
+  border-color: var(--border-active);
+  background: var(--surface-workbench-ai);
+}
+
+.workflow-memory-item strong {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-primary);
+  font-size: 12px;
+  font-weight: 850;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.workflow-memory-item em {
+  grid-row: 1 / span 2;
+  grid-column: 2;
+  align-self: center;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 800;
+}
+
+.workflow-memory-item.status-failed {
+  border-color: rgba(239, 68, 68, 0.28);
+}
 .builder-panel {
   display: flex;
   flex-direction: column;
