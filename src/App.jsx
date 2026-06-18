@@ -115,6 +115,8 @@ const DEFAULT_AGENT_WORKFLOW = {
       title: '输入',
       role: '接收今日推荐、用户画像、追踪关键词和已收藏素材。',
       prompt: '读取今日情报工作台、用户画像、素材库和用户补充指令。',
+      inputKey: 'user_context',
+      outputKey: 'briefing_context',
       enabled: true
     },
     {
@@ -123,6 +125,8 @@ const DEFAULT_AGENT_WORKFLOW = {
       title: '大模型分析',
       role: '识别重要事实、机会、风险和不确定性。',
       prompt: '请基于输入资料输出事实、推断、不确定性和优先级。',
+      inputKey: 'briefing_context',
+      outputKey: 'analysis',
       enabled: true
     },
     {
@@ -131,6 +135,9 @@ const DEFAULT_AGENT_WORKFLOW = {
       title: '分类判断',
       role: '按领域、质量等级、应用场景和风险等级给内容分流。',
       prompt: '将内容分类为：必读、追踪、素材、创作、忽略，并说明原因。',
+      classifierLabels: '必读,追踪,素材,创作,降噪',
+      inputKey: 'analysis',
+      outputKey: 'classified_signals',
       enabled: true
     },
     {
@@ -139,6 +146,9 @@ const DEFAULT_AGENT_WORKFLOW = {
       title: '工具 Skills',
       role: '调用搜索、摘要、正文抽取、导出和格式化等工具能力。',
       prompt: '需要时调用工具补充证据、提取正文图片、整理参考链接。',
+      skillId: 'evidence-pack',
+      inputKey: 'classified_signals',
+      outputKey: 'evidence_pack',
       enabled: true
     },
     {
@@ -147,10 +157,357 @@ const DEFAULT_AGENT_WORKFLOW = {
       title: '输出',
       role: '生成今日简报、素材卡片、追踪记忆和创作选题。',
       prompt: '输出结构：一句话判断、优先阅读、风险、行动、可沉淀素材。',
+      inputKey: 'evidence_pack',
+      outputKey: 'final_briefing',
       enabled: true
     }
   ]
 };
+
+const WORKFLOW_NODE_TYPES = ['input', 'llm', 'skill', 'condition', 'classifier', 'reply', 'output'];
+
+const WORKFLOW_SKILL_CATALOG = [
+  {
+    id: 'evidence-pack',
+    label: '证据包整理',
+    description: '整理可引用链接、来源、摘要和推荐理由，形成后续 LLM 可直接使用的证据包。'
+  },
+  {
+    id: 'media-audit',
+    label: '多媒体审计',
+    description: '检查资讯卡片图片/视频覆盖、重复图片、缺图风险和可补图线索。'
+  },
+  {
+    id: 'material-extractor',
+    label: '素材候选提取',
+    description: '把高价值资讯转成素材库候选，补齐类型、标签、来源和使用场景。'
+  },
+  {
+    id: 'profile-memory',
+    label: '画像记忆更新',
+    description: '从本次输入中提取追踪词、兴趣强化项和降噪建议，让系统越用越懂用户。'
+  },
+  {
+    id: 'article-outline',
+    label: '文章草稿架构',
+    description: '把素材与情报结论转成可进入内容创作中心的大纲、论点和引用安排。'
+  },
+  {
+    id: 'github-evaluator',
+    label: 'GitHub 项目评估',
+    description: '评估开源项目用途、成熟度、可落地场景、媒体线索和试用建议。'
+  }
+];
+
+const WORKFLOW_CONDITION_METRICS = [
+  { id: 'itemCount', label: '资讯数量' },
+  { id: 'mediaCount', label: '多媒体线索' },
+  { id: 'materialCount', label: '素材数量' },
+  { id: 'savedCount', label: '收藏/素材命中' },
+  { id: 'focusCount', label: '关注领域命中' },
+  { id: 'githubCount', label: 'GitHub 项目数' }
+];
+
+const WORKFLOW_CONDITION_OPERATORS = [
+  { id: '>=', label: '>=' },
+  { id: '>', label: '>' },
+  { id: '<=', label: '<=' },
+  { id: '<', label: '<' },
+  { id: '==', label: '=' }
+];
+
+function getWorkflowSkillMeta(skillId) {
+  return WORKFLOW_SKILL_CATALOG.find(skill => skill.id === skillId) || WORKFLOW_SKILL_CATALOG[0];
+}
+
+function isWorkflowSkillId(skillId) {
+  return WORKFLOW_SKILL_CATALOG.some(skill => skill.id === skillId);
+}
+
+function formatWorkflowNodeConfig(node) {
+  if (!node) return '';
+  if (node.type === 'skill') return getWorkflowSkillMeta(node.skillId)?.label || '证据包整理';
+  if (node.type === 'condition') {
+    const metric = WORKFLOW_CONDITION_METRICS.find(item => item.id === node.conditionMetric)?.label || node.conditionMetric || '资讯数量';
+    return `${metric} ${node.conditionOperator || '>='} ${node.conditionValue || 1}`;
+  }
+  if (node.type === 'classifier') return `分类桶：${node.classifierLabels || '必读,追踪,素材,创作,降噪'}`;
+  return '';
+}
+
+const WORKFLOW_TEMPLATE_LIBRARY = [
+  {
+    id: 'daily-briefing-copilot',
+    name: '每日情报简报工作流',
+    description: '从用户画像、今日资讯、收藏素材中提取高价值信号，生成可追踪的每日汇报。',
+    source: '参考 Dify / Langflow 的模板化工作流设计',
+    tags: ['每日汇报', '用户画像', '可执行'],
+    nodes: [
+      {
+        id: 'tpl-daily-input',
+        type: 'input',
+        title: '汇总输入',
+        role: '收集今日推荐、关注领域、阅读历史、收藏素材和用户补充任务。',
+        prompt: '读取当前日期、用户画像、今日推荐列表、追踪关键词、收藏和素材库，形成完整任务上下文。',
+        inputKey: 'user_context',
+        outputKey: 'briefing_context',
+        enabled: true
+      },
+      {
+        id: 'tpl-daily-rank',
+        type: 'classifier',
+        title: '信号分层',
+        role: '把信息分为必读、追踪、素材、创作、降噪五类，并说明分层依据。',
+        prompt: '按照质量等级、用户兴趣、来源可信度、可行动性和新鲜度给资讯分层，避免平均用力。',
+        classifierLabels: '必读,追踪,素材,创作,降噪',
+        inputKey: 'briefing_context',
+        outputKey: 'ranked_signals',
+        enabled: true
+      },
+      {
+        id: 'tpl-daily-llm',
+        type: 'llm',
+        title: '大模型解读',
+        role: '把高价值信号解释成对用户有意义的判断、机会、风险和下一步行动。',
+        prompt: '输出一段清晰的每日汇报：一句话结论、三条必读、风险提醒、行动建议、可沉淀素材。',
+        inputKey: 'ranked_signals',
+        outputKey: 'briefing_analysis',
+        enabled: true
+      },
+      {
+        id: 'tpl-daily-actions',
+        type: 'skill',
+        title: '行动沉淀',
+        role: '生成可执行动作：收藏素材、追踪关键词、生成创作草稿、记录画像快照。',
+        prompt: '根据分析结果生成后续动作队列，并标明每个动作的触发原因和预期价值。',
+        skillId: 'profile-memory',
+        inputKey: 'briefing_analysis',
+        outputKey: 'action_queue',
+        enabled: true
+      },
+      {
+        id: 'tpl-daily-output',
+        type: 'output',
+        title: '结构化输出',
+        role: '生成可阅读、可追踪、可导出的最终汇报。',
+        prompt: '输出 Markdown 结构，包含结论、依据、引用来源、行动清单和素材沉淀建议。',
+        inputKey: 'action_queue',
+        outputKey: 'final_briefing',
+        enabled: true
+      }
+    ]
+  },
+  {
+    id: 'github-project-evaluator',
+    name: 'GitHub 项目评估工作流',
+    description: '评估热门开源项目的真实用途、成熟度、适用人群和可落地场景。',
+    source: '参考 Flowise / Langflow 的节点化评估链路',
+    tags: ['GitHub', '开源评估', '项目场景'],
+    nodes: [
+      {
+        id: 'tpl-github-input',
+        type: 'input',
+        title: '项目输入',
+        role: '读取 GitHub 榜单、README 摘要、Stars、更新时间、语言和媒体线索。',
+        prompt: '聚合项目元数据、README 介绍、图片线索、仓库活跃度和当前用户关注领域。',
+        inputKey: 'github_items',
+        outputKey: 'repo_context',
+        enabled: true
+      },
+      {
+        id: 'tpl-github-condition',
+        type: 'condition',
+        title: '质量门槛',
+        role: '过滤过期、描述空泛、缺少应用场景或证据不足的项目。',
+        prompt: '至少需要 3 个项目；优先保留有 README、近期更新、明确应用场景和可解释价值的项目。',
+        conditionMetric: 'githubCount',
+        conditionOperator: '>=',
+        conditionValue: 3,
+        inputKey: 'repo_context',
+        outputKey: 'quality_pass',
+        enabled: true
+      },
+      {
+        id: 'tpl-github-skill',
+        type: 'skill',
+        title: '证据增强',
+        role: '整理 README 图片、官网截图、演示视频、引用链接和重复媒体风险。',
+        prompt: '生成媒体质量审计：正文图片优先，过滤 logo/小图标，记录缺图、重复图和可引用链接。',
+        skillId: 'github-evaluator',
+        inputKey: 'quality_pass',
+        outputKey: 'evidence_pack',
+        enabled: true
+      },
+      {
+        id: 'tpl-github-llm',
+        type: 'llm',
+        title: '应用场景判断',
+        role: '用大模型解释项目解决什么问题、适合谁、能落地到什么业务场景。',
+        prompt: '为每个项目输出：核心价值、适用人群、典型应用场景、集成难度、风险和下一步试用建议。',
+        inputKey: 'evidence_pack',
+        outputKey: 'repo_judgement',
+        enabled: true
+      },
+      {
+        id: 'tpl-github-output',
+        type: 'output',
+        title: '项目卡片输出',
+        role: '形成可以进入资讯卡片、素材库和内容创作的项目洞察。',
+        prompt: '输出项目对比表和推荐排序，保留来源链接、图片线索和可沉淀素材字段。',
+        inputKey: 'repo_judgement',
+        outputKey: 'final_repo_cards',
+        enabled: true
+      }
+    ]
+  },
+  {
+    id: 'material-to-article',
+    name: '素材转文章工作流',
+    description: '把资讯卡片、每日汇报和本地素材转成可继续编辑的文章草稿。',
+    source: '参考 n8n 的可执行自动化与 Langflow 的多 Agent 协作',
+    tags: ['素材库', '内容创作', '知识资产'],
+    nodes: [
+      {
+        id: 'tpl-article-input',
+        type: 'input',
+        title: '素材读取',
+        role: '读取素材库、收藏资讯、今日汇报、用户选题和目标读者。',
+        prompt: '把可用素材按主题、来源、观点、证据、媒体资源分类，形成写作输入包。',
+        inputKey: 'material_pool',
+        outputKey: 'writing_context',
+        enabled: true
+      },
+      {
+        id: 'tpl-article-classifier',
+        type: 'classifier',
+        title: '选题聚类',
+        role: '把素材聚类为可写选题，并区分观点型、教程型、趋势型和复盘型文章。',
+        prompt: '输出 3 个候选选题，每个选题给出核心论点、关键证据、目标读者和缺口。',
+        classifierLabels: '观点型,教程型,趋势型,复盘型,资料型',
+        inputKey: 'writing_context',
+        outputKey: 'topic_candidates',
+        enabled: true
+      },
+      {
+        id: 'tpl-article-llm',
+        type: 'llm',
+        title: '文章架构',
+        role: '生成完整大纲、段落目的、引用安排和需要补充的证据。',
+        prompt: '选择最有价值的选题，生成类似 Word 文档的文章结构：标题、摘要、正文大纲、引用、结尾行动。',
+        inputKey: 'topic_candidates',
+        outputKey: 'article_outline',
+        enabled: true
+      },
+      {
+        id: 'tpl-article-reply',
+        type: 'reply',
+        title: '写作风格约束',
+        role: '确保文章不是资讯堆砌，而是清晰、有判断、有证据的成稿。',
+        prompt: '保持简洁、可信、可读；每个观点必须对应素材或来源；避免空泛口号。',
+        inputKey: 'article_outline',
+        outputKey: 'style_guardrails',
+        enabled: true
+      },
+      {
+        id: 'tpl-article-output',
+        type: 'output',
+        title: '导出草稿',
+        role: '输出可进入内容创作中心继续编辑、导出和沉淀为私有知识库的草稿。',
+        prompt: '输出 Markdown 草稿，包含素材引用清单、图片建议、标签和知识库归档建议。',
+        inputKey: 'style_guardrails',
+        outputKey: 'final_article_draft',
+        enabled: true
+      }
+    ]
+  }
+];
+
+function createWorkflowTemplateInstance(template, options = {}) {
+  const suffix = options.suffix || `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+  const rawNodes = Array.isArray(template?.nodes) ? template.nodes : [];
+  if (!rawNodes.length) throw new Error('工作流至少需要一个节点');
+
+  const seenNodeIds = new Set();
+  const nodes = rawNodes.map((node, index) => {
+    const type = WORKFLOW_NODE_TYPES.includes(node?.type) ? node.type : 'llm';
+    const baseId = String(node?.id || `${type}-${index + 1}`).replace(/[^\w-]/g, '') || `${type}-${index + 1}`;
+    const id = options.preserveNodeIds && !seenNodeIds.has(baseId) ? baseId : `${baseId}-${suffix}`;
+    seenNodeIds.add(id);
+    return {
+      id,
+      type,
+      title: String(node?.title || `节点 ${index + 1}`).trim(),
+      role: String(node?.role || '').trim(),
+      prompt: String(node?.prompt || '').trim(),
+      skillId: type === 'skill' ? (node?.skillId || 'evidence-pack') : node?.skillId,
+      conditionMetric: type === 'condition' ? (node?.conditionMetric || 'itemCount') : node?.conditionMetric,
+      conditionOperator: type === 'condition' ? (node?.conditionOperator || '>=') : node?.conditionOperator,
+      conditionValue: type === 'condition' ? Number(node?.conditionValue ?? 1) : node?.conditionValue,
+      classifierLabels: type === 'classifier' ? (node?.classifierLabels || '必读,追踪,素材,创作,降噪') : node?.classifierLabels,
+      inputKey: String(node?.inputKey || (index === 0 ? 'context' : `step_${index}`)).trim(),
+      outputKey: String(node?.outputKey || (type === 'output' ? 'final' : `step_${index + 1}`)).trim(),
+      enabled: node?.enabled !== false
+    };
+  });
+
+  return {
+    id: options.id || `${options.idPrefix || template?.id || 'workflow'}-${suffix}`,
+    name: String(template?.name || '未命名工作流').trim(),
+    description: String(template?.description || '').trim(),
+    source: String(options.source || template?.source || 'custom').trim(),
+    tags: Array.isArray(template?.tags) ? template.tags.filter(Boolean) : [],
+    updatedAt: new Date().toISOString(),
+    nodes
+  };
+}
+
+function validateWorkflowImportPayload(payload) {
+  const workflow = payload?.workflow && typeof payload.workflow === 'object' ? payload.workflow : payload;
+  if (!workflow || typeof workflow !== 'object') throw new Error('JSON 不是有效的工作流对象');
+  if (!String(workflow.name || '').trim()) throw new Error('导入失败：缺少工作流名称 name');
+  if (!Array.isArray(workflow.nodes) || workflow.nodes.length === 0) throw new Error('导入失败：nodes 必须是非空数组');
+
+  workflow.nodes.forEach((node, index) => {
+    const label = `第 ${index + 1} 个节点`;
+    if (!WORKFLOW_NODE_TYPES.includes(node?.type)) throw new Error(`${label} 的 type 不受支持`);
+    if (!String(node?.title || '').trim()) throw new Error(`${label} 缺少 title`);
+    if (!String(node?.role || '').trim()) throw new Error(`${label} 缺少 role`);
+    if (!String(node?.prompt || '').trim()) throw new Error(`${label} 缺少 prompt`);
+  });
+
+  return createWorkflowTemplateInstance(workflow, { idPrefix: 'imported-workflow', source: 'imported-json' });
+}
+
+function normalizeWorkflowTemplate(workflow, fallback = DEFAULT_AGENT_WORKFLOW) {
+  const base = { ...fallback, ...(workflow || {}) };
+  const rawNodes = Array.isArray(base.nodes) && base.nodes.length ? base.nodes : fallback.nodes;
+  const nodes = rawNodes.map((node, index) => {
+    const type = WORKFLOW_NODE_TYPES.includes(node?.type) ? node.type : 'llm';
+    const previousOutputKey = index > 0 ? (rawNodes[index - 1]?.outputKey || `step_${index}`) : 'context';
+    return {
+      id: node?.id || `wf-${type}-${index + 1}`,
+      type,
+      title: node?.title || `节点 ${index + 1}`,
+      role: node?.role || '描述这个节点负责的判断、工具或输出职责。',
+      prompt: node?.prompt || '在这里填写该节点的执行指令。',
+      skillId: type === 'skill' ? (node?.skillId || 'evidence-pack') : node?.skillId,
+      conditionMetric: type === 'condition' ? (node?.conditionMetric || 'itemCount') : node?.conditionMetric,
+      conditionOperator: type === 'condition' ? (node?.conditionOperator || '>=') : node?.conditionOperator,
+      conditionValue: type === 'condition' ? Number(node?.conditionValue ?? 1) : node?.conditionValue,
+      classifierLabels: type === 'classifier' ? (node?.classifierLabels || '必读,追踪,素材,创作,降噪') : node?.classifierLabels,
+      inputKey: String(node?.inputKey || previousOutputKey).trim(),
+      outputKey: String(node?.outputKey || (type === 'output' ? 'final_output' : `step_${index + 1}`)).trim(),
+      enabled: node?.enabled !== false
+    };
+  });
+
+  return {
+    ...base,
+    name: base.name || fallback.name,
+    description: base.description || fallback.description,
+    nodes
+  };
+}
 
 const CATEGORIES = [
   { id: 'ai-models', label: 'AI 大模型', icon: 'cpu' },
@@ -698,14 +1055,14 @@ function App() {
   const [agentWorkflowScope, setAgentWorkflowScope] = useState('daily');
   const [agentWorkflowDraft, setAgentWorkflowDraft] = useState(() => {
     const saved = loadLS('agentWorkflowDraft', DEFAULT_AGENT_WORKFLOW);
-    if (!saved || !Array.isArray(saved.nodes) || saved.nodes.length === 0) return DEFAULT_AGENT_WORKFLOW;
-    return { ...DEFAULT_AGENT_WORKFLOW, ...saved };
+    if (!saved || !Array.isArray(saved.nodes) || saved.nodes.length === 0) return normalizeWorkflowTemplate(DEFAULT_AGENT_WORKFLOW);
+    return normalizeWorkflowTemplate(saved);
   });
   const [workflowTemplates, setWorkflowTemplates] = useState(() => {
     const savedTemplates = loadLS('agentWorkflowTemplates', null);
-    if (Array.isArray(savedTemplates) && savedTemplates.length > 0) return savedTemplates;
+    if (Array.isArray(savedTemplates) && savedTemplates.length > 0) return savedTemplates.map(template => normalizeWorkflowTemplate(template));
     const savedDraft = loadLS('agentWorkflowDraft', DEFAULT_AGENT_WORKFLOW);
-    const baseDraft = savedDraft && Array.isArray(savedDraft.nodes) && savedDraft.nodes.length > 0 ? { ...DEFAULT_AGENT_WORKFLOW, ...savedDraft } : DEFAULT_AGENT_WORKFLOW;
+    const baseDraft = savedDraft && Array.isArray(savedDraft.nodes) && savedDraft.nodes.length > 0 ? normalizeWorkflowTemplate(savedDraft) : normalizeWorkflowTemplate(DEFAULT_AGENT_WORKFLOW);
     return [{ ...baseDraft, id: baseDraft.id || 'default-workflow', updatedAt: new Date().toISOString() }];
   });
   const [activeWorkflowId, setActiveWorkflowId] = useState(() => loadLS('activeWorkflowId', 'default-workflow'));
@@ -1054,9 +1411,10 @@ function App() {
   const [scrollingNewsPaused, setScrollingNewsPaused] = useState(false);
   const [scrollingNewsIndex, setScrollingNewsIndex] = useState(0);
   const scrollingNewsRef = useRef(null);
-  
+
   const editorTextareaRef = useRef(null);
   const imageInputRef = useRef(null);
+  const workflowImportInputRef = useRef(null);
 
   const feedRef = useRef(null);
   const searchInputRef = useRef(null);
@@ -2546,6 +2904,9 @@ ${agentWorkflowDraft.description}
 
 ${agentWorkflowDraft.nodes.map((node, index) => `${index + 1}. [${workflowTypeMeta[node.type]?.label || node.type}] ${node.title}
 角色：${node.role}
+输入：${node.inputKey || 'context'}
+输出：${node.outputKey || `step_${index + 1}`}
+能力配置：${formatWorkflowNodeConfig(node) || '默认'}
 指令：${node.prompt}
 状态：${node.enabled === false ? '停用' : '启用'}`).join('\n\n')}`;
   }, [agentWorkflowDraft, workflowTypeMeta]);
@@ -2567,9 +2928,10 @@ ${agentWorkflowDraft.nodes.map((node, index) => `${index + 1}. [${workflowTypeMe
   const switchWorkflowTemplate = useCallback((templateId) => {
     const template = workflowTemplates.find(item => item.id === templateId);
     if (!template) return;
+    const normalized = normalizeWorkflowTemplate(template);
     setActiveWorkflowId(templateId);
-    setAgentWorkflowDraft({ ...DEFAULT_AGENT_WORKFLOW, ...template });
-    setSelectedWorkflowNodeId(template.nodes?.[0]?.id || '');
+    setAgentWorkflowDraft(normalized);
+    setSelectedWorkflowNodeId(normalized.nodes?.[0]?.id || '');
   }, [workflowTemplates]);
 
   const saveWorkflowAsTemplate = useCallback(() => {
@@ -2586,6 +2948,37 @@ ${agentWorkflowDraft.nodes.map((node, index) => `${index + 1}. [${workflowTypeMe
     showToast('已保存为新的工作流模板');
   }, [agentWorkflowDraft]);
 
+  const installWorkflowTemplate = useCallback((template) => {
+    try {
+      const instance = normalizeWorkflowTemplate(createWorkflowTemplateInstance(template, { idPrefix: template.id }));
+      setWorkflowTemplates(prev => [instance, ...prev.filter(item => item.id !== instance.id)]);
+      setActiveWorkflowId(instance.id);
+      setAgentWorkflowDraft(instance);
+      setSelectedWorkflowNodeId(instance.nodes[0]?.id || '');
+      showToast(`已安装模板：${instance.name}`);
+    } catch (e) {
+      showToast(e.message || '模板安装失败');
+    }
+  }, []);
+
+  const importWorkflowJson = useCallback(async (file) => {
+    if (!file) return;
+    try {
+      const text = await file.text();
+      const payload = JSON.parse(text);
+      const imported = normalizeWorkflowTemplate(validateWorkflowImportPayload(payload));
+      setWorkflowTemplates(prev => [imported, ...prev.filter(item => item.id !== imported.id)]);
+      setActiveWorkflowId(imported.id);
+      setAgentWorkflowDraft(imported);
+      setSelectedWorkflowNodeId(imported.nodes[0]?.id || '');
+      showToast(`已导入工作流：${imported.name}`);
+    } catch (e) {
+      showToast(e.message || '导入失败，请检查 JSON 格式');
+    } finally {
+      if (workflowImportInputRef.current) workflowImportInputRef.current.value = '';
+    }
+  }, []);
+
   const deleteWorkflowTemplate = useCallback((templateId) => {
     setWorkflowTemplates(prev => {
       if (prev.length <= 1) {
@@ -2594,9 +2987,9 @@ ${agentWorkflowDraft.nodes.map((node, index) => `${index + 1}. [${workflowTypeMe
       }
       const next = prev.filter(template => template.id !== templateId);
       if (activeWorkflowId === templateId) {
-        const fallback = next[0];
+        const fallback = normalizeWorkflowTemplate(next[0]);
         setActiveWorkflowId(fallback.id);
-        setAgentWorkflowDraft({ ...DEFAULT_AGENT_WORKFLOW, ...fallback });
+        setAgentWorkflowDraft(fallback);
         setSelectedWorkflowNodeId(fallback.nodes?.[0]?.id || '');
       }
       showToast('已删除工作流模板');
@@ -2644,11 +3037,18 @@ ${agentWorkflowDraft.nodes.map((node, index) => `${index + 1}. [${workflowTypeMe
       title: meta.label,
       role: '描述这个节点负责的判断、工具或输出职责。',
       prompt: '在这里填写该节点的执行指令。',
+      skillId: newWorkflowNodeType === 'skill' ? 'evidence-pack' : undefined,
+      conditionMetric: newWorkflowNodeType === 'condition' ? 'itemCount' : undefined,
+      conditionOperator: newWorkflowNodeType === 'condition' ? '>=' : undefined,
+      conditionValue: newWorkflowNodeType === 'condition' ? 1 : undefined,
+      classifierLabels: newWorkflowNodeType === 'classifier' ? '必读,追踪,素材,创作,降噪' : undefined,
+      inputKey: `step_${Math.max(agentWorkflowDraft.nodes.length, 1)}`,
+      outputKey: `step_${agentWorkflowDraft.nodes.length + 1}`,
       enabled: true
     };
     setAgentWorkflowDraft(prev => ({ ...prev, nodes: [...prev.nodes, node] }));
     setSelectedWorkflowNodeId(node.id);
-  }, [newWorkflowNodeType, workflowTypeMeta]);
+  }, [newWorkflowNodeType, workflowTypeMeta, agentWorkflowDraft.nodes.length]);
 
   const removeWorkflowNode = useCallback((nodeId) => {
     setAgentWorkflowDraft(prev => {
@@ -2662,8 +3062,9 @@ ${agentWorkflowDraft.nodes.map((node, index) => `${index + 1}. [${workflowTypeMe
   }, [selectedWorkflowNodeId]);
 
   const resetWorkflowDraft = useCallback(() => {
-    setAgentWorkflowDraft(DEFAULT_AGENT_WORKFLOW);
-    setSelectedWorkflowNodeId(DEFAULT_AGENT_WORKFLOW.nodes[1]?.id || DEFAULT_AGENT_WORKFLOW.nodes[0]?.id || '');
+    const normalizedDefault = normalizeWorkflowTemplate(DEFAULT_AGENT_WORKFLOW);
+    setAgentWorkflowDraft(normalizedDefault);
+    setSelectedWorkflowNodeId(normalizedDefault.nodes[1]?.id || normalizedDefault.nodes[0]?.id || '');
     showToast('已恢复默认工作流模板');
   }, []);
 
@@ -2734,6 +3135,67 @@ ${agentWorkflowDraft.nodes.map((node, index) => `${index + 1}. [${workflowTypeMe
     }
     return workbenchItems;
   }, [agentWorkflowScope, workbenchItems, selectedInterests, bookmarks, materials]);
+
+  const workflowValidation = useMemo(() => {
+    const nodes = Array.isArray(agentWorkflowDraft.nodes) ? agentWorkflowDraft.nodes : [];
+    const enabledNodes = nodes.filter(node => node.enabled !== false);
+    const outputKeys = new Set();
+    const checks = [];
+    const addCheck = (id, label, ok, blocking = false, detail = '') => {
+      checks.push({ id, label, ok, blocking, detail });
+    };
+
+    addCheck('enabled-nodes', '至少启用一个节点', enabledNodes.length > 0, true, `${enabledNodes.length} 个启用节点`);
+    addCheck('output-node', '包含最终输出节点', enabledNodes.some(node => node.type === 'output'), true, '需要 output 节点承接结果');
+    addCheck('llm-config', '大模型节点具备运行配置', !enabledNodes.some(node => node.type === 'llm') || Boolean(llmConfig.baseUrl && llmConfig.selectedModel), true, llmConfig.selectedModel || '未选择模型');
+    addCheck('context-items', '当前范围有可分析资讯', scopedAgentItems.length > 0, false, `${scopedAgentItems.length} 条资讯`);
+    addCheck('profile-signal', '画像有偏好或行为依据', selectedInterests.length > 0 || readingHistory.length > 0 || bookmarks.length > 0 || materials.length > 0, false, `${selectedInterests.length} 个关注领域`);
+    addCheck('template-identity', '工作流名称与目标完整', Boolean(String(agentWorkflowDraft.name || '').trim() && String(agentWorkflowDraft.description || '').trim()), false, '便于导出和复用');
+
+    enabledNodes.forEach((node, index) => {
+      const title = String(node.title || '').trim();
+      const role = String(node.role || '').trim();
+      const prompt = String(node.prompt || '').trim();
+      const inputKey = String(node.inputKey || '').trim();
+      const outputKey = String(node.outputKey || '').trim();
+      const missing = [
+        !title ? '标题' : '',
+        !role ? '职责' : '',
+        !prompt ? 'Prompt' : ''
+      ].filter(Boolean);
+      addCheck(`node-required-${node.id}`, `${index + 1}. ${title || '未命名节点'} 基础配置`, missing.length === 0, true, missing.length ? `缺少 ${missing.join('、')}` : '已填写');
+      addCheck(`node-io-${node.id}`, `${index + 1}. ${title || '未命名节点'} 输入输出变量`, Boolean(inputKey && outputKey), false, inputKey && outputKey ? `${inputKey} -> ${outputKey}` : '建议填写 inputKey / outputKey');
+      if (node.type === 'skill') {
+        const skillId = node.skillId || 'evidence-pack';
+        addCheck(`node-skill-${node.id}`, `${index + 1}. ${title || '工具节点'} 已选择内置能力`, isWorkflowSkillId(skillId), true, getWorkflowSkillMeta(skillId)?.label || '未选择 Skill');
+      }
+      if (node.type === 'condition') {
+        const conditionMetricOk = WORKFLOW_CONDITION_METRICS.some(item => item.id === (node.conditionMetric || 'itemCount'));
+        const conditionOperatorOk = WORKFLOW_CONDITION_OPERATORS.some(item => item.id === (node.conditionOperator || '>='));
+        const conditionValueOk = Number.isFinite(Number(node.conditionValue ?? 1));
+        addCheck(`node-condition-${node.id}`, `${index + 1}. ${title || '条件节点'} 规则可执行`, conditionMetricOk && conditionOperatorOk && conditionValueOk, true, formatWorkflowNodeConfig(node));
+      }
+      if (node.type === 'classifier') {
+        const labels = String(node.classifierLabels || '').split(',').map(item => item.trim()).filter(Boolean);
+        addCheck(`node-classifier-${node.id}`, `${index + 1}. ${title || '分类节点'} 分类桶完整`, labels.length >= 2, false, labels.length ? labels.join(' / ') : '建议至少 2 个分类');
+      }
+      if (outputKey) {
+        addCheck(`node-unique-output-${node.id}`, `${index + 1}. ${title || '未命名节点'} 输出变量不重复`, !outputKeys.has(outputKey), true, outputKey);
+        outputKeys.add(outputKey);
+      }
+    });
+
+    const blockingIssues = checks.filter(check => check.blocking && !check.ok);
+    const warnings = checks.filter(check => !check.blocking && !check.ok);
+
+    return {
+      checks,
+      blockingIssues,
+      warnings,
+      ready: blockingIssues.length === 0,
+      score: Math.round((checks.filter(check => check.ok).length / Math.max(checks.length, 1)) * 100)
+    };
+  }, [agentWorkflowDraft, llmConfig.baseUrl, llmConfig.selectedModel, scopedAgentItems.length, selectedInterests.length, readingHistory.length, bookmarks.length, materials.length]);
 
   const buildWorkbenchContext = useCallback((prompt) => {
     const topItems = scopedAgentItems.slice(0, 8);
@@ -3018,8 +3480,37 @@ ${lines}`;
       order: index + 1,
       status: index === 0 ? 'running' : 'queued',
       detail: node.role,
-      prompt: node.prompt
+      prompt: node.prompt,
+      inputKey: node.inputKey || (index === 0 ? 'context' : `step_${index}`),
+      outputKey: node.outputKey || `step_${index + 1}`
     }));
+
+    if (!workflowValidation.ready) {
+      const issueText = workflowValidation.blockingIssues.map(issue => `- ${issue.label}：${issue.detail || '未通过'}`).join('\n');
+      setCurrentAgent(agent?.id || 'orchestrator');
+      setAgentWorkflowPrompt(prompt);
+      setAgentWorkflowResult({
+        loading: false,
+        content: '',
+        error: `工作流尚未就绪，请先处理以下问题：\n${issueText}`,
+        missionId: selectedMission.id
+      });
+      setAgentWorkflowRun({
+        id: runId,
+        status: 'blocked',
+        missionLabel: selectedMission.label,
+        startedAt,
+        finishedAt: new Date().toISOString(),
+        trace: baseTrace.map((step, index) => ({
+          ...step,
+          status: index === 0 ? 'blocked' : 'skipped',
+          detail: index === 0 ? workflowValidation.blockingIssues[0]?.label || '工作流未就绪' : step.detail
+        }))
+      });
+      if (workflowValidation.blockingIssues.some(issue => issue.id === 'llm-config')) setShowLlmQuickConfig(true);
+      return;
+    }
+
     setCurrentAgent(agent?.id || 'orchestrator');
     setAgentWorkflowPrompt(prompt);
     setAgentWorkflowResult({ loading: true, content: '', error: '', missionId: selectedMission.id });
@@ -3086,6 +3577,89 @@ ${lines}`;
       return `${index + 1}. ${item.title}｜${item.source || '未知来源'}｜${getCategoryLabel(item.category)}｜推荐分 ${score}`;
     };
     const formatItemLinks = (list) => list.map((item, index) => `${index + 1}. ${item.title}（${item.source || '未知来源'}）${item.url ? `\n   ${item.url}` : ''}`).join('\n');
+    const workflowMetrics = {
+      itemCount: scopedAgentItems.length,
+      mediaCount: mediaItems.length,
+      materialCount: materials.length,
+      savedCount: savedScopedItems.length,
+      focusCount: scopedAgentItems.filter(item => selectedInterests.includes(item.category)).length,
+      githubCount: scopedAgentItems.filter(item =>
+        /github/i.test(`${item.source || ''} ${item.url || ''} ${item.category || ''}`)
+      ).length
+    };
+    const compareWorkflowMetric = (left, operator, right) => {
+      switch (operator) {
+        case '>': return left > right;
+        case '<': return left < right;
+        case '<=': return left <= right;
+        case '==': return left === right;
+        case '>=':
+        default:
+          return left >= right;
+      }
+    };
+    const buildEvidencePack = () => {
+      const evidenceLinks = scopedAgentItems.slice(0, 6);
+      return {
+        evidenceLinks,
+        output: `证据包整理完成：\n${formatItemLinks(evidenceLinks) || '暂无可引用链接'}\n\n已保留来源、分类、摘要、推荐分和原文链接，后续节点可以直接引用。`
+      };
+    };
+    const buildMediaAudit = () => {
+      const imageUrls = mediaItems.map(item => item.imageUrl).filter(Boolean);
+      const duplicateImages = imageUrls.filter((url, index) => imageUrls.indexOf(url) !== index);
+      const missingMedia = Math.max(0, scopedAgentItems.length - mediaItems.length);
+      return {
+        imageUrls,
+        duplicateImages,
+        mediaAudit: {
+          imageCount: imageUrls.length,
+          videoCount: mediaItems.filter(item => item.videoUrl).length,
+          missingMediaCount: missingMedia,
+          duplicateImageCount: new Set(duplicateImages).size
+        },
+        output: `多媒体审计完成：图片 ${imageUrls.length} 条，视频 ${mediaItems.filter(item => item.videoUrl).length} 条，缺少多媒体 ${missingMedia} 条，重复图片 ${new Set(duplicateImages).size} 条。\n建议优先补齐高推荐分卡片的正文图片，避免使用 logo、favicon 或站点默认图。`
+      };
+    };
+    const buildMaterialExtraction = () => {
+      const candidates = materialCandidates.slice(0, 5);
+      const lines = candidates.map((item, index) => {
+        const type = item.imageUrl ? '图文素材' : (item.summary || '').length > 120 ? '观点素材' : '线索素材';
+        return `${index + 1}. ${type}｜${item.title}｜${item.source || '未知来源'}`;
+      }).join('\n');
+      return {
+        candidates,
+        output: `素材候选提取完成：${candidates.length} 条。\n${lines || '暂无新的素材候选'}\n\n这些素材可以进入素材库，继续支撑智能体分析和内容创作。`
+      };
+    };
+    const buildProfileMemory = () => {
+      const terms = [...new Set([
+        ...trackedTerms,
+        ...scopedAgentItems.slice(0, 5).flatMap(item => item.tags || []),
+        ...scopedAgentItems.slice(0, 3).map(item => getCategoryLabel(item.category))
+      ])].filter(Boolean).slice(0, 8);
+      return {
+        terms,
+        output: `画像记忆建议：\n- 建议追踪：${terms.join('、') || '暂无'}\n- 强化领域：${intelligenceProfile.focusLabels.join('、') || '未设置'}\n- 本次行为依据：${scopedAgentItems.length} 条资讯、${savedScopedItems.length} 条收藏/素材命中、${mediaItems.length} 条多媒体线索。`
+      };
+    };
+    const buildArticleOutline = () => {
+      const topReads = scopedAgentItems.slice(0, 3);
+      return {
+        topReads,
+        output: `文章草稿架构：\n# ${selectedMission.label || '智能体选题'}\n\n## 核心论点\n基于今日高价值信号，提炼一个清晰判断，而不是罗列资讯。\n\n## 可用素材\n${topReads.map((item, index) => `${index + 1}. ${item.title}｜${item.source || '未知来源'}`).join('\n') || '暂无'}\n\n## 建议结构\n背景 -> 关键事实 -> 对用户的影响 -> 风险与不确定性 -> 下一步行动。`
+      };
+    };
+    const buildGithubEvaluation = () => {
+      const repos = scopedAgentItems
+        .filter(item => /github/i.test(`${item.source || ''} ${item.url || ''} ${item.category || ''}`))
+        .slice(0, 5);
+      const targets = repos.length ? repos : scopedAgentItems.slice(0, 5);
+      return {
+        repos: targets,
+        output: `GitHub 项目评估：\n${targets.map((item, index) => `${index + 1}. ${item.title}\n   用途判断：${item.summary || item.recommendation || '需要结合 README 继续分析'}\n   应用场景：可作为技术选型、原型验证或知识库素材。\n   证据：${item.url || '暂无链接'}`).join('\n') || '暂无项目'}`
+      };
+    };
 
     const runLocalNode = (node, previousOutput) => {
       const sourceItems = scopedAgentItems.slice(0, 5).map(formatItemLine).join('\n');
@@ -3109,6 +3683,7 @@ ${lines}`;
         };
       }
       if (node.type === 'classifier') {
+        const labels = String(node.classifierLabels || '必读,追踪,素材,创作,降噪').split(',').map(item => item.trim()).filter(Boolean);
         const mustRead = scopedAgentItems
           .filter(item => (item.mustReadScore || 0) >= 65 || item.sourceGradeLabel?.startsWith('S') || item.sourceGradeLabel?.startsWith('A'))
           .slice(0, 4);
@@ -3124,9 +3699,21 @@ ${lines}`;
         const ignore = scopedAgentItems
           .filter(item => (item.mustReadScore || 0) < 25 && !selectedInterests.includes(item.category))
           .slice(0, 3);
+        const buckets = labels.reduce((acc, label) => ({ ...acc, [label]: [] }), {});
+        const assignBucket = (label, list) => {
+          if (!buckets[label]) buckets[label] = [];
+          buckets[label] = list.map(item => item.title);
+        };
+        assignBucket(labels[0] || '必读', mustRead);
+        assignBucket(labels[1] || '追踪', followUp);
+        assignBucket(labels[2] || '素材', materialReady);
+        assignBucket(labels[3] || '创作', creationReady);
+        assignBucket(labels[4] || '降噪', ignore);
         return {
-          output: `分类结果：\n- 必读：${mustRead.map(item => item.title).join('；') || '暂无'}\n- 追踪：${followUp.map(item => item.title).join('；') || trackedTerms.join('、') || '暂无'}\n- 素材：${materialReady.map(item => item.title).join('；') || '暂无'}\n- 创作：${creationReady.map(item => item.title).join('；') || '暂无'}\n- 降噪：${ignore.map(item => item.title).join('；') || '暂无'}\n\n依据上一节点：\n${previousOutput.slice(0, 600)}`,
+          output: `分类结果：\n${Object.entries(buckets).map(([label, list]) => `- ${label}：${list.join('；') || (label === (labels[1] || '追踪') ? trackedTerms.join('、') : '') || '暂无'}`).join('\n')}\n\n依据上一节点：\n${previousOutput.slice(0, 600)}`,
           structured: {
+            labels,
+            buckets,
             mustRead: mustRead.map(item => item.id),
             followUp: followUp.map(item => item.id),
             materialReady: materialReady.map(item => item.id),
@@ -3136,48 +3723,54 @@ ${lines}`;
         };
       }
       if (node.type === 'condition') {
-        const conditionText = `${node.role || ''} ${node.prompt || ''}`;
-        const minMatch = conditionText.match(/(?:至少|不少于|>=)\s*(\d+)/);
-        const minItems = minMatch ? Number(minMatch[1]) : 1;
-        const requiresMaterial = /素材|material/i.test(conditionText);
-        const requiresMedia = /图片|视频|多媒体|media/i.test(conditionText);
-        const checks = [
-          { label: `资讯数量不少于 ${minItems} 条`, passed: scopedAgentItems.length >= minItems },
-          { label: '素材库存在可用材料', passed: !requiresMaterial || materials.length > 0 },
-          { label: '存在图片/视频线索', passed: !requiresMedia || mediaItems.length > 0 }
-        ];
+        const metric = node.conditionMetric || 'itemCount';
+        const operator = node.conditionOperator || '>=';
+        const threshold = Number(node.conditionValue ?? 1);
+        const current = Number(workflowMetrics[metric] ?? 0);
+        const metricLabel = WORKFLOW_CONDITION_METRICS.find(item => item.id === metric)?.label || metric;
+        const checks = [{
+          label: `${metricLabel} ${operator} ${threshold}（当前 ${current}）`,
+          passed: compareWorkflowMetric(current, operator, threshold)
+        }];
         const shouldContinue = checks.every(check => check.passed);
         return {
           output: `条件判断：${shouldContinue ? '通过，继续执行后续链路' : '未通过，后续节点将跳过'}。\n${checks.map(check => `- ${check.passed ? '通过' : '未通过'}：${check.label}`).join('\n')}\n\n条件依据：${node.prompt}`,
           shouldContinue,
-          structured: { checks, action: shouldContinue ? 'continue' : 'skip-rest' }
+          structured: { checks, metric, operator, threshold, current, action: shouldContinue ? 'continue' : 'skip-rest' }
         };
       }
       if (node.type === 'skill') {
-        const imageUrls = mediaItems.map(item => item.imageUrl).filter(Boolean);
-        const duplicateImages = imageUrls.filter((url, index) => imageUrls.indexOf(url) !== index);
-        const evidenceLinks = scopedAgentItems.slice(0, 6);
-        const mediaAudit = [
-          `图片线索 ${imageUrls.length} 条`,
-          `视频线索 ${mediaItems.filter(item => item.videoUrl).length} 条`,
-          `缺少多媒体 ${Math.max(0, scopedAgentItems.length - mediaItems.length)} 条`,
-          `重复图片 ${new Set(duplicateImages).size} 条`
-        ].join('；');
-        const candidateLines = materialCandidates.slice(0, 4).map((item, index) => {
-          const type = item.imageUrl ? '图文素材' : (item.summary || '').length > 120 ? '观点素材' : '线索素材';
-          return `${index + 1}. ${type}｜${item.title}`;
-        }).join('\n');
+        const skillId = node.skillId || 'evidence-pack';
+        const skillMeta = getWorkflowSkillMeta(skillId);
+        const evidencePack = buildEvidencePack();
+        const mediaAudit = buildMediaAudit();
+        const materialExtraction = buildMaterialExtraction();
+        const profileMemory = buildProfileMemory();
+        const articleOutline = buildArticleOutline();
+        const githubEvaluation = buildGithubEvaluation();
+        const skillOutputs = {
+          'evidence-pack': evidencePack,
+          'media-audit': mediaAudit,
+          'material-extractor': materialExtraction,
+          'profile-memory': profileMemory,
+          'article-outline': articleOutline,
+          'github-evaluator': githubEvaluation
+        };
+        const selectedSkillOutput = skillOutputs[skillId] || evidencePack;
+        const combinedOutput = skillId === 'evidence-pack'
+          ? `${evidencePack.output}\n\n${mediaAudit.output}\n\n${materialExtraction.output}`
+          : selectedSkillOutput.output;
         return {
-          output: `工具 Skills 执行结果：\n- 证据包：已整理 ${evidenceLinks.length} 条可引用链接\n- 多媒体审计：${mediaAudit}\n- 素材候选：${materialCandidates.length} 条可沉淀\n- 导出准备：已生成“来源、摘要、链接、应用场景”字段\n\n素材候选：\n${candidateLines || '暂无新的素材候选'}\n\n参考链接：\n${formatItemLinks(evidenceLinks) || '暂无'}\n\n工具说明：${node.prompt}`,
+          output: `工具 Skills 执行结果：${skillMeta.label}\n${skillMeta.description}\n\n${combinedOutput}\n\n工具说明：${node.prompt}`,
           structured: {
-            evidenceLinks: evidenceLinks.map(item => ({ title: item.title, source: item.source, url: item.url })),
-            mediaAudit: {
-              imageCount: imageUrls.length,
-              videoCount: mediaItems.filter(item => item.videoUrl).length,
-              missingMediaCount: Math.max(0, scopedAgentItems.length - mediaItems.length),
-              duplicateImageCount: new Set(duplicateImages).size
-            },
-            materialCandidates: materialCandidates.map(item => item.id)
+            skillId,
+            skillLabel: skillMeta.label,
+            evidenceLinks: evidencePack.evidenceLinks.map(item => ({ title: item.title, source: item.source, url: item.url })),
+            mediaAudit: mediaAudit.mediaAudit,
+            materialCandidates: materialExtraction.candidates.map(item => item.id),
+            profileTerms: profileMemory.terms,
+            githubItems: githubEvaluation.repos.map(item => item.id),
+            articleItems: articleOutline.topReads.map(item => item.id)
           }
         };
       }
@@ -3210,12 +3803,20 @@ ${lines}`;
 
     try {
       let previousOutput = buildWorkbenchContext(prompt);
+      const workflowVariables = {
+        user_context: previousOutput,
+        context: previousOutput,
+        mission: prompt
+      };
       const nodeOutputs = [];
       let haltedByCondition = null;
 
       for (let index = 0; index < workflowNodes.length; index++) {
         const node = workflowNodes[index];
         activeNodeId = node.id;
+        const inputKey = node.inputKey || (index === 0 ? 'context' : `step_${index}`);
+        const outputKey = node.outputKey || `step_${index + 1}`;
+        const nodeInput = workflowVariables[inputKey] || previousOutput;
         localTrace = localTrace.map(step => {
           if (step.nodeId === node.id) return { ...step, status: 'running' };
           if (step.status === 'running') return { ...step, status: 'completed' };
@@ -3247,15 +3848,17 @@ ${lines}`;
 当前节点：${node.title}
 节点职责：${node.role}
 节点指令：${node.prompt}
+输入变量：${inputKey}
+输出变量：${outputKey}
 
 上游输出：
-${previousOutput}
+${nodeInput}
 
 完整蓝图：
 ${blueprintSummary}`,
               systemPrompt,
               messages: [
-                { role: 'user', content: previousOutput.slice(-6000) }
+                { role: 'user', content: String(nodeInput).slice(-6000) }
               ]
             })
           });
@@ -3263,19 +3866,23 @@ ${blueprintSummary}`,
           if (data.error) throw new Error(data.error);
           output = data.content || `${node.title} 暂无输出`;
         } else {
-          const localResult = runLocalNode(node, previousOutput);
+          const localResult = runLocalNode(node, nodeInput);
           output = typeof localResult === 'string' ? localResult : localResult.output;
           structured = typeof localResult === 'string' ? null : localResult.structured;
           shouldContinue = typeof localResult === 'string' ? true : localResult.shouldContinue !== false;
         }
 
-        nodeOutputs.push({ nodeId: node.id, title: node.title, type: node.type, output, structured });
+        workflowVariables[outputKey] = output;
+        nodeOutputs.push({ nodeId: node.id, title: node.title, type: node.type, inputKey, outputKey, input: nodeInput, output, structured });
         previousOutput = output;
         setTraceStep(node.id, {
           status: 'completed',
           detail: output.slice(0, 220),
           output,
-          structured
+          structured,
+          inputKey,
+          outputKey,
+          variablePreview: `${inputKey} → ${outputKey}`
         });
 
         if (node.type === 'condition' && !shouldContinue) {
@@ -3336,6 +3943,7 @@ ${blueprintSummary}`,
         content: finalContent || previousOutput || '暂无结果',
         trace: localTrace,
         nodeOutputs,
+        variables: Object.keys(workflowVariables),
         actions: workflowActions,
         haltedByCondition: haltedByCondition?.title || ''
       }, ...prev.filter(item => item.id !== runId)].slice(0, 12));
@@ -5790,6 +6398,60 @@ ${signals}
                     <button onClick={() => deleteWorkflowTemplate(activeWorkflowId)}>删除模板</button>
                   </div>
 
+                  <div className="workflow-template-gallery">
+                    <div className="workflow-gallery-head">
+                      <div>
+                        <span>成熟模板库</span>
+                        <strong>从真实工作流产品提炼的三条起步链路</strong>
+                      </div>
+                      <div className="workflow-import-actions">
+                        <input
+                          ref={workflowImportInputRef}
+                          type="file"
+                          accept="application/json,.json"
+                          onChange={e => importWorkflowJson(e.target.files?.[0])}
+                          hidden
+                        />
+                        <button type="button" onClick={() => workflowImportInputRef.current?.click()}>
+                          导入 JSON
+                        </button>
+                      </div>
+                    </div>
+                    <div className="workflow-template-cards">
+                      {WORKFLOW_TEMPLATE_LIBRARY.map(template => (
+                        <button
+                          key={template.id}
+                          type="button"
+                          className="workflow-template-card"
+                          onClick={() => installWorkflowTemplate(template)}
+                        >
+                          <strong>{template.name}</strong>
+                          <p>{template.description}</p>
+                          <small>{template.source}</small>
+                          <span>{template.nodes.length} 节点 · {template.tags.join(' / ')}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className={`workflow-validation-panel ${workflowValidation.ready ? 'ready' : 'blocked'}`}>
+                    <div className="workflow-validation-head">
+                      <div>
+                        <span>运行前检查</span>
+                        <strong>{workflowValidation.ready ? '工作流已就绪' : `${workflowValidation.blockingIssues.length} 个阻塞项`}</strong>
+                      </div>
+                      <em>{workflowValidation.score}%</em>
+                    </div>
+                    <div className="workflow-validation-list">
+                      {workflowValidation.checks.slice(0, 8).map(check => (
+                        <div key={check.id} className={`workflow-validation-item ${check.ok ? 'ok' : check.blocking ? 'bad' : 'warn'}`}>
+                          <span>{check.ok ? 'OK' : check.blocking ? 'Fix' : 'Warn'}</span>
+                          <p>{check.label}<small>{check.detail}</small></p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
                   <div className="workflow-draft-form">
                     <label>
                       <span>工作流名称</span>
@@ -5831,6 +6493,7 @@ ${signals}
                           <span className="workflow-node-type">{workflowTypeMeta[node.type]?.label || node.type}</span>
                           <strong>{node.title}</strong>
                           <p>{node.role}</p>
+                          {formatWorkflowNodeConfig(node) && <small>{formatWorkflowNodeConfig(node)}</small>}
                         </button>
                         {index < agentWorkflowDraft.nodes.length - 1 && <span className="workflow-connector">→</span>}
                       </div>
@@ -5906,6 +6569,81 @@ ${signals}
                           rows={4}
                         />
                       </label>
+                      {selectedWorkflowNode.type === 'skill' && (
+                        <label>
+                          <span>内置 Skill 能力</span>
+                          <select
+                            value={selectedWorkflowNode.skillId || 'evidence-pack'}
+                            onChange={e => updateWorkflowNode(selectedWorkflowNode.id, { skillId: e.target.value })}
+                          >
+                            {WORKFLOW_SKILL_CATALOG.map(skill => (
+                              <option key={skill.id} value={skill.id}>{skill.label}</option>
+                            ))}
+                          </select>
+                        </label>
+                      )}
+                      {selectedWorkflowNode.type === 'condition' && (
+                        <div className="workflow-node-editor-grid condition-grid">
+                          <label>
+                            <span>判断指标</span>
+                            <select
+                              value={selectedWorkflowNode.conditionMetric || 'itemCount'}
+                              onChange={e => updateWorkflowNode(selectedWorkflowNode.id, { conditionMetric: e.target.value })}
+                            >
+                              {WORKFLOW_CONDITION_METRICS.map(metric => (
+                                <option key={metric.id} value={metric.id}>{metric.label}</option>
+                              ))}
+                            </select>
+                          </label>
+                          <label>
+                            <span>条件</span>
+                            <select
+                              value={selectedWorkflowNode.conditionOperator || '>='}
+                              onChange={e => updateWorkflowNode(selectedWorkflowNode.id, { conditionOperator: e.target.value })}
+                            >
+                              {WORKFLOW_CONDITION_OPERATORS.map(operator => (
+                                <option key={operator.id} value={operator.id}>{operator.label}</option>
+                              ))}
+                            </select>
+                          </label>
+                          <label>
+                            <span>阈值</span>
+                            <input
+                              type="number"
+                              value={selectedWorkflowNode.conditionValue ?? 1}
+                              onChange={e => updateWorkflowNode(selectedWorkflowNode.id, { conditionValue: Number(e.target.value) })}
+                            />
+                          </label>
+                        </div>
+                      )}
+                      {selectedWorkflowNode.type === 'classifier' && (
+                        <label>
+                          <span>分类桶</span>
+                          <input
+                            value={selectedWorkflowNode.classifierLabels || '必读,追踪,素材,创作,降噪'}
+                            onChange={e => updateWorkflowNode(selectedWorkflowNode.id, { classifierLabels: e.target.value })}
+                            placeholder="例如 必读,追踪,素材,创作,降噪"
+                          />
+                        </label>
+                      )}
+                      <div className="workflow-node-editor-grid">
+                        <label>
+                          <span>输入变量</span>
+                          <input
+                            value={selectedWorkflowNode.inputKey || ''}
+                            onChange={e => updateWorkflowNode(selectedWorkflowNode.id, { inputKey: e.target.value })}
+                            placeholder="例如 briefing_context"
+                          />
+                        </label>
+                        <label>
+                          <span>输出变量</span>
+                          <input
+                            value={selectedWorkflowNode.outputKey || ''}
+                            onChange={e => updateWorkflowNode(selectedWorkflowNode.id, { outputKey: e.target.value })}
+                            placeholder="例如 ranked_signals"
+                          />
+                        </label>
+                      </div>
                       <button className="workflow-delete-node" onClick={() => removeWorkflowNode(selectedWorkflowNode.id)}>删除节点</button>
                       <div className="workflow-node-relations">
                         <div>
@@ -5959,6 +6697,12 @@ ${signals}
                           <div>
                             <strong>{step.title}</strong>
                             <p>{step.detail}</p>
+                            {(step.inputKey || step.outputKey) && (
+                              <small className="workflow-trace-io">
+                                {(step.inputKey || 'context')} → {(step.outputKey || 'output')}
+                              </small>
+                            )}
+                            {step.variablePreview && <small className="workflow-trace-io">{step.variablePreview}</small>}
                             {step.output && <pre>{step.output.slice(0, 420)}</pre>}
                           </div>
                           <em>{step.status}</em>

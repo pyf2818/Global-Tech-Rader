@@ -771,6 +771,22 @@ body {
   font: 11px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 
+.workflow-trace-io {
+  display: inline-flex;
+  max-width: 100%;
+  margin-top: 5px;
+  margin-right: 5px;
+  padding: 3px 6px;
+  border: 1px solid var(--border-color);
+  border-radius: 7px;
+  background: var(--surface-workbench-control);
+  color: var(--text-muted);
+  font: 10px/1.4 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .workflow-trace-step em {
   color: var(--text-muted);
   font-style: normal;
@@ -1033,6 +1049,183 @@ body {
   color: var(--accent-cyan);
 }
 
+.workflow-template-gallery,
+.workflow-validation-panel {
+  padding: 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  background: var(--surface-workbench-control);
+}
+
+.workflow-gallery-head,
+.workflow-validation-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.workflow-gallery-head span,
+.workflow-validation-head span {
+  display: block;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 850;
+}
+
+.workflow-gallery-head strong,
+.workflow-validation-head strong {
+  display: block;
+  margin-top: 3px;
+  color: var(--text-primary);
+  font-size: 13px;
+}
+
+.workflow-import-actions button,
+.workflow-template-card {
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.workflow-import-actions button {
+  min-height: 32px;
+  padding: 0 10px;
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.workflow-import-actions button:hover,
+.workflow-template-card:hover {
+  border-color: var(--border-active);
+  background: var(--surface-workbench-ai);
+}
+
+.workflow-template-cards {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.workflow-template-card {
+  min-height: 122px;
+  padding: 10px;
+  text-align: left;
+}
+
+.workflow-template-card strong {
+  display: block;
+  color: var(--text-primary);
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.workflow-template-card p {
+  margin: 6px 0;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.workflow-template-card small {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
+.workflow-template-card span {
+  color: var(--accent-cyan);
+  font-size: 11px;
+  font-weight: 850;
+}
+
+.workflow-validation-panel.ready {
+  border-color: var(--accent-cyan-border);
+  background: var(--accent-cyan-softer);
+}
+
+.workflow-validation-panel.blocked {
+  border-color: rgba(239, 68, 68, 0.28);
+}
+
+.workflow-validation-head em {
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--bg-primary);
+  color: var(--accent-cyan);
+  font-size: 13px;
+  font-style: normal;
+  font-weight: 900;
+}
+
+.workflow-validation-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.workflow-validation-item {
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+  padding: 8px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: var(--bg-primary);
+}
+
+.workflow-validation-item > span {
+  display: grid;
+  place-items: center;
+  min-height: 24px;
+  border-radius: 7px;
+  background: var(--surface-workbench-control);
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 900;
+}
+
+.workflow-validation-item.ok > span {
+  background: var(--accent-cyan-soft);
+  color: var(--accent-cyan);
+}
+
+.workflow-validation-item.bad > span {
+  background: rgba(239, 68, 68, 0.12);
+  color: #ef4444;
+}
+
+.workflow-validation-item.warn > span {
+  background: rgba(245, 158, 11, 0.14);
+  color: #d97706;
+}
+
+.workflow-validation-item p {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
+.workflow-validation-item small {
+  display: block;
+  margin-top: 3px;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+
 .workflow-draft-form label,
 .workflow-node-editor label {
   display: flex;
@@ -1161,6 +1354,22 @@ body {
   line-height: 1.55;
 }
 
+.workflow-builder-node small {
+  display: inline-flex;
+  max-width: 100%;
+  margin-top: 8px;
+  padding: 4px 7px;
+  border: 1px solid var(--border-color);
+  border-radius: 7px;
+  background: var(--bg-primary);
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 850;
+  line-height: 1.35;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .workflow-add-row {
   display: flex;
   flex-wrap: wrap;
@@ -1237,6 +1446,10 @@ body {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
+}
+
+.workflow-node-editor-grid.condition-grid {
+  grid-template-columns: minmax(0, 1.2fr) minmax(74px, 0.5fr) minmax(86px, 0.55fr);
 }
 
 .workflow-node-relations {
