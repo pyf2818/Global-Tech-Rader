@@ -55,11 +55,37 @@ const NAV_ITEMS = [
   { id: 'knowledge-export', label: '导出发布', icon: 'link' }
 ];
 
-const NAV_GROUPS = [
-  { id: 'core', label: '核心工作台', items: ['today', 'all', 'recommendations'] },
-  { id: 'create', label: '沉淀创作', items: ['materials', 'editor', 'reading-list'] },
-  { id: 'advanced', label: '高级能力', items: ['briefing', 'tracker', 'trends', 'reading-stats', 'trending', 'github', 'custom-url', 'calendar', 'knowledge-export'] }
+const PRIMARY_NAV_ITEMS = [
+  { id: 'today', label: '今日', desc: '每日判断', icon: 'sparkle', nav: 'today' },
+  { id: 'tracker', label: '追踪', desc: '偏好记忆', icon: 'follow', nav: 'tracker' },
+  { id: 'create', label: '创作', desc: '素材文章', icon: 'edit', nav: 'editor' },
+  { id: 'agents', label: '智能体', desc: 'AI协作', icon: 'bot', nav: 'agents' }
 ];
+
+const NAV_CONTEXT_SECTIONS = {
+  today: {
+    label: '今日工作流',
+    items: ['today', 'recommendations', 'all', 'briefing']
+  },
+  tracker: {
+    label: '追踪与画像',
+    items: ['tracker', 'trends', 'reading-stats', 'calendar']
+  },
+  create: {
+    label: '沉淀创作',
+    items: ['editor', 'materials', 'reading-list', 'knowledge-export']
+  },
+  agents: {
+    label: '智能协作',
+    items: []
+  },
+  tools: {
+    label: '更多工具',
+    items: ['trending', 'github', 'custom-url']
+  }
+};
+
+const MORE_NAV_ITEMS = ['trending', 'github', 'custom-url'];
 
 const CATEGORIES = [
   { id: 'ai-models', label: 'AI 大模型', icon: 'cpu' },
@@ -863,7 +889,7 @@ function App() {
   const [elfQuotedContext, setElfQuotedContext] = useState(null);
   const [translationOpen, setTranslationOpen] = useState({});
   const [translatingItems, setTranslatingItems] = useState({});
-  const [navGroupOpen, setNavGroupOpen] = useState({ core: true, create: true, advanced: false });
+  const [moreNavOpen, setMoreNavOpen] = useState(false);
   const [currentArticleId, setCurrentArticleId] = useState(null);
   const [materialFilter, setMaterialFilter] = useState('all');
   const [materialSearch, setMaterialSearch] = useState('');
@@ -3511,6 +3537,44 @@ ${signals}
     return 4;
   }
 
+  const navToPrimary = {
+    today: 'today',
+    recommendations: 'today',
+    all: 'today',
+    briefing: 'today',
+    tracker: 'tracker',
+    trends: 'tracker',
+    'reading-stats': 'tracker',
+    calendar: 'tracker',
+    editor: 'create',
+    materials: 'create',
+    'reading-list': 'create',
+    'knowledge-export': 'create',
+    agents: 'agents',
+    trending: 'tools',
+    github: 'tools',
+    'custom-url': 'tools'
+  };
+  const activePrimaryNav = navToPrimary[nav] || 'today';
+  const activeContextSection = NAV_CONTEXT_SECTIONS[activePrimaryNav] || NAV_CONTEXT_SECTIONS.today;
+  const activeContextItems = activeContextSection.items.map(id => NAV_ITEMS.find(item => item.id === id)).filter(Boolean);
+  const moreNavItems = MORE_NAV_ITEMS.map(id => NAV_ITEMS.find(item => item.id === id)).filter(Boolean);
+  const goNav = (nextNav) => {
+    if (nextNav === 'agents') {
+      setCurrentAgent('orchestrator');
+      setElfQuotedContext({
+        id: Date.now(),
+        title: '智能体工作台',
+        agentId: 'orchestrator',
+        content: buildWorkbenchContext('请作为情报总控，先查看我的今日情报上下文和个人画像。'),
+        suggestedPrompt: '请介绍当前智能体团队能为我做什么，并建议今天应该先运行哪个任务。'
+      });
+    }
+    setNav(nextNav);
+    setFocusedIndex(-1);
+    setMobileMenuOpen(false);
+  };
+
   return (
     <div className={`app ${sidebarCollapsed ? 'sidebar-collapsed' : ''} ${panelCollapsed ? 'panel-collapsed' : ''} ${editorFullscreen ? 'editor-fullscreen' : ''}`}>
       <div className="particle-layer" aria-hidden="true">
@@ -3601,49 +3665,93 @@ ${signals}
           </button>
         </div>
 
-        {recentVisits.length > 0 && !sidebarCollapsed && (
-          <div className="quick-access-bar">
-            <div className="quick-access-title">快速访问</div>
-            <div className="quick-access-list">
-              {recentVisits.map((v, i) => (
-                <button key={i} className="quick-access-item" onClick={() => {
-                  if (v.type === 'nav') setNav(v.value);
-                  else if (v.type === 'search') { setQuery(v.value); setNav('all'); }
-                }}>
-                  <span className="quick-access-icon">{v.type === 'search' ? ICONS.search : ICONS.globe}</span>
-                  <span className="quick-access-label">{v.label}</span>
+        <nav className="nav-menu">
+          <div className="nav-primary-group">
+            {!sidebarCollapsed && <div className="nav-group-title-static">工作流</div>}
+            {PRIMARY_NAV_ITEMS.map(item => (
+              <button
+                key={item.id}
+                className={`nav-item nav-primary-item ${activePrimaryNav === item.id ? 'active' : ''}`}
+                onClick={() => { goNav(item.nav); addRecentVisit('nav', item.nav, item.label); }}
+                title={sidebarCollapsed ? item.label : undefined}
+              >
+                <span className="nav-icon">{ICONS[item.icon]}</span>
+                {!sidebarCollapsed && (
+                  <span className="nav-label-wrap">
+                    <span className="nav-label">{item.label}</span>
+                    <small>{item.desc}</small>
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
+
+          {!sidebarCollapsed && activeContextItems.length > 0 && (
+            <div className="nav-context-group">
+              <div className="nav-group-title-static">{activeContextSection.label}</div>
+              {activeContextItems.map(item => (
+                <button
+                  key={item.id}
+                  className={`nav-item nav-sub-item ${nav === item.id ? 'active' : ''}`}
+                  onClick={() => { goNav(item.id); addRecentVisit('nav', item.id, item.label); }}
+                >
+                  <span className="nav-icon">{ICONS[item.icon]}</span>
+                  <span className="nav-label">{item.label}</span>
+                  {item.id === 'reading-list' && <span className="nav-count">{bookmarks.length}</span>}
+                  {item.id === 'all' && <span className="nav-count">{filtered.length}</span>}
                 </button>
               ))}
             </div>
-          </div>
-        )}
+          )}
 
-        <nav className="nav-menu">
-          {NAV_GROUPS.map(group => {
-            const groupItems = group.items.map(id => NAV_ITEMS.find(item => item.id === id)).filter(Boolean);
-            return (
-              <div key={group.id} className="nav-group">
-                {!sidebarCollapsed && (
-                  <button className="nav-group-toggle" onClick={() => setNavGroupOpen(prev => ({ ...prev, [group.id]: !prev[group.id] }))}>
-                    <span className="nav-group-title">{group.label}</span>
-                    <span className={`nav-group-chevron ${navGroupOpen[group.id] ? 'open' : ''}`}>{ICONS.chevronDown}</span>
-                  </button>
-                )}
-                {(sidebarCollapsed || navGroupOpen[group.id]) && groupItems.map(item => (
-                  <button key={item.id} className={`nav-item ${nav === item.id ? 'active' : ''}`} onClick={() => { setNav(item.id); setFocusedIndex(-1); addRecentVisit('nav', item.id, item.label); setMobileMenuOpen(false); }} title={sidebarCollapsed ? item.label : undefined}>
-                    <span className="nav-icon">{ICONS[item.icon]}</span>
-                    {!sidebarCollapsed && <span className="nav-label">{item.label}</span>}
-                    {!sidebarCollapsed && nav === item.id && item.id === 'reading-list' && <span className="nav-count">{bookmarks.length}</span>}
-                    {!sidebarCollapsed && nav === item.id && item.id === 'all' && <span className="nav-count">{filtered.length}</span>}
-                  </button>
-                ))}
-              </div>
-            );
-          })}
-          {!sidebarCollapsed && (
+          {!sidebarCollapsed && activePrimaryNav === 'agents' && (
+            <div className="nav-context-group agent-nav-summary">
+              <div className="nav-group-title-static">智能体生态</div>
+              {agents.slice(0, 5).map(agent => (
+                <button
+                  key={agent.id}
+                  className={`nav-item nav-sub-item ${currentAgent === agent.id ? 'active' : ''}`}
+                  onClick={() => {
+                    setCurrentAgent(agent.id);
+                    setElfQuotedContext({
+                      id: Date.now(),
+                      title: `智能体：${agent.name}`,
+                      agentId: agent.id,
+                      content: buildWorkbenchContext(`请作为${agent.name}，基于我的今日情报上下文进入待命。`),
+                      suggestedPrompt: `请作为${agent.name}，告诉我你能如何帮助我处理今天的情报。`
+                    });
+                  }}
+                >
+                  <span className="nav-icon">{ICONS.bot}</span>
+                  <span className="nav-label">{agent.name}</span>
+                </button>
+              ))}
+            </div>
+          )}
+
+          {!sidebarCollapsed && activePrimaryNav !== 'tools' && (
+            <div className="nav-context-group">
+              <button className="nav-group-toggle nav-more-toggle" onClick={() => setMoreNavOpen(v => !v)}>
+                <span className="nav-group-title">更多工具</span>
+                <span className={`nav-group-chevron ${moreNavOpen ? 'open' : ''}`}>{ICONS.chevronDown}</span>
+              </button>
+              {moreNavOpen && moreNavItems.map(item => (
+                <button
+                  key={item.id}
+                  className={`nav-item nav-sub-item ${nav === item.id ? 'active' : ''}`}
+                  onClick={() => { goNav(item.id); addRecentVisit('nav', item.id, item.label); }}
+                >
+                  <span className="nav-icon">{ICONS[item.icon]}</span>
+                  <span className="nav-label">{item.label}</span>
+                </button>
+              ))}
+            </div>
+          )}
+
+          {!sidebarCollapsed && activePrimaryNav === 'tracker' && (
             <div className="nav-group nav-follow-group">
               <button className="nav-group-toggle" onClick={() => setShowFollowDropdown(v => !v)}>
-                <span className="nav-group-title">我的关注</span>
+                <span className="nav-group-title">追踪关键词</span>
                 {followKeywords.length > 0 && <span className="nav-group-follow-count">{followKeywords.length}</span>}
                 <span className={`nav-group-chevron ${showFollowDropdown ? 'open' : ''}`}>{ICONS.chevronDown}</span>
               </button>
@@ -4192,6 +4300,72 @@ ${signals}
                   <button onClick={() => setNav('editor')}>写一篇情报短文</button>
                   <button onClick={() => setNav('materials')}>查看素材库</button>
                   <button onClick={() => setShowSettings(true)}>管理来源质量</button>
+                </div>
+              </section>
+            </div>
+          )}
+
+          {nav === 'agents' && (
+            <div className="agent-home">
+              <section className="agent-home-hero">
+                <div>
+                  <div className="workbench-kicker">Agentic Intelligence</div>
+                  <h1>智能体工作台</h1>
+                  <p>把今日情报、个人偏好和创作目标交给智能体团队协作处理。你不需要记住所有功能，只需要选择一个任务。</p>
+                </div>
+                <button
+                  className="ai-primary-action"
+                  onClick={() => {
+                    setCurrentAgent('orchestrator');
+                    setElfQuotedContext({
+                      id: Date.now(),
+                      title: '智能体工作台',
+                      agentId: 'orchestrator',
+                      content: buildWorkbenchContext('请作为情报总控，基于我的今日情报上下文启动智能体协作。'),
+                      suggestedPrompt: '请先给我一份今日智能体协作建议：应该先阅读、追踪、风险扫描还是创作转化？'
+                    });
+                  }}
+                >
+                  启动情报总控
+                </button>
+              </section>
+
+              <section className="agent-home-grid">
+                {agents.slice(0, 6).map(agent => (
+                  <button
+                    key={agent.id}
+                    className={`agent-home-card ${currentAgent === agent.id ? 'active' : ''}`}
+                    onClick={() => {
+                      setCurrentAgent(agent.id);
+                      setElfQuotedContext({
+                        id: Date.now(),
+                        title: `智能体：${agent.name}`,
+                        agentId: agent.id,
+                        content: buildWorkbenchContext(`请作为${agent.name}，基于我的今日情报上下文进入待命。`),
+                        suggestedPrompt: `请作为${agent.name}，给我一个适合今天使用你的任务建议。`
+                      });
+                    }}
+                  >
+                    <img src={agent.avatar || elfAvatar || '/ai-elf-avatar.png'} alt={agent.name} />
+                    <span>{agent.category}</span>
+                    <strong>{agent.name}</strong>
+                    <p>{agent.description}</p>
+                  </button>
+                ))}
+              </section>
+
+              <section className="agent-home-missions">
+                <div className="section-header">
+                  <h2 className="section-title">{ICONS.sparkles} 推荐任务</h2>
+                  <p className="section-desc">这些任务会自动携带今日资讯、用户画像和追踪记忆。</p>
+                </div>
+                <div className="ai-mission-list agent-home-mission-list">
+                  {intelligenceMissions.map(mission => (
+                    <button key={mission.id} onClick={() => sendWorkbenchToElf(mission.prompt, mission.agentId)}>
+                      <span>{mission.label}</span>
+                      <small>{agents.find(agent => agent.id === mission.agentId)?.name || '智能体'}</small>
+                    </button>
+                  ))}
                 </div>
               </section>
             </div>
