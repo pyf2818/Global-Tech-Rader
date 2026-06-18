@@ -2313,17 +2313,132 @@ function App() {
     }));
   }, [readingProfile.topSources, insightData.sourceQuality, sourcePriorities]);
 
+  const profileLearningEngine = useMemo(() => {
+    const categoryMap = new Map();
+    const sourceMap = new Map();
+    const tagMap = new Map();
+    const allBehaviorItems = [
+      ...readingHistory.map(item => ({ ...item, behavior: 'read', weight: 3 })),
+      ...bookmarks.map(item => ({ ...item, behavior: 'saved', weight: 4 })),
+      ...materials.map(item => ({ ...item, behavior: 'material', weight: 5 }))
+    ];
+
+    allBehaviorItems.forEach(item => {
+      const category = item.category || item.metadata?.category || '';
+      if (category) categoryMap.set(category, (categoryMap.get(category) || 0) + item.weight);
+      if (item.source) sourceMap.set(item.source, (sourceMap.get(item.source) || 0) + item.weight);
+      (item.tags || []).forEach(tag => {
+        if (tag) tagMap.set(tag, (tagMap.get(tag) || 0) + item.weight);
+      });
+    });
+
+    selectedInterests.forEach(id => categoryMap.set(id, (categoryMap.get(id) || 0) + Number(domainPriorities[id] || 3) * 2));
+    Object.entries(recommendationFeedback.boostedCategories || {}).forEach(([id, count]) => categoryMap.set(id, (categoryMap.get(id) || 0) + count * 6));
+    Object.entries(recommendationFeedback.trackedTerms || {}).forEach(([term, count]) => tagMap.set(term, (tagMap.get(term) || 0) + count * 5));
+    followKeywords.forEach(term => tagMap.set(term, (tagMap.get(term) || 0) + 4));
+    Object.entries(sourcePriorities || {}).forEach(([source, priority]) => sourceMap.set(source, (sourceMap.get(source) || 0) + Number(priority || 0) * 2));
+    Object.entries(recommendationFeedback.mutedSources || {}).forEach(([source, count]) => sourceMap.set(source, Math.max(0, (sourceMap.get(source) || 0) - count * 8)));
+
+    const topCategories = [...categoryMap.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([id, score]) => ({
+        id,
+        label: CATEGORIES.find(cat => cat.id === id)?.label || id,
+        score: Math.round(score)
+      }));
+    const topSources = [...sourceMap.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([name, score]) => ({ name, score: Math.round(score) }));
+    const topTags = [...tagMap.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 8)
+      .map(([name, score]) => ({ name, score: Math.round(score) }));
+
+    const selectedSet = new Set(selectedInterests);
+    const readCategorySet = new Set(readingHistory.map(item => item.category).filter(Boolean));
+    const blindSpots = CATEGORIES
+      .filter(cat => cat.id !== 'all' && !selectedSet.has(cat.id) && !readCategorySet.has(cat.id))
+      .slice(0, 4)
+      .map(cat => cat.label);
+
+    const materialRatio = allBehaviorItems.length ? Math.round(materials.length / Math.max(allBehaviorItems.length, 1) * 100) : 0;
+    const savedRatio = readingHistory.length ? Math.round(bookmarks.length / Math.max(readingHistory.length, 1) * 100) : 0;
+    const recentReads = readingHistory.filter(item => Date.now() - new Date(item.readAt || 0).getTime() < 7 * 24 * 60 * 60 * 1000);
+    const multimediaReads = readingHistory.filter(item => item.imageUrl || item.videoUrl).length;
+    const behaviorDepth = materials.length >= bookmarks.length && materials.length > 0
+      ? '资产沉淀型'
+      : savedRatio >= 50
+        ? '收藏复盘型'
+        : recentReads.length >= 6
+          ? '高频扫描型'
+          : '探索校准型';
+
+    const confidence = Math.min(96, Math.round(
+      Math.min(readingHistory.length, 30) * 1.4
+      + Math.min(bookmarks.length, 20) * 1.3
+      + Math.min(materials.length, 20) * 1.8
+      + selectedInterests.length * 3
+      + followKeywords.length * 1.8
+      + feedbackLearningCount * 2
+    ));
+    const confidenceLabel = confidence >= 75 ? '高可信' : confidence >= 45 ? '持续学习中' : '需要校准';
+    const dominantCategory = topCategories[0]?.label || '综合科技';
+    const dominantSource = topSources[0]?.name || '多来源';
+    const dominantTag = topTags[0]?.name || followKeywords[0] || '关键趋势';
+    const summary = confidence >= 45
+      ? `系统判断你当前更偏向「${dominantCategory}」与「${dominantTag}」，信任来源集中在「${dominantSource}」，推荐会优先保留高质量、可沉淀的信息。`
+      : '系统仍在学习你的偏好。建议先设置关注领域、阅读几条推荐并收藏/沉淀重要内容。';
+
+    const explanation = [
+      topCategories[0] ? `领域权重最高：${topCategories[0].label}` : '',
+      topSources[0] ? `信任来源最高：${topSources[0].name}` : '',
+      topTags[0] ? `记忆关键词：${topTags.slice(0, 3).map(item => item.name).join('、')}` : '',
+      recommendationFeedback.mutedSources && Object.keys(recommendationFeedback.mutedSources).length ? `已降低 ${Object.keys(recommendationFeedback.mutedSources).slice(0, 2).join('、')} 的权重` : ''
+    ].filter(Boolean);
+
+    const nextActions = [
+      blindSpots.length ? `补看 ${blindSpots.slice(0, 2).join('、')}，避免信息茧房` : '',
+      topTags.length ? `持续追踪 ${topTags.slice(0, 2).map(item => item.name).join('、')}` : '',
+      materialRatio < 15 && bookmarks.length > 0 ? '把收藏中的关键内容沉淀为素材' : '',
+      confidence < 45 ? '先校准 3 个关注领域和 2 个高信任来源' : ''
+    ].filter(Boolean).slice(0, 3);
+
+    return {
+      confidence,
+      confidenceLabel,
+      summary,
+      behaviorDepth,
+      topCategories,
+      topSources,
+      topTags,
+      blindSpots,
+      explanation,
+      nextActions,
+      savedRatio,
+      materialRatio,
+      recentReadCount: recentReads.length,
+      multimediaReads
+    };
+  }, [readingHistory, bookmarks, materials, selectedInterests, domainPriorities, recommendationFeedback, followKeywords, sourcePriorities, feedbackLearningCount]);
+
   const todayProfileSnapshot = useMemo(() => ({
     date: selectedNewsDate,
     focus: intelligenceProfile.focusLabels.slice(0, 5),
     tracked: intelligenceProfile.tracked.slice(0, 5),
     depth: intelligenceProfile.depth,
     outputGoal: intelligenceProfile.outputGoal,
+    confidence: profileLearningEngine.confidence,
+    learningSummary: profileLearningEngine.summary,
+    behaviorDepth: profileLearningEngine.behaviorDepth,
+    blindSpots: profileLearningEngine.blindSpots.slice(0, 3),
+    nextActions: profileLearningEngine.nextActions.slice(0, 3),
     reads: readingHistory.length,
     saved: bookmarks.length,
     materials: materials.length,
     sources: sourcePriorityItems.slice(0, 3).map(s => s.name)
-  }), [selectedNewsDate, intelligenceProfile, readingHistory.length, bookmarks.length, materials.length, sourcePriorityItems]);
+  }), [selectedNewsDate, intelligenceProfile, profileLearningEngine, readingHistory.length, bookmarks.length, materials.length, sourcePriorityItems]);
 
   const profileCalibrationSignals = useMemo(() => {
     const highDomainCount = profilePriorityItems.filter(item => item.priority >= 4).length;
@@ -4548,7 +4663,19 @@ ${signals}
   function recordReading(item) {
     setReadingHistory(prev => {
       const filtered = prev.filter(h => h.id !== item.id);
-      return [{ id: item.id, title: item.title, source: item.source, category: item.category, tags: item.tags, readAt: new Date().toISOString() }, ...filtered].slice(0, 100);
+      return [{
+        id: item.id,
+        title: item.title,
+        source: item.source,
+        category: item.category,
+        tags: item.tags || [],
+        summary: item.summary || '',
+        url: item.url || '',
+        imageUrl: item.imageUrl || '',
+        videoUrl: item.videoUrl || '',
+        sourceGradeLabel: item.sourceGradeLabel || item.grade || '',
+        readAt: new Date().toISOString()
+      }, ...filtered].slice(0, 100);
     });
   }
 
@@ -5324,6 +5451,10 @@ ${signals}
                           <span>风险/判断</span>
                           <p>{workbenchAiInsight.risk}</p>
                         </div>
+                        <div>
+                          <span>画像依据</span>
+                          <p>{profileLearningEngine.summary}</p>
+                        </div>
                       </div>
                     </div>
                     <div className="ai-priority-list">
@@ -5340,6 +5471,8 @@ ${signals}
 
                 {!loading && !error && (
                   <div className="workbench-profile-strip">
+                    <em>{profileLearningEngine.confidenceLabel} {profileLearningEngine.confidence}%</em>
+                    <em>{profileLearningEngine.behaviorDepth}</em>
                     <span>{ICONS.sparkles} 画像已参与推荐</span>
                     <em>领域权重 {profilePriorityItems.filter(item => item.priority >= 4).length}</em>
                     <em>信任来源 {sourcePriorityItems.filter(item => item.priority >= 4).length}</em>
@@ -6117,6 +6250,43 @@ ${signals}
                 <div><span>阅读点击</span><strong>{readingHistory.length}</strong><p>近 100 条点击记录用于校准推荐</p></div>
                 <div><span>收藏资讯</span><strong>{bookmarks.length}</strong><p>收藏会提高相似主题和来源权重</p></div>
                 <div><span>每日画像</span><strong>{dailyProfileSnapshots.length}</strong><p>按日期保留 AI 对你的理解变化</p></div>
+              </section>
+
+              <section className="profile-learning-panel">
+                <div className="profile-learning-main">
+                  <div className="section-header">
+                    <h2 className="section-title">{ICONS.sparkles} 画像学习引擎</h2>
+                    <p className="section-desc">系统把关注领域、阅读点击、收藏、素材沉淀和反馈动作汇总成可解释的推荐记忆。</p>
+                  </div>
+                  <div className="profile-learning-score">
+                    <strong>{profileLearningEngine.confidence}%</strong>
+                    <span>{profileLearningEngine.confidenceLabel} · {profileLearningEngine.behaviorDepth}</span>
+                    <p>{profileLearningEngine.summary}</p>
+                  </div>
+                  <div className="profile-learning-actions">
+                    {(profileLearningEngine.nextActions.length ? profileLearningEngine.nextActions : ['继续阅读每日汇报并收藏真正有价值的内容']).map(action => (
+                      <button key={action} onClick={() => showToast(action)}>{action}</button>
+                    ))}
+                  </div>
+                </div>
+                <div className="profile-learning-side">
+                  <div>
+                    <span>强领域</span>
+                    <p>{profileLearningEngine.topCategories.slice(0, 3).map(item => item.label).join('、') || '等待校准'}</p>
+                  </div>
+                  <div>
+                    <span>信任来源</span>
+                    <p>{profileLearningEngine.topSources.slice(0, 3).map(item => item.name).join('、') || '等待阅读行为'}</p>
+                  </div>
+                  <div>
+                    <span>记忆关键词</span>
+                    <p>{profileLearningEngine.topTags.slice(0, 5).map(item => item.name).join('、') || '暂无'}</p>
+                  </div>
+                  <div>
+                    <span>探索盲区</span>
+                    <p>{profileLearningEngine.blindSpots.slice(0, 3).join('、') || '覆盖较均衡'}</p>
+                  </div>
+                </div>
               </section>
 
               <section className="profile-control-layout">

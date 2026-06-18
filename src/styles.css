@@ -2161,6 +2161,101 @@ body {
   line-height: 1.55;
 }
 
+.profile-learning-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(280px, 0.9fr);
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--accent-cyan-border);
+  border-radius: 12px;
+  background: var(--surface-workbench-ai);
+  box-shadow: var(--shadow-card);
+}
+
+.profile-learning-main {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.profile-learning-score {
+  display: grid;
+  gap: 6px;
+}
+
+.profile-learning-score strong {
+  color: var(--text-primary);
+  font-size: 38px;
+  line-height: 1;
+}
+
+.profile-learning-score span {
+  color: var(--accent-cyan);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.profile-learning-score p {
+  max-width: 760px;
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.profile-learning-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.profile-learning-actions button {
+  min-height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--accent-cyan-border);
+  border-radius: 8px;
+  background: var(--surface-workbench-control);
+  color: var(--text-primary);
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.profile-learning-actions button:hover {
+  border-color: var(--border-active);
+  color: var(--accent-cyan);
+}
+
+.profile-learning-side {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.profile-learning-side div {
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid var(--border-color);
+  border-radius: 9px;
+  background: var(--surface-workbench-control);
+}
+
+.profile-learning-side span {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--accent-cyan);
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.profile-learning-side p {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
 .profile-control-layout {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -2357,6 +2452,7 @@ body {
   .product-hero,
   .studio-asset-row,
   .square-layout,
+  .profile-learning-panel,
   .profile-control-layout {
     grid-template-columns: 1fr;
   }
@@ -2367,6 +2463,7 @@ body {
 
   .studio-module-grid,
   .profile-summary-grid,
+  .profile-learning-side,
   .profile-calibration-grid {
     grid-template-columns: 1fr;
   }
