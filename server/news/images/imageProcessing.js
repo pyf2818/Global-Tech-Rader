@@ -1,6 +1,47 @@
 import { IMAGE_BLACKLIST_RE, IMAGE_MIN_DIM_HINT, LAZY_LOAD_ATTRS } from '../config/constants.js';
 import { escapeRegExp } from '../utils/textProcessing.js';
 
+export function normalizeImageKey(url) {
+  try {
+    const urlObj = new URL(url);
+    urlObj.hash = '';
+    ['utm_source', 'utm_medium', 'utm_campaign', 'fbclid', 'gclid', 'ref', 'referrer'].forEach(param => urlObj.searchParams.delete(param));
+    return `${urlObj.hostname}${urlObj.pathname}`.toLowerCase()
+      .replace(/-\d+x\d+(?=\.(jpg|jpeg|png|webp|avif)$)/i, '')
+      .replace(/_(small|thumb|thumbnail|mini|icon|logo)(?=\.)/i, '');
+  } catch {
+    return String(url || '').split('?')[0].toLowerCase();
+  }
+}
+
+export function getImageDimensionHint(context = '', url = '') {
+  const escaped = escapeRegExp(url);
+  const tagMatch = escaped
+    ? context.match(new RegExp(`<img[^>]+(?:src|data-src|data-original|data-lazy-src)=["'][^"']*${escaped}[^"']*["'][^>]*>`, 'i'))
+    : context.match(/<img[^>]*>/i);
+  const tag = tagMatch?.[0] || context;
+  const width = tag.match(/\bwidth=["']?(\d{2,5})["']?/i)?.[1];
+  const height = tag.match(/\bheight=["']?(\d{2,5})["']?/i)?.[1];
+  return {
+    width: width ? parseInt(width, 10) : 0,
+    height: height ? parseInt(height, 10) : 0
+  };
+}
+
+export function isLikelySiteAsset(url, context = '') {
+  const text = `${url} ${context}`.toLowerCase();
+  if (/(favicon|apple-touch-icon|android-chrome|mstile|mask-icon|site-logo|brand-logo|company-logo|logo\.|\/logo[-_.\/]|\/icons?\/|sprite|avatar|badge|placeholder|default-image|no-image|og-image-default)/i.test(text)) {
+    return true;
+  }
+  const { width, height } = getImageDimensionHint(context, url);
+  if (width && height) {
+    if (width < 160 || height < 100) return true;
+    const ratio = width / height;
+    if (ratio < 0.45 || ratio > 4.5) return true;
+  }
+  return false;
+}
+
 export function parseSrcset(srcset) {
   const candidates = srcset.split(',').map(s => {
     const parts = s.trim().split(/\s+/);
@@ -54,6 +95,7 @@ export function optimizeImageUrl(url) {
 export function isGoodImageUrl(url, htmlSource) {
   if (!url) return false;
   if (IMAGE_BLACKLIST_RE.test(url)) return false;
+  if (isLikelySiteAsset(url, htmlSource)) return false;
 
   // 放宽域名黑名单检查（只排除明显的追踪和分析域名）
   const TRACKING_DOMAINS = /\/\/(gravatar\.|disqus\.|pixel\.|tracking\.|analytics\.|doubleclick\.|adsense\.|adnxs\.|moatads\.|chartbeat\.|newrelic\.|pingdom\.|taboola\.|outbrain\.|zemanta\.)/i;
@@ -73,13 +115,9 @@ export function isGoodImageUrl(url, htmlSource) {
     }
   }
 
-  // 放宽尺寸限制（降低要求）
-  const dimMatch = htmlSource?.match(IMAGE_MIN_DIM_HINT);
-  if (dimMatch) {
-    const w = parseInt(dimMatch[1] || '0', 10);
-    const h = parseInt(dimMatch[2] || '0', 10);
-    // 只排除非常小的图片（从200x150降低到100x100）
-    if (w > 0 && w < 100 && h > 0 && h < 100) return false;
+  const dimHint = getImageDimensionHint(htmlSource, url);
+  if (dimHint.width && dimHint.height) {
+    if (dimHint.width < 240 || dimHint.height < 140) return false;
   }
 
   // 增强通用图片文件名排除（排除更多占位图和logo）

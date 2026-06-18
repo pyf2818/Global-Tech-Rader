@@ -1,7 +1,7 @@
 import { MEDIA_CONFIG } from '../config/constants.js';
 import { isSafeUrl } from '../utils/httpUtils.js';
 import { sleep } from '../utils/httpUtils.js';
-import { parseSrcset, optimizeImageUrl, isGoodImageUrl, scoreImageUrl } from './imageProcessing.js';
+import { parseSrcset, optimizeImageUrl, isGoodImageUrl, scoreImageUrl, normalizeImageKey } from './imageProcessing.js';
 
 // ========== 多媒体统计 ==========
 export const mediaStats = {
@@ -66,10 +66,7 @@ export const globalImageUsage = new Map(); // 图片URL -> 使用次数
 
 export function getImageUsageCount(imageUrl) {
   try {
-    const urlObj = new URL(imageUrl);
-    urlObj.search = '';
-    urlObj.hash = '';
-    const normalized = urlObj.href;
+    const normalized = normalizeImageKey(imageUrl);
     return globalImageUsage.get(normalized) || 0;
   } catch {
     return 0;
@@ -78,10 +75,7 @@ export function getImageUsageCount(imageUrl) {
 
 export function incrementImageUsage(imageUrl) {
   try {
-    const urlObj = new URL(imageUrl);
-    urlObj.search = '';
-    urlObj.hash = '';
-    const normalized = urlObj.href;
+    const normalized = normalizeImageKey(imageUrl);
     const count = globalImageUsage.get(normalized) || 0;
     globalImageUsage.set(normalized, count + 1);
     return count + 1;
@@ -467,13 +461,24 @@ export async function resolveImageWithScrapling(articleUrl) {
         .sort((a, b) => b.score - a.score);
 
       if (scoredImages.length > 0) {
-        const best = scoredImages[0];
-        const optimizedUrl = optimizeImageUrl(best.url);
-        const result = { imageUrl: optimizedUrl, videoUrl: '' };
-        imageResolveCache[articleUrl] = result;
-        mediaStats.scraplingImageCount = (mediaStats.scraplingImageCount || 0) + 1;
-        mediaStats.totalImageScore += best.score;
-        return result;
+        for (const candidate of scoredImages.slice(0, 5)) {
+          const optimizedUrl = optimizeImageUrl(candidate.url);
+          if (getImageUsageCount(optimizedUrl) >= MEDIA_CONFIG.MAX_IMAGE_REUSE) {
+            mediaStats.duplicateFilteredCount++;
+            continue;
+          }
+          const isValid = await validateImageUrl(optimizedUrl, 5000);
+          if (!isValid) {
+            mediaStats.validationFailedCount++;
+            continue;
+          }
+          incrementImageUsage(optimizedUrl);
+          const result = { imageUrl: optimizedUrl, videoUrl: '' };
+          imageResolveCache[articleUrl] = result;
+          mediaStats.scraplingImageCount = (mediaStats.scraplingImageCount || 0) + 1;
+          mediaStats.totalImageScore += candidate.score;
+          return result;
+        }
       }
     }
 

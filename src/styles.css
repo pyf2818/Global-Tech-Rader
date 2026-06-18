@@ -622,15 +622,37 @@ body {
 .agent-home-hero { display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 22px; border: 1px solid var(--border-color); border-radius: 12px; background: var(--bg-card); }
 .agent-home-hero h1 { margin: 6px 0 8px; color: var(--text-primary); font-size: 30px; line-height: 1.1; }
 .agent-home-hero p { max-width: 660px; color: var(--text-secondary); font-size: 14px; line-height: 1.7; }
-.agent-home-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
-.agent-home-card { min-height: 210px; padding: 16px; border: 1px solid var(--border-color); border-radius: 10px; background: var(--bg-card); color: var(--text-secondary); text-align: left; cursor: pointer; transition: border-color 0.18s ease, transform 0.18s ease, background 0.18s ease; }
-.agent-home-card:hover, .agent-home-card.active { border-color: var(--border-active); background: var(--surface-workbench-ai); transform: translateY(-2px); }
-.agent-home-card img { width: 42px; height: 42px; border-radius: 50%; object-fit: cover; margin-bottom: 12px; border: 1px solid var(--border-color); }
-.agent-home-card span { display: inline-flex; margin-bottom: 8px; padding: 3px 8px; border-radius: 6px; background: var(--accent-cyan-soft); color: var(--accent-cyan); font-size: 11px; font-weight: 800; }
-.agent-home-card strong { display: block; margin-bottom: 8px; color: var(--text-primary); font-size: 15px; }
-.agent-home-card p { color: var(--text-muted); font-size: 12px; line-height: 1.6; }
-.agent-home-missions { padding: 18px; border: 1px solid var(--border-color); border-radius: 12px; background: var(--bg-card); }
-.agent-home-mission-list { grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
+.agent-workflow-layout { display: grid; grid-template-columns: minmax(220px, 0.82fr) minmax(260px, 0.95fr) minmax(420px, 1.45fr); gap: 14px; align-items: start; }
+.agent-workflow-panel { min-height: 420px; padding: 18px; border: 1px solid var(--border-color); border-radius: 12px; background: var(--bg-card); }
+.agent-workflow-missions { display: flex; flex-direction: column; gap: 8px; }
+.agent-workflow-mission { padding: 12px; border: 1px solid var(--border-color); border-radius: 9px; background: var(--surface-workbench-control); color: var(--text-secondary); text-align: left; cursor: pointer; transition: border-color 0.18s ease, background 0.18s ease, transform 0.18s ease; }
+.agent-workflow-mission:hover, .agent-workflow-mission.active { border-color: var(--border-active); background: var(--surface-workbench-ai); transform: translateY(-1px); }
+.agent-workflow-mission span { display: block; color: var(--text-primary); font-size: 13px; font-weight: 800; }
+.agent-workflow-mission small { display: block; margin-top: 4px; color: var(--accent-cyan); font-size: 11px; font-weight: 700; }
+.agent-custom-run { display: flex; flex-direction: column; gap: 8px; margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--border-color); }
+.agent-custom-run label { color: var(--text-primary); font-size: 12px; font-weight: 800; }
+.agent-custom-run textarea { width: 100%; resize: vertical; min-height: 92px; padding: 10px; border: 1px solid var(--border-color); border-radius: 8px; background: var(--bg-primary); color: var(--text-primary); font-size: 12px; line-height: 1.6; outline: none; }
+.agent-custom-run textarea:focus { border-color: var(--border-active); }
+.agent-custom-run button, .agent-result-actions button, .agent-source-strategy button, .agent-result-error button { min-height: 34px; padding: 0 12px; border: 1px solid var(--border-color); border-radius: 8px; background: var(--surface-workbench-control); color: var(--text-primary); font-weight: 800; cursor: pointer; }
+.agent-custom-run button:hover, .agent-result-actions button:hover, .agent-source-strategy button:hover, .agent-result-error button:hover { border-color: var(--border-active); background: var(--accent-cyan-soft); color: var(--accent-cyan); }
+.agent-context-grid { display: grid; grid-template-columns: 1fr; gap: 8px; }
+.agent-context-grid div { padding: 11px; border: 1px solid var(--border-color); border-radius: 8px; background: var(--surface-workbench-control); }
+.agent-context-grid span { display: block; margin-bottom: 5px; color: var(--text-muted); font-size: 11px; font-weight: 700; }
+.agent-context-grid strong { display: block; color: var(--text-primary); font-size: 13px; line-height: 1.5; }
+.agent-source-strategy { margin-top: 12px; padding: 12px; border: 1px solid var(--accent-cyan-border); border-radius: 9px; background: var(--surface-workbench-ai); }
+.agent-source-strategy strong { color: var(--text-primary); font-size: 13px; }
+.agent-source-strategy p { margin: 6px 0 10px; color: var(--text-secondary); font-size: 12px; line-height: 1.7; }
+.agent-result-loading, .agent-result-empty, .agent-result-error { min-height: 260px; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 12px; color: var(--text-muted); text-align: center; }
+.agent-result-content { min-height: 310px; max-height: 58vh; overflow: auto; padding: 14px; border: 1px solid var(--border-color); border-radius: 9px; background: var(--bg-primary); color: var(--text-primary); white-space: pre-wrap; font: 13px/1.75 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+.agent-result-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 12px; }
+@media (max-width: 1280px) { .agent-workflow-layout { grid-template-columns: 1fr; } .agent-workflow-panel { min-height: auto; } }
+
+.source-strategy-panel { display: flex; justify-content: space-between; gap: 16px; align-items: center; margin-bottom: 16px; padding: 14px; border: 1px solid var(--accent-cyan-border); border-radius: 10px; background: var(--surface-workbench-ai); }
+.source-strategy-panel span { color: var(--accent-cyan); font-size: 10px; font-weight: 900; letter-spacing: 0.12em; text-transform: uppercase; }
+.source-strategy-panel strong { display: block; margin-top: 4px; color: var(--text-primary); font-size: 14px; }
+.source-strategy-panel p { margin-top: 6px; color: var(--text-secondary); font-size: 12px; line-height: 1.6; }
+.source-strategy-panel button { flex-shrink: 0; min-height: 34px; padding: 0 12px; border: 1px solid var(--border-active); border-radius: 8px; background: var(--accent-cyan-soft); color: var(--accent-cyan); font-weight: 800; cursor: pointer; }
+.source-strategy-panel button:disabled { cursor: not-allowed; opacity: 0.6; }
 
 /* Event Clusters */
 .event-clusters { display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px; }

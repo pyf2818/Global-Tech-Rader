@@ -7,12 +7,12 @@ export const MEDIA_CONFIG = {
   SCRAPLING_MODE: 'dynamic',    // Scrapling 模式（basic/dynamic/stealth）
   SCRAPLING_TIMEOUT: 18000,     // Scrapling 超时（毫秒，从15秒提高到18秒）
 
-  // 图片评分阈值（大幅降低以提高覆盖率）
-  MIN_IMAGE_SCORE: 10,          // 最低分数才使用（从25降低到10，优先获取图片）
-  MIN_IMAGE_WIDTH: 200,         // 最小宽度（像素，从400降低到300）
-  MIN_IMAGE_HEIGHT: 150,        // 最小高度（像素，从300降低到200）
-  ASPECT_RATIO_MIN: 0.5,        // 最小宽高比（从1.2降低到0.5）
-  ASPECT_RATIO_MAX: 4.0,        // 最大宽高比（从2.5提高到3.0）
+  // 图片评分阈值：宁可少图，也不要 logo / 小图标 / 默认图污染资讯卡片
+  MIN_IMAGE_SCORE: 32,
+  MIN_IMAGE_WIDTH: 320,
+  MIN_IMAGE_HEIGHT: 180,
+  ASPECT_RATIO_MIN: 0.8,
+  ASPECT_RATIO_MAX: 3.2,
 
   // 缓存配置
   IMAGE_CACHE_SIZE: 2000,       // 缓存条目数量（从1000提高到2000）

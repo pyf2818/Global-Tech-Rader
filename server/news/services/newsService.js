@@ -6,6 +6,7 @@ import {
   mediaStats, resetMediaStats, logMediaStats,
   resetGlobalImageUsage, resolveImageWithScrapling
 } from '../images/imageResolver.js';
+import { isGoodImageUrl, normalizeImageKey } from '../images/imageProcessing.js';
 
 // 缓存（服务内部拥有）
 export const newsCache = { data: null, expiresAt: 0, key: '' };
@@ -132,10 +133,11 @@ export async function getNews(blocked, customSources, page = 0, pageSize = PAGE_
     fullItems.forEach(item => {
       if (item.imageUrl) {
         try {
-          const urlObj = new URL(item.imageUrl);
-          urlObj.search = '';
-          urlObj.hash = '';
-          const normalized = urlObj.href;
+          if (!isGoodImageUrl(item.imageUrl, `${item.title || ''} ${item.summary || ''}`)) {
+            item.imageUrl = '';
+            return;
+          }
+          const normalized = normalizeImageKey(item.imageUrl);
           const usageCount = rssImageUsage.get(normalized) || 0;
 
           if (usageCount >= 1) {

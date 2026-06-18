@@ -610,6 +610,8 @@ function App() {
   const [newAgent, setNewAgent] = useState({ name: '', description: '', systemPrompt: '', category: '分析', avatar: '' });
   const [agentFilter, setAgentFilter] = useState('全部');
   const [agentPromptRefining, setAgentPromptRefining] = useState(false);
+  const [agentWorkflowResult, setAgentWorkflowResult] = useState({ loading: false, content: '', error: '', missionId: '' });
+  const [agentWorkflowPrompt, setAgentWorkflowPrompt] = useState('');
   const [stats, setStats] = useState({ sourceCount: 40, failedSources: 0, updatedAt: '', blockedCount: 0 });
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => localStorage.getItem('sidebarCollapsed') === 'true');
   const motivationalQuote = useMemo(() => {
@@ -2122,6 +2124,67 @@ ${lines}`;
     });
     showToast('已把今日情报交给智能体');
   }, [buildWorkbenchContext]);
+
+  const runAgentWorkflow = useCallback(async (mission, customPrompt = '') => {
+    const selectedMission = mission || intelligenceMissions[0];
+    if (!selectedMission) return;
+    const agent = agents.find(a => a.id === selectedMission.agentId) || agents.find(a => a.id === 'orchestrator') || agents[0];
+    const prompt = customPrompt.trim() || selectedMission.prompt;
+    setCurrentAgent(agent?.id || 'orchestrator');
+    setAgentWorkflowPrompt(prompt);
+    setAgentWorkflowResult({ loading: true, content: '', error: '', missionId: selectedMission.id });
+
+    if (!llmConfig.baseUrl || !llmConfig.selectedModel) {
+      setAgentWorkflowResult({
+        loading: false,
+        content: '',
+        error: '请先配置大模型，才能运行智能体工作流。',
+        missionId: selectedMission.id
+      });
+      setShowLlmQuickConfig(true);
+      return;
+    }
+
+    const systemPrompt = `${agent?.systemPrompt || '你是个人情报智能体。'}
+
+你正在宽屏智能体工作流中工作，不是闲聊窗口。请基于用户画像、今日推荐资讯和任务目标输出可执行结果。
+要求：
+1. 先给一句话结论和优先级。
+2. 明确事实、推断、不确定性。
+3. 输出下一步动作，能进入追踪、阅读或创作。
+4. 回答结构清晰，避免泛泛总结。`;
+
+    try {
+      const response = await fetch('/api/ai-generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          baseUrl: llmConfig.baseUrl,
+          apiKey: llmConfig.apiKey,
+          model: llmConfig.selectedModel,
+          action: 'chat',
+          content: buildWorkbenchContext(prompt),
+          systemPrompt,
+          messages: []
+        })
+      });
+      const data = await response.json();
+      if (data.error) throw new Error(data.error);
+      setAgentWorkflowResult({
+        loading: false,
+        content: data.content || '暂无结果',
+        error: '',
+        missionId: selectedMission.id
+      });
+    } catch (e) {
+      setAgentWorkflowResult({
+        loading: false,
+        content: '',
+        error: e.message || '智能体工作流运行失败',
+        missionId: selectedMission.id
+      });
+    }
+  }, [agents, intelligenceMissions, llmConfig, buildWorkbenchContext]);
 
   const getFeedbackTerm = useCallback((item) => {
     const tags = item.tags || [];
@@ -4310,62 +4373,113 @@ ${signals}
               <section className="agent-home-hero">
                 <div>
                   <div className="workbench-kicker">Agentic Intelligence</div>
-                  <h1>智能体工作台</h1>
-                  <p>把今日情报、个人偏好和创作目标交给智能体团队协作处理。你不需要记住所有功能，只需要选择一个任务。</p>
+                  <h1>智能体工作流</h1>
+                  <p>这是主力大模型工作区，用来完成深度分析、追踪记忆、风险扫描和创作转化。AI 精灵保留为页面小助手，这里负责真正的宽屏任务处理。</p>
                 </div>
                 <button
                   className="ai-primary-action"
-                  onClick={() => {
-                    setCurrentAgent('orchestrator');
-                    setElfQuotedContext({
-                      id: Date.now(),
-                      title: '智能体工作台',
-                      agentId: 'orchestrator',
-                      content: buildWorkbenchContext('请作为情报总控，基于我的今日情报上下文启动智能体协作。'),
-                      suggestedPrompt: '请先给我一份今日智能体协作建议：应该先阅读、追踪、风险扫描还是创作转化？'
-                    });
-                  }}
+                  onClick={() => runAgentWorkflow(intelligenceMissions[0])}
                 >
-                  启动情报总控
+                  运行今日简报
                 </button>
               </section>
 
-              <section className="agent-home-grid">
-                {agents.slice(0, 6).map(agent => (
-                  <button
-                    key={agent.id}
-                    className={`agent-home-card ${currentAgent === agent.id ? 'active' : ''}`}
-                    onClick={() => {
-                      setCurrentAgent(agent.id);
-                      setElfQuotedContext({
-                        id: Date.now(),
-                        title: `智能体：${agent.name}`,
-                        agentId: agent.id,
-                        content: buildWorkbenchContext(`请作为${agent.name}，基于我的今日情报上下文进入待命。`),
-                        suggestedPrompt: `请作为${agent.name}，给我一个适合今天使用你的任务建议。`
-                      });
-                    }}
-                  >
-                    <img src={agent.avatar || elfAvatar || '/ai-elf-avatar.png'} alt={agent.name} />
-                    <span>{agent.category}</span>
-                    <strong>{agent.name}</strong>
-                    <p>{agent.description}</p>
-                  </button>
-                ))}
-              </section>
-
-              <section className="agent-home-missions">
-                <div className="section-header">
-                  <h2 className="section-title">{ICONS.sparkles} 推荐任务</h2>
-                  <p className="section-desc">这些任务会自动携带今日资讯、用户画像和追踪记忆。</p>
-                </div>
-                <div className="ai-mission-list agent-home-mission-list">
-                  {intelligenceMissions.map(mission => (
-                    <button key={mission.id} onClick={() => sendWorkbenchToElf(mission.prompt, mission.agentId)}>
-                      <span>{mission.label}</span>
-                      <small>{agents.find(agent => agent.id === mission.agentId)?.name || '智能体'}</small>
+              <section className="agent-workflow-layout">
+                <div className="agent-workflow-panel mission-panel">
+                  <div className="section-header">
+                    <h2 className="section-title">{ICONS.sparkles} 工作流任务</h2>
+                    <p className="section-desc">任务会自动携带今日资讯、用户画像、追踪关键词和来源偏好。</p>
+                  </div>
+                  <div className="agent-workflow-missions">
+                    {intelligenceMissions.map(mission => {
+                      const agent = agents.find(a => a.id === mission.agentId);
+                      return (
+                        <button
+                          key={mission.id}
+                          className={`agent-workflow-mission ${agentWorkflowResult.missionId === mission.id ? 'active' : ''}`}
+                          onClick={() => runAgentWorkflow(mission)}
+                        >
+                          <span>{mission.label}</span>
+                          <small>{agent?.name || '智能体'}</small>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <div className="agent-custom-run">
+                    <label>自定义任务</label>
+                    <textarea
+                      id="agent-workflow-custom-prompt"
+                      name="agentWorkflowPrompt"
+                      value={agentWorkflowPrompt}
+                      onChange={e => setAgentWorkflowPrompt(e.target.value)}
+                      placeholder="例如：只分析我关注领域里的机会，并给出三个可执行创作选题"
+                      rows={4}
+                    />
+                    <button onClick={() => runAgentWorkflow(intelligenceMissions[0], agentWorkflowPrompt)}>
+                      运行自定义工作流
                     </button>
-                  ))}
+                  </div>
+                </div>
+
+                <div className="agent-workflow-panel context-panel">
+                  <div className="section-header">
+                    <h2 className="section-title">{ICONS.follow} 个性化上下文</h2>
+                    <p className="section-desc">产品不只聚焦 AI，会从你的选择由小及大扩展到科技、商业、政策和产业赛道。</p>
+                  </div>
+                  <div className="agent-context-grid">
+                    <div><span>关注领域</span><strong>{intelligenceProfile.focusLabels.join('、') || '未设置'}</strong></div>
+                    <div><span>追踪记忆</span><strong>{intelligenceProfile.tracked.join('、') || '暂无'}</strong></div>
+                    <div><span>推荐深度</span><strong>{intelligenceProfile.depth}</strong></div>
+                    <div><span>输出目标</span><strong>{intelligenceProfile.outputGoal}</strong></div>
+                  </div>
+                  <div className="agent-source-strategy">
+                    <strong>信息源增强方向</strong>
+                    <p>参考 RSSHub、feedfinder、Readability/Mercury Parser 的思路：用源发现扩大覆盖，用健康评分控制质量，用正文抽取提高图片和摘要准确性。</p>
+                    <button onClick={() => { setSettingsTab('sources'); setShowSettings(true); }}>管理信息源</button>
+                  </div>
+                  <div className="agent-source-strategy">
+                    <strong>AI 精灵定位</strong>
+                    <p>小精灵继续负责随手问、引用卡片、轻量接力；复杂任务在此页面运行，避免窗口太小影响操作。</p>
+                  </div>
+                </div>
+
+                <div className="agent-workflow-panel result-panel">
+                  <div className="section-header">
+                    <h2 className="section-title">{ICONS.document} 工作流输出</h2>
+                    <p className="section-desc">结果可继续交给小助手追问，或沉淀到素材库。</p>
+                  </div>
+                  {agentWorkflowResult.loading && <div className="agent-result-loading"><div className="spinner" /><span>智能体正在处理今日情报...</span></div>}
+                  {!agentWorkflowResult.loading && agentWorkflowResult.error && (
+                    <div className="agent-result-error">
+                      <p>{agentWorkflowResult.error}</p>
+                      <button onClick={() => setShowLlmQuickConfig(true)}>配置大模型</button>
+                    </div>
+                  )}
+                  {!agentWorkflowResult.loading && !agentWorkflowResult.error && !agentWorkflowResult.content && (
+                    <div className="agent-result-empty">
+                      <p>选择左侧任务后，结果会在这里生成。</p>
+                    </div>
+                  )}
+                  {!agentWorkflowResult.loading && agentWorkflowResult.content && (
+                    <>
+                      <pre className="agent-result-content">{agentWorkflowResult.content}</pre>
+                      <div className="agent-result-actions">
+                        <button onClick={() => addManualMaterial({
+                          title: `智能体工作流 ${new Date().toLocaleDateString('zh-CN')}`,
+                          content: agentWorkflowResult.content,
+                          type: 'analysis',
+                          source: '智能体工作流',
+                          url: '',
+                          tags: '智能体,情报分析',
+                          note: '',
+                          spaceId: null
+                        })}>存入素材库</button>
+                        <button onClick={() => sendWorkbenchToElf(`请基于以下智能体工作流结果继续追问：\n${agentWorkflowResult.content}`, currentAgent)}>
+                          交给小助手追问
+                        </button>
+                      </div>
+                    </>
+                  )}
                 </div>
               </section>
             </div>

@@ -102,6 +102,17 @@ export default function SettingsModal({
 
                 {settingsTab === 'sources' && (
                   <>
+                    <div className="source-strategy-panel">
+                      <div>
+                        <span>Source Intelligence</span>
+                        <strong>信息源不是堆数量，而是控制质量、覆盖和稳定性</strong>
+                        <p>建议采用 RSSHub 扩展非标准来源、feedfinder 思路自动发现站点 RSS、Readability/Mercury Parser 思路抽正文与首图，再用健康检测和来源等级决定展示权重。</p>
+                      </div>
+                      <button onClick={() => verifyAllSources()} disabled={verifyingAllSources}>
+                        {verifyingAllSources ? '检测中...' : '检测源健康'}
+                      </button>
+                    </div>
+
                     {/* 源类型切换 */}
                     <div className="source-type-tabs">
                       <button
