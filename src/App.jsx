@@ -105,6 +105,53 @@ const NAV_CONTEXT_SECTIONS = {
 
 const MORE_NAV_ITEMS = ['recommendations', 'briefing', 'tracker', 'trends', 'reading-stats', 'calendar', 'reading-list', 'knowledge-export', 'trending', 'custom-url'];
 
+const DEFAULT_AGENT_WORKFLOW = {
+  name: '个人情报协作流',
+  description: '把每日汇报、用户画像和素材库交给多个智能体协作，输出可阅读、可追踪、可创作的结果。',
+  nodes: [
+    {
+      id: 'wf-input',
+      type: 'input',
+      title: '输入',
+      role: '接收今日推荐、用户画像、追踪关键词和已收藏素材。',
+      prompt: '读取今日情报工作台、用户画像、素材库和用户补充指令。',
+      enabled: true
+    },
+    {
+      id: 'wf-analyst',
+      type: 'llm',
+      title: '大模型分析',
+      role: '识别重要事实、机会、风险和不确定性。',
+      prompt: '请基于输入资料输出事实、推断、不确定性和优先级。',
+      enabled: true
+    },
+    {
+      id: 'wf-classifier',
+      type: 'classifier',
+      title: '分类判断',
+      role: '按领域、质量等级、应用场景和风险等级给内容分流。',
+      prompt: '将内容分类为：必读、追踪、素材、创作、忽略，并说明原因。',
+      enabled: true
+    },
+    {
+      id: 'wf-skill',
+      type: 'skill',
+      title: '工具 Skills',
+      role: '调用搜索、摘要、正文抽取、导出和格式化等工具能力。',
+      prompt: '需要时调用工具补充证据、提取正文图片、整理参考链接。',
+      enabled: true
+    },
+    {
+      id: 'wf-output',
+      type: 'output',
+      title: '输出',
+      role: '生成今日简报、素材卡片、追踪记忆和创作选题。',
+      prompt: '输出结构：一句话判断、优先阅读、风险、行动、可沉淀素材。',
+      enabled: true
+    }
+  ]
+};
+
 const CATEGORIES = [
   { id: 'ai-models', label: 'AI 大模型', icon: 'cpu' },
   { id: 'research', label: '科研前沿', icon: 'beaker' },
@@ -629,8 +676,32 @@ function App() {
   const [agentFilter, setAgentFilter] = useState('全部');
   const [agentPromptRefining, setAgentPromptRefining] = useState(false);
   const [agentWorkflowResult, setAgentWorkflowResult] = useState({ loading: false, content: '', error: '', missionId: '' });
+  const [agentWorkflowRun, setAgentWorkflowRun] = useState(() => loadLS('agentWorkflowRun', {
+    id: '',
+    status: 'idle',
+    missionLabel: '',
+    startedAt: '',
+    finishedAt: '',
+    trace: []
+  }));
   const [agentWorkflowPrompt, setAgentWorkflowPrompt] = useState('');
   const [agentWorkflowScope, setAgentWorkflowScope] = useState('daily');
+  const [agentWorkflowDraft, setAgentWorkflowDraft] = useState(() => {
+    const saved = loadLS('agentWorkflowDraft', DEFAULT_AGENT_WORKFLOW);
+    if (!saved || !Array.isArray(saved.nodes) || saved.nodes.length === 0) return DEFAULT_AGENT_WORKFLOW;
+    return { ...DEFAULT_AGENT_WORKFLOW, ...saved };
+  });
+  const [workflowTemplates, setWorkflowTemplates] = useState(() => {
+    const savedTemplates = loadLS('agentWorkflowTemplates', null);
+    if (Array.isArray(savedTemplates) && savedTemplates.length > 0) return savedTemplates;
+    const savedDraft = loadLS('agentWorkflowDraft', DEFAULT_AGENT_WORKFLOW);
+    const baseDraft = savedDraft && Array.isArray(savedDraft.nodes) && savedDraft.nodes.length > 0 ? { ...DEFAULT_AGENT_WORKFLOW, ...savedDraft } : DEFAULT_AGENT_WORKFLOW;
+    return [{ ...baseDraft, id: baseDraft.id || 'default-workflow', updatedAt: new Date().toISOString() }];
+  });
+  const [activeWorkflowId, setActiveWorkflowId] = useState(() => loadLS('activeWorkflowId', 'default-workflow'));
+  const [selectedWorkflowNodeId, setSelectedWorkflowNodeId] = useState(() => loadLS('selectedWorkflowNodeId', 'wf-analyst'));
+  const [newWorkflowNodeType, setNewWorkflowNodeType] = useState('llm');
+  const [draggingWorkflowNodeId, setDraggingWorkflowNodeId] = useState('');
   const [stats, setStats] = useState({ sourceCount: 40, failedSources: 0, updatedAt: '', blockedCount: 0 });
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => localStorage.getItem('sidebarCollapsed') === 'true');
   const motivationalQuote = useMemo(() => {
@@ -1027,6 +1098,11 @@ function App() {
     localStorage.setItem('elfAgents', JSON.stringify(customAgents));
   }, [agents]);
   useEffect(() => { localStorage.setItem('elfCurrentAgent', currentAgent); }, [currentAgent]);
+  useEffect(() => { saveLS('agentWorkflowDraft', agentWorkflowDraft); }, [agentWorkflowDraft]);
+  useEffect(() => { saveLS('agentWorkflowTemplates', workflowTemplates); }, [workflowTemplates]);
+  useEffect(() => { saveLS('activeWorkflowId', activeWorkflowId); }, [activeWorkflowId]);
+  useEffect(() => { saveLS('agentWorkflowRun', agentWorkflowRun); }, [agentWorkflowRun]);
+  useEffect(() => { saveLS('selectedWorkflowNodeId', selectedWorkflowNodeId); }, [selectedWorkflowNodeId]);
 
   const fetchAiInsights = async () => {
     if (!llmConfig.baseUrl || !llmConfig.selectedModel || items.length === 0) {
@@ -1129,6 +1205,15 @@ function App() {
     } else if (nav === 'studio') {
       title = `${PRODUCT_NAME} - 智创中心`;
       description = '聚合素材库、智能体工作流和内容创作，沉淀个人知识资产。';
+    } else if (nav === 'agents') {
+      title = `${PRODUCT_NAME} - 智能体工作流`;
+      description = '主力大模型工作区，支持可视化节点蓝图、智能体协作和工作流输出沉淀。';
+    } else if (nav === 'materials') {
+      title = `${PRODUCT_NAME} - 素材库`;
+      description = '收集资讯卡片、每日汇报、本地上传和智能体输出，形成可复用知识资产。';
+    } else if (nav === 'editor') {
+      title = `${PRODUCT_NAME} - 内容创作`;
+      description = '联动素材库和智能体工作流，创作文章、报告并导出本地知识库资产。';
     } else if (nav === 'square') {
       title = `${PRODUCT_NAME} - 用户广场`;
       description = '分享文章、智能体和每日汇报，提供点赞、收藏、关注和评论等交流能力。';
@@ -2291,6 +2376,217 @@ function App() {
 
   const aiActionPrompts = useMemo(() => intelligenceMissions.slice(0, 4), [intelligenceMissions]);
 
+  const workflowTypeMeta = useMemo(() => ({
+    input: { label: '输入', tone: 'blue' },
+    llm: { label: '大模型 Prompt', tone: 'cyan' },
+    skill: { label: '工具 Skills', tone: 'green' },
+    condition: { label: '条件语句', tone: 'amber' },
+    classifier: { label: '分类语句', tone: 'violet' },
+    reply: { label: '指定回复', tone: 'rose' },
+    output: { label: '输出', tone: 'slate' }
+  }), []);
+
+  const workflowRunStatusMeta = useMemo(() => ({
+    idle: { label: '待运行', tone: 'neutral' },
+    running: { label: '运行中', tone: 'running' },
+    completed: { label: '已完成', tone: 'success' },
+    blocked: { label: '待配置', tone: 'blocked' },
+    failed: { label: '失败', tone: 'failed' }
+  }), []);
+
+  const selectedWorkflowNode = useMemo(() => {
+    return agentWorkflowDraft.nodes.find(node => node.id === selectedWorkflowNodeId) || agentWorkflowDraft.nodes[0] || null;
+  }, [agentWorkflowDraft.nodes, selectedWorkflowNodeId]);
+
+  const selectedWorkflowConnections = useMemo(() => {
+    const index = agentWorkflowDraft.nodes.findIndex(node => node.id === selectedWorkflowNodeId);
+    return {
+      previous: index > 0 ? agentWorkflowDraft.nodes[index - 1] : null,
+      next: index >= 0 && index < agentWorkflowDraft.nodes.length - 1 ? agentWorkflowDraft.nodes[index + 1] : null
+    };
+  }, [agentWorkflowDraft.nodes, selectedWorkflowNodeId]);
+
+  const enabledWorkflowNodes = useMemo(() => {
+    return agentWorkflowDraft.nodes.filter(node => node.enabled !== false);
+  }, [agentWorkflowDraft.nodes]);
+
+  const workflowBlueprintText = useMemo(() => {
+    return `${agentWorkflowDraft.name}
+${agentWorkflowDraft.description}
+
+${agentWorkflowDraft.nodes.map((node, index) => `${index + 1}. [${workflowTypeMeta[node.type]?.label || node.type}] ${node.title}
+角色：${node.role}
+指令：${node.prompt}
+状态：${node.enabled === false ? '停用' : '启用'}`).join('\n\n')}`;
+  }, [agentWorkflowDraft, workflowTypeMeta]);
+
+  const updateWorkflowDraft = useCallback((patch) => {
+    setAgentWorkflowDraft(prev => ({ ...prev, ...patch }));
+  }, []);
+
+  useEffect(() => {
+    if (!agentWorkflowDraft?.nodes?.length) return;
+    setWorkflowTemplates(prev => {
+      const draftId = activeWorkflowId || agentWorkflowDraft.id || 'default-workflow';
+      const nextDraft = { ...agentWorkflowDraft, id: draftId, updatedAt: new Date().toISOString() };
+      if (!prev.some(template => template.id === draftId)) return [...prev, nextDraft];
+      return prev.map(template => template.id === draftId ? nextDraft : template);
+    });
+  }, [agentWorkflowDraft, activeWorkflowId]);
+
+  const switchWorkflowTemplate = useCallback((templateId) => {
+    const template = workflowTemplates.find(item => item.id === templateId);
+    if (!template) return;
+    setActiveWorkflowId(templateId);
+    setAgentWorkflowDraft({ ...DEFAULT_AGENT_WORKFLOW, ...template });
+    setSelectedWorkflowNodeId(template.nodes?.[0]?.id || '');
+  }, [workflowTemplates]);
+
+  const saveWorkflowAsTemplate = useCallback(() => {
+    const id = `workflow-${Date.now()}`;
+    const template = {
+      ...agentWorkflowDraft,
+      id,
+      name: `${agentWorkflowDraft.name || '未命名工作流'} 副本`,
+      updatedAt: new Date().toISOString()
+    };
+    setWorkflowTemplates(prev => [template, ...prev]);
+    setActiveWorkflowId(id);
+    setAgentWorkflowDraft(template);
+    showToast('已保存为新的工作流模板');
+  }, [agentWorkflowDraft]);
+
+  const deleteWorkflowTemplate = useCallback((templateId) => {
+    setWorkflowTemplates(prev => {
+      if (prev.length <= 1) {
+        showToast('至少保留一个工作流模板');
+        return prev;
+      }
+      const next = prev.filter(template => template.id !== templateId);
+      if (activeWorkflowId === templateId) {
+        const fallback = next[0];
+        setActiveWorkflowId(fallback.id);
+        setAgentWorkflowDraft({ ...DEFAULT_AGENT_WORKFLOW, ...fallback });
+        setSelectedWorkflowNodeId(fallback.nodes?.[0]?.id || '');
+      }
+      showToast('已删除工作流模板');
+      return next;
+    });
+  }, [activeWorkflowId]);
+
+  const updateWorkflowNode = useCallback((nodeId, patch) => {
+    setAgentWorkflowDraft(prev => ({
+      ...prev,
+      nodes: prev.nodes.map(node => node.id === nodeId ? { ...node, ...patch } : node)
+    }));
+  }, []);
+
+  const reorderWorkflowNode = useCallback((fromId, toId) => {
+    if (!fromId || !toId || fromId === toId) return;
+    setAgentWorkflowDraft(prev => {
+      const fromIndex = prev.nodes.findIndex(node => node.id === fromId);
+      const toIndex = prev.nodes.findIndex(node => node.id === toId);
+      if (fromIndex < 0 || toIndex < 0) return prev;
+      const nodes = [...prev.nodes];
+      const [moved] = nodes.splice(fromIndex, 1);
+      nodes.splice(toIndex, 0, moved);
+      return { ...prev, nodes };
+    });
+  }, []);
+
+  const moveWorkflowNode = useCallback((nodeId, direction) => {
+    setAgentWorkflowDraft(prev => {
+      const index = prev.nodes.findIndex(node => node.id === nodeId);
+      const targetIndex = direction === 'up' ? index - 1 : index + 1;
+      if (index < 0 || targetIndex < 0 || targetIndex >= prev.nodes.length) return prev;
+      const nodes = [...prev.nodes];
+      const [moved] = nodes.splice(index, 1);
+      nodes.splice(targetIndex, 0, moved);
+      return { ...prev, nodes };
+    });
+  }, []);
+
+  const addWorkflowNode = useCallback(() => {
+    const meta = workflowTypeMeta[newWorkflowNodeType] || workflowTypeMeta.llm;
+    const node = {
+      id: `wf-${newWorkflowNodeType}-${Date.now()}`,
+      type: newWorkflowNodeType,
+      title: meta.label,
+      role: '描述这个节点负责的判断、工具或输出职责。',
+      prompt: '在这里填写该节点的执行指令。',
+      enabled: true
+    };
+    setAgentWorkflowDraft(prev => ({ ...prev, nodes: [...prev.nodes, node] }));
+    setSelectedWorkflowNodeId(node.id);
+  }, [newWorkflowNodeType, workflowTypeMeta]);
+
+  const removeWorkflowNode = useCallback((nodeId) => {
+    setAgentWorkflowDraft(prev => {
+      if (prev.nodes.length <= 1) return prev;
+      const nodes = prev.nodes.filter(node => node.id !== nodeId);
+      if (selectedWorkflowNodeId === nodeId) {
+        setSelectedWorkflowNodeId(nodes[0]?.id || '');
+      }
+      return { ...prev, nodes };
+    });
+  }, [selectedWorkflowNodeId]);
+
+  const resetWorkflowDraft = useCallback(() => {
+    setAgentWorkflowDraft(DEFAULT_AGENT_WORKFLOW);
+    setSelectedWorkflowNodeId(DEFAULT_AGENT_WORKFLOW.nodes[1]?.id || DEFAULT_AGENT_WORKFLOW.nodes[0]?.id || '');
+    showToast('已恢复默认工作流模板');
+  }, []);
+
+  const exportWorkflowToMaterials = useCallback(() => {
+    addManualMaterial({
+      title: `${agentWorkflowDraft.name} 工作流蓝图`,
+      content: workflowBlueprintText,
+      type: 'analysis',
+      source: '智能体工作流',
+      url: '',
+      tags: '智能体,工作流,蓝图',
+      note: '从智创中心智能体工作流导出',
+      spaceId: null
+    });
+    showToast('工作流蓝图已存入素材库');
+  }, [agentWorkflowDraft.name, workflowBlueprintText]);
+
+  const downloadWorkflowJson = useCallback(() => {
+    const payload = JSON.stringify({ ...agentWorkflowDraft, exportedAt: new Date().toISOString() }, null, 2);
+    const blob = new Blob([payload], { type: 'application/json;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${agentWorkflowDraft.name || 'agent-workflow'}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [agentWorkflowDraft]);
+
+  const exportWorkflowResultToEditor = useCallback(() => {
+    if (!agentWorkflowResult.content) return;
+    const traceText = (agentWorkflowRun.trace || [])
+      .map(step => `- ${step.order}. ${step.title} [${step.status}]：${step.detail || step.prompt || ''}`)
+      .join('\n');
+    const newArticle = {
+      id: Date.now(),
+      title: `${agentWorkflowDraft.name || '智能体工作流'} · ${new Date().toLocaleDateString('zh-CN')}`,
+      content: `# ${agentWorkflowDraft.name || '智能体工作流'}\n\n## 任务\n${agentWorkflowRun.missionLabel || '自定义任务'}\n\n## 运行轨迹\n${traceText || '暂无轨迹'}\n\n## 输出结果\n${agentWorkflowResult.content}\n\n---\n\n## 工作流蓝图\n${workflowBlueprintText}`,
+      template: 'blank',
+      materials: [],
+      tags: ['智能体', '工作流'],
+      status: 'draft',
+      spaceId: null,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      version: 1,
+      images: []
+    };
+    setArticles(prev => [...prev, newArticle]);
+    setCurrentArticleId(newArticle.id);
+    setNav('editor');
+    showToast('已导出到内容创作');
+  }, [agentWorkflowResult.content, agentWorkflowRun, agentWorkflowDraft.name, workflowBlueprintText]);
+
   const agentWorkflowScopes = useMemo(() => [
     { id: 'daily', label: '今日', desc: `${workbenchItems.length} 条推荐` },
     { id: 'focus', label: '关注', desc: `${workbenchStats.focusMatches} 条匹配` },
@@ -2365,10 +2661,32 @@ ${lines}`;
     const selectedMission = mission || intelligenceMissions[0];
     if (!selectedMission) return;
     const agent = agents.find(a => a.id === selectedMission.agentId) || agents.find(a => a.id === 'orchestrator') || agents[0];
+    const workflowNodes = enabledWorkflowNodes.length ? enabledWorkflowNodes : agentWorkflowDraft.nodes;
+    const blueprintSummary = workflowNodes.map((node, index) => `${index + 1}. ${node.title}｜${node.role}｜${node.prompt}`).join('\n');
     const prompt = customPrompt.trim() || selectedMission.prompt;
+    const runId = `run-${Date.now()}`;
+    const startedAt = new Date().toISOString();
+    const baseTrace = workflowNodes.map((node, index) => ({
+      id: `${runId}-${node.id}`,
+      nodeId: node.id,
+      title: node.title,
+      type: node.type,
+      order: index + 1,
+      status: index === 0 ? 'running' : 'queued',
+      detail: node.role,
+      prompt: node.prompt
+    }));
     setCurrentAgent(agent?.id || 'orchestrator');
     setAgentWorkflowPrompt(prompt);
     setAgentWorkflowResult({ loading: true, content: '', error: '', missionId: selectedMission.id });
+    setAgentWorkflowRun({
+      id: runId,
+      status: 'running',
+      missionLabel: selectedMission.label,
+      startedAt,
+      finishedAt: '',
+      trace: baseTrace
+    });
 
     if (!llmConfig.baseUrl || !llmConfig.selectedModel) {
       setAgentWorkflowResult({
@@ -2377,6 +2695,16 @@ ${lines}`;
         error: '请先配置大模型，才能运行智能体工作流。',
         missionId: selectedMission.id
       });
+      setAgentWorkflowRun(prev => ({
+        ...prev,
+        status: 'blocked',
+        finishedAt: new Date().toISOString(),
+        trace: prev.trace.map((step, index) => ({
+          ...step,
+          status: index === 0 ? 'blocked' : 'skipped',
+          detail: index === 0 ? '等待配置大模型后继续运行。' : step.detail
+        }))
+      }));
       setShowLlmQuickConfig(true);
       return;
     }
@@ -2399,9 +2727,20 @@ ${lines}`;
           apiKey: llmConfig.apiKey,
           model: llmConfig.selectedModel,
           action: 'chat',
-          content: buildWorkbenchContext(prompt),
+          content: `${buildWorkbenchContext(prompt)}
+
+工作流蓝图：
+${blueprintSummary}`,
           systemPrompt,
-          messages: []
+          messages: [
+            {
+              role: 'user',
+              content: `${prompt}
+
+当前工作流蓝图：
+${blueprintSummary}`
+            }
+          ]
         })
       });
       const data = await response.json();
@@ -2412,6 +2751,16 @@ ${lines}`;
         error: '',
         missionId: selectedMission.id
       });
+      setAgentWorkflowRun(prev => ({
+        ...prev,
+        status: 'completed',
+        finishedAt: new Date().toISOString(),
+        trace: prev.trace.map((step, index) => ({
+          ...step,
+          status: 'completed',
+          detail: index === prev.trace.length - 1 ? '已生成可沉淀输出。' : step.detail
+        }))
+      }));
     } catch (e) {
       setAgentWorkflowResult({
         loading: false,
@@ -2419,8 +2768,18 @@ ${lines}`;
         error: e.message || '智能体工作流运行失败',
         missionId: selectedMission.id
       });
+      setAgentWorkflowRun(prev => ({
+        ...prev,
+        status: 'failed',
+        finishedAt: new Date().toISOString(),
+        trace: prev.trace.map((step, index) => ({
+          ...step,
+          status: index === 0 ? 'failed' : step.status === 'queued' ? 'skipped' : step.status,
+          detail: index === 0 ? (e.message || '智能体工作流运行失败') : step.detail
+        }))
+      }));
     }
-  }, [agents, intelligenceMissions, llmConfig, buildWorkbenchContext]);
+  }, [agents, intelligenceMissions, llmConfig, buildWorkbenchContext, enabledWorkflowNodes, agentWorkflowDraft.nodes]);
 
   const getFeedbackTerm = useCallback((item) => {
     const tags = item.tags || [];
@@ -2898,6 +3257,7 @@ ${lines}`;
     };
     setMaterials(prev => [...prev, newMaterial]);
     setShowAddMaterial(false);
+    return newMaterial;
   }
 
   function removeMaterial(id) {
@@ -4766,10 +5126,199 @@ ${signals}
                   </div>
                 </div>
 
+                <div className="agent-workflow-panel builder-panel">
+                  <div className="section-header">
+                    <h2 className="section-title">{ICONS.bot} 可视化工作流蓝图</h2>
+                    <p className="section-desc">先用可编辑节点定义智能体协作语言，后续再升级为拖拽式画布和真实节点执行。</p>
+                  </div>
+
+                  <div className="workflow-template-bar">
+                    <label>
+                      <span>工作流模板</span>
+                      <select value={activeWorkflowId} onChange={e => switchWorkflowTemplate(e.target.value)}>
+                        {workflowTemplates.map(template => (
+                          <option key={template.id} value={template.id}>{template.name || '未命名工作流'}</option>
+                        ))}
+                      </select>
+                    </label>
+                    <button onClick={saveWorkflowAsTemplate}>{ICONS.plus} 保存副本</button>
+                    <button onClick={() => deleteWorkflowTemplate(activeWorkflowId)}>删除模板</button>
+                  </div>
+
+                  <div className="workflow-draft-form">
+                    <label>
+                      <span>工作流名称</span>
+                      <input
+                        value={agentWorkflowDraft.name}
+                        onChange={e => updateWorkflowDraft({ name: e.target.value })}
+                      />
+                    </label>
+                    <label>
+                      <span>目标说明</span>
+                      <textarea
+                        value={agentWorkflowDraft.description}
+                        onChange={e => updateWorkflowDraft({ description: e.target.value })}
+                        rows={2}
+                      />
+                    </label>
+                  </div>
+
+                  <div className="workflow-canvas">
+                    {agentWorkflowDraft.nodes.map((node, index) => (
+                      <div
+                        key={node.id}
+                        className={`workflow-node-frame ${draggingWorkflowNodeId === node.id ? 'dragging' : ''}`}
+                        draggable
+                        onDragStart={() => setDraggingWorkflowNodeId(node.id)}
+                        onDragOver={e => e.preventDefault()}
+                        onDrop={() => {
+                          reorderWorkflowNode(draggingWorkflowNodeId, node.id);
+                          setDraggingWorkflowNodeId('');
+                        }}
+                        onDragEnd={() => setDraggingWorkflowNodeId('')}
+                      >
+                        <button
+                          type="button"
+                          className={`workflow-builder-node tone-${workflowTypeMeta[node.type]?.tone || 'slate'} ${selectedWorkflowNodeId === node.id ? 'active' : ''} ${node.enabled === false ? 'disabled' : ''}`}
+                          onClick={() => setSelectedWorkflowNodeId(node.id)}
+                        >
+                          <span className="workflow-node-index">{String(index + 1).padStart(2, '0')}</span>
+                          <span className="workflow-node-type">{workflowTypeMeta[node.type]?.label || node.type}</span>
+                          <strong>{node.title}</strong>
+                          <p>{node.role}</p>
+                        </button>
+                        {index < agentWorkflowDraft.nodes.length - 1 && <span className="workflow-connector">→</span>}
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="workflow-add-row">
+                    <select value={newWorkflowNodeType} onChange={e => setNewWorkflowNodeType(e.target.value)}>
+                      {Object.entries(workflowTypeMeta).map(([type, meta]) => (
+                        <option key={type} value={type}>{meta.label}</option>
+                      ))}
+                    </select>
+                    <button onClick={addWorkflowNode}>{ICONS.plus} 添加节点</button>
+                    <button className="workflow-save-blueprint" onClick={exportWorkflowToMaterials}>{ICONS.layers} 保存蓝图</button>
+                    <button className="workflow-download-json" onClick={downloadWorkflowJson}>{ICONS.download} 导出 JSON</button>
+                    <button onClick={resetWorkflowDraft}>恢复模板</button>
+                  </div>
+
+                  {selectedWorkflowNode && (
+                    <div className="workflow-node-editor">
+                      <div className="workflow-node-editor-head">
+                        <div>
+                          <span>节点配置</span>
+                          <strong>{selectedWorkflowNode.title}</strong>
+                        </div>
+                        <div className="workflow-node-tools">
+                          <button onClick={() => moveWorkflowNode(selectedWorkflowNode.id, 'up')}>上移</button>
+                          <button onClick={() => moveWorkflowNode(selectedWorkflowNode.id, 'down')}>下移</button>
+                          <label className="workflow-toggle">
+                            <input
+                              type="checkbox"
+                              checked={selectedWorkflowNode.enabled !== false}
+                              onChange={e => updateWorkflowNode(selectedWorkflowNode.id, { enabled: e.target.checked })}
+                            />
+                            启用
+                          </label>
+                        </div>
+                      </div>
+                      <div className="workflow-node-editor-grid">
+                        <label>
+                          <span>节点标题</span>
+                          <input
+                            className="workflow-node-title-input"
+                            value={selectedWorkflowNode.title}
+                            onChange={e => updateWorkflowNode(selectedWorkflowNode.id, { title: e.target.value })}
+                          />
+                        </label>
+                        <label>
+                          <span>节点类型</span>
+                          <select
+                            value={selectedWorkflowNode.type}
+                            onChange={e => updateWorkflowNode(selectedWorkflowNode.id, { type: e.target.value })}
+                          >
+                            {Object.entries(workflowTypeMeta).map(([type, meta]) => (
+                              <option key={type} value={type}>{meta.label}</option>
+                            ))}
+                          </select>
+                        </label>
+                      </div>
+                      <label>
+                        <span>职责说明</span>
+                        <textarea
+                          value={selectedWorkflowNode.role}
+                          onChange={e => updateWorkflowNode(selectedWorkflowNode.id, { role: e.target.value })}
+                          rows={2}
+                        />
+                      </label>
+                      <label>
+                        <span>执行指令 / Prompt</span>
+                        <textarea
+                          value={selectedWorkflowNode.prompt}
+                          onChange={e => updateWorkflowNode(selectedWorkflowNode.id, { prompt: e.target.value })}
+                          rows={4}
+                        />
+                      </label>
+                      <button className="workflow-delete-node" onClick={() => removeWorkflowNode(selectedWorkflowNode.id)}>删除节点</button>
+                      <div className="workflow-node-relations">
+                        <div>
+                          <span>上游</span>
+                          <strong>{selectedWorkflowConnections.previous?.title || '起点'}</strong>
+                        </div>
+                        <div>
+                          <span>下游</span>
+                          <strong>{selectedWorkflowConnections.next?.title || '终点'}</strong>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="workflow-blueprint-preview">
+                    <span>当前启用链路</span>
+                    <p>{enabledWorkflowNodes.map(node => node.title).join(' → ') || '暂无启用节点'}</p>
+                  </div>
+                </div>
+
                 <div className="agent-workflow-panel result-panel">
                   <div className="section-header">
                     <h2 className="section-title">{ICONS.document} 工作流输出</h2>
                     <p className="section-desc">结果可继续交给小助手追问，或沉淀到素材库。</p>
+                  </div>
+                  <div className={`workflow-run-panel status-${agentWorkflowRun.status || 'idle'}`}>
+                    <div className="workflow-run-head">
+                      <div>
+                        <span>最近运行</span>
+                        <strong>{agentWorkflowRun.missionLabel || '尚未运行工作流'}</strong>
+                      </div>
+                      <em>{workflowRunStatusMeta[agentWorkflowRun.status]?.label || '待运行'}</em>
+                    </div>
+                    {agentWorkflowRun.startedAt && (
+                      <p className="workflow-run-time">
+                        开始：{new Date(agentWorkflowRun.startedAt).toLocaleTimeString('zh-CN')}
+                        {agentWorkflowRun.finishedAt ? ` · 结束：${new Date(agentWorkflowRun.finishedAt).toLocaleTimeString('zh-CN')}` : ''}
+                      </p>
+                    )}
+                    <div className="workflow-run-trace">
+                      {(agentWorkflowRun.trace?.length ? agentWorkflowRun.trace : enabledWorkflowNodes.map((node, index) => ({
+                        id: node.id,
+                        title: node.title,
+                        type: node.type,
+                        order: index + 1,
+                        status: 'idle',
+                        detail: node.role
+                      }))).map(step => (
+                        <div key={step.id} className={`workflow-trace-step status-${step.status}`}>
+                          <span>{String(step.order).padStart(2, '0')}</span>
+                          <div>
+                            <strong>{step.title}</strong>
+                            <p>{step.detail}</p>
+                          </div>
+                          <em>{step.status}</em>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                   {agentWorkflowResult.loading && <div className="agent-result-loading"><div className="spinner" /><span>智能体正在处理今日情报...</span></div>}
                   {!agentWorkflowResult.loading && agentWorkflowResult.error && (
@@ -4788,8 +5337,8 @@ ${signals}
                       <pre className="agent-result-content">{agentWorkflowResult.content}</pre>
                       <div className="agent-result-actions">
                         <button onClick={() => addManualMaterial({
-                          title: `智能体工作流 ${new Date().toLocaleDateString('zh-CN')}`,
-                          content: agentWorkflowResult.content,
+                          title: `${agentWorkflowDraft.name || '智能体工作流'} ${new Date().toLocaleDateString('zh-CN')}`,
+                          content: `${agentWorkflowResult.content}\n\n---\n\n工作流蓝图\n${workflowBlueprintText}`,
                           type: 'analysis',
                           source: '智能体工作流',
                           url: '',
@@ -4797,6 +5346,7 @@ ${signals}
                           note: '',
                           spaceId: null
                         })}>存入素材库</button>
+                        <button onClick={exportWorkflowResultToEditor}>导出到内容创作</button>
                         <button onClick={() => sendWorkbenchToElf(`请基于以下智能体工作流结果继续追问：\n${agentWorkflowResult.content}`, currentAgent)}>
                           交给小助手追问
                         </button>
@@ -6297,7 +6847,7 @@ ${signals}
             </div>
           )}
 
-{nav === 'editor' && <ArticleEditor editorFullscreen={editorFullscreen} setEditorFullscreen={setEditorFullscreen} editorTextareaRef={editorTextareaRef} imageInputRef={imageInputRef} articles={articles} setArticles={setArticles} currentArticleId={currentArticleId} setCurrentArticleId={setCurrentArticleId} editorTab={editorTab} setEditorTab={setEditorTab} editorCursorPos={editorCursorPos} setEditorCursorPos={setEditorCursorPos} showTemplateMenu={showTemplateMenu} setShowTemplateMenu={setShowTemplateMenu} showAiPanel={showAiPanel} setShowAiPanel={setShowAiPanel} showImagePanel={showImagePanel} setShowImagePanel={setShowImagePanel} aiResult={aiResult} setAiResult={setAiResult} aiCustomPrompt={aiCustomPrompt} setAiCustomPrompt={setAiCustomPrompt} autoSaveTimer={autoSaveTimer} setAutoSaveTimer={setAutoSaveTimer} lastSavedAt={lastSavedAt} setLastSavedAt={setLastSavedAt} articleTagInput={articleTagInput} setArticleTagInput={setArticleTagInput} editingArticleTag={editingArticleTag} setEditingArticleTag={setEditingArticleTag} articleSpaces={articleSpaces} setArticleSpaces={setArticleSpaces} articleSpaceFilter={articleSpaceFilter} setArticleSpaceFilter={setArticleSpaceFilter} articleMaterialSpaceFilter={articleMaterialSpaceFilter} setArticleMaterialSpaceFilter={setArticleMaterialSpaceFilter} articleSpaceFormOpen={articleSpaceFormOpen} setArticleSpaceFormOpen={setArticleSpaceFormOpen} newArticleSpaceName={newArticleSpaceName} setNewArticleSpaceName={setNewArticleSpaceName} articleSpaceForNewArticle={articleSpaceForNewArticle} setArticleSpaceForNewArticle={setArticleSpaceForNewArticle} articleSearch={articleSearch} setArticleSearch={setArticleSearch} articleStatusFilter={articleStatusFilter} setArticleStatusFilter={setArticleStatusFilter} articleTemplateFilter={articleTemplateFilter} setArticleTemplateFilter={setArticleTemplateFilter} articleSort={articleSort} setArticleSort={setArticleSort} filteredArticles={filteredArticles} articleExportFilter={articleExportFilter} setArticleExportFilter={setArticleExportFilter} createArticle={createArticle} updateArticle={updateArticle} deleteArticle={deleteArticle} duplicateArticle={duplicateArticle} addArticleTag={addArticleTag} removeArticleTag={removeArticleTag} triggerAutoSave={triggerAutoSave} handleContentChange={handleContentChange} handleTitleChange={handleTitleChange} insertAtCursor={insertAtCursor} insertMaterialAtCursor={insertMaterialAtCursor} removeLinkedMaterial={removeLinkedMaterial} handleImageUpload={handleImageUpload} handlePaste={handlePaste} createArticleSpace={createArticleSpace} deleteArticleSpace={deleteArticleSpace} assignArticleToSpace={assignArticleToSpace} batchAssignArticlesToSpace={batchAssignArticlesToSpace} insertAiResult={insertAiResult} clearAiResult={clearAiResult} exportArticleToFile={exportArticleToFile} copyArticleAsRichText={copyArticleAsRichText} materials={materials} llmConfig={llmConfig} />}
+{nav === 'editor' && <ArticleEditor editorFullscreen={editorFullscreen} setEditorFullscreen={setEditorFullscreen} editorTextareaRef={editorTextareaRef} imageInputRef={imageInputRef} articles={articles} setArticles={setArticles} currentArticleId={currentArticleId} setCurrentArticleId={setCurrentArticleId} editorTab={editorTab} setEditorTab={setEditorTab} editorCursorPos={editorCursorPos} setEditorCursorPos={setEditorCursorPos} showTemplateMenu={showTemplateMenu} setShowTemplateMenu={setShowTemplateMenu} showAiPanel={showAiPanel} setShowAiPanel={setShowAiPanel} showImagePanel={showImagePanel} setShowImagePanel={setShowImagePanel} aiResult={aiResult} setAiResult={setAiResult} aiCustomPrompt={aiCustomPrompt} setAiCustomPrompt={setAiCustomPrompt} autoSaveTimer={autoSaveTimer} setAutoSaveTimer={setAutoSaveTimer} lastSavedAt={lastSavedAt} setLastSavedAt={setLastSavedAt} articleTagInput={articleTagInput} setArticleTagInput={setArticleTagInput} editingArticleTag={editingArticleTag} setEditingArticleTag={setEditingArticleTag} articleSpaces={articleSpaces} setArticleSpaces={setArticleSpaces} materialSpaces={materialSpaces} setMaterialSpaces={setMaterialSpaces} articleSpaceFilter={articleSpaceFilter} setArticleSpaceFilter={setArticleSpaceFilter} articleMaterialSpaceFilter={articleMaterialSpaceFilter} setArticleMaterialSpaceFilter={setArticleMaterialSpaceFilter} articleSpaceFormOpen={articleSpaceFormOpen} setArticleSpaceFormOpen={setArticleSpaceFormOpen} newArticleSpaceName={newArticleSpaceName} setNewArticleSpaceName={setNewArticleSpaceName} articleSpaceForNewArticle={articleSpaceForNewArticle} setArticleSpaceForNewArticle={setArticleSpaceForNewArticle} articleSearch={articleSearch} setArticleSearch={setArticleSearch} articleStatusFilter={articleStatusFilter} setArticleStatusFilter={setArticleStatusFilter} articleTemplateFilter={articleTemplateFilter} setArticleTemplateFilter={setArticleTemplateFilter} articleSort={articleSort} setArticleSort={setArticleSort} filteredArticles={filteredArticles} articleExportFilter={articleExportFilter} setArticleExportFilter={setArticleExportFilter} createArticle={createArticle} updateArticle={updateArticle} deleteArticle={deleteArticle} duplicateArticle={duplicateArticle} addArticleTag={addArticleTag} removeArticleTag={removeArticleTag} triggerAutoSave={triggerAutoSave} handleContentChange={handleContentChange} handleTitleChange={handleTitleChange} insertAtCursor={insertAtCursor} insertMaterialAtCursor={insertMaterialAtCursor} removeLinkedMaterial={removeLinkedMaterial} handleImageUpload={handleImageUpload} handlePaste={handlePaste} createArticleSpace={createArticleSpace} deleteArticleSpace={deleteArticleSpace} assignArticleToSpace={assignArticleToSpace} batchAssignArticlesToSpace={batchAssignArticlesToSpace} insertAiResult={insertAiResult} clearAiResult={clearAiResult} exportArticleToFile={exportArticleToFile} copyArticleAsRichText={copyArticleAsRichText} materials={materials} llmConfig={llmConfig} />}
 
           {articleSpaceFormOpen && (
             <div className="modal-backdrop" onClick={() => setArticleSpaceFormOpen(false)}>

@@ -1,6 +1,6 @@
 import React from 'react';
 import { ICONS } from '../constants/index.jsx';
-import { ARTICLE_STATUS, ARTICLE_TEMPLATES, ARTICLE_TEMPLATE_CONTENT } from '../constants/index.jsx';
+import { ARTICLE_STATUS, ARTICLE_TEMPLATES, ARTICLE_TEMPLATE_CONTENT, MATERIAL_TYPES } from '../constants/index.jsx';
 import { formatRelative } from '../utils/format.js';
 import { renderMarkdownWithImages } from '../utils/markdown.jsx';
 
@@ -21,6 +21,7 @@ export default function ArticleEditor({
   articleTagInput, setArticleTagInput,
   editingArticleTag, setEditingArticleTag,
   articleSpaces, setArticleSpaces,
+  materialSpaces, setMaterialSpaces,
   articleSpaceFilter, setArticleSpaceFilter,
   articleMaterialSpaceFilter, setArticleMaterialSpaceFilter,
   articleSpaceFormOpen, setArticleSpaceFormOpen,
@@ -500,7 +501,7 @@ export default function ArticleEditor({
                             <div className="linked-materials-list">
                               {linkedMaterials.map(m => (
                                 <div key={m.id} className="linked-material-item">
-                                  <span className={`material-type-badge type-${m.type}`}>{MATERIAL_TYPES[m.type]}</span>
+                                  <span className={`material-type-badge type-${m.type}`}>{MATERIAL_TYPES[m.type] || m.type}</span>
                                   <span className="linked-material-text">{m.content.slice(0, 50)}...</span>
                                   <button className="linked-material-remove" onClick={() => removeLinkedMaterial(article, m.id)} title="移除引用">{ICONS.x}</button>
                                 </div>
@@ -522,7 +523,7 @@ export default function ArticleEditor({
                                     onDragStart={e => { e.dataTransfer.setData('text/plain', JSON.stringify({ materialId: m.id })); e.dataTransfer.effectAllowed = 'copy'; }}
                                     title={m.content}
                                   >
-                                    <span className={`material-type-badge type-${m.type}`}>{MATERIAL_TYPES[m.type]}</span>
+                                    <span className={`material-type-badge type-${m.type}`}>{MATERIAL_TYPES[m.type] || m.type}</span>
                                     <span className="material-picker-content">{m.content.slice(0, 40)}...</span>
                                   </div>
                                 ))}
