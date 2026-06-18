@@ -179,8 +179,8 @@ export async function getNews(blocked, customSources, page = 0, pageSize = PAGE_
       imageSettled.forEach(result => {
         if (result.status === 'fulfilled' && result.value) {
           const idx = fullItems.findIndex(i => i.id === result.value.id);
-          if (idx >= 0 && result.value.imageUrl) {
-            fullItems[idx].imageUrl = result.value.imageUrl;
+          if (idx >= 0) {
+            if (result.value.imageUrl) fullItems[idx].imageUrl = result.value.imageUrl;
             if (result.value.videoUrl) fullItems[idx].videoUrl = result.value.videoUrl;
           }
         }
@@ -188,6 +188,30 @@ export async function getNews(blocked, customSources, page = 0, pageSize = PAGE_
     }
 
     // 更新统计
+    const finalImageUsage = new Map();
+    fullItems.forEach(item => {
+      if (!item.imageUrl) return;
+      try {
+        const normalized = normalizeImageKey(item.imageUrl);
+        if (finalImageUsage.has(normalized)) {
+          console.log(`[getNews] Removing duplicate resolved image: ${normalized.substring(0, 60)}`);
+          item.imageUrl = '';
+          mediaStats.duplicateFilteredCount++;
+          return;
+        }
+        finalImageUsage.set(normalized, item.id);
+      } catch {
+        item.imageUrl = '';
+      }
+    });
+
+    mediaStats.itemsWithImage = 0;
+    mediaStats.itemsWithVideo = 0;
+    fullItems.forEach(item => {
+      if (item.imageUrl) mediaStats.itemsWithImage++;
+      if (item.videoUrl) mediaStats.itemsWithVideo++;
+    });
+
     mediaStats.lastUpdate = new Date().toISOString();
 
     // 输出统计日志

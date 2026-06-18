@@ -1,7 +1,15 @@
 import { MEDIA_CONFIG } from '../config/constants.js';
 import { isSafeUrl } from '../utils/httpUtils.js';
 import { sleep } from '../utils/httpUtils.js';
-import { parseSrcset, optimizeImageUrl, isGoodImageUrl, scoreImageUrl, normalizeImageKey } from './imageProcessing.js';
+import {
+  collectStructuredImageCandidates,
+  normalizeCandidateImageUrl,
+  parseSrcset,
+  optimizeImageUrl,
+  isGoodImageUrl,
+  scoreImageUrl,
+  normalizeImageKey
+} from './imageProcessing.js';
 
 // ========== 多媒体统计 ==========
 export const mediaStats = {
@@ -94,10 +102,18 @@ export async function validateImageUrl(url, timeout = 8000) {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), timeout);
 
-    const response = await fetch(url, {
+    let response = await fetch(url, {
       method: 'HEAD',
       signal: controller.signal
     });
+
+    if (!response.ok) {
+      response = await fetch(url, {
+        method: 'GET',
+        headers: { Range: 'bytes=0-2048' },
+        signal: controller.signal
+      });
+    }
 
     clearTimeout(timeoutId);
 
@@ -169,6 +185,28 @@ export async function resolveImageFromArticle(articleUrl) {
     if (!res.ok) return { imageUrl: '', videoUrl: '' };
 
     const html = await res.text();
+    const structuredImageCandidates = collectStructuredImageCandidates(html, articleUrl);
+    const inlineImageCandidates = [];
+    const pushInlineCandidate = (rawUrl, tag = '') => {
+      const imageUrl = normalizeCandidateImageUrl(rawUrl, articleUrl);
+      if (!imageUrl || !isGoodImageUrl(imageUrl, tag || imageUrl)) return;
+      inlineImageCandidates.push({ url: imageUrl, context: tag || imageUrl });
+    };
+    [...html.matchAll(/<img[^>]*>/gi)].forEach(match => {
+      const tag = match[0];
+      [...tag.matchAll(/\b(?:src|data-src|data-original|data-lazy-src|data-lazy|data-img|oldsrc)=["']([^"']+)["']/gi)].forEach(attrMatch => {
+        const raw = attrMatch[1];
+        if (raw.includes(',')) {
+          const maxSrc = parseSrcset(raw);
+          if (maxSrc) pushInlineCandidate(maxSrc, tag);
+        } else {
+          pushInlineCandidate(raw, tag);
+        }
+      });
+      const srcset = tag.match(/\b(?:srcset|data-srcset)=["']([^"']+)["']/i)?.[1];
+      const maxSrc = srcset ? parseSrcset(srcset) : '';
+      if (maxSrc) pushInlineCandidate(maxSrc, tag);
+    });
 
     // 提取所有图片（包括懒加载图片）- 增强版
     const allImages = [];
@@ -212,7 +250,8 @@ export async function resolveImageFromArticle(articleUrl) {
     // 标准化URL并去重（增强版：基于多维度去重）
     const normalizedImages = [...new Set(allImages.map(url => {
       try {
-        const urlObj = new URL(url, articleUrl);
+        const normalizedUrl = normalizeCandidateImageUrl(url, articleUrl);
+        const urlObj = new URL(normalizedUrl, articleUrl);
         // 移除常见查询参数但保留关键的尺寸参数
         const paramsToRemove = ['ref', 'utm_source', 'utm_medium', 'utm_campaign', 'fbclid', 'gclid', 't', 'time'];
         paramsToRemove.forEach(param => urlObj.searchParams.delete(param));
@@ -258,13 +297,38 @@ export async function resolveImageFromArticle(articleUrl) {
     });
 
     // 对所有图片进行评分和过滤
-    const scoredImages = normalizedImages
+    const scoredStructuredImages = structuredImageCandidates
+      .map(candidate => {
+        const { score, reasons } = scoreImageUrl(candidate.url, html);
+        const sourceBonus = candidate.source === 'og' ? 34
+          : candidate.source === 'twitter' ? 32
+          : candidate.source === 'json' ? 24
+          : candidate.source === 'link' ? 14
+          : 0;
+        return { url: candidate.url, score: score + sourceBonus, reasons: [...reasons, candidate.source] };
+      })
+      .filter(img => img.score >= 24);
+
+    const scoredInlineImages = normalizedImages
       .filter(url => isGoodImageUrl(url, html))
       .map(url => {
         const { score, reasons } = scoreImageUrl(url, html);
         return { url, score, reasons };
       })
-.filter(img => img.score >= MEDIA_CONFIG.MIN_IMAGE_SCORE)
+      .filter(img => img.score >= MEDIA_CONFIG.MIN_IMAGE_SCORE);
+
+    const scoredArticleImages = inlineImageCandidates
+      .map(candidate => {
+        const { score, reasons } = scoreImageUrl(candidate.url, candidate.context);
+        return { url: candidate.url, score: score + 12, reasons: [...reasons, 'article-img'] };
+      })
+      .filter(img => img.score >= 24);
+
+    const scoredImages = [...scoredStructuredImages, ...scoredArticleImages, ...scoredInlineImages]
+      .filter((img, index, list) => {
+        const key = normalizeImageKey(img.url);
+        return list.findIndex(other => normalizeImageKey(other.url) === key) === index;
+      })
       .sort((a, b) => b.score - a.score);
 
     // 提取视频（增强版）- 在图片之前提取，优先视频
@@ -366,7 +430,13 @@ export async function resolveImageFromArticle(articleUrl) {
       const bestUrl = optimizeImageUrl(best.url);
       const isValid = await validateImageUrl(bestUrl, 8000); // 8秒超时（从5秒增加）
 
-      if (isValid) {
+      const isHighConfidenceStructured = best.score >= 32
+        && best.reasons?.some(reason => ['og', 'twitter', 'json'].includes(reason));
+
+      if (isValid || isHighConfidenceStructured) {
+        if (!isValid) {
+          console.log(`[resolveImage] Accepting high-confidence structured image despite validation failure: ${bestUrl.substring(0, 80)}`);
+        }
         incrementImageUsage(bestUrl);
         console.log(`[resolveImage] Selected for ${articleUrl}:`, {
           url: bestUrl.substring(0, 80),

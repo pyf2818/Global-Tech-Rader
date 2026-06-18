@@ -1,11 +1,10 @@
 import { CATEGORIES, MODES, DEFAULT_SOURCES, SOURCE_GRADES, PAGE_SIZE } from './config/constants.js';
 import { getSourceGrade, getSourceGradeInfo } from './config/sourceGrades.js';
-import { cleanText } from './utils/textProcessing.js';
 import { sendJson, parseBody, isSafeUrl } from './utils/httpUtils.js';
-import { matchBlocks, pick } from './parsing/feedParser.js';
 import { users, userSessions, createUser, verifyUser, generateToken, getUserByToken } from './auth/userAuth.js';
 import { getNews } from './services/newsService.js';
 import { getTrending, getGithubTrending } from './services/trendingService.js';
+import { discoverSourceCandidates, validateFeedUrl } from './services/sourceDiscovery.js';
 
 export function newsPlugin() {
   return {
@@ -18,11 +17,13 @@ export function newsPlugin() {
           return sendJson(res, {
             categories: CATEGORIES,
             modes: MODES,
-            sources: DEFAULT_SOURCES.map(({ name, region }) => {
+            sources: DEFAULT_SOURCES.map(({ name, url, region, defaultCategory }) => {
               const gradeInfo = getSourceGradeInfo(name);
               return {
                 name,
+                url,
                 region,
+                defaultCategory,
                 grade: getSourceGrade(name),
                 gradeInfo: {
                   label: gradeInfo.label,
@@ -159,24 +160,15 @@ export function newsPlugin() {
           const url = requestUrl.searchParams.get('url') || '';
           if (!url) return sendJson(res, { ok: false, message: 'URL is required' }, 400);
           if (!isSafeUrl(url)) return sendJson(res, { ok: false, message: 'URL points to a blocked destination' }, 403);
-          try {
-            const controller = new AbortController();
-            const timeout = setTimeout(() => controller.abort(), 8000);
-            const response = await fetch(url, {
-              headers: { 'User-Agent': 'GlobalTechRadar/0.1 (+https://localhost)' },
-              signal: controller.signal
-            });
-            clearTimeout(timeout);
-            if (!response.ok) return sendJson(res, { ok: false, message: `HTTP ${response.status}`, status: response.status });
-            const xml = await response.text();
-            const isFeed = /<rss\b|<feed\b|<channel\b/i.test(xml);
-            if (!isFeed) return sendJson(res, { ok: false, message: 'Not a valid RSS/Atom feed' });
-            const items = matchBlocks(xml, 'item').length || matchBlocks(xml, 'entry').length;
-            const title = cleanText(pick(matchBlocks(xml, 'channel').concat(matchBlocks(xml, 'feed')).join(''), ['title'])) || url;
-            return sendJson(res, { ok: true, title, itemCount: items, message: 'Feed is valid' });
-          } catch (e) {
-            return sendJson(res, { ok: false, message: e.message });
-          }
+          const result = await validateFeedUrl(url);
+          return sendJson(res, result, result.ok ? 200 : 200);
+        }
+
+        if (requestUrl.pathname === '/api/discover-source') {
+          const url = requestUrl.searchParams.get('url') || '';
+          if (!url) return sendJson(res, { ok: false, message: 'URL is required', candidates: [] }, 400);
+          const result = await discoverSourceCandidates(url);
+          return sendJson(res, result, result.ok ? 200 : 200);
         }
 
         if (requestUrl.pathname === '/api/llm-models') {

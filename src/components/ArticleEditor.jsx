@@ -30,6 +30,7 @@ export default function ArticleEditor({
   articleStatusFilter, setArticleStatusFilter,
   articleTemplateFilter, setArticleTemplateFilter,
   articleSort, setArticleSort,
+  filteredArticles = [],
   articleExportFilter, setArticleExportFilter,
   createArticle, updateArticle, deleteArticle, duplicateArticle,
   addArticleTag, removeArticleTag,

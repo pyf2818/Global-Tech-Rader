@@ -1,6 +1,7 @@
 import React from 'react';
 import { ICONS, REGION_MAP, AGENT_CATEGORIES } from '../constants/index.jsx';
 import { showToast } from '../utils/toast.js';
+import SourceOpsPanel from './SourceOpsPanel.jsx';
 
 // Helper functions (local to this component)
 function truncateUrl(url, maxLength) {
@@ -55,6 +56,7 @@ export default function SettingsModal({
   // Source operations
   addCustomSource, removeCustomSource, verifySource, verifyAllSources,
   verifySingleSource, exportSources, importSources,
+  sourceDiscoveryUrl, setSourceDiscoveryUrl, sourceDiscoveryState, discoverSource, addDiscoveredSource,
   verifyingAllSources, allSourcesVerifyResults, setAllSourcesVerifyResults,
 
   // Monitor
@@ -82,6 +84,8 @@ export default function SettingsModal({
   formatRelative,
   loadNews,
 }) {
+  const [showSourceAdvanced, setShowSourceAdvanced] = React.useState(false);
+
   if (!showSettings) return null;
 
   return (
@@ -95,7 +99,7 @@ export default function SettingsModal({
                   <button className={`settings-nav-item ${settingsTab === 'llm' ? 'active' : ''}`} onClick={() => setSettingsTab('llm')}>大模型</button>
                   <button className={`settings-nav-item ${settingsTab === 'agents' ? 'active' : ''}`} onClick={() => setSettingsTab('agents')}>Agent管理</button>
                 </div>
-                <div className="settings-content">
+                <div className={`settings-content ${settingsTab === 'sources' && !showSourceAdvanced ? 'sources-simple-mode' : ''}`}>
                 {settingsTab === 'general' && (
                   <div className="setting-item"><label>关键词屏蔽</label><textarea value={blocked} onChange={e => setBlocked(e.target.value)} placeholder="输入屏蔽词，逗号分隔" /><p className="setting-note">已过滤 {stats.blockedCount} 条资讯</p></div>
                 )}
@@ -111,6 +115,31 @@ export default function SettingsModal({
                       <button onClick={() => verifyAllSources()} disabled={verifyingAllSources}>
                         {verifyingAllSources ? '检测中...' : '检测源健康'}
                       </button>
+                    </div>
+
+                    <SourceOpsPanel
+                      allSources={allSources}
+                      customSources={customSources}
+                      disabledSources={disabledSources}
+                      sourceHealth={sourceHealth}
+                      setSourceTypeTab={setSourceTypeTab}
+                      setGradeFilter={setGradeFilter}
+                      setStatusFilter={setStatusFilter}
+                      setCustomSourceFilter={setCustomSourceFilter}
+                      sourceDiscoveryUrl={sourceDiscoveryUrl}
+                      setSourceDiscoveryUrl={setSourceDiscoveryUrl}
+                      sourceDiscoveryState={sourceDiscoveryState}
+                      discoverSource={discoverSource}
+                      addDiscoveredSource={addDiscoveredSource}
+                      verifyAllSources={verifyAllSources}
+                      verifyingAllSources={verifyingAllSources}
+                    />
+
+                    <div className="source-simplify-toggle">
+                      <button type="button" onClick={() => setShowSourceAdvanced(prev => !prev)}>
+                        {showSourceAdvanced ? '收起高级管理' : '展开高级管理'}
+                      </button>
+                      <p>默认只保留关键操作，复杂筛选和完整列表放在高级区。</p>
                     </div>
 
                     {/* 源类型切换 */}

@@ -65,15 +65,15 @@ const PRIMARY_NAV_ITEMS = [
 const NAV_CONTEXT_SECTIONS = {
   today: {
     label: '今日工作流',
-    items: ['today', 'recommendations', 'all', 'briefing']
+    items: ['today', 'recommendations']
   },
   tracker: {
     label: '追踪与画像',
-    items: ['tracker', 'trends', 'reading-stats', 'calendar']
+    items: ['tracker', 'calendar']
   },
   create: {
     label: '沉淀创作',
-    items: ['editor', 'materials', 'reading-list', 'knowledge-export']
+    items: ['editor', 'materials']
   },
   agents: {
     label: '智能协作',
@@ -85,7 +85,7 @@ const NAV_CONTEXT_SECTIONS = {
   }
 };
 
-const MORE_NAV_ITEMS = ['trending', 'github', 'custom-url'];
+const MORE_NAV_ITEMS = ['all', 'briefing', 'trends', 'reading-stats', 'reading-list', 'knowledge-export', 'trending', 'github', 'custom-url'];
 
 const CATEGORIES = [
   { id: 'ai-models', label: 'AI 大模型', icon: 'cpu' },
@@ -612,6 +612,7 @@ function App() {
   const [agentPromptRefining, setAgentPromptRefining] = useState(false);
   const [agentWorkflowResult, setAgentWorkflowResult] = useState({ loading: false, content: '', error: '', missionId: '' });
   const [agentWorkflowPrompt, setAgentWorkflowPrompt] = useState('');
+  const [agentWorkflowScope, setAgentWorkflowScope] = useState('daily');
   const [stats, setStats] = useState({ sourceCount: 40, failedSources: 0, updatedAt: '', blockedCount: 0 });
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => localStorage.getItem('sidebarCollapsed') === 'true');
   const motivationalQuote = useMemo(() => {
@@ -624,6 +625,8 @@ function App() {
   const [newSource, setNewSource] = useState({ name: '', url: '', region: 'overseas', category: '', tags: '', notes: '' });
   const [sourceVerifyResult, setSourceVerifyResult] = useState(null);
   const [sourceVerifying, setSourceVerifying] = useState(false);
+  const [sourceDiscoveryUrl, setSourceDiscoveryUrl] = useState('');
+  const [sourceDiscoveryState, setSourceDiscoveryState] = useState({ loading: false, result: null, error: '' });
   const [verifyingAllSources, setVerifyingAllSources] = useState(false);
   const [allSourcesVerifyResults, setAllSourcesVerifyResults] = useState(null);
   const [sourceHealth, setSourceHealth] = useState(() => loadLS('sourceHealth', {}));
@@ -842,6 +845,18 @@ function App() {
   const [trendingLoadingMore, setTrendingLoadingMore] = useState(false);
   const [githubRepos, setGithubRepos] = useState([]);
   const [githubLoading, setGithubLoading] = useState(false);
+
+  useEffect(() => {
+    fetch('/api/meta')
+      .then(response => response.json())
+      .then(data => {
+        if (Array.isArray(data.sources)) setAllSources(data.sources);
+        if (data.sourceGrades) setSourceGrades(data.sourceGrades);
+      })
+      .catch(error => {
+        console.warn('Failed to load source metadata:', error);
+      });
+  }, []);
   const [githubLang, setGithubLang] = useState('');
   const [githubSince, setGithubSince] = useState('weekly');
   const [calendarDate, setCalendarDate] = useState(new Date());
@@ -2084,8 +2099,26 @@ function App() {
 
   const aiActionPrompts = useMemo(() => intelligenceMissions.slice(0, 4), [intelligenceMissions]);
 
+  const agentWorkflowScopes = useMemo(() => [
+    { id: 'daily', label: '今日', desc: `${workbenchItems.length} 条推荐` },
+    { id: 'focus', label: '关注', desc: `${workbenchStats.focusMatches} 条匹配` },
+    { id: 'saved', label: '沉淀', desc: `${workbenchStats.savedCount} 条已存` }
+  ], [workbenchItems.length, workbenchStats.focusMatches, workbenchStats.savedCount]);
+
+  const scopedAgentItems = useMemo(() => {
+    if (agentWorkflowScope === 'focus') {
+      const focused = workbenchItems.filter(item => selectedInterests.includes(item.category));
+      return focused.length ? focused : workbenchItems;
+    }
+    if (agentWorkflowScope === 'saved') {
+      const saved = workbenchItems.filter(item => isBookmarked(item.id) || isInMaterials(item.id));
+      return saved.length ? saved : workbenchItems;
+    }
+    return workbenchItems;
+  }, [agentWorkflowScope, workbenchItems, selectedInterests, bookmarks, materials]);
+
   const buildWorkbenchContext = useCallback((prompt) => {
-    const topItems = workbenchItems.slice(0, 8);
+    const topItems = scopedAgentItems.slice(0, 8);
     const lines = topItems.map((item, idx) => {
       const reasons = item.recommendationReasons?.length ? item.recommendationReasons.join('、') : item.recommendation || '综合推荐';
       return `${idx + 1}. ${item.title}
@@ -2107,11 +2140,11 @@ function App() {
 - 最近强化：${intelligenceProfile.boosted.join('、') || '暂无'}
 - 降权来源：${intelligenceProfile.muted.join('、') || '暂无'}
 - 记忆关键词：${intelligenceProfile.tracked.join('、') || '暂无'}
-推荐统计：共 ${workbenchItems.length} 条，兴趣匹配 ${workbenchStats.focusMatches} 条，关键词命中 ${workbenchStats.keywordMatches} 条
+推荐统计：当前范围 ${scopedAgentItems.length} 条，全部推荐 ${workbenchItems.length} 条，兴趣匹配 ${workbenchStats.focusMatches} 条，关键词命中 ${workbenchStats.keywordMatches} 条
 
 今日推荐资讯：
 ${lines}`;
-  }, [workbenchItems, selectedNewsDate, selectedInterests, followKeywords, intelligenceProfile, workbenchStats.focusMatches, workbenchStats.keywordMatches]);
+  }, [scopedAgentItems, workbenchItems.length, selectedNewsDate, selectedInterests, followKeywords, intelligenceProfile, workbenchStats.focusMatches, workbenchStats.keywordMatches]);
 
   const sendWorkbenchToElf = useCallback((prompt, agentId = 'orchestrator') => {
     if (agentId) setCurrentAgent(agentId);
@@ -4159,16 +4192,8 @@ ${signals}
                     <span>兴趣匹配</span>
                   </div>
                   <div>
-                    <strong>{workbenchStats.keywordMatches}</strong>
-                    <span>关键词命中</span>
-                  </div>
-                  <div>
                     <strong>{workbenchStats.savedCount}</strong>
                     <span>已沉淀</span>
-                  </div>
-                  <div>
-                    <strong>{feedbackLearningCount}</strong>
-                    <span>学习反馈</span>
                   </div>
                 </div>
               </section>
@@ -4285,7 +4310,7 @@ ${signals}
 
               <section className="workbench-ai">
                 <div className="agent-ecosystem-card">
-                  <div className="workbench-section-label">Agent Ecosystem</div>
+                  <div className="workbench-section-label">AI Copilot</div>
                   <h2>你的个人情报智能体正在协作</h2>
                   <p>{llmConfig.baseUrl ? `当前模型：${llmConfig.selectedModel || '已连接模型'}` : '配置大模型后，智能体可把今日资讯转化为简报、洞察和创作素材。'}</p>
                   <div className="agent-profile-strip">
@@ -4303,7 +4328,7 @@ ${signals}
                     </div>
                   </div>
                   <div className="agent-status-list">
-                    {intelligenceAgents.map(agent => (
+                    {intelligenceAgents.slice(0, 2).map(agent => (
                       <div key={agent.name} className={`agent-status-item tone-${agent.tone}`}>
                         <div>
                           <strong>{agent.name}</strong>
@@ -4321,7 +4346,7 @@ ${signals}
                 <div className="ai-command-card compact">
                   <div className="workbench-block-title">AI 指挥台</div>
                   <div className="ai-mission-list">
-                    {aiActionPrompts.map(mission => (
+                    {aiActionPrompts.slice(0, 3).map(mission => (
                       <button key={mission.id} onClick={() => sendWorkbenchToElf(mission.prompt, mission.agentId)}>
                         <span>{mission.label}</span>
                         <small>{agents.find(agent => agent.id === mission.agentId)?.name || '智能体'}</small>
@@ -4360,9 +4385,9 @@ ${signals}
 
                 <div className="next-actions-card">
                   <div className="workbench-block-title">下一步</div>
-                  <button onClick={() => setNav('editor')}>写一篇情报短文</button>
-                  <button onClick={() => setNav('materials')}>查看素材库</button>
-                  <button onClick={() => setShowSettings(true)}>管理来源质量</button>
+                  <button className="primary" onClick={() => goNav('agents')}>运行智能体工作流</button>
+                  <button onClick={() => setNav('editor')}>沉淀为创作</button>
+                  <button onClick={() => { setSettingsTab('sources'); setShowSettings(true); }}>优化来源质量</button>
                 </div>
               </section>
             </div>
@@ -4389,6 +4414,19 @@ ${signals}
                   <div className="section-header">
                     <h2 className="section-title">{ICONS.sparkles} 工作流任务</h2>
                     <p className="section-desc">任务会自动携带今日资讯、用户画像、追踪关键词和来源偏好。</p>
+                  </div>
+                  <div className="agent-scope-selector">
+                    {agentWorkflowScopes.map(scope => (
+                      <button
+                        key={scope.id}
+                        type="button"
+                        className={agentWorkflowScope === scope.id ? 'active' : ''}
+                        onClick={() => setAgentWorkflowScope(scope.id)}
+                      >
+                        <span>{scope.label}</span>
+                        <small>{scope.desc}</small>
+                      </button>
+                    ))}
                   </div>
                   <div className="agent-workflow-missions">
                     {intelligenceMissions.map(mission => {
@@ -5820,7 +5858,7 @@ ${signals}
             </div>
           )}
 
-{nav === 'editor' && <ArticleEditor editorFullscreen={editorFullscreen} setEditorFullscreen={setEditorFullscreen} editorTextareaRef={editorTextareaRef} imageInputRef={imageInputRef} articles={articles} setArticles={setArticles} currentArticleId={currentArticleId} setCurrentArticleId={setCurrentArticleId} editorTab={editorTab} setEditorTab={setEditorTab} editorCursorPos={editorCursorPos} setEditorCursorPos={setEditorCursorPos} showTemplateMenu={showTemplateMenu} setShowTemplateMenu={setShowTemplateMenu} showAiPanel={showAiPanel} setShowAiPanel={setShowAiPanel} showImagePanel={showImagePanel} setShowImagePanel={setShowImagePanel} aiResult={aiResult} setAiResult={setAiResult} aiCustomPrompt={aiCustomPrompt} setAiCustomPrompt={setAiCustomPrompt} autoSaveTimer={autoSaveTimer} setAutoSaveTimer={setAutoSaveTimer} lastSavedAt={lastSavedAt} setLastSavedAt={setLastSavedAt} articleTagInput={articleTagInput} setArticleTagInput={setArticleTagInput} editingArticleTag={editingArticleTag} setEditingArticleTag={setEditingArticleTag} articleSpaces={articleSpaces} setArticleSpaces={setArticleSpaces} articleSpaceFilter={articleSpaceFilter} setArticleSpaceFilter={setArticleSpaceFilter} articleMaterialSpaceFilter={articleMaterialSpaceFilter} setArticleMaterialSpaceFilter={setArticleMaterialSpaceFilter} articleSpaceFormOpen={articleSpaceFormOpen} setArticleSpaceFormOpen={setArticleSpaceFormOpen} newArticleSpaceName={newArticleSpaceName} setNewArticleSpaceName={setNewArticleSpaceName} articleSpaceForNewArticle={articleSpaceForNewArticle} setArticleSpaceForNewArticle={setArticleSpaceForNewArticle} articleSearch={articleSearch} setArticleSearch={setArticleSearch} articleStatusFilter={articleStatusFilter} setArticleStatusFilter={setArticleStatusFilter} articleTemplateFilter={articleTemplateFilter} setArticleTemplateFilter={setArticleTemplateFilter} articleSort={articleSort} setArticleSort={setArticleSort} articleExportFilter={articleExportFilter} setArticleExportFilter={setArticleExportFilter} createArticle={createArticle} updateArticle={updateArticle} deleteArticle={deleteArticle} duplicateArticle={duplicateArticle} addArticleTag={addArticleTag} removeArticleTag={removeArticleTag} triggerAutoSave={triggerAutoSave} handleContentChange={handleContentChange} handleTitleChange={handleTitleChange} insertAtCursor={insertAtCursor} insertMaterialAtCursor={insertMaterialAtCursor} removeLinkedMaterial={removeLinkedMaterial} handleImageUpload={handleImageUpload} handlePaste={handlePaste} createArticleSpace={createArticleSpace} deleteArticleSpace={deleteArticleSpace} assignArticleToSpace={assignArticleToSpace} batchAssignArticlesToSpace={batchAssignArticlesToSpace} insertAiResult={insertAiResult} clearAiResult={clearAiResult} exportArticleToFile={exportArticleToFile} copyArticleAsRichText={copyArticleAsRichText} materials={materials} llmConfig={llmConfig} />}
+{nav === 'editor' && <ArticleEditor editorFullscreen={editorFullscreen} setEditorFullscreen={setEditorFullscreen} editorTextareaRef={editorTextareaRef} imageInputRef={imageInputRef} articles={articles} setArticles={setArticles} currentArticleId={currentArticleId} setCurrentArticleId={setCurrentArticleId} editorTab={editorTab} setEditorTab={setEditorTab} editorCursorPos={editorCursorPos} setEditorCursorPos={setEditorCursorPos} showTemplateMenu={showTemplateMenu} setShowTemplateMenu={setShowTemplateMenu} showAiPanel={showAiPanel} setShowAiPanel={setShowAiPanel} showImagePanel={showImagePanel} setShowImagePanel={setShowImagePanel} aiResult={aiResult} setAiResult={setAiResult} aiCustomPrompt={aiCustomPrompt} setAiCustomPrompt={setAiCustomPrompt} autoSaveTimer={autoSaveTimer} setAutoSaveTimer={setAutoSaveTimer} lastSavedAt={lastSavedAt} setLastSavedAt={setLastSavedAt} articleTagInput={articleTagInput} setArticleTagInput={setArticleTagInput} editingArticleTag={editingArticleTag} setEditingArticleTag={setEditingArticleTag} articleSpaces={articleSpaces} setArticleSpaces={setArticleSpaces} articleSpaceFilter={articleSpaceFilter} setArticleSpaceFilter={setArticleSpaceFilter} articleMaterialSpaceFilter={articleMaterialSpaceFilter} setArticleMaterialSpaceFilter={setArticleMaterialSpaceFilter} articleSpaceFormOpen={articleSpaceFormOpen} setArticleSpaceFormOpen={setArticleSpaceFormOpen} newArticleSpaceName={newArticleSpaceName} setNewArticleSpaceName={setNewArticleSpaceName} articleSpaceForNewArticle={articleSpaceForNewArticle} setArticleSpaceForNewArticle={setArticleSpaceForNewArticle} articleSearch={articleSearch} setArticleSearch={setArticleSearch} articleStatusFilter={articleStatusFilter} setArticleStatusFilter={setArticleStatusFilter} articleTemplateFilter={articleTemplateFilter} setArticleTemplateFilter={setArticleTemplateFilter} articleSort={articleSort} setArticleSort={setArticleSort} filteredArticles={filteredArticles} articleExportFilter={articleExportFilter} setArticleExportFilter={setArticleExportFilter} createArticle={createArticle} updateArticle={updateArticle} deleteArticle={deleteArticle} duplicateArticle={duplicateArticle} addArticleTag={addArticleTag} removeArticleTag={removeArticleTag} triggerAutoSave={triggerAutoSave} handleContentChange={handleContentChange} handleTitleChange={handleTitleChange} insertAtCursor={insertAtCursor} insertMaterialAtCursor={insertMaterialAtCursor} removeLinkedMaterial={removeLinkedMaterial} handleImageUpload={handleImageUpload} handlePaste={handlePaste} createArticleSpace={createArticleSpace} deleteArticleSpace={deleteArticleSpace} assignArticleToSpace={assignArticleToSpace} batchAssignArticlesToSpace={batchAssignArticlesToSpace} insertAiResult={insertAiResult} clearAiResult={clearAiResult} exportArticleToFile={exportArticleToFile} copyArticleAsRichText={copyArticleAsRichText} materials={materials} llmConfig={llmConfig} />}
 
           {articleSpaceFormOpen && (
             <div className="modal-backdrop" onClick={() => setArticleSpaceFormOpen(false)}>
@@ -6310,6 +6348,13 @@ ${signals}
           addCustomSource={addCustomSource}
           removeCustomSource={removeCustomSource}
           verifySource={verifySource}
+          sourceVerifying={sourceVerifying}
+          sourceVerifyResult={sourceVerifyResult}
+          sourceDiscoveryUrl={sourceDiscoveryUrl}
+          setSourceDiscoveryUrl={setSourceDiscoveryUrl}
+          sourceDiscoveryState={sourceDiscoveryState}
+          discoverSource={discoverSource}
+          addDiscoveredSource={addDiscoveredSource}
           verifyAllSources={verifyAllSources}
           verifySingleSource={verifySingleSource}
           exportSources={exportSources}
@@ -6734,6 +6779,12 @@ ${signals}
 
   function addCustomSource() {
     if (!newSource.name || !newSource.url) return;
+    const nextUrl = normalizeSourceUrl(newSource.url);
+    const exists = customSources.some(source => normalizeSourceUrl(source.url) === nextUrl) || allSources.some(source => normalizeSourceUrl(source.url) === nextUrl);
+    if (exists) {
+      showToast('Source already exists');
+      return;
+    }
     setCustomSources(prev => [...prev, { ...newSource, id: Date.now() }]);
     setNewSource({ name: '', url: '', region: 'overseas' });
     setSourceVerifyResult(null);
@@ -6755,6 +6806,51 @@ ${signals}
     }).catch(() => {
       setSourceVerifyResult({ ok: false, message: 'Network error' });
     }).finally(() => setSourceVerifying(false));
+  }
+
+  async function discoverSource() {
+    const url = sourceDiscoveryUrl.trim();
+    if (!url) return;
+    setSourceDiscoveryState({ loading: true, result: null, error: '' });
+    try {
+      const response = await fetch(`/api/discover-source?url=${encodeURIComponent(url)}`);
+      const data = await response.json();
+      setSourceDiscoveryState({ loading: false, result: data, error: data.ok ? '' : data.message || 'No feed discovered' });
+    } catch (error) {
+      setSourceDiscoveryState({ loading: false, result: null, error: error.message || 'Network error' });
+    }
+  }
+
+  function addDiscoveredSource(candidate) {
+    if (!candidate?.url) return;
+    const candidateUrl = normalizeSourceUrl(candidate.url);
+    const exists = customSources.some(source => normalizeSourceUrl(source.url) === candidateUrl) || allSources.some(source => normalizeSourceUrl(source.url) === candidateUrl);
+    if (exists) {
+      showToast('Source already exists');
+      return;
+    }
+    const source = {
+      id: Date.now(),
+      name: candidate.title || candidate.name || 'Custom Feed',
+      url: candidate.url,
+      region: candidate.suggestedRegion || 'global',
+      category: candidate.suggestedCategory || '',
+      grade: candidate.suggestedGrade || 'D',
+      tags: candidate.tags || ['discovered'],
+      notes: `Discovered via ${candidate.discoveredVia || 'source discovery'}`
+    };
+    setCustomSources(prev => [...prev, source]);
+    setSourceHealth(prev => ({
+      ...prev,
+      [source.id]: {
+        status: 'healthy',
+        lastCheck: Date.now(),
+        responseTime: 0,
+        failCount: 0,
+        itemCount: candidate.itemCount || 0
+      }
+    }));
+    showToast('Source added');
   }
 
   function verifyAllSources() {
@@ -6804,6 +6900,10 @@ ${signals}
   function truncateUrl(url, maxLength) {
     if (!url) return '';
     return url.length > maxLength ? url.slice(0, maxLength) + '...' : url;
+  }
+
+  function normalizeSourceUrl(url) {
+    return (url || '').replace(/\/$/, '').toLowerCase();
   }
 
   // 辅助函数：截断文本
@@ -7175,6 +7275,25 @@ function NewsItem({ item, index, viewMode = 'standard', isFocused = false, isBoo
   const isCompact = viewMode === 'compact';
   const isCard = viewMode === 'card';
   const hasMedia = item.imageUrl || item.videoUrl;
+  const trimBrief = (text = '', max = 132) => {
+    const normalized = String(text || '')
+      .replace(/arXiv:\S+\s+Announce Type:\s*\w+\s+Abstract:\s*/i, '')
+      .replace(/Nature [^,]+,\s*Published online:[^;]+;\s*doi:\S+\s*/i, '')
+      .replace(/\bdoi:\s*10\.\S+/gi, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+    if (!normalized) return '';
+    return normalized.length > max ? `${normalized.slice(0, max)}...` : normalized;
+  };
+  const displayTitle = showTranslation && translation ? translation.title : item.title;
+  const displaySummary = showTranslation && translation && translation.summary ? translation.summary : item.summary;
+  const explainLead = trimBrief(item.bodyIntro || displaySummary, 150);
+  const explainReason = trimBrief(item.recommendation || (item.tags || []).slice(0, 3).join(' / ') || '综合热度、来源质量和发布时间进入推荐', 108);
+  const explainJudgement = [
+    item.sourceGradeLabel ? item.sourceGradeLabel.split('-')[0] : '',
+    MODE_MAP[item.mode],
+    REGION_MAP[item.region]
+  ].filter(Boolean).join(' · ');
 
   const isEnglish = /^[a-zA-Z0-9\s\-.,!?"'():;&%$#@*+\[\]{}|\\\/<>`~+=]+$/.test(item.title) && !/^[\u4e00-\u9fff]/.test(item.title);
 
@@ -7194,11 +7313,11 @@ function NewsItem({ item, index, viewMode = 'standard', isFocused = false, isBoo
     if (!validGrades.includes(grade)) return null;
 
     const gradeColors = {
-      S: { primary: '#ff0000', glow: 'rgba(255, 0, 0, 1)' },
-      A: { primary: '#ff8800', glow: 'rgba(255, 136, 0, 1)' },
-      B: { primary: '#00cc00', glow: 'rgba(0, 204, 0, 1)' },
-      C: { primary: '#0088ff', glow: 'rgba(0, 136, 255, 1)' },
-      D: { primary: '#666666', glow: 'rgba(102, 102, 102, 1)' }
+      S: { primary: '#d96f65', glow: 'rgba(217, 111, 101, 0.28)' },
+      A: { primary: '#d6933d', glow: 'rgba(214, 147, 61, 0.28)' },
+      B: { primary: '#4f9d66', glow: 'rgba(79, 157, 102, 0.26)' },
+      C: { primary: '#5b87bd', glow: 'rgba(91, 135, 189, 0.24)' },
+      D: { primary: '#7a857d', glow: 'rgba(122, 133, 125, 0.2)' }
     };
 
     const colors = gradeColors[grade] || gradeColors.D;
@@ -7273,10 +7392,17 @@ function NewsItem({ item, index, viewMode = 'standard', isFocused = false, isBoo
       <div className="item-main">
         <div className="item-content-row">
           <div className="item-text">
-            <h2 className="item-title"><span className="item-rank">{index + 1}.</span> {showTranslation && translation ? translation.title : item.title}</h2>
-            {!isCompact && <p className="item-summary">{showTranslation && translation && translation.summary ? translation.summary : item.summary}</p>}
-            {!isCompact && item.bodyIntro && <p className="item-intro">导读：{item.bodyIntro}</p>}
+            <h2 className="item-title"><span className="item-rank">{index + 1}.</span> {displayTitle}</h2>
+            {!isCompact && <p className="item-summary">{displaySummary}</p>}
           </div>
+          {hasMedia && isCompact && (
+            <span
+              className={`compact-media-indicator ${item.videoUrl ? 'has-video' : 'has-image'}`}
+              title={item.videoUrl ? '包含视频' : '包含图片'}
+            >
+              {item.videoUrl ? ICONS.play : ICONS.image}
+            </span>
+          )}
           {hasMedia && !isCompact && (
             <div className="item-media">
               {item.videoUrl ? (
@@ -7305,6 +7431,28 @@ function NewsItem({ item, index, viewMode = 'standard', isFocused = false, isBoo
             </div>
           )}
         </div>
+        {!isCompact && (explainLead || explainReason || explainJudgement) && (
+          <div className="item-explain-panel">
+            {explainReason && (
+              <div className="item-explain-cell">
+                <span>看点</span>
+                <p>{explainReason}</p>
+              </div>
+            )}
+            {explainLead && (
+              <div className="item-explain-cell">
+                <span>内容</span>
+                <p>{explainLead}</p>
+              </div>
+            )}
+            {explainJudgement && (
+              <div className="item-explain-cell compact">
+                <span>判断</span>
+                <p>{explainJudgement}</p>
+              </div>
+            )}
+          </div>
+        )}
         {isSummaryOpen && summaryText && (
           <div className="ai-summary">
             <div className="ai-summary-header">{ICONS.sparkle}<span>AI 摘要</span></div>
