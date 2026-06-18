@@ -889,6 +889,90 @@ body {
 .workflow-memory-item.status-failed {
   border-color: rgba(239, 68, 68, 0.28);
 }
+
+.workflow-action-panel {
+  margin-top: 12px;
+  padding: 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  background: var(--surface-workbench-control);
+}
+
+.workflow-action-head {
+  margin-bottom: 10px;
+}
+
+.workflow-action-head span {
+  display: block;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.workflow-action-head strong {
+  display: block;
+  margin-top: 3px;
+  color: var(--text-primary);
+  font-size: 13px;
+}
+
+.workflow-action-list {
+  display: grid;
+  gap: 8px;
+}
+
+.workflow-action-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: start;
+  padding: 10px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: var(--bg-primary);
+}
+
+.workflow-action-item span {
+  display: inline-block;
+  margin-bottom: 4px;
+  color: var(--accent-cyan);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.workflow-action-item strong {
+  display: block;
+  color: var(--text-primary);
+  font-size: 13px;
+}
+
+.workflow-action-item p {
+  margin: 4px 0 0;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.workflow-action-item button {
+  min-height: 30px;
+  padding: 0 10px;
+  border: 1px solid var(--border-color);
+  border-radius: 7px;
+  background: var(--surface-workbench-control);
+  color: var(--text-primary);
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.workflow-action-item button:hover {
+  border-color: var(--border-active);
+  color: var(--accent-cyan);
+}
+
+.workflow-action-item.status-done {
+  opacity: 0.65;
+}
 .builder-panel {
   display: flex;
   flex-direction: column;
