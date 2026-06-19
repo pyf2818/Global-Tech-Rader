@@ -4455,7 +4455,7 @@ ${blueprintSummary}`,
         url: item.url,
         tags,
         imageUrl: item.imageUrl || '',
-        insight: item.insight || null,
+        insight: item.insight || buildNewsCardInsight(item),
         metadata: item.metadata || null,
         originalItemId: item.id,
         note,
@@ -5212,15 +5212,20 @@ ${signals}
   }
 
   function generateSummary(item) {
-    if (summaryCache[item.id]) return summaryCache[item.id];
+    const cachedSummary = summaryCache[item.id];
+    if (cachedSummary && cachedSummary.includes('场景:') && cachedSummary.includes('行动:')) return cachedSummary;
     const title = item.title;
     const source = item.source;
-    const tags = item.tags?.join('、') || '';
+    const tags = Array.isArray(item.tags) ? item.tags.join('、') : (item.tags || '');
     const summaryText = item.summary || '';
+    const insight = buildNewsCardInsight(item);
     const points = [
       `核心: ${title}`,
       tags ? `领域: ${tags}` : `来源: ${source}`,
-      summaryText.length > 20 ? `要点: ${summaryText.slice(0, 80)}` : `追踪: ${source}`
+      `看点: ${insight.why.slice(0, 96)}`,
+      `场景: ${insight.scenario.slice(0, 96)}`,
+      `行动: ${insight.action.slice(0, 96)}`,
+      summaryText.length > 20 ? `原文线索: ${summaryText.slice(0, 80)}` : `质量: ${insight.quality}`
     ];
     const result = points.join(' | ');
     setSummaryCache(prev => ({ ...prev, [item.id]: result }));
@@ -8199,9 +8204,13 @@ ${signals}
                         )}
                         {m.insight && (
                           <div className="material-insight">
+                            {m.insight.why && <p><span>看点</span>{m.insight.why}</p>}
                             {m.insight.scenario && <p><span>场景</span>{m.insight.scenario}</p>}
+                            {m.insight.action && <p><span>行动</span>{m.insight.action}</p>}
                             {m.insight.value && <p><span>价值</span>{m.insight.value}</p>}
+                            {m.insight.audience && <p><span>适合</span>{m.insight.audience}</p>}
                             {m.insight.difficulty && <p><span>难度</span>{m.insight.difficulty}</p>}
+                            {m.insight.quality && <p><span>质量</span>{m.insight.quality}</p>}
                           </div>
                         )}
                         <p className="material-content">{m.fullContent || m.content}</p>
@@ -9748,6 +9757,56 @@ function SkeletonCard({ viewMode = 'standard' }) {
   );
 }
 
+function buildNewsCardInsight(item = {}, summaryOverride = '') {
+  const title = item.title || '';
+  const summary = summaryOverride || item.summary || '';
+  const tags = Array.isArray(item.tags) ? item.tags : (item.tags ? [item.tags] : []);
+  const text = `${title} ${summary} ${tags.join(' ')} ${item.category || ''}`.toLowerCase();
+  const reasons = Array.isArray(item.recommendationReasons) && item.recommendationReasons.length
+    ? item.recommendationReasons.join('、')
+    : String(item.recommendation || '');
+  const grade = item.sourceGradeLabel ? item.sourceGradeLabel.split('-')[0] : '';
+  const quality = [
+    grade,
+    MODE_MAP[item.mode],
+    REGION_MAP[item.region],
+    item.imageUrl ? '图文' : '',
+    item.videoUrl ? '视频' : ''
+  ].filter(Boolean).join(' · ');
+
+  let scenario = '适合作为今日技术动态的背景材料，快速判断是否需要继续追踪。';
+  if (/github|repo|open-source|开源|readme|stars?/.test(text)) {
+    scenario = '适合沉淀为开源项目观察素材，后续可进入 GitHub 项目评估或技术选型。';
+  } else if (/agent|workflow|rag|copilot|assistant|model|llm|大模型|智能体/.test(text)) {
+    scenario = '适合用于智能体、推荐算法或创作工作流的产品能力参考。';
+  } else if (/research|paper|arxiv|论文|研究|benchmark|评测/.test(text)) {
+    scenario = '适合作为科研或技术路线观察，重点看方法、数据和可复现价值。';
+  } else if (/policy|regulat|law|安全|治理|risk|ban|compliance|监管/.test(text)) {
+    scenario = '适合作为风险与政策观察，重点判断对业务、合规和市场预期的影响。';
+  } else if (/funding|startup|融资|商业|market|product|launch|发布/.test(text)) {
+    scenario = '适合作为商业机会或产品趋势观察，重点看用户需求和落地路径。';
+  }
+
+  let action = '先快速浏览摘要；若与关注领域相关，再收藏或交给 AI 精灵追问。';
+  if (item.mustReadScore >= 80 || grade === 'S' || grade === 'A') {
+    action = '建议优先阅读原文，并保存为素材，后续可用于每日汇报或内容创作。';
+  } else if (item.imageUrl || item.videoUrl) {
+    action = '可作为图文/视频素材沉淀；适合进入素材库后再由工作流生成草稿。';
+  } else if (reasons.includes('追踪') || reasons.includes('关注')) {
+    action = '建议加入追踪记忆，观察后续是否形成连续信号。';
+  }
+
+  const why = reasons || (summary ? String(summary).slice(0, 96) : '综合来源质量、发布时间和主题相关性进入推荐。');
+
+  return {
+    why,
+    scenario,
+    action,
+    quality: quality || '综合资讯',
+    mediaLabel: item.videoUrl ? '视频线索' : item.imageUrl ? '正文图片' : '暂无多媒体'
+  };
+}
+
 function NewsItem({ item, index, viewMode = 'standard', isFocused = false, isBookmarked = false, isInMaterials = false, onBookmark, onSummary, isSummaryOpen, summaryText, isFollowed = false, onRead, showTranslation, onToggleTranslation, onRequestTranslation, isTranslating, translation, onOpenLightbox, onAddMaterial }) {
   const isCompact = viewMode === 'compact';
   const isCard = viewMode === 'card';
@@ -9764,13 +9823,11 @@ function NewsItem({ item, index, viewMode = 'standard', isFocused = false, isBoo
   };
   const displayTitle = showTranslation && translation ? translation.title : item.title;
   const displaySummary = showTranslation && translation && translation.summary ? translation.summary : item.summary;
-  const explainLead = trimBrief(item.bodyIntro || displaySummary, 150);
-  const explainReason = trimBrief(item.recommendation || (item.tags || []).slice(0, 3).join(' / ') || '综合热度、来源质量和发布时间进入推荐', 108);
-  const explainJudgement = [
-    item.sourceGradeLabel ? item.sourceGradeLabel.split('-')[0] : '',
-    MODE_MAP[item.mode],
-    REGION_MAP[item.region]
-  ].filter(Boolean).join(' · ');
+  const cardInsight = buildNewsCardInsight(item, displaySummary);
+  const explainReason = trimBrief(cardInsight.why, 118);
+  const explainScenario = trimBrief(cardInsight.scenario, 126);
+  const explainAction = trimBrief(cardInsight.action, 126);
+  const explainJudgement = trimBrief(`${cardInsight.quality} · ${cardInsight.mediaLabel}`, 86);
 
   const isEnglish = /^[a-zA-Z0-9\s\-.,!?"'():;&%$#@*+\[\]{}|\\\/<>`~+=]+$/.test(item.title) && !/^[\u4e00-\u9fff]/.test(item.title);
 
@@ -9908,7 +9965,7 @@ function NewsItem({ item, index, viewMode = 'standard', isFocused = false, isBoo
             </div>
           )}
         </div>
-        {!isCompact && (explainLead || explainReason || explainJudgement) && (
+        {!isCompact && (explainReason || explainScenario || explainAction) && (
           <div className="item-explain-panel">
             {explainReason && (
               <div className="item-explain-cell">
@@ -9916,18 +9973,19 @@ function NewsItem({ item, index, viewMode = 'standard', isFocused = false, isBoo
                 <p>{explainReason}</p>
               </div>
             )}
-            {explainLead && (
+            {explainScenario && (
               <div className="item-explain-cell">
-                <span>内容</span>
-                <p>{explainLead}</p>
+                <span>场景</span>
+                <p>{explainScenario}</p>
               </div>
             )}
-            {explainJudgement && (
+            {explainAction && (
               <div className="item-explain-cell compact">
-                <span>判断</span>
-                <p>{explainJudgement}</p>
+                <span>行动</span>
+                <p>{explainAction}</p>
               </div>
             )}
+            {explainJudgement && <span className="item-insight-meta">{explainJudgement}</span>}
           </div>
         )}
         {isSummaryOpen && summaryText && (

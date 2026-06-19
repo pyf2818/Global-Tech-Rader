@@ -2043,11 +2043,12 @@ body {
 .item-rank { color: var(--accent-cyan); font-weight: 900; margin-right: 5px; }
 .news-item:hover .item-title { color: var(--accent-cyan); }
 .item-summary { font-size: 12px; color: var(--text-secondary); line-height: 1.6; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; margin-bottom: 10px; }
-.item-explain-panel { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr) minmax(150px, 0.5fr); gap: 8px; margin: 10px 0 8px; }
+.item-explain-panel { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 10px 0 8px; }
 .item-explain-cell { min-width: 0; padding: 9px 10px; border: 1px solid var(--accent-cyan-border); border-radius: 9px; background: linear-gradient(180deg, var(--accent-cyan-softer), transparent 110%), var(--surface-workbench-control, var(--bg-hover)); }
 .item-explain-cell span { display: block; margin-bottom: 5px; color: var(--accent-cyan); font-size: 10px; font-weight: 900; letter-spacing: 0.08em; }
 .item-explain-cell p { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; margin: 0; color: var(--text-secondary); font-size: 12px; line-height: 1.58; }
 .item-explain-cell.compact p { -webkit-line-clamp: 3; }
+.item-insight-meta { grid-column: 1 / -1; color: var(--text-muted); font-size: 10px; font-weight: 800; line-height: 1.4; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .item-meta { display: flex; flex-direction: column; gap: 6px; }
 .item-tags-row { display: flex; gap: 5px; flex-wrap: wrap; }
 .item-tag { max-width: 108px; padding: 3px 7px; background: var(--surface-workbench-action); border: 1px solid var(--border-color); border-radius: 999px; font-size: 10px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -12813,7 +12814,7 @@ body {
 }
 
 .workbench-news-list .item-explain-panel {
-  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.2fr) minmax(130px, 0.42fr);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 7px;
   margin-top: 11px;
 }
