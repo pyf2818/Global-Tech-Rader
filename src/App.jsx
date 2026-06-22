@@ -3,6 +3,8 @@ import GlobeView from './GlobeView.jsx';
 import AiElf from './AiElf.jsx';
 import SettingsModal from './components/SettingsModal.jsx';
 import ArticleEditor from './components/ArticleEditor.jsx';
+import ThemePicker from './ThemePicker.jsx';
+import { PALETTES } from './ThemePicker.jsx';
 
 const PRODUCT_NAME = '万般硅川';
 const PRODUCT_TAGLINE = '高质量多领域智能资讯生态';
@@ -853,6 +855,7 @@ const ICONS = {
   refresh: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>,
   sun: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="12" cy="12" r="4"/><line x1="12" y1="2" x2="12" y2="4"/><line x1="12" y1="20" x2="12" y2="22"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="2" y1="12" x2="4" y2="12"/><line x1="20" y1="12" x2="22" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>,
   moon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>,
+  palette: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M12 2a10 10 0 0 0-1 19.9c.4 0 .7-.2.9-.5.1-.2.2-.4.2-.7 0-.6-.2-1.1-.6-1.5-.4-.4-.6-.9-.6-1.5 0-1.1.9-2 2-2h2.3a3.5 3.5 0 0 0 3.5-3.5c0-3-2.5-5.5-5.5-5.5z"/><circle cx="7.5" cy="11.5" r="1.5" fill="currentColor" stroke="none"/><circle cx="10" cy="7.5" r="1.5" fill="currentColor" stroke="none"/><circle cx="14" cy="7.5" r="1.5" fill="currentColor" stroke="none"/><circle cx="16.5" cy="11.5" r="1.5" fill="currentColor" stroke="none"/></svg>,
   fire: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></svg>,
   arrowRight: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>,
   clock: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>,
@@ -961,9 +964,12 @@ function clearStaleLS() {
   });
 }
 
+
 function App() {
   clearStaleLS();
-  const [theme, setTheme] = useState(() => localStorage.getItem('theme') || 'dark');
+  const [showThemePicker, setShowThemePicker] = useState(false);
+  const [themeMode, setThemeMode] = useState(() => localStorage.getItem('themeMode') || 'dark');
+  const [palette, setPalette] = useState(() => localStorage.getItem('palette') || 'champagne');
   const [editorFullscreen, setEditorFullscreen] = useState(false);
   const [nav, setNav] = useState('today');
   const [category, setCategory] = useState('all');
@@ -1331,6 +1337,7 @@ function App() {
   const [articles, setArticles] = useState(() => loadLS('articles', []));
   const [expandedSummary, setExpandedSummary] = useState({});
   const [summaryCache, setSummaryCache] = useState(() => loadLS('summaryCache', {}));
+  const [summaryLoading, setSummaryLoading] = useState({});
   const [followKeywords, setFollowKeywords] = useState(() => loadLS('followKeywords', []));
   const [pinnedKeywords, setPinnedKeywords] = useState(() => loadLS('pinnedKeywords', []));
   const [recommendationFeedback, setRecommendationFeedback] = useState(() => loadLS('recommendationFeedback', {
@@ -1419,7 +1426,14 @@ function App() {
   const feedRef = useRef(null);
   const searchInputRef = useRef(null);
 
-  useEffect(() => { document.documentElement.dataset.theme = theme; localStorage.setItem('theme', theme); }, [theme]);
+  useEffect(() => {
+    document.documentElement.dataset.mode = themeMode;
+    localStorage.setItem('themeMode', themeMode);
+  }, [themeMode]);
+  useEffect(() => {
+    document.documentElement.dataset.palette = palette;
+    localStorage.setItem('palette', palette);
+  }, [palette]);
   useEffect(() => { localStorage.setItem('sidebarCollapsed', String(sidebarCollapsed)); }, [sidebarCollapsed]);
   useEffect(() => { localStorage.setItem('panelCollapsed', String(panelCollapsed)); }, [panelCollapsed]);
   // ESC 退出创作中心全屏
@@ -5211,25 +5225,139 @@ ${signals}
     }
   }
 
-  function generateSummary(item) {
-    const cachedSummary = summaryCache[item.id];
-    if (cachedSummary && cachedSummary.includes('场景:') && cachedSummary.includes('行动:')) return cachedSummary;
-    const title = item.title;
-    const source = item.source;
+  function cleanSummaryText(text = '', max = 160) {
+    const normalized = String(text || '')
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/arXiv:\S+\s+Announce Type:\s*\w+\s+Abstract:\s*/i, '')
+      .replace(/Nature [^,]+,\s*Published online:[^;]+;\s*doi:\S+\s*/i, '')
+      .replace(/\bdoi:\s*10\.\S+/gi, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+    if (!normalized) return '';
+    return normalized.length > max ? `${normalized.slice(0, max).trim()}...` : normalized;
+  }
+
+  function getSummaryEntry(item) {
+    const cached = summaryCache[item.id];
+    if (!cached) return null;
+    if (typeof cached === 'object' && cached.text) return cached;
+    if (typeof cached === 'string') {
+      const isOldTemplate = cached.includes('场景:') || cached.includes('行动:') || cached.includes('核心:');
+      if (!isOldTemplate && cached.length <= 220) return { text: cached, mode: 'legacy' };
+    }
+    return null;
+  }
+
+  function buildLocalShortSummary(item) {
+    const sourceText = item.bodyIntro || item.fullContent || item.content || item.summary || item.title || '';
+    const cleaned = cleanSummaryText(sourceText, 140);
+    if (cleaned) return cleaned;
+    return cleanSummaryText(`${item.title || ''} ${item.source ? `（${item.source}）` : ''}`, 100);
+  }
+
+  function buildArticleEvidence(item, scraped = null) {
     const tags = Array.isArray(item.tags) ? item.tags.join('、') : (item.tags || '');
-    const summaryText = item.summary || '';
-    const insight = buildNewsCardInsight(item);
-    const points = [
-      `核心: ${title}`,
-      tags ? `领域: ${tags}` : `来源: ${source}`,
-      `看点: ${insight.why.slice(0, 96)}`,
-      `场景: ${insight.scenario.slice(0, 96)}`,
-      `行动: ${insight.action.slice(0, 96)}`,
-      summaryText.length > 20 ? `原文线索: ${summaryText.slice(0, 80)}` : `质量: ${insight.quality}`
-    ];
-    const result = points.join(' | ');
-    setSummaryCache(prev => ({ ...prev, [item.id]: result }));
-    return result;
+    return [
+      `标题：${item.title || ''}`,
+      `来源：${item.source || ''}`,
+      tags ? `标签：${tags}` : '',
+      item.publishedAt ? `发布时间：${item.publishedAt}` : '',
+      item.url ? `链接：${item.url}` : '',
+      item.summary ? `RSS摘要：${cleanSummaryText(item.summary, 500)}` : '',
+      item.bodyIntro ? `RSS正文片段：${cleanSummaryText(item.bodyIntro, 1400)}` : '',
+      item.fullContent ? `素材全文：${cleanSummaryText(item.fullContent, 1400)}` : '',
+      item.content ? `内容片段：${cleanSummaryText(item.content, 1000)}` : '',
+      scraped?.summary ? `网页抓取摘要：${cleanSummaryText(scraped.summary, 1400)}` : '',
+      scraped?.description ? `网页描述：${cleanSummaryText(scraped.description, 500)}` : ''
+    ].filter(Boolean).join('\n');
+  }
+
+  async function scrapeArticleForSummary(item) {
+    if (!item.url) return null;
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 9000);
+    try {
+      const response = await fetch('/api/scrape', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: item.url, mode: 'basic', timeout: 8 }),
+        signal: controller.signal
+      });
+      if (!response.ok) return null;
+      const data = await response.json();
+      if (data?.error) return null;
+      return data;
+    } catch {
+      return null;
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  function normalizeModelSummary(text, fallback) {
+    const cleaned = cleanSummaryText(text, 120)
+      .replace(/^摘要[:：]\s*/i, '')
+      .replace(/^一句话[:：]\s*/i, '')
+      .trim();
+    return cleaned || fallback;
+  }
+
+  async function ensureSummary(item) {
+    if (getSummaryEntry(item) || summaryLoading[item.id]) return;
+    const fallback = buildLocalShortSummary(item);
+    if (!llmConfig.baseUrl || !llmConfig.selectedModel) {
+      setSummaryCache(prev => ({
+        ...prev,
+        [item.id]: { text: fallback, mode: 'local', createdAt: new Date().toISOString() }
+      }));
+      return;
+    }
+
+    setSummaryLoading(prev => ({ ...prev, [item.id]: true }));
+    try {
+      const scraped = await scrapeArticleForSummary(item);
+      const evidence = buildArticleEvidence(item, scraped);
+      const res = await fetch('/api/ai-generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          baseUrl: llmConfig.baseUrl,
+          apiKey: llmConfig.apiKey,
+          model: llmConfig.selectedModel,
+          action: 'chat',
+          systemPrompt: '你是资讯平台的短摘要助手。只能根据用户提供的文章信息总结，不得编造未给出的事实。',
+          messages: [{ role: 'user', content: evidence.slice(0, 6000) }],
+          content: '请用中文输出一句不超过70字的真实短摘要，只说这条资讯在讲什么，不要写推荐理由、场景、行动，也不要分点。'
+        })
+      });
+      const data = await res.json();
+      const text = data.ok ? normalizeModelSummary(data.content, fallback) : fallback;
+      setSummaryCache(prev => ({
+        ...prev,
+        [item.id]: {
+          text,
+          mode: data.ok ? (scraped ? 'llm-scraped' : 'llm-card') : 'fallback',
+          createdAt: new Date().toISOString()
+        }
+      }));
+    } catch {
+      setSummaryCache(prev => ({
+        ...prev,
+        [item.id]: { text: fallback, mode: 'fallback', createdAt: new Date().toISOString() }
+      }));
+    } finally {
+      setSummaryLoading(prev => {
+        const next = { ...prev };
+        delete next[item.id];
+        return next;
+      });
+    }
+  }
+
+  function handleSummaryToggle(item) {
+    const willOpen = !expandedSummary[item.id];
+    setExpandedSummary(prev => ({ ...prev, [item.id]: willOpen }));
+    if (willOpen) ensureSummary(item);
   }
 
   function addFollowKeyword(kw) {
@@ -5722,9 +5850,9 @@ ${signals}
               {!sidebarCollapsed && <span>登录</span>}
             </button>
           )}
-          <button className="sidebar-action" onClick={() => setTheme(t => t === 'dark' ? 'light' : 'dark')}>
-            {theme === 'dark' ? ICONS.sun : ICONS.moon}
-            {!sidebarCollapsed && <span>{theme === 'dark' ? '浅色模式' : '深色模式'}</span>}
+          <button className="sidebar-action" onClick={() => setShowThemePicker(true)}>
+            {ICONS.palette}
+            {!sidebarCollapsed && <span>主题</span>}
           </button>
           <button className="sidebar-action" onClick={() => setShowSettings(true)}>
             {ICONS.settings}
@@ -5737,13 +5865,16 @@ ${signals}
         </div>
       </aside>
 
+      {/* Theme picker modal */}
+      <ThemePicker mode={themeMode} setMode={setThemeMode} palette={palette} setPalette={setPalette} show={showThemePicker} onClose={() => setShowThemePicker(false)} />
+
       {/* Main */}
       <main className={`main ${nav === 'today' ? 'main-workbench' : ''}`}>
         <header className={`topbar ${nav === 'all' ? 'topbar-all' : ''} ${(nav === 'trending' || nav === 'recommendations') ? 'topbar-trending' : ''}`}>
           {nav === 'all' && (
             <div className="topbar-brand">
               <span className="brand-title">{PRODUCT_NAME}</span>
-              <span className="brand-theme-icon" aria-hidden="true">{theme === 'light' ? ICONS.sun : ICONS.moon}</span>
+              <span className="brand-theme-icon" aria-hidden="true">{ICONS.palette}</span>
             </div>
           )}
           
@@ -6132,9 +6263,11 @@ ${signals}
                           isInMaterials={isInMaterials(item.id)}
                           onBookmark={() => toggleBookmark(item)}
                           onAddMaterial={() => toggleMaterial(item)}
-                          onSummary={() => setExpandedSummary(p => ({ ...p, [item.id]: !p[item.id] }))}
+                          onSummary={() => handleSummaryToggle(item)}
                           isSummaryOpen={expandedSummary[item.id]}
-                          summaryText={generateSummary(item)}
+                          summaryText={getSummaryEntry(item)?.text || ''}
+                          summaryMode={getSummaryEntry(item)?.mode || ''}
+                          summaryLoading={Boolean(summaryLoading[item.id])}
                           isFollowed={followKeywords.some(kw => `${item.title} ${item.summary}`.toLowerCase().includes(kw.toLowerCase()))}
                           onRead={() => recordReading(item)}
                           showTranslation={translationOpen[item.id]}
@@ -6818,7 +6951,10 @@ ${signals}
                       </div>
                       {expandedEvents[cluster.id] && (
                         <div className="cluster-items">
-                          {cluster.items.map((item, ci) => <NewsItem key={item.id} item={item} index={ci} viewMode={viewMode} isFocused={focusedIndex === filtered.indexOf(item)} isBookmarked={isBookmarked(item.id)} isInMaterials={isInMaterials(item.id)} onBookmark={() => toggleBookmark(item)} onAddMaterial={() => toggleMaterial(item)} onSummary={() => setExpandedSummary(p => ({ ...p, [item.id]: !p[item.id] }))} isSummaryOpen={expandedSummary[item.id]} summaryText={generateSummary(item)} isFollowed={followKeywords.some(kw => `${item.title} ${item.summary}`.toLowerCase().includes(kw.toLowerCase()))} onOpenLightbox={(src, title) => setLightbox({ open: true, src, title })} showTranslation={translationOpen[item.id]} onToggleTranslation={() => setTranslationOpen(p => ({ ...p, [item.id]: !p[item.id] }))} onRequestTranslation={() => requestTranslation(item)} isTranslating={translatingItems[item.id]} translation={getTranslation(item)} />)}
+                          {cluster.items.map((item, ci) => {
+                            const summaryEntry = getSummaryEntry(item);
+                            return <NewsItem key={item.id} item={item} index={ci} viewMode={viewMode} isFocused={focusedIndex === filtered.indexOf(item)} isBookmarked={isBookmarked(item.id)} isInMaterials={isInMaterials(item.id)} onBookmark={() => toggleBookmark(item)} onAddMaterial={() => toggleMaterial(item)} onSummary={() => handleSummaryToggle(item)} isSummaryOpen={expandedSummary[item.id]} summaryText={summaryEntry?.text || ''} summaryMode={summaryEntry?.mode || ''} summaryLoading={Boolean(summaryLoading[item.id])} isFollowed={followKeywords.some(kw => `${item.title} ${item.summary}`.toLowerCase().includes(kw.toLowerCase()))} onOpenLightbox={(src, title) => setLightbox({ open: true, src, title })} showTranslation={translationOpen[item.id]} onToggleTranslation={() => setTranslationOpen(p => ({ ...p, [item.id]: !p[item.id] }))} onRequestTranslation={() => requestTranslation(item)} isTranslating={translatingItems[item.id]} translation={getTranslation(item)} />;
+                          })}
                         </div>
                       )}
                     </div>
@@ -6830,7 +6966,10 @@ ${signals}
               {error && <div className="error-state"><p>加载失败: {error}</p><button onClick={() => loadNews()}>重试</button></div>}
               {!loading && !error && filtered.length === 0 && <div className="empty-state"><p>没有匹配的资讯</p><button onClick={() => { setQuery(''); setCategory('all'); setMode('all'); setSourceFilter('all'); }}>重置筛选</button></div>}
               <div className={`feed-list view-${viewMode} ${viewMode === 'card' ? 'card-grid' : ''}`}>
-                {filtered.map((item, i) => <NewsItem key={item.id} item={item} index={i} viewMode={viewMode} isFocused={focusedIndex === i} isBookmarked={isBookmarked(item.id)} isInMaterials={isInMaterials(item.id)} onBookmark={() => toggleBookmark(item)} onAddMaterial={() => toggleMaterial(item)} onSummary={() => setExpandedSummary(p => ({ ...p, [item.id]: !p[item.id] }))} isSummaryOpen={expandedSummary[item.id]} summaryText={generateSummary(item)} isFollowed={followKeywords.some(kw => `${item.title} ${item.summary}`.toLowerCase().includes(kw.toLowerCase()))} onRead={() => recordReading(item)} showTranslation={translationOpen[item.id]} onToggleTranslation={() => setTranslationOpen(p => ({ ...p, [item.id]: !p[item.id] }))} onRequestTranslation={() => requestTranslation(item)} isTranslating={translatingItems[item.id]} translation={getTranslation(item)} onOpenLightbox={(src, title) => setLightbox({ open: true, src, title })} />)}
+                {filtered.map((item, i) => {
+                  const summaryEntry = getSummaryEntry(item);
+                  return <NewsItem key={item.id} item={item} index={i} viewMode={viewMode} isFocused={focusedIndex === i} isBookmarked={isBookmarked(item.id)} isInMaterials={isInMaterials(item.id)} onBookmark={() => toggleBookmark(item)} onAddMaterial={() => toggleMaterial(item)} onSummary={() => handleSummaryToggle(item)} isSummaryOpen={expandedSummary[item.id]} summaryText={summaryEntry?.text || ''} summaryMode={summaryEntry?.mode || ''} summaryLoading={Boolean(summaryLoading[item.id])} isFollowed={followKeywords.some(kw => `${item.title} ${item.summary}`.toLowerCase().includes(kw.toLowerCase()))} onRead={() => recordReading(item)} showTranslation={translationOpen[item.id]} onToggleTranslation={() => setTranslationOpen(p => ({ ...p, [item.id]: !p[item.id] }))} onRequestTranslation={() => requestTranslation(item)} isTranslating={translatingItems[item.id]} translation={getTranslation(item)} onOpenLightbox={(src, title) => setLightbox({ open: true, src, title })} />;
+                })}
               </div>
               {nav === 'all' && newsHasMore && (
                 <div id="load-more-sentinel" className="load-more-area">
@@ -6905,7 +7044,10 @@ ${signals}
                   {!loading && !error && filtered.length === 0 && <div className="empty-state"><p>暂无推荐内容</p></div>}
                   {!loading && !error && filtered.length > 0 && (
                     <div className={`feed-list view-${viewMode} ${viewMode === 'card' ? 'card-grid' : ''}`}>
-                      {filtered.map((item, i) => <NewsItem key={item.id} item={item} index={i} viewMode={viewMode} isFocused={focusedIndex === i} isBookmarked={isBookmarked(item.id)} isInMaterials={isInMaterials(item.id)} onBookmark={() => toggleBookmark(item)} onAddMaterial={() => toggleMaterial(item)} onSummary={() => setExpandedSummary(p => ({ ...p, [item.id]: !p[item.id] }))} isSummaryOpen={expandedSummary[item.id]} summaryText={generateSummary(item)} isFollowed={followKeywords.some(kw => `${item.title} ${item.summary}`.toLowerCase().includes(kw.toLowerCase()))} onRead={() => recordReading(item)} showTranslation={translationOpen[item.id]} onToggleTranslation={() => setTranslationOpen(p => ({ ...p, [item.id]: !p[item.id] }))} onRequestTranslation={() => requestTranslation(item)} isTranslating={translatingItems[item.id]} translation={getTranslation(item)} onOpenLightbox={(src, title) => setLightbox({ open: true, src, title })} />)}
+                      {filtered.map((item, i) => {
+                        const summaryEntry = getSummaryEntry(item);
+                        return <NewsItem key={item.id} item={item} index={i} viewMode={viewMode} isFocused={focusedIndex === i} isBookmarked={isBookmarked(item.id)} isInMaterials={isInMaterials(item.id)} onBookmark={() => toggleBookmark(item)} onAddMaterial={() => toggleMaterial(item)} onSummary={() => handleSummaryToggle(item)} isSummaryOpen={expandedSummary[item.id]} summaryText={summaryEntry?.text || ''} summaryMode={summaryEntry?.mode || ''} summaryLoading={Boolean(summaryLoading[item.id])} isFollowed={followKeywords.some(kw => `${item.title} ${item.summary}`.toLowerCase().includes(kw.toLowerCase()))} onRead={() => recordReading(item)} showTranslation={translationOpen[item.id]} onToggleTranslation={() => setTranslationOpen(p => ({ ...p, [item.id]: !p[item.id] }))} onRequestTranslation={() => requestTranslation(item)} isTranslating={translatingItems[item.id]} translation={getTranslation(item)} onOpenLightbox={(src, title) => setLightbox({ open: true, src, title })} />;
+                      })}
                     </div>
                   )}
                   {newsHasMore && (
@@ -8204,9 +8346,8 @@ ${signals}
                         )}
                         {m.insight && (
                           <div className="material-insight">
-                            {m.insight.why && <p><span>看点</span>{m.insight.why}</p>}
+                            {m.insight.why && <p><span>推荐</span>{m.insight.why}</p>}
                             {m.insight.scenario && <p><span>场景</span>{m.insight.scenario}</p>}
-                            {m.insight.action && <p><span>行动</span>{m.insight.action}</p>}
                             {m.insight.value && <p><span>价值</span>{m.insight.value}</p>}
                             {m.insight.audience && <p><span>适合</span>{m.insight.audience}</p>}
                             {m.insight.difficulty && <p><span>难度</span>{m.insight.difficulty}</p>}
@@ -9758,14 +9899,15 @@ function SkeletonCard({ viewMode = 'standard' }) {
 }
 
 function buildNewsCardInsight(item = {}, summaryOverride = '') {
-  const title = item.title || '';
-  const summary = summaryOverride || item.summary || '';
-  const tags = Array.isArray(item.tags) ? item.tags : (item.tags ? [item.tags] : []);
-  const text = `${title} ${summary} ${tags.join(' ')} ${item.category || ''}`.toLowerCase();
   const reasons = Array.isArray(item.recommendationReasons) && item.recommendationReasons.length
     ? item.recommendationReasons.join('、')
     : String(item.recommendation || '');
   const grade = item.sourceGradeLabel ? item.sourceGradeLabel.split('-')[0] : '';
+  const reasonParts = [];
+  if (reasons) reasonParts.push(reasons);
+  if (!reasons && (grade === 'S' || grade === 'A')) reasonParts.push('来自高质量来源');
+  if (!reasons && item.mustReadScore >= 80) reasonParts.push('推荐分较高');
+  if (!reasons && (item.imageUrl || item.videoUrl)) reasonParts.push('包含可查看的多媒体线索');
   const quality = [
     grade,
     MODE_MAP[item.mode],
@@ -9774,40 +9916,14 @@ function buildNewsCardInsight(item = {}, summaryOverride = '') {
     item.videoUrl ? '视频' : ''
   ].filter(Boolean).join(' · ');
 
-  let scenario = '适合作为今日技术动态的背景材料，快速判断是否需要继续追踪。';
-  if (/github|repo|open-source|开源|readme|stars?/.test(text)) {
-    scenario = '适合沉淀为开源项目观察素材，后续可进入 GitHub 项目评估或技术选型。';
-  } else if (/agent|workflow|rag|copilot|assistant|model|llm|大模型|智能体/.test(text)) {
-    scenario = '适合用于智能体、推荐算法或创作工作流的产品能力参考。';
-  } else if (/research|paper|arxiv|论文|研究|benchmark|评测/.test(text)) {
-    scenario = '适合作为科研或技术路线观察，重点看方法、数据和可复现价值。';
-  } else if (/policy|regulat|law|安全|治理|risk|ban|compliance|监管/.test(text)) {
-    scenario = '适合作为风险与政策观察，重点判断对业务、合规和市场预期的影响。';
-  } else if (/funding|startup|融资|商业|market|product|launch|发布/.test(text)) {
-    scenario = '适合作为商业机会或产品趋势观察，重点看用户需求和落地路径。';
-  }
-
-  let action = '先快速浏览摘要；若与关注领域相关，再收藏或交给 AI 精灵追问。';
-  if (item.mustReadScore >= 80 || grade === 'S' || grade === 'A') {
-    action = '建议优先阅读原文，并保存为素材，后续可用于每日汇报或内容创作。';
-  } else if (item.imageUrl || item.videoUrl) {
-    action = '可作为图文/视频素材沉淀；适合进入素材库后再由工作流生成草稿。';
-  } else if (reasons.includes('追踪') || reasons.includes('关注')) {
-    action = '建议加入追踪记忆，观察后续是否形成连续信号。';
-  }
-
-  const why = reasons || (summary ? String(summary).slice(0, 96) : '综合来源质量、发布时间和主题相关性进入推荐。');
-
   return {
-    why,
-    scenario,
-    action,
+    why: reasonParts.join('，'),
     quality: quality || '综合资讯',
     mediaLabel: item.videoUrl ? '视频线索' : item.imageUrl ? '正文图片' : '暂无多媒体'
   };
 }
 
-function NewsItem({ item, index, viewMode = 'standard', isFocused = false, isBookmarked = false, isInMaterials = false, onBookmark, onSummary, isSummaryOpen, summaryText, isFollowed = false, onRead, showTranslation, onToggleTranslation, onRequestTranslation, isTranslating, translation, onOpenLightbox, onAddMaterial }) {
+function NewsItem({ item, index, viewMode = 'standard', isFocused = false, isBookmarked = false, isInMaterials = false, onBookmark, onSummary, isSummaryOpen, summaryText, summaryLoading = false, summaryMode = '', isFollowed = false, onRead, showTranslation, onToggleTranslation, onRequestTranslation, isTranslating, translation, onOpenLightbox, onAddMaterial }) {
   const isCompact = viewMode === 'compact';
   const isCard = viewMode === 'card';
   const hasMedia = item.imageUrl || item.videoUrl;
@@ -9824,10 +9940,18 @@ function NewsItem({ item, index, viewMode = 'standard', isFocused = false, isBoo
   const displayTitle = showTranslation && translation ? translation.title : item.title;
   const displaySummary = showTranslation && translation && translation.summary ? translation.summary : item.summary;
   const cardInsight = buildNewsCardInsight(item, displaySummary);
-  const explainReason = trimBrief(cardInsight.why, 118);
-  const explainScenario = trimBrief(cardInsight.scenario, 126);
-  const explainAction = trimBrief(cardInsight.action, 126);
-  const explainJudgement = trimBrief(`${cardInsight.quality} · ${cardInsight.mediaLabel}`, 86);
+  const recommendationReason = trimBrief(cardInsight.why, 150);
+  const summaryModeLabel = summaryMode === 'llm-scraped'
+    ? 'AI 短摘要 · 已尝试抓取网页'
+    : summaryMode === 'llm-card'
+      ? 'AI 短摘要 · 基于卡片内容'
+      : summaryMode === 'local'
+        ? '短摘要 · 未配置模型'
+        : summaryMode === 'fallback'
+          ? '短摘要 · 模型暂不可用'
+          : summaryMode === 'legacy'
+            ? '短摘要'
+            : 'AI 短摘要';
 
   const isEnglish = /^[a-zA-Z0-9\s\-.,!?"'():;&%$#@*+\[\]{}|\\\/<>`~+=]+$/.test(item.title) && !/^[\u4e00-\u9fff]/.test(item.title);
 
@@ -9919,7 +10043,7 @@ function NewsItem({ item, index, viewMode = 'standard', isFocused = false, isBoo
         <div className="item-actions-left">
           {onBookmark && <button className={`bookmark-btn ${isBookmarked ? 'active' : ''}`} onClick={onBookmark} title={isBookmarked ? '取消收藏' : '收藏'}>{isBookmarked ? ICONS.bookmarkFill : ICONS.bookmark}</button>}
           {onAddMaterial && <button className={`add-material-btn ${isInMaterials ? 'active' : ''}`} onClick={() => onAddMaterial(item)} title={isInMaterials ? '已在素材库' : '收藏为素材'}>{ICONS.layers}</button>}
-          {onSummary && <button className="summary-btn" onClick={onSummary} title="AI 摘要">{ICONS.sparkle}</button>}
+          {onSummary && <button className={`summary-btn ${summaryLoading ? 'loading' : ''}`} onClick={onSummary} title="生成短摘要" disabled={summaryLoading}>{summaryLoading ? ICONS.spinner : ICONS.sparkle}</button>}
           {isEnglish && onToggleTranslation && <button className={`translate-btn ${showTranslation ? 'active' : ''} ${isTranslating ? 'translating' : ''}`} onClick={() => { console.log('[NewsItem] Translate button clicked:', { isTranslating, translation, onRequestTranslation: !!onRequestTranslation }); if (isTranslating) return; if (!translation && onRequestTranslation) { onRequestTranslation().then(result => { console.log('[NewsItem] Translation result:', result); if (result) onToggleTranslation(); }); } else { onToggleTranslation(); } }} title="翻译" disabled={isTranslating}>{isTranslating ? ICONS.spinner : ICONS.globe}</button>}
         </div>
       </div>
@@ -9965,39 +10089,18 @@ function NewsItem({ item, index, viewMode = 'standard', isFocused = false, isBoo
             </div>
           )}
         </div>
-        {!isCompact && (explainReason || explainScenario || explainAction) && (
-          <div className="item-explain-panel">
-            {explainReason && (
-              <div className="item-explain-cell">
-                <span>看点</span>
-                <p>{explainReason}</p>
-              </div>
-            )}
-            {explainScenario && (
-              <div className="item-explain-cell">
-                <span>场景</span>
-                <p>{explainScenario}</p>
-              </div>
-            )}
-            {explainAction && (
-              <div className="item-explain-cell compact">
-                <span>行动</span>
-                <p>{explainAction}</p>
-              </div>
-            )}
-            {explainJudgement && <span className="item-insight-meta">{explainJudgement}</span>}
-          </div>
-        )}
-        {isSummaryOpen && summaryText && (
-          <div className="ai-summary">
-            <div className="ai-summary-header">{ICONS.sparkle}<span>AI 摘要</span></div>
-            <div className="ai-summary-content">{summaryText.split(' | ').map((p, i) => <p key={i}>{p}</p>)}</div>
-          </div>
-        )}
-        {!isCompact && item.recommendation && (
+        {!isCompact && recommendationReason && (
           <div className="recommendation-reason">
             <span className="recommendation-label">推荐理由：</span>
-            <span className="recommendation-text">{item.recommendation}</span>
+            <span className="recommendation-text">{recommendationReason}</span>
+          </div>
+        )}
+        {isSummaryOpen && (summaryLoading || summaryText) && (
+          <div className="ai-summary">
+            <div className="ai-summary-header">{ICONS.sparkle}<span>{summaryLoading ? '正在生成短摘要' : summaryModeLabel}</span></div>
+            <div className="ai-summary-content">
+              <p>{summaryLoading ? '正在读取已抓取内容并压缩成一句话...' : summaryText}</p>
+            </div>
           </div>
         )}
         {!isCompact && <div className="item-meta">

@@ -1,0 +1,579 @@
+/* ============================================================
+   Palette System — [data-palette="xxx"]
+   Overrides accent / mood / glow tokens on top of base mode.
+   Default (no data-palette) = champagne.
+   ============================================================ */
+
+/* ---------- 1. Champagne 香槟金 (default) ---------- */
+:root[data-palette="champagne"] {
+  --accent-cyan: #C9A961;
+  --accent-blue: #B89752;
+  --accent-violet: #8C8C8C;
+  --accent-emerald: #A88643;
+  --accent-amber: #D4B576;
+  --accent-rose: #7A7A7A;
+  --gradient-primary: linear-gradient(135deg, #D4B576, #C9A961);
+  --gradient-glow: linear-gradient(135deg, rgba(201,169,97,0.11), rgba(184,151,82,0.075));
+  --accent-cyan-soft: rgba(201,169,97,0.12);
+  --accent-cyan-softer: rgba(201,169,97,0.075);
+  --accent-cyan-border: rgba(201,169,97,0.3);
+  --accent-blue-soft: rgba(184,151,82,0.1);
+  --accent-emerald-soft: rgba(168,134,67,0.13);
+  --accent-amber-soft: rgba(212,181,118,0.14);
+  --border-color: rgba(201,169,97,0.12);
+  --border-active: rgba(201,169,97,0.45);
+  --border-glow: rgba(201,169,97,0.18);
+  --bg-glow-1: rgba(201,169,97,0.1);
+  --bg-glow-2: rgba(140,140,140,0.07);
+  --particle-c1: rgba(201,169,97,0.5);
+  --particle-c2: rgba(212,181,118,0.42);
+  --grid-color: rgba(201,169,97,0.03);
+  --shadow-card: 0 16px 40px rgba(0,0,0,0.5);
+  --surface-workbench-ai: linear-gradient(135deg, rgba(201,169,97,0.105), rgba(184,151,82,0.055)), rgba(20,24,28,0.88);
+  --workbench-page-wash: linear-gradient(180deg, rgba(201,169,97,0.055), transparent 250px);
+}
+:root[data-mode="light"][data-palette="champagne"] {
+  --border-color: rgba(154,123,63,0.15);
+  --border-active: rgba(154,123,63,0.4);
+  --border-glow: rgba(154,123,63,0.12);
+  --gradient-primary: linear-gradient(135deg, #B8943E, #9A7B3F);
+  --gradient-glow: linear-gradient(135deg, rgba(154,123,63,0.11), rgba(138,111,58,0.075));
+  --accent-cyan-soft: rgba(154,123,63,0.1);
+  --accent-cyan-softer: rgba(154,123,63,0.065);
+  --accent-cyan-border: rgba(154,123,63,0.25);
+  --accent-blue-soft: rgba(138,111,58,0.09);
+  --accent-emerald-soft: rgba(122,98,50,0.11);
+  --accent-amber-soft: rgba(184,148,62,0.11);
+  --bg-glow-1: rgba(154,123,63,0.09);
+  --bg-glow-2: rgba(120,120,120,0.05);
+  --particle-c1: rgba(154,123,63,0.3);
+  --particle-c2: rgba(184,148,62,0.24);
+  --grid-color: rgba(154,123,63,0.03);
+  --shadow-card: 0 16px 34px rgba(26,29,33,0.08);
+  --surface-workbench-ai: linear-gradient(135deg, rgba(154,123,63,0.1), rgba(138,111,58,0.05)), rgba(255,253,248,0.98);
+  --workbench-page-wash: linear-gradient(180deg, rgba(154,123,63,0.07), rgba(255,244,224,0.18) 210px, transparent 310px);
+}
+
+/* ---------- 2. Sakura 樱花和纸 ---------- */
+:root[data-palette="sakura"] {
+  --accent-cyan: #F9A8B8;
+  --accent-blue: #E8849A;
+  --accent-violet: #D4A0B0;
+  --accent-emerald: #F0B8C8;
+  --accent-amber: #FBC8D4;
+  --accent-rose: #E85A7E;
+  --gradient-primary: linear-gradient(135deg, #FBC8D4, #E85A7E);
+  --gradient-glow: linear-gradient(135deg, rgba(249,168,184,0.12), rgba(232,90,126,0.07));
+  --accent-cyan-soft: rgba(249,168,184,0.13);
+  --accent-cyan-softer: rgba(249,168,184,0.08);
+  --accent-cyan-border: rgba(249,168,184,0.3);
+  --accent-blue-soft: rgba(232,132,154,0.12);
+  --accent-emerald-soft: rgba(240,184,200,0.12);
+  --accent-amber-soft: rgba(251,200,212,0.13);
+  --border-color: rgba(249,168,184,0.12);
+  --border-active: rgba(249,168,184,0.42);
+  --border-glow: rgba(249,168,184,0.18);
+  --bg-glow-1: rgba(249,168,184,0.1);
+  --bg-glow-2: rgba(212,160,176,0.08);
+  --particle-c1: rgba(249,168,184,0.5);
+  --particle-c2: rgba(232,90,126,0.42);
+  --grid-color: rgba(249,168,184,0.03);
+  --shadow-card: 0 16px 40px rgba(0,0,0,0.45);
+  --surface-workbench-ai: linear-gradient(135deg, rgba(249,168,184,0.11), rgba(232,90,126,0.05)), rgba(20,24,28,0.88);
+  --workbench-page-wash: linear-gradient(180deg, rgba(249,168,184,0.06), transparent 250px);
+}
+:root[data-mode="light"][data-palette="sakura"] {
+  --border-color: rgba(212,104,138,0.14);
+  --border-active: rgba(212,104,138,0.4);
+  --border-glow: rgba(212,104,138,0.12);
+  --gradient-primary: linear-gradient(135deg, #D4688A, #C04060);
+  --gradient-glow: linear-gradient(135deg, rgba(212,104,138,0.11), rgba(192,64,96,0.07));
+  --accent-cyan-soft: rgba(212,104,138,0.1);
+  --accent-cyan-softer: rgba(212,104,138,0.065);
+  --accent-cyan-border: rgba(212,104,138,0.25);
+  --accent-blue-soft: rgba(192,64,96,0.09);
+  --accent-emerald-soft: rgba(212,104,138,0.11);
+  --accent-amber-soft: rgba(212,104,138,0.11);
+  --bg-glow-1: rgba(212,104,138,0.08);
+  --bg-glow-2: rgba(192,64,96,0.05);
+  --particle-c1: rgba(212,104,138,0.3);
+  --particle-c2: rgba(192,64,96,0.24);
+  --grid-color: rgba(212,104,138,0.03);
+  --shadow-card: 0 16px 34px rgba(100,20,40,0.08);
+  --surface-workbench-ai: linear-gradient(135deg, rgba(212,104,138,0.1), rgba(192,64,96,0.045)), rgba(255,253,248,0.98);
+  --workbench-page-wash: linear-gradient(180deg, rgba(212,104,138,0.07), rgba(255,230,238,0.18) 210px, transparent 310px);
+}
+
+/* ---------- 3. Forest 森林翡翠 ---------- */
+:root[data-palette="forest"] {
+  --accent-cyan: #34D399;
+  --accent-blue: #5BBF8A;
+  --accent-violet: #7BA88E;
+  --accent-emerald: #4ADE80;
+  --accent-amber: #A7D9B8;
+  --accent-rose: #6B9B7F;
+  --gradient-primary: linear-gradient(135deg, #4ADE80, #34D399);
+  --gradient-glow: linear-gradient(135deg, rgba(52,211,153,0.12), rgba(91,191,138,0.07));
+  --accent-cyan-soft: rgba(52,211,153,0.12);
+  --accent-cyan-softer: rgba(52,211,153,0.07);
+  --accent-cyan-border: rgba(52,211,153,0.3);
+  --accent-blue-soft: rgba(91,191,138,0.11);
+  --accent-emerald-soft: rgba(74,222,128,0.13);
+  --accent-amber-soft: rgba(167,217,184,0.12);
+  --border-color: rgba(52,211,153,0.12);
+  --border-active: rgba(52,211,153,0.42);
+  --border-glow: rgba(52,211,153,0.18);
+  --bg-glow-1: rgba(52,211,153,0.11);
+  --bg-glow-2: rgba(123,168,142,0.08);
+  --particle-c1: rgba(52,211,153,0.5);
+  --particle-c2: rgba(74,222,128,0.42);
+  --grid-color: rgba(52,211,153,0.03);
+  --shadow-card: 0 16px 40px rgba(0,0,0,0.5);
+  --surface-workbench-ai: linear-gradient(135deg, rgba(52,211,153,0.1), rgba(91,191,138,0.05)), rgba(20,24,28,0.88);
+  --workbench-page-wash: linear-gradient(180deg, rgba(52,211,153,0.06), transparent 250px);
+}
+:root[data-mode="light"][data-palette="forest"] {
+  --border-color: rgba(26,158,110,0.14);
+  --border-active: rgba(26,158,110,0.4);
+  --border-glow: rgba(26,158,110,0.12);
+  --gradient-primary: linear-gradient(135deg, #22875C, #1A9E6E);
+  --gradient-glow: linear-gradient(135deg, rgba(26,158,110,0.11), rgba(34,135,92,0.07));
+  --accent-cyan-soft: rgba(26,158,110,0.1);
+  --accent-cyan-softer: rgba(26,158,110,0.065);
+  --accent-cyan-border: rgba(26,158,110,0.25);
+  --accent-blue-soft: rgba(34,135,92,0.09);
+  --accent-emerald-soft: rgba(26,158,110,0.11);
+  --accent-amber-soft: rgba(26,158,110,0.11);
+  --bg-glow-1: rgba(26,158,110,0.08);
+  --bg-glow-2: rgba(34,135,92,0.05);
+  --particle-c1: rgba(26,158,110,0.3);
+  --particle-c2: rgba(34,135,92,0.24);
+  --grid-color: rgba(26,158,110,0.03);
+  --shadow-card: 0 16px 34px rgba(0,80,40,0.08);
+  --surface-workbench-ai: linear-gradient(135deg, rgba(26,158,110,0.1), rgba(34,135,92,0.045)), rgba(255,253,248,0.98);
+  --workbench-page-wash: linear-gradient(180deg, rgba(26,158,110,0.07), rgba(232,255,240,0.18) 210px, transparent 310px);
+}
+
+/* ---------- 4. Neon 赛博霓虹 ---------- */
+:root[data-palette="neon"] {
+  --accent-cyan: #22D3EE;
+  --accent-blue: #818CF8;
+  --accent-violet: #A855F7;
+  --accent-emerald: #2DD4BF;
+  --accent-amber: #F472B6;
+  --accent-rose: #EC4899;
+  --gradient-primary: linear-gradient(135deg, #22D3EE, #A855F7);
+  --gradient-glow: linear-gradient(135deg, rgba(34,211,238,0.14), rgba(168,85,247,0.09));
+  --accent-cyan-soft: rgba(34,211,238,0.13);
+  --accent-cyan-softer: rgba(34,211,238,0.08);
+  --accent-cyan-border: rgba(34,211,238,0.32);
+  --accent-blue-soft: rgba(129,140,248,0.13);
+  --accent-emerald-soft: rgba(45,212,191,0.13);
+  --accent-amber-soft: rgba(244,114,182,0.14);
+  --border-color: rgba(34,211,238,0.12);
+  --border-active: rgba(34,211,238,0.45);
+  --border-glow: rgba(34,211,238,0.2);
+  --bg-glow-1: rgba(34,211,238,0.12);
+  --bg-glow-2: rgba(168,85,247,0.1);
+  --particle-c1: rgba(34,211,238,0.55);
+  --particle-c2: rgba(236,72,153,0.48);
+  --grid-color: rgba(129,140,248,0.035);
+  --shadow-card: 0 16px 42px rgba(0,0,0,0.5);
+  --surface-workbench-ai: linear-gradient(135deg, rgba(34,211,238,0.11), rgba(168,85,247,0.06)), rgba(20,24,28,0.88);
+  --workbench-page-wash: linear-gradient(180deg, rgba(34,211,238,0.06), transparent 250px);
+}
+:root[data-mode="light"][data-palette="neon"] {
+  --border-color: rgba(14,165,192,0.14);
+  --border-active: rgba(14,165,192,0.4);
+  --border-glow: rgba(14,165,192,0.12);
+  --gradient-primary: linear-gradient(135deg, #0EA5C0, #8B3FD8);
+  --gradient-glow: linear-gradient(135deg, rgba(14,165,192,0.11), rgba(139,63,216,0.07));
+  --accent-cyan-soft: rgba(14,165,192,0.1);
+  --accent-cyan-softer: rgba(14,165,192,0.065);
+  --accent-cyan-border: rgba(14,165,192,0.25);
+  --accent-blue-soft: rgba(139,63,216,0.09);
+  --accent-emerald-soft: rgba(14,165,192,0.11);
+  --accent-amber-soft: rgba(236,72,153,0.11);
+  --bg-glow-1: rgba(14,165,192,0.08);
+  --bg-glow-2: rgba(139,63,216,0.06);
+  --particle-c1: rgba(14,165,192,0.3);
+  --particle-c2: rgba(236,72,153,0.24);
+  --grid-color: rgba(14,165,192,0.03);
+  --shadow-card: 0 16px 34px rgba(0,60,80,0.08);
+  --surface-workbench-ai: linear-gradient(135deg, rgba(14,165,192,0.1), rgba(139,63,216,0.05)), rgba(255,253,248,0.98);
+  --workbench-page-wash: linear-gradient(180deg, rgba(14,165,192,0.07), rgba(240,232,255,0.18) 210px, transparent 310px);
+}
+
+/* ---------- 5. Cosmos 深空蓝 ---------- */
+:root[data-palette="cosmos"] {
+  --accent-cyan: #60A5FA;
+  --accent-blue: #3B82F6;
+  --accent-violet: #818CF8;
+  --accent-emerald: #93C5FD;
+  --accent-amber: #A5B4FC;
+  --accent-rose: #6B8DBF;
+  --gradient-primary: linear-gradient(135deg, #60A5FA, #3B82F6);
+  --gradient-glow: linear-gradient(135deg, rgba(96,165,250,0.12), rgba(59,130,246,0.07));
+  --accent-cyan-soft: rgba(96,165,250,0.12);
+  --accent-cyan-softer: rgba(96,165,250,0.075);
+  --accent-cyan-border: rgba(96,165,250,0.3);
+  --accent-blue-soft: rgba(59,130,246,0.11);
+  --accent-emerald-soft: rgba(147,197,253,0.12);
+  --accent-amber-soft: rgba(165,180,252,0.12);
+  --border-color: rgba(96,165,250,0.12);
+  --border-active: rgba(96,165,250,0.42);
+  --border-glow: rgba(96,165,250,0.18);
+  --bg-glow-1: rgba(96,165,250,0.1);
+  --bg-glow-2: rgba(59,130,246,0.08);
+  --particle-c1: rgba(96,165,250,0.5);
+  --particle-c2: rgba(59,130,246,0.42);
+  --grid-color: rgba(96,165,250,0.03);
+  --shadow-card: 0 16px 40px rgba(0,0,0,0.5);
+  --surface-workbench-ai: linear-gradient(135deg, rgba(96,165,250,0.11), rgba(59,130,246,0.055)), rgba(20,24,28,0.88);
+  --workbench-page-wash: linear-gradient(180deg, rgba(96,165,250,0.06), transparent 250px);
+}
+:root[data-mode="light"][data-palette="cosmos"] {
+  --border-color: rgba(59,130,246,0.14);
+  --border-active: rgba(59,130,246,0.4);
+  --border-glow: rgba(59,130,246,0.12);
+  --gradient-primary: linear-gradient(135deg, #3B82F6, #2563EB);
+  --gradient-glow: linear-gradient(135deg, rgba(59,130,246,0.11), rgba(37,99,235,0.07));
+  --accent-cyan-soft: rgba(59,130,246,0.1);
+  --accent-cyan-softer: rgba(59,130,246,0.065);
+  --accent-cyan-border: rgba(59,130,246,0.25);
+  --accent-blue-soft: rgba(37,99,235,0.09);
+  --accent-emerald-soft: rgba(59,130,246,0.11);
+  --accent-amber-soft: rgba(59,130,246,0.11);
+  --bg-glow-1: rgba(59,130,246,0.08);
+  --bg-glow-2: rgba(37,99,235,0.05);
+  --particle-c1: rgba(59,130,246,0.3);
+  --particle-c2: rgba(37,99,235,0.24);
+  --grid-color: rgba(59,130,246,0.03);
+  --shadow-card: 0 16px 34px rgba(0,40,120,0.08);
+  --surface-workbench-ai: linear-gradient(135deg, rgba(59,130,246,0.1), rgba(37,99,235,0.045)), rgba(255,253,248,0.98);
+  --workbench-page-wash: linear-gradient(180deg, rgba(59,130,246,0.07), rgba(232,240,255,0.18) 210px, transparent 310px);
+}
+
+/* ---------- 6. Terracotta 赤陶夕阳 ---------- */
+:root[data-palette="terracotta"] {
+  --accent-cyan: #E07856;
+  --accent-blue: #C8623E;
+  --accent-violet: #A87858;
+  --accent-emerald: #D8946A;
+  --accent-amber: #F0A878;
+  --accent-rose: #B85A3A;
+  --gradient-primary: linear-gradient(135deg, #F0A878, #C8623E);
+  --gradient-glow: linear-gradient(135deg, rgba(224,120,86,0.12), rgba(200,98,62,0.08));
+  --accent-cyan-soft: rgba(224,120,86,0.13);
+  --accent-cyan-softer: rgba(224,120,86,0.08);
+  --accent-cyan-border: rgba(224,120,86,0.3);
+  --accent-blue-soft: rgba(200,98,62,0.12);
+  --accent-emerald-soft: rgba(216,148,106,0.13);
+  --accent-amber-soft: rgba(240,168,120,0.14);
+  --border-color: rgba(224,120,86,0.12);
+  --border-active: rgba(224,120,86,0.42);
+  --border-glow: rgba(224,120,86,0.18);
+  --bg-glow-1: rgba(224,120,86,0.1);
+  --bg-glow-2: rgba(168,120,88,0.08);
+  --particle-c1: rgba(224,120,86,0.5);
+  --particle-c2: rgba(240,168,120,0.42);
+  --grid-color: rgba(224,120,86,0.03);
+  --shadow-card: 0 16px 40px rgba(0,0,0,0.45);
+  --surface-workbench-ai: linear-gradient(135deg, rgba(224,120,86,0.11), rgba(200,98,62,0.05)), rgba(20,24,28,0.88);
+  --workbench-page-wash: linear-gradient(180deg, rgba(224,120,86,0.06), transparent 250px);
+}
+:root[data-mode="light"][data-palette="terracotta"] {
+  --border-color: rgba(192,88,48,0.14);
+  --border-active: rgba(192,88,48,0.4);
+  --border-glow: rgba(192,88,48,0.12);
+  --gradient-primary: linear-gradient(135deg, #D08050, #C05830);
+  --gradient-glow: linear-gradient(135deg, rgba(192,88,48,0.11), rgba(192,88,48,0.07));
+  --accent-cyan-soft: rgba(192,88,48,0.1);
+  --accent-cyan-softer: rgba(192,88,48,0.065);
+  --accent-cyan-border: rgba(192,88,48,0.25);
+  --accent-blue-soft: rgba(192,88,48,0.09);
+  --accent-emerald-soft: rgba(192,88,48,0.11);
+  --accent-amber-soft: rgba(192,88,48,0.11);
+  --bg-glow-1: rgba(192,88,48,0.08);
+  --bg-glow-2: rgba(168,80,48,0.05);
+  --particle-c1: rgba(192,88,48,0.3);
+  --particle-c2: rgba(168,80,48,0.24);
+  --grid-color: rgba(192,88,48,0.03);
+  --shadow-card: 0 16px 34px rgba(80,20,0,0.08);
+  --surface-workbench-ai: linear-gradient(135deg, rgba(192,88,48,0.1), rgba(192,88,48,0.045)), rgba(255,253,248,0.98);
+  --workbench-page-wash: linear-gradient(180deg, rgba(192,88,48,0.07), rgba(255,240,230,0.18) 210px, transparent 310px);
+}
+
+/* ---------- 7. Arctic 北极银 ---------- */
+:root[data-palette="arctic"] {
+  --accent-cyan: #E2E8F0;
+  --accent-blue: #94A3B8;
+  --accent-violet: #64748B;
+  --accent-emerald: #CBD5E1;
+  --accent-amber: #F1F5F9;
+  --accent-rose: #94A3B8;
+  --gradient-primary: linear-gradient(135deg, #E2E8F0, #94A3B8);
+  --gradient-glow: linear-gradient(135deg, rgba(226,232,240,0.12), rgba(148,163,184,0.07));
+  --accent-cyan-soft: rgba(226,232,240,0.12);
+  --accent-cyan-softer: rgba(226,232,240,0.075);
+  --accent-cyan-border: rgba(226,232,240,0.28);
+  --accent-blue-soft: rgba(148,163,184,0.11);
+  --accent-emerald-soft: rgba(203,213,225,0.12);
+  --accent-amber-soft: rgba(241,245,249,0.12);
+  --border-color: rgba(226,232,240,0.1);
+  --border-active: rgba(226,232,240,0.38);
+  --border-glow: rgba(226,232,240,0.15);
+  --bg-glow-1: rgba(226,232,240,0.08);
+  --bg-glow-2: rgba(148,163,184,0.06);
+  --particle-c1: rgba(226,232,240,0.45);
+  --particle-c2: rgba(148,163,184,0.35);
+  --grid-color: rgba(226,232,240,0.03);
+  --shadow-card: 0 16px 40px rgba(0,0,0,0.5);
+  --surface-workbench-ai: linear-gradient(135deg, rgba(226,232,240,0.1), rgba(148,163,184,0.05)), rgba(20,24,28,0.88);
+  --workbench-page-wash: linear-gradient(180deg, rgba(226,232,240,0.05), transparent 250px);
+}
+:root[data-mode="light"][data-palette="arctic"] {
+  --border-color: rgba(100,116,139,0.14);
+  --border-active: rgba(100,116,139,0.4);
+  --border-glow: rgba(100,116,139,0.12);
+  --gradient-primary: linear-gradient(135deg, #64748B, #475569);
+  --gradient-glow: linear-gradient(135deg, rgba(100,116,139,0.11), rgba(71,85,105,0.07));
+  --accent-cyan-soft: rgba(100,116,139,0.1);
+  --accent-cyan-softer: rgba(100,116,139,0.065);
+  --accent-cyan-border: rgba(100,116,139,0.25);
+  --accent-blue-soft: rgba(71,85,105,0.09);
+  --accent-emerald-soft: rgba(100,116,139,0.11);
+  --accent-amber-soft: rgba(100,116,139,0.11);
+  --bg-glow-1: rgba(100,116,139,0.08);
+  --bg-glow-2: rgba(71,85,105,0.05);
+  --particle-c1: rgba(100,116,139,0.3);
+  --particle-c2: rgba(71,85,105,0.24);
+  --grid-color: rgba(100,116,139,0.03);
+  --shadow-card: 0 16px 34px rgba(0,20,40,0.08);
+  --surface-workbench-ai: linear-gradient(135deg, rgba(100,116,139,0.1), rgba(71,85,105,0.045)), rgba(255,253,248,0.98);
+  --workbench-page-wash: linear-gradient(180deg, rgba(100,116,139,0.07), rgba(240,243,248,0.18) 210px, transparent 310px);
+}
+
+/* ---------- 8. Aurora 极光紫 ---------- */
+:root[data-palette="aurora"] {
+  --accent-cyan: #C084FC;
+  --accent-blue: #818CF8;
+  --accent-violet: #A78BFA;
+  --accent-emerald: #F472B6;
+  --accent-amber: #E9D5FF;
+  --accent-rose: #D946EF;
+  --gradient-primary: linear-gradient(135deg, #C084FC, #818CF8);
+  --gradient-glow: linear-gradient(135deg, rgba(192,132,252,0.13), rgba(129,140,248,0.08));
+  --accent-cyan-soft: rgba(192,132,252,0.13);
+  --accent-cyan-softer: rgba(192,132,252,0.08);
+  --accent-cyan-border: rgba(192,132,252,0.32);
+  --accent-blue-soft: rgba(129,140,248,0.12);
+  --accent-emerald-soft: rgba(244,114,182,0.13);
+  --accent-amber-soft: rgba(233,213,255,0.13);
+  --border-color: rgba(192,132,252,0.12);
+  --border-active: rgba(192,132,252,0.44);
+  --border-glow: rgba(192,132,252,0.19);
+  --bg-glow-1: rgba(192,132,252,0.11);
+  --bg-glow-2: rgba(244,114,182,0.09);
+  --particle-c1: rgba(192,132,252,0.5);
+  --particle-c2: rgba(244,114,182,0.44);
+  --grid-color: rgba(192,132,252,0.035);
+  --shadow-card: 0 16px 42px rgba(0,0,0,0.5);
+  --surface-workbench-ai: linear-gradient(135deg, rgba(192,132,252,0.11), rgba(129,140,248,0.06)), rgba(20,24,28,0.88);
+  --workbench-page-wash: linear-gradient(180deg, rgba(192,132,252,0.06), transparent 250px);
+}
+:root[data-mode="light"][data-palette="aurora"] {
+  --border-color: rgba(147,51,234,0.14);
+  --border-active: rgba(147,51,234,0.4);
+  --border-glow: rgba(147,51,234,0.12);
+  --gradient-primary: linear-gradient(135deg, #9333EA, #6366F1);
+  --gradient-glow: linear-gradient(135deg, rgba(147,51,234,0.11), rgba(99,102,241,0.07));
+  --accent-cyan-soft: rgba(147,51,234,0.1);
+  --accent-cyan-softer: rgba(147,51,234,0.065);
+  --accent-cyan-border: rgba(147,51,234,0.25);
+  --accent-blue-soft: rgba(99,102,241,0.09);
+  --accent-emerald-soft: rgba(217,70,239,0.11);
+  --accent-amber-soft: rgba(147,51,234,0.11);
+  --bg-glow-1: rgba(147,51,234,0.08);
+  --bg-glow-2: rgba(217,70,239,0.06);
+  --particle-c1: rgba(147,51,234,0.3);
+  --particle-c2: rgba(217,70,239,0.24);
+  --grid-color: rgba(147,51,234,0.03);
+  --shadow-card: 0 16px 34px rgba(60,0,100,0.08);
+  --surface-workbench-ai: linear-gradient(135deg, rgba(147,51,234,0.1), rgba(99,102,241,0.045)), rgba(255,253,248,0.98);
+  --workbench-page-wash: linear-gradient(180deg, rgba(147,51,234,0.07), rgba(245,230,255,0.18) 210px, transparent 310px);
+}
+
+/* ============================================================
+   Theme Picker Modal UI
+   ============================================================ */
+
+/* Overlay */
+.theme-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  animation: themeModalFadeIn 0.18s ease;
+}
+@keyframes themeModalFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* Modal */
+.theme-modal {
+  width: 380px;
+  max-height: 85vh;
+  background: var(--bg-card-solid);
+  border: 1px solid var(--border-color);
+  border-radius: 18px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(255,255,255,0.03) inset;
+  padding: 20px;
+  animation: themeModalSlideIn 0.2s ease;
+  overflow-y: auto;
+}
+@keyframes themeModalSlideIn {
+  from { opacity: 0; transform: translateY(16px) scale(0.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* Header */
+.theme-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 18px;
+}
+.theme-modal-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.theme-modal-close {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  border: none;
+  background: var(--surface-workbench-action);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.theme-modal-close:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+/* Section */
+.theme-modal-section {
+  margin-bottom: 16px;
+}
+.theme-modal-section:last-child {
+  margin-bottom: 0;
+}
+.theme-modal-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 10px;
+}
+
+/* Mode row */
+.theme-mode-row {
+  display: flex;
+  gap: 8px;
+}
+.theme-mode-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 0;
+  border-radius: 10px;
+  border: 1.5px solid var(--border-color);
+  background: var(--surface-workbench-action);
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.theme-mode-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-secondary);
+  border-color: var(--border-glow);
+}
+.theme-mode-btn.active {
+  border-color: var(--border-active);
+  background: var(--accent-cyan-soft);
+  color: var(--text-primary);
+  font-weight: 600;
+  box-shadow: 0 0 16px var(--border-glow);
+}
+
+/* Divider */
+.theme-divider {
+  height: 1px;
+  background: var(--border-color);
+  margin: 16px 0;
+}
+
+/* Palette grid - 2 cols */
+.theme-modal-palette-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.theme-palette-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1.5px solid transparent;
+  background: var(--surface-workbench-action);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: left;
+}
+.theme-palette-card:hover {
+  background: var(--bg-hover);
+  border-color: var(--border-color);
+}
+.theme-palette-card.active {
+  border-color: var(--border-active);
+  background: var(--accent-cyan-soft);
+  box-shadow: 0 0 20px var(--palette-glow, rgba(255,255,255,0.05));
+}
+.theme-palette-swatch {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  transition: box-shadow 0.25s ease;
+}
+.theme-palette-card.active .theme-palette-swatch {
+  box-shadow: inset 0 0 0 2px rgba(255,255,255,0.25), 0 0 14px var(--palette-glow, rgba(255,255,255,0.15));
+}
+.theme-palette-name {
+  font-size: 12px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.theme-palette-card.active .theme-palette-name {
+  color: var(--text-primary);
+  font-weight: 600;
+}
