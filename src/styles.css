@@ -102,8 +102,8 @@ body {
 
 :root[data-mode="light"] body {
   background:
-    radial-gradient(circle at 12% -8%, rgba(255, 235, 198, 0.42), transparent 34%),
-    radial-gradient(circle at 82% 0%, rgba(40, 160, 141, 0.1), transparent 30%),
+    radial-gradient(circle at 12% -8%, var(--bg-glow-1), transparent 34%),
+    radial-gradient(circle at 82% 0%, var(--bg-glow-2), transparent 30%),
     var(--bg-primary);
 }
 

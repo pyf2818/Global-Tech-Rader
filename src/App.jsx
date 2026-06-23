@@ -969,7 +969,10 @@ function App() {
   clearStaleLS();
   const [showThemePicker, setShowThemePicker] = useState(false);
   const [themeMode, setThemeMode] = useState(() => localStorage.getItem('themeMode') || 'dark');
-  const [palette, setPalette] = useState(() => localStorage.getItem('palette') || 'champagne');
+  const [palette, setPalette] = useState(() => {
+    const saved = localStorage.getItem('palette');
+    return (saved && PALETTES.some(p => p.id === saved)) ? saved : 'champagne';
+  });
   const [editorFullscreen, setEditorFullscreen] = useState(false);
   const [nav, setNav] = useState('today');
   const [category, setCategory] = useState('all');
@@ -1169,9 +1172,11 @@ function App() {
   useEffect(() => {
     localStorage.setItem('selectedInterests', JSON.stringify(selectedInterests));
   }, [selectedInterests]);
-  useEffect(() => { saveLS('domainPriorities', domainPriorities); }, [domainPriorities]);
-  useEffect(() => { saveLS('sourcePriorities', sourcePriorities); }, [sourcePriorities]);
-  useEffect(() => { saveLS('dailyProfileSnapshots', dailyProfileSnapshots); }, [dailyProfileSnapshots]);
+  useEffect(() => {
+    saveLS('domainPriorities', domainPriorities);
+    saveLS('sourcePriorities', sourcePriorities);
+    saveLS('dailyProfileSnapshots', dailyProfileSnapshots);
+  }, [domainPriorities, sourcePriorities, dailyProfileSnapshots]);
 
   // 认证函数
   const handleRegister = async () => {
@@ -1442,54 +1447,47 @@ function App() {
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, []);
-  useEffect(() => { saveLS('customSources', customSources); }, [customSources]);
-  useEffect(() => { saveLS('sourceHealth', sourceHealth); }, [sourceHealth]);
-  useEffect(() => { saveLS('disabledSources', disabledSources); }, [disabledSources]);
-  useEffect(() => { saveLS('calendarEvents', events); }, [events]);
-  useEffect(() => { saveLS('bookmarks', bookmarks); }, [bookmarks]);
-  useEffect(() => { saveLS('materials', materials); }, [materials]);
-  useEffect(() => { saveLS('materialSpaces', materialSpaces); }, [materialSpaces]);
-  useEffect(() => { saveLS('articleSpaces', articleSpaces); }, [articleSpaces]);
-  useEffect(() => { saveLS('articles', articles); }, [articles]);
   useEffect(() => {
     if (!showTemplateMenu) return;
     const handler = (e) => { if (!e.target.closest('.editor-template-dropdown')) setShowTemplateMenu(false); };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, [showTemplateMenu]);
-  useEffect(() => { saveLS('summaryCache', summaryCache); }, [summaryCache]);
-  useEffect(() => { saveLS('followKeywords', followKeywords); }, [followKeywords]);
-  useEffect(() => { saveLS('pinnedKeywords', pinnedKeywords); }, [pinnedKeywords]);
-  useEffect(() => { saveLS('recommendationFeedback', recommendationFeedback); }, [recommendationFeedback]);
-  useEffect(() => { saveLS('searchHistory', searchHistory); }, [searchHistory]);
-  useEffect(() => { saveLS('viewMode', viewMode); }, [viewMode]);
-  useEffect(() => { saveLS('recentVisits', recentVisits); }, [recentVisits]);
-  useEffect(() => { saveLS('trackTargets', trackTargets); }, [trackTargets]);
-  useEffect(() => { saveLS('briefingConfig', briefingConfig); }, [briefingConfig]);
-  useEffect(() => { saveLS('readingHistory', readingHistory); }, [readingHistory]);
-  useEffect(() => { saveLS('translations', translations); }, [translations]);
-  useEffect(() => { saveLS('llmConfig', llmConfig); }, [llmConfig]);
+  // 30+ 个 saveLS 合并为一个统一同步 effect — 任何 state 变化只触发一次写入
   useEffect(() => {
-    if (elfAvatar) localStorage.setItem('elfAvatar', elfAvatar);
-    else localStorage.removeItem('elfAvatar');
-  }, [elfAvatar]);
-  useEffect(() => { localStorage.setItem('elfAvatarHistory', JSON.stringify(elfAvatarHistory)); }, [elfAvatarHistory]);
-  useEffect(() => { localStorage.setItem('elfName', elfName); }, [elfName]);
-  useEffect(() => {
+    const map = {
+      customSources, sourceHealth, disabledSources, calendarEvents: events,
+      bookmarks, materials, materialSpaces, articleSpaces, articles,
+      summaryCache, followKeywords, pinnedKeywords, recommendationFeedback,
+      searchHistory, viewMode, recentVisits, trackTargets, briefingConfig,
+      readingHistory, translations, llmConfig,
+    };
+    for (const [key, val] of Object.entries(map)) saveLS(key, val);
+    // localStorage 直写的字段
+    localStorage.setItem('elfAvatar', elfAvatar || '');
+    if (!elfAvatar) localStorage.removeItem('elfAvatar');
+    localStorage.setItem('elfAvatarHistory', JSON.stringify(elfAvatarHistory));
+    localStorage.setItem('elfName', elfName);
     const customAgents = agents.filter(a => a.isCustom);
     localStorage.setItem('elfAgents', JSON.stringify(customAgents));
-  }, [agents]);
+  }, [
+    customSources, sourceHealth, disabledSources, events, bookmarks, materials,
+    materialSpaces, articleSpaces, articles, summaryCache, followKeywords,
+    pinnedKeywords, recommendationFeedback, searchHistory, viewMode, recentVisits,
+    trackTargets, briefingConfig, readingHistory, translations, llmConfig,
+    elfAvatar, elfAvatarHistory, elfName, agents,
+  ]);
   useEffect(() => { localStorage.setItem('elfCurrentAgent', currentAgent); }, [currentAgent]);
-  useEffect(() => { saveLS('agentWorkflowDraft', agentWorkflowDraft); }, [agentWorkflowDraft]);
-  useEffect(() => { saveLS('agentWorkflowTemplates', workflowTemplates); }, [workflowTemplates]);
-  useEffect(() => { saveLS('activeWorkflowId', activeWorkflowId); }, [activeWorkflowId]);
-  useEffect(() => { saveLS('agentWorkflowRun', agentWorkflowRun); }, [agentWorkflowRun]);
   useEffect(() => {
+    saveLS('agentWorkflowDraft', agentWorkflowDraft);
+    saveLS('agentWorkflowTemplates', workflowTemplates);
+    saveLS('activeWorkflowId', activeWorkflowId);
+    saveLS('agentWorkflowRun', agentWorkflowRun);
     if (!agentWorkflowResult.loading) saveLS('agentWorkflowResult', agentWorkflowResult);
-  }, [agentWorkflowResult]);
-  useEffect(() => { saveLS('agentWorkflowHistory', agentWorkflowHistory); }, [agentWorkflowHistory]);
-  useEffect(() => { saveLS('agentWorkflowActions', agentWorkflowActions); }, [agentWorkflowActions]);
-  useEffect(() => { saveLS('selectedWorkflowNodeId', selectedWorkflowNodeId); }, [selectedWorkflowNodeId]);
+    saveLS('agentWorkflowHistory', agentWorkflowHistory);
+    saveLS('agentWorkflowActions', agentWorkflowActions);
+    saveLS('selectedWorkflowNodeId', selectedWorkflowNodeId);
+  }, [agentWorkflowDraft, workflowTemplates, activeWorkflowId, agentWorkflowRun, agentWorkflowResult, agentWorkflowHistory, agentWorkflowActions, selectedWorkflowNodeId]);
 
   const fetchAiInsights = async () => {
     if (!llmConfig.baseUrl || !llmConfig.selectedModel || items.length === 0) {

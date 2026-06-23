@@ -131,7 +131,7 @@ const CATEGORY_GROUPS = [
 ];
 
 // 检测当前主题
-function isLightTheme() { return document.documentElement.getAttribute('data-theme') === 'light'; }
+function isLightTheme() { return document.documentElement.dataset.mode === 'light'; }
 
 // 热力图颜色映射：根据主题返回适配颜色
 function getHeatColor(count, maxCount) {

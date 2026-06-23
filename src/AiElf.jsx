@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 
 // AI精灵助手组件 - Agent系统 + 历史记录 + 自适应窗口
 export default function AiElf({ llmConfig, avatarImage, elfName, onExportToMaterials, agents, currentAgent, onChangeAgent, externalQuotedContext, intelligenceProfile, intelligenceMissions }) {
@@ -97,7 +97,7 @@ export default function AiElf({ llmConfig, avatarImage, elfName, onExportToMater
 3. 尽量给出下一步动作，让用户能继续阅读、追踪或创作。
 4. 如果任务更适合其他智能体，要在回答末尾说明建议接力给谁。`;
 
-  const buildAgenticSystemPrompt = () => {
+  const buildAgenticSystemPrompt = useMemo(() => {
     const basePrompt = activeAgent?.systemPrompt || '';
     const missionText = missions.slice(0, 5).map(mission => {
       const missionAgent = agentById(mission.agentId);
@@ -113,7 +113,7 @@ ${buildPersonalContext()}
 - 专长：${activeAgent?.description || '综合分析'}
 - 可接力任务：
 ${missionText}`;
-  };
+  }, [activeAgent, missions, agents, profile]);
 
   const runMission = (mission) => {
     if (!mission) return;
@@ -154,15 +154,14 @@ ${missionText}`;
   };
 
   useEffect(() => {
-    if (currentAgent && currentAgent !== activeAgentId) {
-      setActiveAgentId(currentAgent);
-    }
-  }, [currentAgent, activeAgentId]);
+    if (currentAgent) setActiveAgentId(currentAgent);
+  }, [currentAgent]);
 
   useEffect(() => {
     if (!externalQuotedContext) return;
     if (externalQuotedContext.agentId) {
-      handleChangeAgent(externalQuotedContext.agentId);
+      setActiveAgentId(externalQuotedContext.agentId);
+      onChangeAgent && onChangeAgent(externalQuotedContext.agentId);
     }
     setQuotedContext({
       title: externalQuotedContext.title || '外部上下文',

@@ -2,14 +2,14 @@ import React from 'react';
 
 /* Palette definitions */
 const PALETTES = [
-  { id: 'champagne',   label: '香槟金',  dark: '#0B0E11', light: '#F7F5F0', accent: '#C9A961', gradient: 'linear-gradient(135deg, #D4B576, #C9A961)' },
-  { id: 'sakura',      label: '樱花粉',  dark: '#1A1014', light: '#FFF5F7', accent: '#F9A8B8', gradient: 'linear-gradient(135deg, #FBC8D4, #E85A7E)' },
-  { id: 'forest',      label: '翠翠绿',  dark: '#0C1410', light: '#F2FBF5', accent: '#34D399', gradient: 'linear-gradient(135deg, #4ADE80, #34D399)' },
-  { id: 'neon',        label: '赛博蓝',  dark: '#0F0A1E', light: '#F0F4FF', accent: '#22D3EE', gradient: 'linear-gradient(135deg, #22D3EE, #A855F7)' },
-  { id: 'cosmos',      label: '深空蓝',  dark: '#0A0F1A', light: '#F0F5FF', accent: '#60A5FA', gradient: 'linear-gradient(135deg, #60A5FA, #3B82F6)' },
-  { id: 'terracotta',  label: '赤陶橘',  dark: '#1A1410', light: '#FFF8F2', accent: '#E07856', gradient: 'linear-gradient(135deg, #F0A878, #C8623E)' },
-  { id: 'arctic',      label: '北极银',  dark: '#0D0F12', light: '#F8FAFC', accent: '#94A3B8', gradient: 'linear-gradient(135deg, #E2E8F0, #94A3B8)' },
-  { id: 'aurora',      label: '极光紫',  dark: '#12081E', light: '#F5F0FF', accent: '#C084FC', gradient: 'linear-gradient(135deg, #C084FC, #818CF8)' },
+  { id: 'champagne',   label: '香槟金',accent: '#C9A961', gradient: 'linear-gradient(135deg, #D4B576, #C9A961)' },
+  { id: 'sakura',      label: '樱花粉',accent: '#F9A8B8', gradient: 'linear-gradient(135deg, #FBC8D4, #E85A7E)' },
+  { id: 'forest',      label: '翠翠绿',accent: '#34D399', gradient: 'linear-gradient(135deg, #4ADE80, #34D399)' },
+  { id: 'neon',        label: '赛博蓝',accent: '#22D3EE', gradient: 'linear-gradient(135deg, #22D3EE, #A855F7)' },
+  { id: 'cosmos',      label: '深空蓝',accent: '#60A5FA', gradient: 'linear-gradient(135deg, #60A5FA, #3B82F6)' },
+  { id: 'terracotta',  label: '赤陶橘',accent: '#E07856', gradient: 'linear-gradient(135deg, #F0A878, #C8623E)' },
+  { id: 'arctic',      label: '北极银',accent: '#94A3B8', gradient: 'linear-gradient(135deg, #E2E8F0, #94A3B8)' },
+  { id: 'aurora',      label: '极光紫',accent: '#C084FC', gradient: 'linear-gradient(135deg, #C084FC, #818CF8)' },
 ];
 
 export { PALETTES };
