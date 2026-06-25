@@ -2,6 +2,40 @@ import { TRENDING_SOURCES } from '../config/constants.js';
 import { hash } from '../utils/textProcessing.js';
 import { parseFeed } from '../parsing/feedParser.js';
 import { isGoodImageUrl } from '../images/imageProcessing.js';
+import https from 'node:https';
+
+// GitHub HTTPS fetch wrapper that bypasses TLS verification only for github.com domains.
+// This is needed because some Windows environments lack the required root CA certificates.
+function githubFetch(url, options = {}) {
+  return new Promise((resolve, reject) => {
+    const parsed = new URL(url);
+    const isGitHub = parsed.hostname === 'github.com' || parsed.hostname.endsWith('.github.com') || parsed.hostname === 'raw.githubusercontent.com';
+    const agent = isGitHub ? new https.Agent({ rejectUnauthorized: false }) : undefined;
+    const req = https.request(url, {
+      method: options.method || 'GET',
+      headers: options.headers || {},
+      agent,
+      signal: options.signal,
+    }, (res) => {
+      if (res.statusCode && res.statusCode >= 400 && res.statusCode < 600 && !options.allowError) {
+        const body = [];
+        res.on('data', c => body.push(c));
+        res.on('end', () => reject(new Error(`HTTP ${res.statusCode}`)));
+        return;
+      }
+      const chunks = [];
+      res.on('data', c => chunks.push(c));
+      res.on('end', () => {
+        const text = Buffer.concat(chunks).toString();
+        resolve({ ok: res.statusCode < 400 ? true : false, status: res.statusCode, text: () => Promise.resolve(text), json: () => Promise.resolve(JSON.parse(text)) });
+      });
+    });
+    req.on('error', reject);
+    req.setTimeout(options.timeout || 15000, () => { req.destroy(); reject(new Error('timeout')); });
+    if (options.body) req.write(options.body);
+    req.end();
+  });
+}
 
 // 缓存（服务内部拥有）
 export const trendingCache = { data: null, expiresAt: 0 };
@@ -86,14 +120,18 @@ export async function getGithubTrending(lang, since) {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 15000);
 
-    const response = await fetch(apiUrl, {
-      headers: { 'User-Agent': 'GlobalTechRadar/0.1', 'Accept': 'application/vnd.github.v3+json' },
-      signal: controller.signal
-    });
+    const headers = {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      'Accept': 'application/vnd.github.v3+json',
+    };
+    // Support GITHUB_TOKEN env var to bypass unauthenticated rate limits
+    const ghToken = process.env.GITHUB_TOKEN || process.env.VITE_GITHUB_TOKEN;
+    if (ghToken) headers['Authorization'] = `Bearer ${ghToken}`;
+
+    const response = await githubFetch(apiUrl, { headers, signal: controller.signal });
     clearTimeout(timeout);
 
     if (!response.ok) throw new Error(`GitHub API responded ${response.status}`);
-
     const data = await response.json();
     const rawRepos = data.items || [];
 
@@ -124,20 +162,19 @@ export async function getGithubTrending(lang, since) {
       try {
         const branches = ['main', 'master'];
         let content = '';
+        const ghToken = process.env.GITHUB_TOKEN || process.env.VITE_GITHUB_TOKEN;
+        const rawHeaders = ghToken ? { 'User-Agent': 'GlobalTechRadar/0.1', 'Authorization': `Bearer ${ghToken}` } : { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' };
         for (const branch of branches) {
           const rawUrl = `https://raw.githubusercontent.com/${item.full_name}/${branch}/README.md`;
-          const rawRes = await fetch(rawUrl, {
-            headers: { 'User-Agent': 'GlobalTechRadar/0.1' },
-            signal: AbortSignal.timeout(5000)
-          });
+          const rawRes = await githubFetch(rawUrl, { headers: rawHeaders, timeout: 5000 });
           if (rawRes.ok) { content = await rawRes.text(); break; }
         }
         if (!content) {
           const readmeUrl = `https://api.github.com/repos/${item.full_name}/readme`;
-          const readmeRes = await fetch(readmeUrl, {
-            headers: { 'User-Agent': 'GlobalTechRadar/0.1', 'Accept': 'application/vnd.github.raw' },
-            signal: AbortSignal.timeout(6000)
-          });
+          const apiHeaders = ghToken
+            ? { 'User-Agent': 'GlobalTechRadar/0.1', 'Authorization': `Bearer ${ghToken}`, 'Accept': 'application/vnd.github.raw' }
+            : { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36', 'Accept': 'application/vnd.github.raw' };
+          const readmeRes = await githubFetch(readmeUrl, { headers: apiHeaders, timeout: 6000 });
           if (!readmeRes.ok) return null;
           content = await readmeRes.text();
         }
@@ -199,7 +236,10 @@ const imageUrls = [...content.matchAll(/<img[^>]+src=["']([^"']+)["']/gi)].map(m
     githubCaches[cacheKey] = { data: payload, expiresAt: now + 1000 * 60 * 30 };
     return payload;
   } catch (e) {
-    return { updatedAt: new Date().toISOString(), language: lang || 'all', period: validSince, repos: [], error: e.message };
+    const err = { updatedAt: new Date().toISOString(), language: lang || 'all', period: validSince, repos: [], error: e.message };
+    // Cache errors for 5min to avoid burning rate limits on retries
+    githubCaches[cacheKey] = { data: err, expiresAt: now + 1000 * 60 * 5 };
+    return err;
   }
 }
 

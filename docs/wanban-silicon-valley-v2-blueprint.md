@@ -141,6 +141,7 @@ type GithubProjectInsight = {
 - 支持序列化：`reactFlowInstance.toObject()`
 - 支持复杂分支：多个 sourceHandle / targetHandle
 - 社区成熟，维护活跃
+- 工作流搭建是可视化的画板，类似dify、n8n可以拖拽节点到画布里可视化搭建
 
 参考文档：`docs/reactflow-implementation-guide.md`
 
@@ -206,18 +207,20 @@ type WorkflowEdge = {
 
 第一阶段只做真正有用的节点，不做空壳。
 
-| 节点 | 用途 |
-|---|---|
-| `input` | 用户输入 / 外部上下文输入 |
-| `llm` | 大模型调用，包含 system/user prompt、模型参数 |
-| `tool` | 工具调用，如网页抓取、RSS 查询、素材检索 |
-| `condition` | 条件判断，输出 true/false 两个 handle |
-| `classifier` | 分类节点，多分支输出 |
-| `material-search` | 从素材库检索上下文 |
-| `response` | 指定回复模板 |
-| `output` | 工作流最终输出 |
-| `subworkflow` | 调用另一个工作流 |
-| `note` | 画布说明便签 |
+
+| 节点                | 用途                               |
+| ----------------- | -------------------------------- |
+| `input`           | 用户输入 / 外部上下文输入                   |
+| `llm`             | 大模型调用，包含 system/user prompt、模型参数 |
+| `tool`            | 工具调用，如网页抓取、RSS 查询、素材检索           |
+| `condition`       | 条件判断，输出 true/false 两个 handle     |
+| `classifier`      | 分类节点，多分支输出                       |
+| `material-search` | 从素材库检索上下文                        |
+| `response`        | 指定回复模板                           |
+| `output`          | 工作流最终输出                          |
+| `subworkflow`     | 调用另一个工作流                         |
+| `note`            | 画布说明便签                           |
+
 
 ### 4.5 连接规则
 
@@ -333,8 +336,8 @@ type Material = {
 - 收藏
 - 停留时长（后续）
 - 关注领域
-- 自定义领域优先级
-- 信源优先级
+- 自定义领域优先级（有专门模块可以让用户拖拽排等级管理）
+- 信源优先级（有专门模块可以让用户拖拽排等级管理）
 - 屏蔽/降权主题
 - AI 精灵提问内容
 
@@ -439,3 +442,4 @@ src/pages/ProfilePage.jsx
 - 不把执行状态塞进 workflow 定义
 - 不把 AI 精灵和智能体工作流混为一谈
 - 每个模块必须有真实数据结构和用户操作闭环
+

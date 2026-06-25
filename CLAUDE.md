@@ -22,6 +22,8 @@ No test, lint, typecheck, or formatter commands exist. Do not run them.
 
 **Data Flow**: Vite middleware plugin (`server/newsPlugin.js`) intercepts `/api/*` routes at dev-server level. Frontend uses native `fetch` to call these APIs. There is no Express/Koa — the plugin registers middleware directly on the Vite dev server.
 
+**v2 Direction**: See `docs/wanban-silicon-valley-v2-blueprint.md`. The product is migrating from "news aggregator" to a "personal intelligence & creation OS" centered on daily briefing, user profile, materials library, agent workflows, and content creation. Current branch `codex/intelligence-workbench-redesign` implements this.
+
 ### Frontend (`src/`)
 
 - **`App.jsx`** (~7300 lines) — Main component containing ~150 useState hooks, routing logic, settings modal, and all page views. Being incrementally split into modules below.
@@ -51,6 +53,30 @@ src/constants/
 src/hooks/
   useLocalStorage.js   Auto-syncing localStorage hook
 ```
+
+#### v2 Intelligence Workbench Modules
+
+New pages and engines wired into App.jsx (imported at top, used via `workflowEngine` hook and `useMemo`-derived briefing/profile data):
+
+```
+src/components/
+  DailyReportPage.jsx   每日汇报页 — AI-generated daily briefing (summary, must-reads, impact, signals, material cards)
+  ProfileCenterPage.jsx 用户画像页 — focus labels, depth, reading/materials/bookmarks history, profile snapshot
+  StudioPage.jsx        智创中心页 — materials library + content creation hub
+  WorkflowCanvas.jsx    智能体工作流画布 — node DAG editor + run viewer (uses reactflow-style nodes/edges)
+  WorkflowNodeCard.jsx  画布节点卡片
+  WorkflowEdge.jsx      画布连线
+src/hooks/
+  useWorkflowEngine.js  React wrapper over WorkflowEngine: run/result/history/actions state, persists to localStorage `agentWorkflowHistory` (max 12)
+src/utils/
+  workflowEngine.js     Pure-logic DAG executor. LLM nodes call POST /api/ai-generate (chat action); local nodes (input/classifier/condition/skill/output/reply) run synchronously with no React dependency. Condition nodes halt the rest of the chain on failure.
+  profileModel.js       computeIntelligenceProfile / computeReadingProfile / computeProfileLearningEngine / computeTodayProfileSnapshot — derive profile from bookmarks, reading history, materials, interests
+  dailyBriefing.js      generateDailyBriefing / makeEmptyBriefing — builds the daily report payload
+src/constants/
+  workflowConstants.js  DEFAULT_AGENT_WORKFLOW, WORKFLOW_NODE_TYPES, WORKFLOW_SKILL_CATALOG, WORKFLOW_CONDITION_METRICS, WORKFLOW_TEMPLATE_LIBRARY (3 templates: daily-briefing / github-evaluator / material-to-article), and template instance/normalize/validate helpers
+```
+
+**Workflow node types**: `input`, `llm`, `skill`, `condition`, `classifier`, `reply`, `output`. Each node has `inputKey`/`outputKey` forming a variable chain; the first node's input is `buildWorkbenchContext()` (today's recommended items + profile + tracked terms + saved materials). `skill` nodes map to local builders: `evidence-pack`, `media-audit`, `material-extractor`, `profile-memory`, `article-outline`, `github-evaluator`.
 
 ### Backend (`server/newsPlugin.js`, ~3000 lines)
 
@@ -96,6 +122,14 @@ Single Vite plugin exporting `newsPlugin()` which registers one middleware handl
 - `githubCaches`: 30 min TTL, keyed by `${lang}-${since}`
 - `imageResolveCache`: session-scoped (no TTL, in-memory only)
 
+### Backend service layer (`server/news/services/`)
+
+Logic is being extracted out of the monolithic `newsPlugin.js` into a `services/` tree. Currently extracted:
+
+- `trendingService.js` — exports `trendingCache` (10min), `githubCaches` (30min), `fetchTrendingSource()`, `getTrending(platformFilter, page, pageSize)`, `getGithubTrending(lang, since)`, plus README tutorial extraction and date helpers (`getYesterday`/`get7DaysAgo`/`get30DaysAgo`). `newsPlugin.js` delegates to these rather than inlining the logic.
+
+When adding trending/github features, prefer extending `trendingService.js` and importing it in `newsPlugin.js` instead of duplicating inline.
+
 ## Critical Duplication (Must Update Both)
 
 Categories, source grades, and tag rules are defined **independently** in both `server/newsPlugin.js` and `src/App.jsx`:
@@ -129,3 +163,7 @@ Also `DEFAULT_SOURCES` is partially duplicated in `api/news.js` (shorter list) �
 - When adding source grading features, declare: `sourceGrades`, `gradeFilter`, `sourceTypeTab`, `statusFilter`, `searchQuery`, `regionFilter`, `disabledSources` — do NOT add `selectedSources` or `batchMode` (batch ops are filter-based, no selection state)
 - Settings modal JSX is deeply nested; each tab is a sibling inside `<div className="settings-content">`
 - `scripts/` contains deployment and test scripts; `docs/reports/` contains historical optimization reports
+- v2 localStorage keys: `agentWorkflowHistory` (workflow run records, max 12), `dailyBriefingReport` (last generated briefing). AI Elf uses per-agent keys. All `setItem` calls must be wrapped in try-catch for `QuotaExceededError`.
+- WorkflowEngine: `condition` node failure halts the entire rest of the chain (subsequent nodes marked `skipped`), it does NOT branch. LLM nodes require `ctx.llmConfig` (baseUrl/apiKey/selectedModel) and an agent with `systemPrompt`; local nodes ignore LLM config entirely.
+- The monolithic `App.jsx` (~7300 lines) imports the v2 modules but ALSO retains inline copies of some logic — when editing workflow/profile/briefing behavior, check whether App.jsx calls the extracted module or its inline copy. Prefer the extracted module.
+- Runtime `ReferenceError: useMemo is not defined` means a component file uses `useMemo` without importing it from `react` — add `import { useMemo } from 'react'` to that file.

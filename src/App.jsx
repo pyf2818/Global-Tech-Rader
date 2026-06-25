@@ -3,6 +3,8 @@ import GlobeView from './GlobeView.jsx';
 import AiElf from './AiElf.jsx';
 import SettingsModal from './components/SettingsModal.jsx';
 import ArticleEditor from './components/ArticleEditor.jsx';
+import ColorfulBubbles from './components/ColorfulBubbles.jsx';
+import AiChatPanel from './components/AiChatPanel.jsx';
 import ThemePicker from './ThemePicker.jsx';
 import { PALETTES } from './ThemePicker.jsx';
 
@@ -1141,6 +1143,8 @@ function App() {
       return [];
     }
   });
+  const [profilePage, setProfilePage] = useState(1);
+  const [copilotPendingMessage, setCopilotPendingMessage] = useState('');
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [profileForm, setProfileForm] = useState({ displayName: '', signature: '' });
@@ -2500,6 +2504,19 @@ function App() {
     return '与今天的技术动态相关，可快速浏览后决定是否沉淀。';
   }, []);
 
+  // TOP 5 hot items
+  const topMustRead = useMemo(() => {
+    return workbenchItems.slice(0, 5);
+  }, [workbenchItems]);
+
+  // Profile-based recommendations (excluding top 5, unlimited)
+  const profileRecommendations = useMemo(() => {
+    const topIds = new Set(topMustRead.map(i => i.id));
+    return workbenchItems
+      .filter(item => !topIds.has(item.id))
+      .sort((a, b) => (b.mustReadScore || 0) - (a.mustReadScore || 0));
+  }, [workbenchItems, topMustRead]);
+
   const workbenchAiInsight = useMemo(() => {
     const topItems = workbenchItems.slice(0, 3);
     const categoryCounts = workbenchItems.reduce((acc, item) => {
@@ -3249,6 +3266,11 @@ ${lines}`;
     });
     showToast('已把今日情报交给智能体');
   }, [buildWorkbenchContext]);
+
+  const sendCopilotAbout = useCallback((item) => {
+    const msg = `请分析这条资讯：「${item.title}」——来源：${item.sourceName || item.source || '未知'}，分类：${item.category || '未分类'}，推荐理由：${item.recommendation || '综合推荐'}。请给出要点分析和跟我关注领域的关联。`;
+    setCopilotPendingMessage(msg);
+  }, []);
 
   const generateDailyProfileSnapshot = useCallback(() => {
     setDailyProfileSnapshots(prev => {
@@ -6126,31 +6148,14 @@ ${signals}
 
                 <div className="workbench-preferences">
                   <div className="workbench-block-title">关注领域</div>
-                  <div className="interest-chip-list">
-                    {selectedInterests.length === 0 ? (
-                      <button className="interest-chip empty" onClick={() => setShowInterestModal(true)}>设置关注领域</button>
-                    ) : selectedInterests.slice(0, 6).map(id => {
-                      const cat = CATEGORIES.find(c => c.id === id);
-                      return <button key={id} className="interest-chip" onClick={() => setCategory(id)}>{cat?.label || id}</button>;
-                    })}
-                  </div>
-                  <button className="workbench-text-btn" onClick={() => setShowInterestModal(true)}>调整偏好</button>
+                  <ColorfulBubbles
+                    interests={selectedInterests}
+                    categories={CATEGORIES}
+                    onBubbleClick={(catId) => setCategory(catId)}
+                    onEmptyClick={() => setShowInterestModal(true)}
+                  />
                 </div>
 
-                <div className="workbench-metrics">
-                  <div>
-                    <strong>{workbenchItems.length}</strong>
-                    <span>推荐阅读</span>
-                  </div>
-                  <div>
-                    <strong>{workbenchStats.focusMatches}</strong>
-                    <span>兴趣匹配</span>
-                  </div>
-                  <div>
-                    <strong>{workbenchStats.savedCount}</strong>
-                    <span>已沉淀</span>
-                  </div>
-                </div>
               </section>
 
               <section className="workbench-feed-panel">
@@ -6179,50 +6184,6 @@ ${signals}
                   <button className={`filter-pill ${regionFilter === 'overseas' ? 'active' : ''}`} onClick={() => setRegionFilter('overseas')}>海外</button>
                 </div>
 
-                {!loading && !error && workbenchItems.length > 0 && (
-                  <div className="ai-daily-insight">
-                    <div className="ai-daily-main">
-                      <div className="workbench-section-label">AI Daily Insight</div>
-                      <h3>{workbenchAiInsight.oneLine}</h3>
-                      <div className="ai-signal-grid">
-                        <div>
-                          <span>机会</span>
-                          <p>{workbenchAiInsight.opportunity}</p>
-                        </div>
-                        <div>
-                          <span>风险/判断</span>
-                          <p>{workbenchAiInsight.risk}</p>
-                        </div>
-                        <div>
-                          <span>画像依据</span>
-                          <p>{profileLearningEngine.summary}</p>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="ai-priority-list">
-                      <span>优先阅读</span>
-                      {workbenchAiInsight.topItems.map((item, index) => (
-                        <button key={item.id} onClick={() => recordReading(item)}>
-                          <strong>{index + 1}</strong>
-                          <span>{item.title}</span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {!loading && !error && (
-                  <div className="workbench-profile-strip">
-                    <em>{profileLearningEngine.confidenceLabel} {profileLearningEngine.confidence}%</em>
-                    <em>{profileLearningEngine.behaviorDepth}</em>
-                    <span>{ICONS.sparkles} 画像已参与推荐</span>
-                    <em>领域权重 {profilePriorityItems.filter(item => item.priority >= 4).length}</em>
-                    <em>信任来源 {sourcePriorityItems.filter(item => item.priority >= 4).length}</em>
-                    <em>阅读记忆 {readingHistory.length}</em>
-                    <button onClick={() => goNav('profile-center')}>校准画像</button>
-                  </div>
-                )}
-
                 {loading && <div className="feed-list">{Array.from({ length: 5 }).map((_, i) => <SkeletonCard key={i} viewMode="standard" />)}</div>}
                 {error && <div className="error-state"><p>加载失败: {error}</p><button onClick={() => loadNews()}>重试</button></div>}
                 {!loading && !error && workbenchItems.length === 0 && (
@@ -6233,136 +6194,81 @@ ${signals}
                 )}
                 {!loading && !error && workbenchItems.length > 0 && (
                   <div className="workbench-news-list">
-                    {workbenchItems.map((item, i) => (
-                      <div key={item.id} className="workbench-news-card">
-                        <div className="workbench-reason-strip">
-                          <span className={`reason-score level-${getRecommendationLevel(item.mustReadScore).tone}`}>
-                            {getRecommendationLevel(item.mustReadScore).label}
-                            {item.mustReadScore ? <small>{Math.round(item.mustReadScore)}分</small> : null}
-                          </span>
-                          <span className="reason-text">{item.recommendation || '综合推荐'}</span>
-                          <div className="feedback-actions">
-                            <button title="继续追踪这个主题" onClick={() => handleRecommendationFeedback(item, 'track')}>追踪</button>
-                            <button title="多推荐类似内容" onClick={() => handleRecommendationFeedback(item, 'more-like-this')}>更多类似</button>
-                            <button title="降低这个来源权重" onClick={() => handleRecommendationFeedback(item, 'mute-source')}>少看来源</button>
-                            <button title="不再推荐这条" onClick={() => handleRecommendationFeedback(item, 'hide')}>不感兴趣</button>
-                          </div>
-                        </div>
-                        <div className="ai-card-judgement">
-                          <span>AI 判断</span>
-                          <p>{buildAiJudgement(item)}</p>
-                        </div>
-                        <NewsItem
-                          item={item}
-                          index={i}
-                          viewMode="standard"
-                          isFocused={focusedIndex === i}
-                          isBookmarked={isBookmarked(item.id)}
-                          isInMaterials={isInMaterials(item.id)}
-                          onBookmark={() => toggleBookmark(item)}
-                          onAddMaterial={() => toggleMaterial(item)}
-                          onSummary={() => handleSummaryToggle(item)}
-                          isSummaryOpen={expandedSummary[item.id]}
-                          summaryText={getSummaryEntry(item)?.text || ''}
-                          summaryMode={getSummaryEntry(item)?.mode || ''}
-                          summaryLoading={Boolean(summaryLoading[item.id])}
-                          isFollowed={followKeywords.some(kw => `${item.title} ${item.summary}`.toLowerCase().includes(kw.toLowerCase()))}
-                          onRead={() => recordReading(item)}
-                          showTranslation={translationOpen[item.id]}
-                          onToggleTranslation={() => setTranslationOpen(p => ({ ...p, [item.id]: !p[item.id] }))}
-                          onRequestTranslation={() => requestTranslation(item)}
-                          isTranslating={translatingItems[item.id]}
-                          translation={getTranslation(item)}
-                          onOpenLightbox={(src, title) => setLightbox({ open: true, src, title })}
-                        />
+                    <div className="hotspot-list">
+                      <div className="hotspot-header">
+                        <h3>🔥 当前热点</h3>
+                        <span style={{marginLeft: 'auto', opacity: 0.6, fontSize: 12}}>多信源热度 · 随时间消退</span>
                       </div>
-                    ))}
+                      {topMustRead.slice(0, 5).map((item, i) => (
+                        <div
+                          key={item.id}
+                          className="hotspot-row"
+                          onClick={() => recordReading(item)}
+                          style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', cursor: 'pointer', borderRadius: 8, borderBottom: '1px solid var(--border-color, rgba(255,255,255,0.06))' }}
+                        >
+                          <span style={{ flex: '0 0 22px', fontWeight: 700, fontSize: 14, color: i === 0 ? '#dc2626' : i === 1 ? '#ea580c' : 'var(--accent-color, #6366f1)' }}>{i + 1}</span>
+                          <span style={{ flex: 1, fontWeight: 600, fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.title}</span>
+                          <span style={{ flex: '0 0 auto', opacity: 0.6, fontSize: 11, textAlign: 'right' }}>
+                            {(item.recommendationReasons?.length || 0)} 信源 · {formatTime(item.publishedAt || item.time)}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="profile-recommendations">
+                      <div className="profile-rec-header">
+                        <h3>为你推荐</h3>
+                        <span style={{marginLeft: 'auto', opacity: 0.6, fontSize: 12}}>基于你的画像偏好</span>
+                      </div>
+                      {profileRecommendations.slice(0, profilePage * 10).map((item, i) => (
+                        <div key={item.id} className="profile-rec-item-wrap">
+                          <NewsItem
+                            item={item}
+                            index={i}
+                            viewMode="standard"
+                            isFocused={focusedIndex === i + topMustRead.length}
+                            isBookmarked={isBookmarked(item.id)}
+                            isInMaterials={isInMaterials(item.id)}
+                            onBookmark={() => toggleBookmark(item)}
+                            onAddMaterial={() => toggleMaterial(item)}
+                            onSummary={() => handleSummaryToggle(item)}
+                            isSummaryOpen={expandedSummary[item.id]}
+                            summaryText={getSummaryEntry(item)?.text || ''}
+                            summaryMode={getSummaryEntry(item)?.mode || ''}
+                            summaryLoading={Boolean(summaryLoading[item.id])}
+                            isFollowed={followKeywords.some(kw => `${item.title} ${item.summary}`.toLowerCase().includes(kw.toLowerCase()))}
+                            onRead={() => recordReading(item)}
+                            showTranslation={translationOpen[item.id]}
+                            onToggleTranslation={() => setTranslationOpen(p => ({ ...p, [item.id]: !p[item.id] }))}
+                            onRequestTranslation={() => requestTranslation(item)}
+                            isTranslating={translatingItems[item.id]}
+                            translation={getTranslation(item)}
+                            onOpenLightbox={(src, title) => setLightbox({ open: true, src, title })}
+                          />
+                          <button className="rec-ask-ai-btn" onClick={() => sendCopilotAbout(item)} title="让 AI 分析这条资讯">Ask AI</button>
+                        </div>
+                      ))}
+                      {profileRecommendations.length > profilePage * 10 && profilePage * 10 < 40 && (
+                        <div className="profile-load-more">
+                          <button onClick={() => setProfilePage(p => p + 1)}>加载更多</button>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )}
               </section>
 
-              <section className="workbench-ai">
-                <div className="agent-ecosystem-card">
-                  <div className="workbench-section-label">AI Copilot</div>
-                  <h2>你的个人情报智能体正在协作</h2>
-                  <p>{llmConfig.baseUrl ? `当前模型：${llmConfig.selectedModel || '已连接模型'}` : '配置大模型后，智能体可把今日资讯转化为简报、洞察和创作素材。'}</p>
-                  <div className="agent-profile-strip">
-                    <div>
-                      <span>理解模式</span>
-                      <strong>{intelligenceProfile.depth}</strong>
-                    </div>
-                    <div>
-                      <span>输出目标</span>
-                      <strong>{intelligenceProfile.outputGoal}</strong>
-                    </div>
-                    <div>
-                      <span>记忆信号</span>
-                      <strong>{intelligenceProfile.tracked.length}</strong>
-                    </div>
-                  </div>
-                  <div className="agent-status-list">
-                    {intelligenceAgents.slice(0, 2).map(agent => (
-                      <div key={agent.name} className={`agent-status-item tone-${agent.tone}`}>
-                        <div>
-                          <strong>{agent.name}</strong>
-                          <span>{agent.status}</span>
-                        </div>
-                        <p>{agent.detail}</p>
-                      </div>
-                    ))}
-                  </div>
-                  <button className="ai-primary-action" onClick={() => llmConfig.baseUrl ? sendWorkbenchToElf('请扮演我的个人情报智能体团队，基于今日推荐生成：1）一句话判断；2）三个关键机会；3）两个潜在风险；4）建议优先读的三条；5）可转化为创作的选题。', 'orchestrator') : setShowLlmQuickConfig(true)}>
-                    {llmConfig.baseUrl ? '召集智能体生成洞察' : '配置大模型'}
-                  </button>
-                </div>
-
-                <div className="ai-command-card compact">
-                  <div className="workbench-block-title">AI 指挥台</div>
-                  <div className="ai-mission-list">
-                    {aiActionPrompts.slice(0, 3).map(mission => (
-                      <button key={mission.id} onClick={() => sendWorkbenchToElf(mission.prompt, mission.agentId)}>
-                        <span>{mission.label}</span>
-                        <small>{agents.find(agent => agent.id === mission.agentId)?.name || '智能体'}</small>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="agent-memory-card">
-                  <div className="workbench-block-title">个人情报记忆</div>
-                  <div className="agent-memory-row">
-                    <span>关注</span>
-                    <strong>{intelligenceProfile.focusLabels.slice(0, 3).join('、') || '待设置'}</strong>
-                  </div>
-                  <div className="agent-memory-row">
-                    <span>追踪</span>
-                    <strong>{intelligenceProfile.tracked.slice(0, 3).join('、') || '暂无'}</strong>
-                  </div>
-                  <div className="agent-memory-row">
-                    <span>少看</span>
-                    <strong>{intelligenceProfile.muted.slice(0, 2).join('、') || '暂无'}</strong>
-                  </div>
-                </div>
-
-                <div className="quality-card">
-                  <div className="workbench-block-title">质量等级</div>
-                  <div className="quality-grid">
-                    {['S', 'A', 'B', 'C', 'D'].map(grade => (
-                      <div key={grade} className={`quality-item grade-${grade.toLowerCase()}`}>
-                        <strong>{workbenchStats.gradeCounts[grade] || 0}</strong>
-                        <span>{grade} 级来源</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="next-actions-card">
-                  <div className="workbench-block-title">下一步</div>
-                  <button className="primary" onClick={() => goNav('agents')}>运行智能体工作流</button>
-                  <button onClick={() => setNav('editor')}>沉淀为创作</button>
-                  <button onClick={() => { setSettingsTab('sources'); setShowSettings(true); }}>优化来源质量</button>
-                </div>
-              </section>
+              <AiChatPanel
+                llmConfig={llmConfig}
+                intelligenceProfile={intelligenceProfile}
+                workbenchItems={workbenchItems}
+                selectedInterests={selectedInterests}
+                categories={CATEGORIES}
+                allLlmModels={allLlmModels}
+                onOpenLlmConfig={() => setShowLlmQuickConfig(true)}
+                pendingMessage={copilotPendingMessage}
+                onMessageSent={() => setCopilotPendingMessage('')}
+              />
             </div>
           )}
 
@@ -9063,79 +8969,99 @@ ${signals}
 
       {/* LLM Quick Config Modal */}
       {showLlmQuickConfig && (
-        <div className="modal-overlay" onClick={() => setShowLlmQuickConfig(false)}>
-          <div className="modal modal-sm llm-quick-modal" onClick={e => e.stopPropagation()}>
-            <div className="modal-header">
-              <h3>🤖 大模型快速配置</h3>
-              <button className="modal-close" onClick={() => setShowLlmQuickConfig(false)}>{ICONS.x}</button>
+        <div className="modal-overlay llm-config-overlay" onClick={() => setShowLlmQuickConfig(false)}>
+          <div className="llm-config-modal" onClick={e => e.stopPropagation()}>
+            <div className="llm-config-header">
+              <div className="llm-config-title">
+                <span className="llm-config-emoji">✨</span>
+                <div>
+                  <h3>大模型配置</h3>
+                  <p>选择服务商并填入凭证，开启 AI 智能助手</p>
+                </div>
+              </div>
+              <button className="llm-config-close" onClick={() => setShowLlmQuickConfig(false)} aria-label="关闭">{ICONS.x}</button>
             </div>
-            <div className="modal-body">
-              <div className="llm-preset-bar">
+
+            <div className="llm-config-body">
+              <div className="llm-provider-grid">
                 {LLM_PRESETS.map(preset => (
                   <button
                     key={preset.id}
-                    className={`llm-preset-btn ${llmConfig.provider === preset.id ? 'active' : ''}`}
+                    className={`llm-provider-card ${llmConfig.provider === preset.id ? 'active' : ''}`}
                     onClick={() => handleSelectPreset(preset)}
-                    title={preset.name}
                   >
-                    <span className="preset-icon">{preset.icon}</span>
-                    <span className="preset-name">{preset.name}</span>
+                    <span className="provider-card-icon">{preset.icon}</span>
+                    <span className="provider-card-name">{preset.name}</span>
+                    <span className="provider-card-tag">{preset.id === 'custom' ? '自定义' : '云端'}</span>
                   </button>
                 ))}
               </div>
 
-              <div className="setting-item">
-                <label>API Base URL</label>
-                <input
-                  type="text"
-                  placeholder={llmConfig.provider === 'custom' ? 'https://...' : '已自动填充'}
-                  value={llmConfig.baseUrl}
-                  onChange={e => setLlmConfig(prev => ({ ...prev, baseUrl: e.target.value }))}
-                  className="llm-input"
-                />
-              </div>
+              <div className="llm-config-fields">
+                <div className="llm-field">
+                  <label>API Base URL</label>
+                  <input
+                    type="text"
+                    placeholder={llmConfig.provider === 'custom' ? 'https://...' : '已自动填充'}
+                    value={llmConfig.baseUrl}
+                    onChange={e => setLlmConfig(prev => ({ ...prev, baseUrl: e.target.value }))}
+                    className="llm-input"
+                  />
+                </div>
 
-              <div className="setting-item">
-                <label>API Key</label>
-                <input
-                  type="password"
-                  placeholder={LLM_PRESETS.find(p => p.id === llmConfig.provider)?.placeholder || 'sk-...'}
-                  value={llmConfig.apiKey}
-                  onChange={e => setLlmConfig(prev => ({ ...prev, apiKey: e.target.value }))}
-                  className="llm-input"
-                />
-              </div>
+                <div className="llm-field">
+                  <label>API Key</label>
+                  <input
+                    type="password"
+                    placeholder={LLM_PRESETS.find(p => p.id === llmConfig.provider)?.placeholder || 'sk-...'}
+                    value={llmConfig.apiKey}
+                    onChange={e => setLlmConfig(prev => ({ ...prev, apiKey: e.target.value }))}
+                    className="llm-input"
+                  />
+                </div>
 
-              <div className="setting-item">
-                <label>选择模型</label>
-                <select
-                  className="llm-model-select"
-                  value={llmConfig.selectedModel}
-                  onChange={e => setLlmConfig(prev => ({ ...prev, selectedModel: e.target.value }))}
-                >
-                  <option value="">选择模型</option>
-                  {allLlmModels.map(m => (
-                    <option key={m.id} value={m.id}>{m.name}{m.owned_by ? ` (${m.owned_by})` : ''}</option>
-                  ))}
-                </select>
+                <div className="llm-field">
+                  <label>选择模型</label>
+                  <select
+                    className="llm-model-select"
+                    value={llmConfig.selectedModel}
+                    onChange={e => setLlmConfig(prev => ({ ...prev, selectedModel: e.target.value }))}
+                  >
+                    <option value="">选择模型</option>
+                    {allLlmModels.map(m => (
+                      <option key={m.id} value={m.id}>{m.name}{m.owned_by ? ` (${m.owned_by})` : ''}</option>
+                    ))}
+                  </select>
+                </div>
               </div>
 
               {llmTestResult && (
-                <div className={`source-verify-result ${llmTestResult.ok ? 'verify-ok' : 'verify-fail'}`}>
+                <div className={`llm-test-result ${llmTestResult.ok ? 'success' : 'fail'}`}>
                   {llmTestResult.ok ? (
-                    <>{ICONS.check} 连接成功 ({llmTestResult.model}): {llmTestResult.reply}</>
+                    <><span className="result-icon">{ICONS.check}</span> 连接成功 ({llmTestResult.model}): {llmTestResult.reply}</>
                   ) : (
-                    <>连接失败：{llmTestResult.message}</>
+                    <><span className="result-icon">⚠</span> 连接失败：{llmTestResult.message}</>
                   )}
                 </div>
               )}
             </div>
-            <div className="modal-footer">
-              <button className="btn-cancel" onClick={() => setShowLlmQuickConfig(false)}>取消</button>
-              <button className="btn-test" onClick={handleQuickTest} disabled={llmTesting || !llmConfig.baseUrl || !llmConfig.selectedModel}>
+
+            <div className="llm-config-footer">
+              <button className="llm-btn-secondary" onClick={() => setShowLlmQuickConfig(false)}>取消</button>
+              <button
+                className="llm-btn-test"
+                onClick={handleQuickTest}
+                disabled={llmTesting || !llmConfig.baseUrl || !llmConfig.selectedModel}
+              >
                 {llmTesting ? '测试中...' : '测试连接'}
               </button>
-              <button className="btn-save" onClick={handleQuickSave} disabled={!llmConfig.baseUrl || !llmConfig.selectedModel}>保存</button>
+              <button
+                className="llm-btn-primary"
+                onClick={handleQuickSave}
+                disabled={!llmConfig.baseUrl || !llmConfig.selectedModel}
+              >
+                保存配置
+              </button>
             </div>
           </div>
         </div>
