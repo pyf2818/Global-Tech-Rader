@@ -2504,10 +2504,13 @@ function App() {
     return '与今天的技术动态相关，可快速浏览后决定是否沉淀。';
   }, []);
 
-  // TOP 5 hot items
+  // TOP 5 hot items — memoized independently from workbenchItems so
+  // clicking a hotspot (which calls recordReading → updates readingHistory)
+  // does NOT reorder the list.
   const topMustRead = useMemo(() => {
     return workbenchItems.slice(0, 5);
-  }, [workbenchItems]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [items, selectedInterests, recommendationFeedback, followKeywords]);
 
   // Profile-based recommendations (excluding top 5, unlimited)
   const profileRecommendations = useMemo(() => {
@@ -6204,11 +6207,10 @@ ${signals}
                           key={item.id}
                           className="hotspot-row"
                           onClick={() => recordReading(item)}
-                          style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', cursor: 'pointer', borderRadius: 8, borderBottom: '1px solid var(--border-color, rgba(255,255,255,0.06))' }}
                         >
-                          <span style={{ flex: '0 0 22px', fontWeight: 700, fontSize: 14, color: i === 0 ? '#dc2626' : i === 1 ? '#ea580c' : 'var(--accent-color, #6366f1)' }}>{i + 1}</span>
-                          <span style={{ flex: 1, fontWeight: 600, fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.title}</span>
-                          <span style={{ flex: '0 0 auto', opacity: 0.6, fontSize: 11, textAlign: 'right' }}>
+                          <span className="hotspot-rank">{i + 1}</span>
+                          <span className="hotspot-title">{item.title}</span>
+                          <span className="hotspot-meta">
                             {(item.recommendationReasons?.length || 0)} 信源 · {formatTime(item.publishedAt || item.time)}
                           </span>
                         </div>
@@ -6244,8 +6246,9 @@ ${signals}
                             isTranslating={translatingItems[item.id]}
                             translation={getTranslation(item)}
                             onOpenLightbox={(src, title) => setLightbox({ open: true, src, title })}
+                            onAskAi={sendCopilotAbout}
+                            showRecommendation
                           />
-                          <button className="rec-ask-ai-btn" onClick={() => sendCopilotAbout(item)} title="让 AI 分析这条资讯">Ask AI</button>
                         </div>
                       ))}
                       {profileRecommendations.length > profilePage * 10 && profilePage * 10 < 40 && (

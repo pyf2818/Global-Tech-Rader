@@ -3,7 +3,7 @@ import { ICONS } from '../constants/index.jsx';
 import { REGION_MAP, MODE_MAP } from '../constants/index.jsx';
 import { formatRelative } from '../utils/format.js';
 
-function NewsItem({ item, index, viewMode = 'standard', isFocused = false, isBookmarked = false, isInMaterials = false, onBookmark, onSummary, isSummaryOpen, summaryText, isFollowed = false, onRead, showTranslation, onToggleTranslation, onRequestTranslation, isTranslating, translation, onOpenLightbox, onAddMaterial }) {
+function NewsItem({ item, index, viewMode = 'standard', isFocused = false, isBookmarked = false, isInMaterials = false, onBookmark, onSummary, isSummaryOpen, summaryText, isFollowed = false, onRead, showTranslation, onToggleTranslation, onRequestTranslation, isTranslating, translation, onOpenLightbox, onAddMaterial, onAskAi, showRecommendation = false }) {
   const isCompact = viewMode === 'compact';
   const isCard = viewMode === 'card';
   const hasMedia = item.imageUrl || item.videoUrl;
@@ -99,6 +99,7 @@ function NewsItem({ item, index, viewMode = 'standard', isFocused = false, isBoo
           {onBookmark && <button className={`bookmark-btn ${isBookmarked ? 'active' : ''}`} onClick={onBookmark} title={isBookmarked ? '取消收藏' : '收藏'}>{isBookmarked ? ICONS.bookmarkFill : ICONS.bookmark}</button>}
           {onAddMaterial && <button className={`add-material-btn ${isInMaterials ? 'active' : ''}`} onClick={() => onAddMaterial(item)} title={isInMaterials ? '已在素材库' : '收藏为素材'}>{ICONS.layers}</button>}
           {onSummary && <button className="summary-btn" onClick={onSummary} title="AI 摘要">{ICONS.sparkle}</button>}
+          {onAskAi && <button className="ask-ai-btn" onClick={() => onAskAi(item)} title="让 AI 分析这条资讯">ASK AI</button>}
           {isEnglish && onToggleTranslation && <button className={`translate-btn ${showTranslation ? 'active' : ''} ${isTranslating ? 'translating' : ''}`} onClick={() => { console.log('[NewsItem] Translate button clicked:', { isTranslating, translation, onRequestTranslation: !!onRequestTranslation }); if (isTranslating) return; if (!translation && onRequestTranslation) { onRequestTranslation().then(result => { console.log('[NewsItem] Translation result:', result); if (result) onToggleTranslation(); }); } else { onToggleTranslation(); } }} title="翻译" disabled={isTranslating}>{isTranslating ? ICONS.spinner : ICONS.globe}</button>}
         </div>
       </div>
