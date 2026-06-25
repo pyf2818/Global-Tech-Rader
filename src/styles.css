@@ -7,7 +7,7 @@
   --bg-hover: rgba(30, 35, 41, 0.94);
   --text-primary: #EDEFF2;
   --text-secondary: #C4C9D0;
-  --text-muted: #9BA3AD;
+  --text-muted: #B8C0CA;
   --surface-workbench: rgba(20, 24, 28, 0.88);
   --surface-workbench-muted: rgba(20, 24, 28, 0.82);
   --surface-workbench-inset: rgba(255, 255, 255, 0.035);
@@ -55,7 +55,7 @@
   --bg-hover: #EDE9E0;
   --text-primary: #1A1D21;
   --text-secondary: #3D3F43;
-  --text-muted: #7A7D82;
+  --text-muted: #5B5E63;
   --surface-workbench: rgba(255, 253, 248, 0.97);
   --surface-workbench-muted: rgba(255, 253, 248, 0.99);
   --surface-workbench-inset: rgba(237, 233, 224, 0.65);
@@ -4163,7 +4163,10 @@ body {
 /* 文字工具类 */
 .text-up { color: var(--accent-emerald); font-weight: 600; }
 .text-down { color: var(--accent-rose); font-weight: 600; }
-.text-muted { color: var(--text-muted); }
+/* text-muted 变深 — 不再灰蒙蒙 */
+.text-muted { color: var(--text-secondary); font-weight: 500; }
+.date-info, .source-time, .meta-text { color: var(--text-secondary); font-weight: 500; }
+.sidebar-section-title { color: var(--text-primary); font-weight: 700; }
 
 /* 响应式 */
 @media (max-width: 768px) {
@@ -12368,7 +12371,7 @@ body {
 .workbench-shell {
   min-height: 100%;
   display: grid;
-  grid-template-columns: minmax(500px, 1fr) 420px;
+  grid-template-columns: minmax(500px, 1fr) minmax(320px, 1fr);
   grid-template-areas:
     "overview ai"
     "feed ai";
@@ -12379,7 +12382,49 @@ body {
   margin: 0 auto;
 }
 
-/* AiChatPanel 宽度由 JS (panelWidth) 动态控制，这里只设默认 */
+/* 左侧拖拽缩放手柄 — 手柄向右拖 = 面板变宽 */
+.ai-resize-handle {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 14px;
+  cursor: col-resize;
+  z-index: 10;
+  background: transparent;
+}
+.ai-resize-handle:hover { background: var(--accent-cyan-soft); }
+.ai-resize-handle::before {
+  content: '';
+  position: absolute;
+  left: 5px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 3px;
+  height: 36px;
+  border-radius: 2px;
+  background: var(--border-active);
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+.ai-chat-panel:hover .ai-resize-handle::before { opacity: 0.6; }
+
+/* AiChatPanel 宽度由 JS (panelWidth) 动态控制 */
+.ai-chat-panel {
+  grid-area: ai;
+  position: sticky;
+  top: 18px;
+  align-self: start;
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 56px);
+  max-height: calc(100vh - 56px);
+  border: 1px solid var(--border-active);
+  border-radius: 10px;
+  background: var(--surface-workbench);
+  overflow: hidden;
+  box-shadow: 0 12px 40px var(--border-glow);
+}
 
 .workbench-overview,
 .workbench-feed-panel,
@@ -12909,10 +12954,32 @@ body {
   position: relative;
   border: 1px solid var(--border-active);
   border-radius: 12px;
-  overflow: hidden;
+  overflow: visible;
   background: var(--bg-secondary);
   transition: border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
 }
+
+/* 评分徽章 */
+.workbench-score-badge {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  min-width: 38px;
+  height: 24px;
+  padding: 0 8px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.3px;
+  z-index: 5;
+  pointer-events: none;
+}
+.workbench-score-badge.score-high { background: rgba(34,197,94,0.15); color: #22c55e; border: 1px solid rgba(34,197,94,0.35); }
+.workbench-score-badge.score-mid  { background: rgba(234,179,8,0.15); color: #eab308; border: 1px solid rgba(234,179,8,0.35); }
+.workbench-score-badge.score-low  { background: rgba(148,163,184,0.12); color: #94a3b8; border: 1px solid rgba(148,163,184,0.25); }
 
 .workbench-news-card:hover {
   border-color: var(--border-active);
@@ -13860,53 +13927,6 @@ body {
   background: var(--accent-cyan-softer);
 }
 
-/* ============================================================
-   AI Chat Panel
-   ============================================================ */
-.ai-chat-panel {
-  grid-area: ai;
-  position: sticky;
-  top: 18px;
-  align-self: start;
-  display: flex;
-  flex-direction: column;
-  height: calc(100vh - 56px);
-  max-height: calc(100vh - 56px);
-  border: 1px solid var(--border-color);
-  border-radius: 10px;
-  background: var(--surface-workbench);
-  overflow: hidden;
-  min-width: 320px;
-  width: 420px;
-  max-width: 700px;
-}
-
-/* 左侧拖拽缩放手柄 */
-.ai-resize-handle {
-  position: absolute;
-  left: -4px;
-  top: 0;
-  bottom: 0;
-  width: 8px;
-  cursor: col-resize;
-  z-index: 10;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.ai-resize-handle::after {
-  content: '';
-  width: 3px;
-  height: 32px;
-  border-radius: 2px;
-  background: var(--border-color);
-  opacity: 0;
-  transition: opacity 0.2s;
-}
-.ai-chat-panel:hover .ai-resize-handle::after,
-.ai-resize-handle:active::after {
-  opacity: 1;
-}
 
 .chat-header {
   display: flex;

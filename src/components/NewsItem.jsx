@@ -89,6 +89,11 @@ function NewsItem({ item, index, viewMode = 'standard', isFocused = false, isBoo
       onDragStart={handleDragStart}
     >
       {isFollowed && <div className="follow-badge">关注</div>}
+      {item.mustReadScore > 0 && (
+        <div className={`card-score-badge ${item.mustReadScore >= 50 ? 'score-high' : item.mustReadScore >= 20 ? 'score-mid' : 'score-low'}`}>
+          {item.mustReadScore}
+        </div>
+      )}
       <div className="item-left">
         {!isCompact && <div className="item-tags">
           <span className={`item-mode mode-${item.mode}`}>{MODE_MAP[item.mode]}</span>
