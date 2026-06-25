@@ -1788,9 +1788,12 @@ function App() {
   }, [items.length, availableNewsDates, selectedNewsDate]);
 
   const selectedDateItems = useMemo(() => {
-    if (!selectedNewsDate) return filtered;
-    const sameDay = filtered.filter(item => item.publishedAt?.slice(0, 10) === selectedNewsDate);
-    return sameDay.length > 0 ? sameDay : filtered;
+    // 每日汇报严格聚焦当天日期，不允许降级到全部数据
+    const sameDay = filtered.filter(item => {
+      const d = item.publishedAt?.slice(0, 10);
+      return d === selectedNewsDate;
+    });
+    return sameDay;
   }, [filtered, selectedNewsDate]);
 
   const regionCategoryMatrix = useMemo(() => {
@@ -2251,7 +2254,7 @@ function App() {
     }).filter(g => g.count > 0);
   }, [followKeywords, items]);
 
-  // 今日必读：多维度推荐算法
+  // 统一推荐引擎：系统A(用户权重)+系统B(AI算法)+系统C(动态行为)
   const todayMustRead = useMemo(() => {
     const readIds = new Set(readingHistory.map(h => h.id));
     const bookmarkIds = new Set(bookmarks.map(b => b.itemId || b.id));
@@ -2412,7 +2415,7 @@ function App() {
         };
       })
       .sort((a, b) => b.mustReadScore - a.mustReadScore)
-      .slice(0, 5);
+      .slice(0, 80);
   }, [items, followKeywords, readingHistory, bookmarks, selectedInterests, domainPriorities, sourcePriorities]);
 
   const workbenchItems = useMemo(() => {
@@ -2464,7 +2467,7 @@ function App() {
         };
       })
       .sort((a, b) => (b.mustReadScore || 0) - (a.mustReadScore || 0));
-    return primary.slice(0, 12);
+    return primary;
   }, [todayMustRead, selectedDateItems, selectedInterests, followKeywords, recommendationFeedback]);
 
   const workbenchStats = useMemo(() => {
@@ -5427,6 +5430,8 @@ ${signals}
   function recordReading(item) {
     setReadingHistory(prev => {
       const filtered = prev.filter(h => h.id !== item.id);
+      setDomainPriorities(p => { const n = { ...p }; n[item.category] = Math.min(10, (n[item.category] || 3) + 0.3); return n; });
+      setSourcePriorities(p => { const n = { ...p }; n[item.source] = Math.min(10, (n[item.source] || 3) + 0.2); return n; });
       return [{
         id: item.id,
         title: item.title,
@@ -6165,7 +6170,7 @@ ${signals}
                 <div className="workbench-toolbar">
                   <div>
                     <div className="workbench-section-label">Daily Briefing</div>
-                    <h2>今天最值得看的 {workbenchItems.length} 条</h2>
+                    <h2>今日推荐</h2>
                   </div>
                   <div className="workbench-toolbar-actions">
                     <div className="search-wrap workbench-search">
@@ -6206,7 +6211,12 @@ ${signals}
                         <div
                           key={item.id}
                           className="hotspot-row"
-                          onClick={() => recordReading(item)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            recordReading(item);
+                            if (item.url) window.open(item.url, '_blank');
+                          }}
+                          title={item.title}
                         >
                           <span className="hotspot-rank">{i + 1}</span>
                           <span className="hotspot-title">{item.title}</span>

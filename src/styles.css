@@ -12368,7 +12368,7 @@ body {
 .workbench-shell {
   min-height: 100%;
   display: grid;
-  grid-template-columns: minmax(500px, 1fr) minmax(420px, 1fr);
+  grid-template-columns: minmax(500px, 1fr) 420px;
   grid-template-areas:
     "overview ai"
     "feed ai";
@@ -12378,6 +12378,8 @@ body {
   max-width: 1600px;
   margin: 0 auto;
 }
+
+/* AiChatPanel 宽度由 JS (panelWidth) 动态控制，这里只设默认 */
 
 .workbench-overview,
 .workbench-feed-panel,
@@ -13874,6 +13876,36 @@ body {
   border-radius: 10px;
   background: var(--surface-workbench);
   overflow: hidden;
+  min-width: 320px;
+  width: 420px;
+  max-width: 700px;
+}
+
+/* 左侧拖拽缩放手柄 */
+.ai-resize-handle {
+  position: absolute;
+  left: -4px;
+  top: 0;
+  bottom: 0;
+  width: 8px;
+  cursor: col-resize;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.ai-resize-handle::after {
+  content: '';
+  width: 3px;
+  height: 32px;
+  border-radius: 2px;
+  background: var(--border-color);
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+.ai-chat-panel:hover .ai-resize-handle::after,
+.ai-resize-handle:active::after {
+  opacity: 1;
 }
 
 .chat-header {
