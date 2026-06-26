@@ -2285,7 +2285,7 @@ function App() {
       .map(([word]) => word);
 
     return items
-      .filter(item => !readIds.has(item.id))
+      .filter(item => !readIds.has(item.id))  // 已读过滤：避免重复推荐
       .map(item => {
         let score = 0;
         
@@ -5428,10 +5428,11 @@ ${signals}
   }
 
   function recordReading(item) {
+    // 动态反馈：阅读行为回写领域/信源权重（必须在 setReadingHistory 外部调用）
+    setDomainPriorities(p => { const n = { ...p }; n[item.category] = Math.min(10, (n[item.category] || 3) + 0.3); return n; });
+    setSourcePriorities(p => { const n = { ...p }; n[item.source] = Math.min(10, (n[item.source] || 3) + 0.2); return n; });
     setReadingHistory(prev => {
       const filtered = prev.filter(h => h.id !== item.id);
-      setDomainPriorities(p => { const n = { ...p }; n[item.category] = Math.min(10, (n[item.category] || 3) + 0.3); return n; });
-      setSourcePriorities(p => { const n = { ...p }; n[item.source] = Math.min(10, (n[item.source] || 3) + 0.2); return n; });
       return [{
         id: item.id,
         title: item.title,
