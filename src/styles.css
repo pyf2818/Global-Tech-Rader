@@ -12382,6 +12382,13 @@ body {
   margin: 0 auto;
 }
 
+/* Copilot 锁定在右侧列，左侧内容可伸缩 */
+.workbench-ai {
+  position: sticky;
+  top: 18px;
+  align-self: start;
+}
+
 /* 左侧拖拽缩放手柄 — 手柄向右拖 = 面板变宽 */
 .ai-resize-handle {
   position: absolute;
