@@ -10,6 +10,7 @@ import { PALETTES } from './ThemePicker.jsx';
 import { getGradeColors } from './utils/format.js';
 import { useAuth } from './hooks/useAuth.js';
 import { useLlmConfig } from './hooks/useLlmConfig.js';
+import { useTrending } from './hooks/useTrending.js';
 
 const PRODUCT_NAME = '万般硅川';
 const PRODUCT_TAGLINE = '高质量多领域智能资讯生态';
@@ -1176,15 +1177,16 @@ function App() {
    const [serverCategories, setServerCategories] = useState([]);
   const [gradeFilter, setGradeFilter] = useState('all');
   const [sourceTypeTab, setSourceTypeTab] = useState('builtin');
-  const [trendingItems, setTrendingItems] = useState([]);
-  const [trendingLoading, setTrendingLoading] = useState(false);
-  const [trendingPlatform, setTrendingPlatform] = useState('all');
-  const [trendingType, setTrendingType] = useState('24h');
-  const [trendingPage, setTrendingPage] = useState(0);
-  const [trendingHasMore, setTrendingHasMore] = useState(true);
-  const [trendingLoadingMore, setTrendingLoadingMore] = useState(false);
-  const [githubRepos, setGithubRepos] = useState([]);
-  const [githubLoading, setGithubLoading] = useState(false);
+  const {
+    trendingItems, setTrendingItems,
+    trendingLoading, trendingPlatform, setTrendingPlatform,
+    trendingType, setTrendingType,
+    trendingPage, trendingHasMore, trendingLoadingMore,
+    githubRepos, githubLoading,
+    githubLang, setGithubLang,
+    githubSince, setGithubSince,
+    loadTrending, loadGithub,
+  } = useTrending();
 
   useEffect(() => {
     fetch('/api/meta')
@@ -1203,8 +1205,7 @@ function App() {
     () => (serverCategories.length > 0 ? serverCategories : FALLBACK_CATEGORIES),
     [serverCategories]
   );
-  const [githubLang, setGithubLang] = useState('');
-  const [githubSince, setGithubSince] = useState('weekly');
+  // githubLang/githubSince 已移入 useTrending
   const [calendarDate, setCalendarDate] = useState(new Date());
   const [events, setEvents] = useState(() => loadLS('calendarEvents', []));
   const [eventForm, setEventForm] = useState({ title: '', time: '', color: '#22d3ee' });
@@ -4229,80 +4230,7 @@ ${blueprintSummary}`,
     return renderMarkdown(processedText);
   }
 
-  function loadTrending(append = false, platform = trendingPlatform, type = trendingType) {
-    if (!append) {
-      setTrendingLoading(true);
-      setTrendingPage(0);
-      setTrendingHasMore(true);
-    } else {
-      setTrendingLoadingMore(true);
-    }
-    const params = new URLSearchParams();
-    if (platform !== 'all') params.set('platform', platform);
-    if (type !== '24h') params.set('type', type);
-    const page = append ? trendingPage + 1 : 0;
-    params.set('page', page);
-    params.set('pageSize', 20);
-    const url = `/api/trending?${params}`;
-    console.log('[Trending] Fetching:', url, 'type:', type);
-    fetch(url).then(r => r.json()).then(d => {
-      console.log('[Trending] Received:', d.items?.length || 0, 'items, hasMore:', d.hasMore, 'type:', type);
-      
-      // 根据榜单类型进行本地排序和过滤
-      let items = d.items || [];
-      
-      if (type === '24h') {
-        // 24小时热点：按时间倒序，最近24小时内的
-        const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-        items = items.filter(item => item.publishedAt && item.publishedAt > oneDayAgo);
-        items.sort((a, b) => new Date(b.publishedAt) - new Date(a.publishedAt));
-      } else if (type === '7d') {
-        // 7日全球财经：筛选财经相关，按7天内排序
-        const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-        items = items.filter(item => {
-          const within7Days = !item.publishedAt || item.publishedAt > sevenDaysAgo;
-          const financeRelated = item.category === 'economy-stock' || 
-                                item.category === 'fintech' || 
-                                item.category === 'policy-finance' ||
-                                (item.tags && item.tags.some(tag => ['财经', '金融', '股市', '经济', '投资', '加息', '通胀'].includes(tag)));
-          return within7Days && financeRelated;
-        });
-        items.sort((a, b) => new Date(b.publishedAt) - new Date(a.publishedAt));
-      } else if (type === 'politics') {
-        // 时政热议：筛选时政相关
-        items = items.filter(item => {
-          const politicsRelated = item.category === 'policy-finance' ||
-                                  (item.tags && item.tags.some(tag => ['政治', '外交', '国际', '地缘', '冲突', '选举', '政府'].includes(tag))) ||
-                                  (item.title && /政治|外交|国际|地缘|冲突|选举|政府|国际关系/.test(item.title));
-          return politicsRelated;
-        });
-        items.sort((a, b) => new Date(b.publishedAt) - new Date(a.publishedAt));
-      }
-      
-      if (append) {
-        setTrendingItems(prev => [...prev, ...items]);
-        setTrendingHasMore(d.hasMore ?? false);
-        setTrendingPage(page);
-      } else {
-        setTrendingItems(items);
-        setTrendingHasMore(d.hasMore ?? true);
-        setTrendingPage(page);
-      }
-    }).catch(e => {
-      console.error('[Trending] Error:', e);
-    }).finally(() => {
-      setTrendingLoading(false);
-      setTrendingLoadingMore(false);
-    });
-  }
-
-  function loadGithub(lang = githubLang, since = githubSince) {
-    setGithubLoading(true);
-    const params = new URLSearchParams();
-    if (lang) params.set('lang', lang);
-    params.set('since', since);
-    fetch(`/api/github-trending?${params}`).then(r => r.json()).then(d => setGithubRepos(d.repos || [])).catch(() => {}).finally(() => setGithubLoading(false));
-  }
+  // loadTrending / loadGithub 已提取至 useTrending hook
 
   function toggleBookmark(item) {
     setBookmarks(prev => {
