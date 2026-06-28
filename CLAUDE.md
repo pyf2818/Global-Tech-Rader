@@ -20,38 +20,45 @@ No test, lint, typecheck, or formatter commands exist. Do not run them.
 
 **Tech Stack**: React 19 + Vite 8 + Tailwind CSS 3 + Three.js (react-globe.gl)
 
-**Data Flow**: Vite middleware plugin (`server/newsPlugin.js`) intercepts `/api/*` routes at dev-server level. Frontend uses native `fetch` to call these APIs. There is no Express/Koa — the plugin registers middleware directly on the Vite dev server.
+**Data Flow**: Vite middleware plugin (`server/news/plugin.js`) intercepts `/api/*` routes at dev-server level. Frontend uses native `fetch` to call these APIs. There is no Express/Koa — the plugin registers middleware directly on the Vite dev server.
 
 **v2 Direction**: See `docs/wanban-silicon-valley-v2-blueprint.md`. The product is migrating from "news aggregator" to a "personal intelligence & creation OS" centered on daily briefing, user profile, materials library, agent workflows, and content creation. Current branch `codex/intelligence-workbench-redesign` implements this.
 
 ### Frontend (`src/`)
 
-- **`App.jsx`** (~7300 lines) — Main component containing ~150 useState hooks, routing logic, settings modal, and all page views. Being incrementally split into modules below.
-- **`AiElf.jsx`** (~1200 lines) — AI assistant with multi-Agent conversation, drag-to-analyze, history management. Uses localStorage per-agent (50 messages, 20 sessions max).
-- **`GlobeView.jsx`** (~1000 lines) — 3D globe via `react-globe.gl`/Three.js. Fullscreen uses `createPortal` to `document.body`. Canvas needs `min-height: 420px`.
+- **`App.jsx`** (10440 lines) — Main component containing ~150 useState hooks, routing logic, settings modal, and all page views. Being incrementally split into modules below.
+- **`AiElf.jsx`** (1354 lines) — AI assistant with multi-Agent conversation, drag-to-analyze, history management. Uses localStorage per-agent (50 messages, 20 sessions max).
+- **`GlobeView.jsx`** (999 lines) — 3D globe via `react-globe.gl`/Three.js. Fullscreen uses `createPortal` to `document.body`. Canvas needs `min-height: 420px`.
 - **`main.jsx`** — Mounts `<App />` inside `<ErrorBoundary>` + `<React.StrictMode>`.
-- **`styles.css`** (~10000 lines) — CSS custom properties for dark/light themes. Tailwind config only sets content paths — no Tailwind utilities used in practice.
+- **`styles.css`** (14560 lines) — CSS custom properties for dark/light themes. Tailwind config only sets content paths — no Tailwind utilities used in practice.
+- **`themes.css`** (884 lines) — Multi-palette theme definitions.
 
 #### Extracted Modules (Phase 1 refactoring)
 
 Components, utilities, constants, and hooks extracted from App.jsx. Currently imported but App.jsx also has inline copies — these will diverge as App.jsx is further refactored.
 
 ```
-src/components/        Extracted presentational components
-  NewsItem.jsx         News card with grade badge, translation, media
-  SkeletonCard.jsx     Loading skeleton
-  HexRadarChart.jsx    SVG radar/spider chart
-  TrendLineChart.jsx   SVG line chart with hover
-  GithubRepoCard.jsx   GitHub repo card
+src/components/
+  NewsItem.jsx          News card with grade badge, translation, media
+  SkeletonCard.jsx      Loading skeleton
+  HexRadarChart.jsx     SVG radar/spider chart
+  TrendLineChart.jsx    SVG line chart with hover
+  GithubRepoCard.jsx    GitHub repo card
+  SettingsModal.jsx     Settings modal (1377 lines, deeply nested tabs)
+  AiChatPanel.jsx       AI chat panel
+  ArticleEditor.jsx     Markdown article editor
+  ColorfulBubbles.jsx   Decorative bubble animation
+  SourceOpsPanel.jsx    Source operations panel
+  ThemePicker.jsx       Multi-palette theme selector
 src/utils/
-  localStorage.js      loadLS/saveLS/clearStaleLS
-  format.js            formatTime/formatRelative/formatStars
-  toast.js             showToast DOM notification
-  markdown.jsx         renderMarkdown/renderMarkdownWithImages/renderBriefMarkdown/renderInline
+  localStorage.js       loadLS/saveLS/clearStaleLS
+  format.js             formatTime/formatRelative/formatStars
+  toast.js              showToast DOM notification
+  markdown.jsx          renderMarkdown/renderMarkdownWithImages/renderBriefMarkdown/renderInline
 src/constants/
-  index.jsx            All constants + ICONS (SVG icon map with JSX)
+  index.jsx             All constants + ICONS (SVG icon map with JSX)
 src/hooks/
-  useLocalStorage.js   Auto-syncing localStorage hook
+  useLocalStorage.js    Auto-syncing localStorage hook
 ```
 
 #### v2 Intelligence Workbench Modules
@@ -78,20 +85,37 @@ src/constants/
 
 **Workflow node types**: `input`, `llm`, `skill`, `condition`, `classifier`, `reply`, `output`. Each node has `inputKey`/`outputKey` forming a variable chain; the first node's input is `buildWorkbenchContext()` (today's recommended items + profile + tracked terms + saved materials). `skill` nodes map to local builders: `evidence-pack`, `media-audit`, `material-extractor`, `profile-memory`, `article-outline`, `github-evaluator`.
 
-### Backend (`server/newsPlugin.js`, ~3000 lines)
+### Backend (`server/news/`)
 
-Single Vite plugin exporting `newsPlugin()` which registers one middleware handling all API routes. Key sections top-to-bottom:
+The backend has been modularized. `server/newsPlugin.js` is now a **16-line re-export shim** that points to `server/news/plugin.js`. All real logic lives in the `server/news/` tree:
 
-1. **MEDIA_CONFIG** — Image resolution settings (timeouts, scores, cache sizes)
-2. **SOURCE_WEIGHTS / SOURCE_GRADES / SOURCE_GRADE_MAP** — Source quality ratings (S/A/B/C/D tiers with weights)
-3. **Auth system** — In-memory `users`/`userSessions` Maps (dev-only, not persisted)
-4. **DEFAULT_SOURCES** — ~200 RSS/Atom source definitions (deduplicated)
-5. **TRENDING_SOURCES** — Hot-trending feed sources
-6. **CATEGORIES / CATEGORY_RULES / TAG_RULES** — Content classification regex rules
-7. **Cache objects** — `newsCache` (5min), `trendingCache` (10min), `githubCaches` (30min), `imageResolveCache` (session)
-8. **Route handlers** — Middleware with `if (pathname === '/api/xxx')` pattern
-9. **Image pipeline** — `resolveImageWithScrapling()` → `resolveImageFromArticle()` → scoring → validation
-10. **Feed parsing** — `parseFeed()` → `normalizeItem()` with category/tag detection
+```
+server/newsPlugin.js          Re-export shim (16 lines)
+server/news/
+  plugin.js                   Vite plugin: registers middleware, routes /api/* requests (450 lines)
+  config/
+    constants.js              MEDIA_CONFIG, SOURCE_WEIGHTS, SOURCE_GRADES, DEFAULT_SOURCES (~52KB)
+    sourceGrades.js           Source grade lookup utilities
+  services/
+    newsService.js            News aggregation, feed fetching, caching
+    trendingService.js        Trending + GitHub trending (10min/30min caches)
+    externalFetchers.js       Source fetching logic
+    sourceDiscovery.js        Auto-discover RSS feeds from websites
+  images/
+    imageProcessing.js        Image extraction, scoring, validation (~21KB)
+    imageResolver.js          Image resolution pipeline with Scrapling fallback (~21KB)
+  parsing/
+    feedParser.js             RSS/Atom feed parsing and normalization
+  auth/
+    userAuth.js               Dev-only in-memory user auth
+  utils/
+    httpUtils.js              SSRF protection (isSafeUrl), sendJson, parseBody
+    textProcessing.js         Text processing helpers
+```
+
+**Route handling**: `plugin.js` uses `if (pathname === '/api/xxx')` pattern for each endpoint. When adding new API routes, add the handler in `plugin.js` and import services from the appropriate module.
+
+**Production API**: `api/*.js` contains Vercel serverless functions — a partial copy of the plugin logic. When changing API behavior, update **both** `server/news/plugin.js` and the corresponding `api/*.js` file for production parity.
 
 ### API Endpoints
 
@@ -102,6 +126,7 @@ Single Vite plugin exporting `newsPlugin()` which registers one middleware handl
 | `/api/trending` | GET | `platform`, `page`, `pageSize` | Hot-trending items |
 | `/api/github-trending` | GET | `lang`, `since` | GitHub trending repos (30min cache) |
 | `/api/verify-source` | GET | `url` | Validate RSS/Atom feed URL |
+| `/api/discover-source` | GET | `url` | Auto-discover RSS feeds from a webpage |
 | `/api/llm-models` | GET | `baseUrl`, `apiKey` | List available LLM models |
 | `/api/llm-test` | POST | `baseUrl`, `apiKey`, `model`, `prompt` | Test LLM connection |
 | `/api/ai-insights` | POST | `baseUrl`, `apiKey`, `model`, `items[]` | AI trend analysis on top 30 items |
@@ -122,19 +147,18 @@ Single Vite plugin exporting `newsPlugin()` which registers one middleware handl
 - `githubCaches`: 30 min TTL, keyed by `${lang}-${since}`
 - `imageResolveCache`: session-scoped (no TTL, in-memory only)
 
-### Backend service layer (`server/news/services/`)
+## Deployment
 
-Logic is being extracted out of the monolithic `newsPlugin.js` into a `services/` tree. Currently extracted:
-
-- `trendingService.js` — exports `trendingCache` (10min), `githubCaches` (30min), `fetchTrendingSource()`, `getTrending(platformFilter, page, pageSize)`, `getGithubTrending(lang, since)`, plus README tutorial extraction and date helpers (`getYesterday`/`get7DaysAgo`/`get30DaysAgo`). `newsPlugin.js` delegates to these rather than inlining the logic.
-
-When adding trending/github features, prefer extending `trendingService.js` and importing it in `newsPlugin.js` instead of duplicating inline.
+- **Vercel**: `vercel.json` maps `/api/*` to serverless functions in `api/`; static build served from `dist/`
+- **Docker**: Multi-stage `Dockerfile` — Node 20 builds frontend, Python 3.11 runs Scrapling + Gunicorn, Nginx serves static files (ports 80 + 5000)
+- **Docker Compose**: `docker-compose.yml` with optional PostgreSQL/Redis (commented out)
+- **Nginx**: `nginx.conf` — SPA routing, Scrapling proxy, static asset caching, security headers
 
 ## Critical Duplication (Must Update Both)
 
-Categories, source grades, and tag rules are defined **independently** in both `server/newsPlugin.js` and `src/App.jsx`:
+Categories, source grades, and tag rules are defined **independently** in both `server/news/config/constants.js` and `src/App.jsx`:
 
-| | `server/newsPlugin.js` | `src/App.jsx` |
+| | `server/news/config/constants.js` | `src/App.jsx` |
 |---|---|---|
 | Categories | 28 items with `all` | 27 items (no `all`) |
 | Source Grades | `SOURCE_GRADES` with color/icon | `gradeColors` object (different hex values!) |
@@ -165,5 +189,5 @@ Also `DEFAULT_SOURCES` is partially duplicated in `api/news.js` (shorter list) �
 - `scripts/` contains deployment and test scripts; `docs/reports/` contains historical optimization reports
 - v2 localStorage keys: `agentWorkflowHistory` (workflow run records, max 12), `dailyBriefingReport` (last generated briefing). AI Elf uses per-agent keys. All `setItem` calls must be wrapped in try-catch for `QuotaExceededError`.
 - WorkflowEngine: `condition` node failure halts the entire rest of the chain (subsequent nodes marked `skipped`), it does NOT branch. LLM nodes require `ctx.llmConfig` (baseUrl/apiKey/selectedModel) and an agent with `systemPrompt`; local nodes ignore LLM config entirely.
-- The monolithic `App.jsx` (~7300 lines) imports the v2 modules but ALSO retains inline copies of some logic — when editing workflow/profile/briefing behavior, check whether App.jsx calls the extracted module or its inline copy. Prefer the extracted module.
+- The monolithic `App.jsx` (10440 lines) imports the v2 modules but ALSO retains inline copies of some logic — when editing workflow/profile/briefing behavior, check whether App.jsx calls the extracted module or its inline copy. Prefer the extracted module.
 - Runtime `ReferenceError: useMemo is not defined` means a component file uses `useMemo` without importing it from `react` — add `import { useMemo } from 'react'` to that file.

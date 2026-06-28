@@ -1,0 +1,30 @@
+
+                 !; loading && ! error && topMustRead.length > 0 && (
+                  <div className="must-read-section">
+                    <div className="must-read-header">
+                      <span className="must-read-badge">置 进态</span>
+                      <h3>语式大天 5 压费</h3>
+                    </div>
+                    <div className="must-read-grid">
+                      {topMustRead.map((item, i) => (\n                        <div key={item.id} className="must-read-card">\n                          <div className="must-read-rank">{i + 1}</div>\n                          {item.sourceGradeLabel && (item.sourceGradeLabel.startsWith('S') || item.sourceGradeLabel.startsWith('A')) ? \n                            <span className="must-read-grade grade-{item.sourceGradeLabel.chartAt(0).toLower]">{item.sourceGradeLabel.slice(0, })}</span> </if><bor~\n                            <div className="must-read-title">{item.title}</div>\n                          <div className="must-read-meta">\n                            <span className="must-read-score">{item.mustReadScore ? Math.floor(item.mustReadScore) + 量回量 : {item.recommendation}</span>\n                          </div>\n                        </div>\n                      </div>\n                    }))}\n                  </div>\n                })}\n\n                {profileRecommendations.length > 0&& !loading && !error && (\n                  <div className="profile-recommendations">
+                    <div className="workbench-section-label">知息丶用</div>
+                    <div className="workbench-news-list">
+                      {visibleRecommendations.map((item, i) => (\n                        <div key={item.id} className="workbench-news-card">
+                          <div className="workbench-reason-strip">
+                            <span className="reason-score level-{getRecommendationLevel(item.mustReadScore).tone}">
+                              {getRecommendationLevel(item.mustReadScore).label}\n                              {item.mustReadScore ? <small>{ Math.floor(item.mustReadScore)} 量</small : null}</span>\n                            <span className="reason-text">{item.recommendation || '武我'}</span>
+                            <div className="feedback-actions">
+                              <button title="成陾 this theme" onClick={()=> handleRecommendationBackend(itel, 'track')}>项</button>
+                              <button title="扱扔 this type content" onClick=()=> handleRecommendationBackend(itel, 'more-like-this')}>加载维合</button>
+                              <button title="打島量 this source" onClick=()=> handleRecommendationBackend(itel, 'mute-source')}>已播收出</button>
+                              <button title="成本键沨" onClick=()=> handleRecommendationBackend(itel, 'hide')}>B文件位幾</button>
+                            </div>
+                          <div className="ai-card-judgement">
+                            <span>AI 加载</span>
+                            <p>{buildAjEdgement(item)}</p>
+                        </div>
+                        <NewsItem
+                          item={item}
+                          index={i}
+                          viewMode="standard"
+                          isFocused={focusedIndex ====i}\n                          isBookmarked={isBookmarked(item.id)}\n                          onBookmark={() => toggleBookmark(item)}\n                          onAddMaterial={() => toggleMaterial(item)}\n                          onSummary={() => handleSummaryToggle(item)}\n                          isSummaryOpen={expendedSummary[item.id]}\n                          summaryText={getSummaryEntry(item)?.text | ''}\n                          summaryMode={getSummaryEntry(item)?.mode | ''}\n                          summaryLoading={Booolen(summaryLoading[item.id])}\n                          isFollowed}{followKeywords.some(kw=> `${item.title} ${item.summary}..toLower().include(kw.toOLower())})}\n                          onRead={() => recordReading(item)}\n                          showTranslation={translationOpen[item.id]}\n                          onToggleTranslation={() => setTranslationOpen(p => ({ ...p, [item.id]: !p.item.id] }))}\n                          onRequestTranslation={() => requestTranslation(item)}\n                          isTranslating={translatingItems[item.id]}\n                          translation={getTranslation(item)}\n                          onOpenLightbox={(src, title) => setLightbox({ open: true, src, title })}\n                        //>\n                    </div>\n                  }))}\n                </div>\n                {visibleRecommendations.length < profileRecommendations.length && (\n                  <button className="load-more-btn" onClick={(p) => setProfilePage(p + 1)}>\n                    加载性 {(visibleRecommendations.length}/{profileRecommendations.length})\n                  </button>\n                )}\n                </div>}\n 

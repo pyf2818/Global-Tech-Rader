@@ -1,7 +1,7 @@
 {
   "version": "1.0.0",
-  "lastScanned": 1777701446628,
-  "projectRoot": "E:\\VStudio_Project\\Global Tech Rader_V1\\workspace",
+  "lastScanned": 1782626275293,
+  "projectRoot": "E:\\VStudio_Project\\Global Tech Rader_V1\\Global-Tech-Rader",
   "techStack": {
     "languages": [
       {
@@ -11,23 +11,31 @@
         "markers": [
           "package.json"
         ]
+      },
+      {
+        "name": "Python",
+        "version": null,
+        "confidence": "high",
+        "markers": [
+          "requirements.txt"
+        ]
       }
     ],
     "frameworks": [
       {
-        "name": "vite",
-        "version": "latest",
-        "category": "build"
-      },
-      {
         "name": "react",
-        "version": "latest",
+        "version": "19.2.7",
         "category": "frontend"
       },
       {
         "name": "react-dom",
-        "version": "latest",
+        "version": "19.2.7",
         "category": "frontend"
+      },
+      {
+        "name": "vite",
+        "version": "8.0.16",
+        "category": "build"
       }
     ],
     "packageManager": "npm",
@@ -35,7 +43,7 @@
   },
   "build": {
     "buildCommand": "npm run build",
-    "testCommand": null,
+    "testCommand": "cd \"E:/VStudio_Project/Silicon Meridian\" && echo \"=== api/ ===\" && ls api/ 2>/dev/null && echo \"=== workflows ===\" && ls .github/workflows/ 2>/dev/null && echo \"=== vitest? ===\" && (ls node_modules/.bin/vitest 2>/dev/null || echo \"no vitest installed\") && echo \"=== App.jsx useState count ===\" && grep -c \"useState\" src/App.jsx",
     "lintCommand": null,
     "devCommand": "npm run dev",
     "scripts": {
@@ -48,26 +56,60 @@
     "namingStyle": null,
     "importStyle": null,
     "testPattern": null,
-    "fileOrganization": null
+    "fileOrganization": "type-based"
   },
   "structure": {
     "isMonorepo": false,
     "workspaces": [],
     "mainDirectories": [
+      "docs",
       "public",
-      "src"
+      "src",
+      "scripts"
     ],
-    "gitBranches": null
+    "gitBranches": {
+      "defaultBranch": "main",
+      "branchingStrategy": null
+    }
   },
   "customNotes": [],
   "directoryMap": {
+    "api": {
+      "path": "api",
+      "purpose": "API routes",
+      "fileCount": 7,
+      "lastAccessed": 1782626275088,
+      "keyFiles": [
+        "ai-generate.js",
+        "news.js",
+        "trending.js",
+        "verify-source.js",
+        "discover-source.js"
+      ]
+    },
+    "docs": {
+      "path": "docs",
+      "purpose": "Documentation",
+      "fileCount": 25,
+      "lastAccessed": 1782626275089,
+      "keyFiles": [
+        "globe-extension-design.md",
+        "reactflow-implementation-guide.md",
+        "wanban-silicon-valley-v2-blueprint.md",
+        "workflow-canvas-plan.md",
+        "theme-picker-upgrade-preview.png"
+      ]
+    },
     "public": {
       "path": "public",
       "purpose": "Public files",
-      "fileCount": 2,
-      "lastAccessed": 1777701446541,
+      "fileCount": 5,
+      "lastAccessed": 1782626275090,
       "keyFiles": [
+        "ai-elf-avatar.png",
         "manifest.json",
+        "robots.txt",
+        "sitemap.xml",
         "sw.js"
       ]
     },
@@ -75,7 +117,7 @@
       "path": "server",
       "purpose": null,
       "fileCount": 1,
-      "lastAccessed": 1777701446589,
+      "lastAccessed": 1782626275090,
       "keyFiles": [
         "newsPlugin.js"
       ]
@@ -83,44 +125,206 @@
     "src": {
       "path": "src",
       "purpose": "Source code",
-      "fileCount": 3,
-      "lastAccessed": 1777701446590,
+      "fileCount": 7,
+      "lastAccessed": 1782626275092,
       "keyFiles": [
-        "App.jsx",
         "main.jsx",
-        "styles.css"
+        "GlobeView.jsx",
+        "AiElf.jsx",
+        "ThemePicker.jsx",
+        "themes.css"
+      ]
+    },
+    "dist": {
+      "path": "dist",
+      "purpose": "Distribution/build output",
+      "fileCount": 6,
+      "lastAccessed": 1782626275228,
+      "keyFiles": [
+        "ai-elf-avatar.png",
+        "manifest.json",
+        "robots.txt",
+        "sitemap.xml",
+        "sw.js"
+      ]
+    },
+    "scripts": {
+      "path": "scripts",
+      "purpose": "Build/utility scripts",
+      "fileCount": 40,
+      "lastAccessed": 1782626275229,
+      "keyFiles": [
+        "financial_scraper_example.py",
+        "quick_sources_test.py",
+        "test_financial_scraping.sh",
+        "test_grade_management.py",
+        "test_integration.sh"
+      ]
+    },
+    "src\\utils": {
+      "path": "src\\utils",
+      "purpose": "Utility functions",
+      "fileCount": 6,
+      "lastAccessed": 1782626275232,
+      "keyFiles": [
+        "localStorage.js",
+        "format.js",
+        "toast.js"
+      ]
+    },
+    "src\\components": {
+      "path": "src\\components",
+      "purpose": "UI components",
+      "fileCount": 15,
+      "lastAccessed": 1782626275232,
+      "keyFiles": [
+        "SkeletonCard.jsx",
+        "TrendLineChart.jsx",
+        "GithubRepoCard.jsx"
+      ]
+    },
+    "dist\\assets": {
+      "path": "dist\\assets",
+      "purpose": "Static assets",
+      "fileCount": 2,
+      "lastAccessed": 1782626275234,
+      "keyFiles": [
+        "index-B_P2edLU.js",
+        "index-ByNyzH98.css"
       ]
     }
   },
   "hotPaths": [
     {
+      "path": "src\\App.jsx",
+      "accessCount": 34,
+      "lastAccessed": 1782628420870,
+      "type": "file"
+    },
+    {
       "path": "",
       "accessCount": 7,
-      "lastAccessed": 1777705490810,
+      "lastAccessed": 1782627492666,
       "type": "directory"
     },
     {
       "path": "CLAUDE.md",
       "accessCount": 3,
-      "lastAccessed": 1777705098310,
+      "lastAccessed": 1782627620422,
       "type": "file"
     },
     {
       "path": "package.json",
+      "accessCount": 3,
+      "lastAccessed": 1782628364062,
+      "type": "file"
+    },
+    {
+      "path": "src\\styles.css",
       "accessCount": 2,
-      "lastAccessed": 1777705475140,
+      "lastAccessed": 1782449126940,
+      "type": "file"
+    },
+    {
+      "path": "AGENTS.md",
+      "accessCount": 2,
+      "lastAccessed": 1782627546916,
       "type": "file"
     },
     {
       "path": "README.md",
-      "accessCount": 1,
-      "lastAccessed": 1777701468940,
+      "accessCount": 2,
+      "lastAccessed": 1782627558991,
       "type": "file"
     },
     {
-      "path": ".monkeycode\\specs\\ROADMAP.md",
+      "path": "server\\newsPlugin.js",
+      "accessCount": 2,
+      "lastAccessed": 1782627576425,
+      "type": "file"
+    },
+    {
+      "path": "vite.config.js",
       "accessCount": 1,
-      "lastAccessed": 1777701494377,
+      "lastAccessed": 1782627426449,
+      "type": "file"
+    },
+    {
+      "path": "tailwind.config.js",
+      "accessCount": 1,
+      "lastAccessed": 1782627427444,
+      "type": "file"
+    },
+    {
+      "path": "postcss.config.js",
+      "accessCount": 1,
+      "lastAccessed": 1782627427906,
+      "type": "file"
+    },
+    {
+      "path": ".env.example",
+      "accessCount": 1,
+      "lastAccessed": 1782627427994,
+      "type": "file"
+    },
+    {
+      "path": "vercel.json",
+      "accessCount": 1,
+      "lastAccessed": 1782627429055,
+      "type": "file"
+    },
+    {
+      "path": "Dockerfile",
+      "accessCount": 1,
+      "lastAccessed": 1782627429900,
+      "type": "file"
+    },
+    {
+      "path": "docker-compose.yml",
+      "accessCount": 1,
+      "lastAccessed": 1782627430546,
+      "type": "file"
+    },
+    {
+      "path": "nginx.conf",
+      "accessCount": 1,
+      "lastAccessed": 1782627431066,
+      "type": "file"
+    },
+    {
+      "path": "requirements.txt",
+      "accessCount": 1,
+      "lastAccessed": 1782627431266,
+      "type": "file"
+    },
+    {
+      "path": "index.html",
+      "accessCount": 1,
+      "lastAccessed": 1782627431369,
+      "type": "file"
+    },
+    {
+      "path": ".claude\\settings.local.json",
+      "accessCount": 1,
+      "lastAccessed": 1782627465813,
+      "type": "file"
+    },
+    {
+      "path": "server\\news\\plugin.js",
+      "accessCount": 1,
+      "lastAccessed": 1782627577431,
+      "type": "file"
+    },
+    {
+      "path": "server\\news\\config\\constants.js",
+      "accessCount": 1,
+      "lastAccessed": 1782628377356,
+      "type": "file"
+    },
+    {
+      "path": "src\\utils\\workflowEngine.js",
+      "accessCount": 1,
+      "lastAccessed": 1782628377547,
       "type": "file"
     }
   ],
