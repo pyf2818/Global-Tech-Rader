@@ -23,16 +23,18 @@ jobs:
 
       - name: Verify RSS source health
         run: |
-          node -e "
-            const { DEFAULT_SOURCES } = require('./server/newsPlugin.js');
-            const fetch = require('node-fetch');
-            
+          node --input-type=module -e "
+            const { DEFAULT_SOURCES } = await import('./server/news/config/constants.js');
+
             async function checkSource(source) {
               try {
-                const response = await fetch(source.url, { 
+                const controller = new AbortController();
+                const timeout = setTimeout(() => controller.abort(), 10000);
+                const response = await fetch(source.url, {
                   headers: { 'User-Agent': 'GlobalTechRadar/0.1' },
-                  timeout: 10000 
+                  signal: controller.signal
                 });
+                clearTimeout(timeout);
                 if (!response.ok) return { name: source.name, status: 'HTTP ' + response.status };
                 const text = await response.text();
                 const isXml = text.includes('<?xml') || text.includes('<rss') || text.includes('<feed');
@@ -41,7 +43,7 @@ jobs:
                 return { name: source.name, status: 'ERROR: ' + e.message };
               }
             }
-            
+
             async function main() {
               const checks = await Promise.all(DEFAULT_SOURCES.map(checkSource));
               const broken = checks.filter(c => c.status !== 'OK');
@@ -53,7 +55,7 @@ jobs:
                 console.log('All ' + checks.length + ' sources are healthy.');
               }
             }
-            
+
             main();
           "
         env:

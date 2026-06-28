@@ -78,7 +78,6 @@ src/hooks/
 src/utils/
   workflowEngine.js     Pure-logic DAG executor. LLM nodes call POST /api/ai-generate (chat action); local nodes (input/classifier/condition/skill/output/reply) run synchronously with no React dependency. Condition nodes halt the rest of the chain on failure.
   profileModel.js       computeIntelligenceProfile / computeReadingProfile / computeProfileLearningEngine / computeTodayProfileSnapshot — derive profile from bookmarks, reading history, materials, interests
-  dailyBriefing.js      generateDailyBriefing / makeEmptyBriefing — builds the daily report payload
 src/constants/
   workflowConstants.js  DEFAULT_AGENT_WORKFLOW, WORKFLOW_NODE_TYPES, WORKFLOW_SKILL_CATALOG, WORKFLOW_CONDITION_METRICS, WORKFLOW_TEMPLATE_LIBRARY (3 templates: daily-briefing / github-evaluator / material-to-article), and template instance/normalize/validate helpers
 ```
@@ -115,7 +114,7 @@ server/news/
 
 **Route handling**: `plugin.js` uses `if (pathname === '/api/xxx')` pattern for each endpoint. When adding new API routes, add the handler in `plugin.js` and import services from the appropriate module.
 
-**Production API**: `api/*.js` contains Vercel serverless functions — a partial copy of the plugin logic. When changing API behavior, update **both** `server/news/plugin.js` and the corresponding `api/*.js` file for production parity.
+**Production API**: `api/*.js` contains Vercel serverless functions. `api/meta.js` and `api/news.js` now复用 `server/news/config/constants.js`；其他文件仍为 plugin 逻辑的手工副本。When changing API behavior, update **both** `server/news/plugin.js` and the corresponding `api/*.js` file for production parity.
 
 ### API Endpoints
 
@@ -164,7 +163,7 @@ Categories, source grades, and tag rules are defined **independently** in both `
 | Source Grades | `SOURCE_GRADES` with color/icon | `gradeColors` object (different hex values!) |
 | Grade Badge Colors | S=#dc2626, A=#ea580c, B=#16a34a, C=#2563eb, D=#64748b | S=#ff0000, A=#ff8800, B=#00cc00, C=#0088ff, D=#666666 |
 
-Also `DEFAULT_SOURCES` is partially duplicated in `api/news.js` (shorter list) — update both for production parity.
+> **Note**: Phase 1 统一了分级色值——App.jsx 和 NewsItem.jsx 已改用服务端 `SOURCE_GRADES` 权威色（#dc2626 系）。`api/news.js` 和 `api/meta.js` 已复用 `server/news/config/constants.js`。App.jsx 内的 `CATEGORIES` 副本仍存在，是唯一剩余的双源问题。
 
 ## Known Issues
 
