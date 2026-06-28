@@ -1,7 +1,7 @@
 import React from 'react';
 import { ICONS } from '../constants/index.jsx';
 import { REGION_MAP, MODE_MAP } from '../constants/index.jsx';
-import { formatRelative } from '../utils/format.js';
+import { formatRelative, getGradeColors } from '../utils/format.js';
 
 function NewsItem({ item, index, viewMode = 'standard', isFocused = false, isBookmarked = false, isInMaterials = false, onBookmark, onSummary, isSummaryOpen, summaryText, isFollowed = false, onRead, showTranslation, onToggleTranslation, onRequestTranslation, isTranslating, translation, onOpenLightbox, onAddMaterial, onAskAi, showRecommendation = false }) {
   const isCompact = viewMode === 'compact';
@@ -25,15 +25,8 @@ function NewsItem({ item, index, viewMode = 'standard', isFocused = false, isBoo
 
     if (!validGrades.includes(grade)) return null;
 
-    const gradeColors = {
-      S: { primary: '#ff0000', glow: 'rgba(255, 0, 0, 1)' },
-      A: { primary: '#ff8800', glow: 'rgba(255, 136, 0, 1)' },
-      B: { primary: '#00cc00', glow: 'rgba(0, 204, 0, 1)' },
-      C: { primary: '#0088ff', glow: 'rgba(0, 136, 255, 1)' },
-      D: { primary: '#666666', glow: 'rgba(102, 102, 102, 1)' }
-    };
-
-    const colors = gradeColors[grade] || gradeColors.D;
+    // 配色单一来源：服务端 SOURCE_GRADES 注入的 item.sourceGradeColor
+    const colors = getGradeColors(item.sourceGradeColor);
 
     return (
       <div

@@ -42,7 +42,7 @@
     "runtime": null
   },
   "build": {
-    "buildCommand": "npm run build",
+    "buildCommand": "cd \"E:/VStudio_Project/Silicon Meridian\" && echo \"=== 残留内联 gradeColors 检查 ===\" && grep -rn \"const gradeColors\" src/ || echo \">>> 无残留内联定义 ✓\" && echo \"\" && echo \"=== 残留 #ff0000 系刺眼色值 ===\" && grep -rn \"#ff0000\\|#ff8800\\|#00cc00\\|#0088ff\" src/ || echo \">>> 无刺眼色值残留 ✓\" && echo \"\" && echo \"=== 构建验证 ===\" && rtk npm run build 2>&1 | tail -20",
     "testCommand": "cd \"E:/VStudio_Project/Silicon Meridian\" && echo \"=== api/ ===\" && ls api/ 2>/dev/null && echo \"=== workflows ===\" && ls .github/workflows/ 2>/dev/null && echo \"=== vitest? ===\" && (ls node_modules/.bin/vitest 2>/dev/null || echo \"no vitest installed\") && echo \"=== App.jsx useState count ===\" && grep -c \"useState\" src/App.jsx",
     "lintCommand": null,
     "devCommand": "npm run dev",
@@ -197,8 +197,14 @@
   "hotPaths": [
     {
       "path": "src\\App.jsx",
-      "accessCount": 34,
-      "lastAccessed": 1782628420870,
+      "accessCount": 47,
+      "lastAccessed": 1782629436070,
+      "type": "file"
+    },
+    {
+      "path": "api\\news.js",
+      "accessCount": 13,
+      "lastAccessed": 1782629331864,
       "type": "file"
     },
     {
@@ -206,6 +212,18 @@
       "accessCount": 7,
       "lastAccessed": 1782627492666,
       "type": "directory"
+    },
+    {
+      "path": "server\\news\\plugin.js",
+      "accessCount": 5,
+      "lastAccessed": 1782629110712,
+      "type": "file"
+    },
+    {
+      "path": "server\\news\\config\\constants.js",
+      "accessCount": 4,
+      "lastAccessed": 1782628943181,
+      "type": "file"
     },
     {
       "path": "CLAUDE.md",
@@ -217,6 +235,12 @@
       "path": "package.json",
       "accessCount": 3,
       "lastAccessed": 1782628364062,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\NewsItem.jsx",
+      "accessCount": 3,
+      "lastAccessed": 1782629377692,
       "type": "file"
     },
     {
@@ -241,6 +265,24 @@
       "path": "server\\newsPlugin.js",
       "accessCount": 2,
       "lastAccessed": 1782627576425,
+      "type": "file"
+    },
+    {
+      "path": "server\\news\\config\\sourceGrades.js",
+      "accessCount": 2,
+      "lastAccessed": 1782628928894,
+      "type": "directory"
+    },
+    {
+      "path": "api\\meta.js",
+      "accessCount": 2,
+      "lastAccessed": 1782628978757,
+      "type": "file"
+    },
+    {
+      "path": "src\\utils\\format.js",
+      "accessCount": 2,
+      "lastAccessed": 1782629175309,
       "type": "file"
     },
     {
@@ -310,22 +352,16 @@
       "type": "file"
     },
     {
-      "path": "server\\news\\plugin.js",
-      "accessCount": 1,
-      "lastAccessed": 1782627577431,
-      "type": "file"
-    },
-    {
-      "path": "server\\news\\config\\constants.js",
-      "accessCount": 1,
-      "lastAccessed": 1782628377356,
-      "type": "file"
-    },
-    {
       "path": "src\\utils\\workflowEngine.js",
       "accessCount": 1,
       "lastAccessed": 1782628377547,
       "type": "file"
+    },
+    {
+      "path": "server\\news\\services\\newsService.js",
+      "accessCount": 1,
+      "lastAccessed": 1782629110616,
+      "type": "directory"
     }
   ],
   "userDirectives": []

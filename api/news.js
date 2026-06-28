@@ -1,96 +1,5 @@
-const DEFAULT_SOURCES = [
-  { name: 'TechCrunch', url: 'https://techcrunch.com/feed/', region: 'overseas', defaultCategory: 'silicon-valley' },
-  { name: 'MIT Technology Review', url: 'https://www.technologyreview.com/feed/', region: 'overseas', defaultCategory: 'research' },
-  { name: 'The Verge', url: 'https://www.theverge.com/rss/index.xml', region: 'overseas', defaultCategory: 'devices' },
-  { name: 'Wired', url: 'https://www.wired.com/feed/rss', region: 'overseas', defaultCategory: 'silicon-valley' },
-  { name: 'OpenAI Blog', url: 'https://openai.com/blog/rss.xml', region: 'overseas', defaultCategory: 'ai-models' },
-  { name: 'Google DeepMind', url: 'https://deepmind.google/discover/blog/rss/', region: 'overseas', defaultCategory: 'ai-models' },
-  { name: 'Google AI Blog', url: 'https://blog.google/technology/ai/rss/', region: 'overseas', defaultCategory: 'ai-models' },
-  { name: 'ArXiv CS AI', url: 'https://export.arxiv.org/rss/cs.AI', region: 'global', defaultCategory: 'research' },
-  { name: 'MIT News AI', url: 'https://news.mit.edu/rss/topic/artificial-intelligence2', region: 'overseas', defaultCategory: 'research' },
-  { name: 'GitHub Blog', url: 'https://github.blog/feed/', region: 'global', defaultCategory: 'open-source' },
-  { name: 'Hacker News', url: 'https://hnrss.org/frontpage', region: 'global', defaultCategory: 'open-source' },
-  { name: '量子位', url: 'https://www.qbitai.com/feed', region: 'domestic', defaultCategory: 'ai-models' },
-  { name: '机器之心', url: 'https://www.jiqizhixin.com/rss', region: 'domestic', defaultCategory: 'ai-models' },
-  { name: '36氪', url: 'https://36kr.com/feed', region: 'domestic', defaultCategory: 'china-tech' },
-  { name: 'Solidot', url: 'https://www.solidot.org/index.rss', region: 'domestic', defaultCategory: 'open-source' },
-  { name: 'OSChina', url: 'https://www.oschina.net/news/rss', region: 'domestic', defaultCategory: 'open-source' },
-  { name: '爱范儿', url: 'https://www.ifanr.com/feed', region: 'domestic', defaultCategory: 'devices' },
-  { name: '少数派', url: 'https://sspai.com/feed', region: 'domestic', defaultCategory: 'devices' },
-  { name: '虎嗅', url: 'https://www.huxiu.com/rss/0.xml', region: 'domestic', defaultCategory: 'china-tech' },
-  { name: 'IT之家', url: 'https://www.ithome.com/rss/', region: 'domestic', defaultCategory: 'devices' },
-  { name: 'AWS Blog', url: 'https://aws.amazon.com/blogs/aws/feed/', region: 'overseas', defaultCategory: 'cloud' },
-  { name: 'Google Cloud', url: 'https://cloud.google.com/blog/feed', region: 'overseas', defaultCategory: 'cloud' },
-  { name: 'Reuters Business', url: 'https://www.reuters.com/business/feed/', region: 'overseas', defaultCategory: 'policy-finance' },
-  { name: 'Canary Media', url: 'https://www.canarymedia.com/feed', region: 'overseas', defaultCategory: 'new-energy' },
-  { name: 'Electrek', url: 'https://electrek.co/feed/', region: 'overseas', defaultCategory: 'new-energy' },
-  { name: 'KrebsOnSecurity', url: 'https://krebsonsecurity.com/feed/', region: 'overseas', defaultCategory: 'cybersecurity' },
-  { name: 'Stat News', url: 'https://www.statnews.com/feed/', region: 'overseas', defaultCategory: 'healthcare' },
-
-  // ========== 经济股市 ==========
-  { name: '财新网', url: 'https://rsshub.rssforever.com/caixin/latest', region: 'domestic', defaultCategory: 'economy-stock' },
-  { name: 'Seeking Alpha', url: 'https://seekingalpha.com/feed/feed.xml', region: 'overseas', defaultCategory: 'economy-stock' },
-  { name: '经济观察网', url: 'https://www.eeo.com.cn/rss.xml', region: 'domestic', defaultCategory: 'economy-stock' },
-  { name: 'MarketWatch', url: 'https://www.marketwatch.com/rss/topstories', region: 'overseas', defaultCategory: 'economy-stock' },
-  { name: 'Kiplinger', url: 'https://www.kiplinger.com/rss/feed', region: 'overseas', defaultCategory: 'economy-stock' },
-  { name: 'Investing.com', url: 'https://www.investing.com/rss/news_25.rss', region: 'overseas', defaultCategory: 'economy-stock' },
-  { name: '36氪', url: 'https://www.36kr.com/feed', region: 'domestic', defaultCategory: 'economy-stock' },
-  { name: '中国新闻网', url: 'https://www.chinanews.com/rss/finance.xml', region: 'domestic', defaultCategory: 'economy-stock' },
-  { name: '人民网财经', url: 'https://www.people.com.cn/rss/finance.xml', region: 'domestic', defaultCategory: 'economy-stock' },
-  { name: 'IT之家', url: 'https://www.ithome.com/rss', region: 'domestic', defaultCategory: 'economy-stock' },
-
-  // ========== 游戏娱乐 ==========
-  { name: 'PC Gamer', url: 'https://www.pcgamer.com/rss/', region: 'overseas', defaultCategory: 'game-entertain' },
-  { name: 'Steam News', url: 'https://store.steampowered.com/feeds/news.xml', region: 'global', defaultCategory: 'game-entertain' },
-  { name: 'Ars Technica Gaming', url: 'https://feeds.arstechnica.com/arstechnica/gaming', region: 'overseas', defaultCategory: 'game-entertain' },
-
-  // ========== 影视娱乐圈 ==========
-  { name: 'Variety', url: 'https://variety.com/feed/', region: 'overseas', defaultCategory: 'showbiz' },
-  { name: 'Hollywood Reporter', url: 'https://www.hollywoodreporter.com/feed/', region: 'overseas', defaultCategory: 'showbiz' },
-  { name: 'TMZ', url: 'https://www.tmz.com/rss.xml', region: 'overseas', defaultCategory: 'showbiz' },
-
-  // ========== 动漫二次元 ==========
-  { name: 'Crunchyroll News', url: 'https://feeds.feedburner.com/crunchyroll/animenews', region: 'overseas', defaultCategory: 'anime-acg' },
-  { name: 'ComicBook.com', url: 'https://comicbook.com/feed/', region: 'overseas', defaultCategory: 'anime-acg' },
-
-  // ========== 芯片半导体 ==========
-  { name: 'Semiconductor Engineering', url: 'https://semiengineering.com/feed/', region: 'overseas', defaultCategory: 'chips-compute' },
-  { name: 'EE Times', url: 'https://www.eetimes.com/feed/', region: 'overseas', defaultCategory: 'chips-compute' },
-
-  // ========== 机器人 ==========
-  { name: 'TechCrunch Robotics', url: 'https://techcrunch.com/category/robotics/feed/', region: 'overseas', defaultCategory: 'robotics' },
-  { name: 'IEEE Spectrum', url: 'https://spectrum.ieee.org/rss', region: 'overseas', defaultCategory: 'robotics' },
-  { name: 'Engadget', url: 'https://www.engadget.com/rss.xml', region: 'overseas', defaultCategory: 'robotics' },
-
-  // ========== 物联网5G ==========
-  { name: 'IoT World Today', url: 'https://www.iotworldtoday.com/feed', region: 'overseas', defaultCategory: 'iot-5g' },
-  { name: 'Light Reading', url: 'https://www.lightreading.com/rss.asp', region: 'overseas', defaultCategory: 'iot-5g' },
-
-  // ========== 太空探索 ==========
-  { name: 'SpaceNews', url: 'https://spacenews.com/feed/', region: 'overseas', defaultCategory: 'space' },
-  { name: 'Space.com', url: 'https://www.space.com/feeds/all', region: 'overseas', defaultCategory: 'space' },
-
-  // ========== 智能汽车 ==========
-  { name: 'CleanTechnica', url: 'https://cleantechnica.com/feed/', region: 'overseas', defaultCategory: 'automotive' },
-  { name: 'Electrek', url: 'https://electrek.co/feed/', region: 'overseas', defaultCategory: 'automotive' },
-  { name: 'The Verge', url: 'https://www.theverge.com/rss/index.xml', region: 'overseas', defaultCategory: 'automotive' },
-
-  // ========== 教育科技 ==========
-  { name: 'EdSurge', url: 'https://www.edsurge.com/rss.xml', region: 'overseas', defaultCategory: 'education-tech' },
-  { name: 'TechCrunch Education', url: 'https://techcrunch.com/category/education/feed/', region: 'overseas', defaultCategory: 'education-tech' },
-
-  // ========== 金融科技 ==========
-  { name: 'Cointelegraph', url: 'https://cointelegraph.com/rss', region: 'overseas', defaultCategory: 'fintech' },
-  { name: 'Popular Mechanics', url: 'https://www.popularmechanics.com/rss/', region: 'overseas', defaultCategory: 'fintech' },
-
-  // ========== 数据科学 ==========
-  { name: 'KDnuggets', url: 'https://www.kdnuggets.com/feed', region: 'overseas', defaultCategory: 'data-science' },
-  { name: 'Towards Data Science', url: 'https://towardsdatascience.com/feed', region: 'overseas', defaultCategory: 'data-science' },
-
-  // ========== 量子计算 ==========
-  { name: 'Quantum Computing Report', url: 'https://quantumcomputingreport.com/feed/', region: 'overseas', defaultCategory: 'quantum' },
-  { name: 'Quanta Magazine', url: 'https://www.quantamagazine.org/feed/', region: 'overseas', defaultCategory: 'quantum' },
-];
+import { DEFAULT_SOURCES, SOURCE_WEIGHTS, CROSS_VERIFY_THRESHOLD } from '../server/news/config/constants.js';
+import { getSourceGradeInfo } from '../server/news/config/sourceGrades.js';
 
 const CATEGORIES = [
   { id: 'all', label: '全部赛道' },
@@ -188,28 +97,7 @@ const TAG_RULES = [
 
 let cache = { data: null, expiresAt: 0 };
 
-// ========== 信息源质量权重（从顶级项目学来）==========
-const SOURCE_WEIGHTS = {
-  'Nature': 1.0, 'Science Magazine': 1.0, 'Nature Machine Intelligence': 1.0,
-  'ArXiv CS AI': 0.9, 'ArXiv CS ML': 0.9, 'ArXiv CS CL': 0.9, 'ArXiv CS CV': 0.9,
-  'MIT News AI': 0.9, 'Stanford HAI': 0.9, 'MIT Technology Review': 0.85,
-  'OpenAI Blog': 0.9, 'Anthropic News': 0.9, 'Google DeepMind': 0.9,
-  'Meta AI Blog': 0.9, 'Apple Machine Learning': 0.9, 'Hugging Face Blog': 0.85,
-  'Hacker News': 0.8, 'GitHub Blog': 0.8, 'Lobsters': 0.75,
-  'TechCrunch': 0.7, 'The Verge': 0.7, 'Wired': 0.7, 'Ars Technica': 0.7,
-  '量子位': 0.75, '机器之心': 0.75, '36氪': 0.7, 'InfoQ CN': 0.7,
-  'KrebsOnSecurity': 0.85, 'Reuters Business': 0.8, 'Bloomberg Technology': 0.8,
-  'Nature Medicine': 0.85, 'Stat News': 0.8, 'Canary Media': 0.75,
-  'AWS Blog': 0.7, 'Google Cloud': 0.7, 'Microsoft Azure': 0.7,
-  'IEEE Spectrum': 0.85, 'Engadget': 0.8, 'Cointelegraph': 0.75,
-  'Popular Mechanics': 0.7, 'Quanta Magazine': 0.85,
-  'MarketWatch': 0.8, 'Kiplinger': 0.75, 'Investing.com': 0.75,
-  '中国新闻网': 0.75, '人民网财经': 0.75, 'IT之家': 0.7,
-};
-
-// 多源交叉验证阈值
-const CROSS_VERIFY_THRESHOLD = 3;
-
+// SOURCE_WEIGHTS / CROSS_VERIFY_THRESHOLD / DEFAULT_SOURCES 均复用自 server/news/config/constants.js
 // ========== Jina AI Reader（绕过反爬虫）==========
 async function jinaFetch(url, timeoutMs = 8000) {
   try {
@@ -445,6 +333,15 @@ export default async function handler(req, res) {
   // 多源交叉验证 + 质量评分
   const verified = crossVerifyItems(cleaned);
   verified.sort((a, b) => (b.qualityScore || 0) - (a.qualityScore || 0));
+
+  // 为每个 item 注入源等级信息（与 dev 端 newsService.js 保持一致）
+  verified.forEach(item => {
+    const gradeInfo = getSourceGradeInfo(item.source);
+    item.sourceGrade = gradeInfo.weight;
+    item.sourceGradeLabel = gradeInfo.label;
+    item.sourceGradeColor = gradeInfo.color;
+    item.sourceGradeIcon = gradeInfo.icon;
+  });
 
   const filtered = verified.slice(0, 360);
   const payload = {

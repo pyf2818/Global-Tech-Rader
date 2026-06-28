@@ -7,6 +7,7 @@ import ColorfulBubbles from './components/ColorfulBubbles.jsx';
 import AiChatPanel from './components/AiChatPanel.jsx';
 import ThemePicker from './ThemePicker.jsx';
 import { PALETTES } from './ThemePicker.jsx';
+import { getGradeColors } from './utils/format.js';
 
 const PRODUCT_NAME = '万般硅川';
 const PRODUCT_TAGLINE = '高质量多领域智能资讯生态';
@@ -9915,15 +9916,8 @@ function NewsItem({ item, index, viewMode = 'standard', isFocused = false, isBoo
 
     if (!validGrades.includes(grade)) return null;
 
-    const gradeColors = {
-      S: { primary: '#d96f65', glow: 'rgba(217, 111, 101, 0.28)' },
-      A: { primary: '#d6933d', glow: 'rgba(214, 147, 61, 0.28)' },
-      B: { primary: '#4f9d66', glow: 'rgba(79, 157, 102, 0.26)' },
-      C: { primary: '#5b87bd', glow: 'rgba(91, 135, 189, 0.24)' },
-      D: { primary: '#7a857d', glow: 'rgba(122, 133, 125, 0.2)' }
-    };
-
-    const colors = gradeColors[grade] || gradeColors.D;
+    // 配色单一来源：服务端 SOURCE_GRADES 注入的 item.sourceGradeColor
+    const colors = getGradeColors(item.sourceGradeColor);
 
     return (
       <div
