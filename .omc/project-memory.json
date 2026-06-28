@@ -42,8 +42,8 @@
     "runtime": null
   },
   "build": {
-    "buildCommand": "cd \"E:/VStudio_Project/Silicon Meridian\" && taskkill //F //IM esbuild.exe 2>/dev/null; sleep 1 && npm run build 2>&1 | tail -6",
-    "testCommand": "cd \"E:/VStudio_Project/Silicon Meridian\" && node node_modules/vitest/vitest.mjs run 2>&1 | tail -8",
+    "buildCommand": "cd \"E:/VStudio_Project/Silicon Meridian\" && taskkill //F //IM esbuild.exe 2>/dev/null; sleep 1 && npm run build 2>&1 | tail -5 && echo \"=== tests ===\" && node node_modules/vitest/vitest.mjs run 2>&1 | tail -6 && echo \"=== App.jsx lines ===\" && wc -l src/App.jsx && echo \"=== hooks ===\" && ls src/hooks/",
+    "testCommand": "cd \"E:/VStudio_Project/Silicon Meridian\" && taskkill //F //IM esbuild.exe 2>/dev/null; sleep 1 && npm run build 2>&1 | tail -5 && echo \"=== tests ===\" && node node_modules/vitest/vitest.mjs run 2>&1 | tail -6 && echo \"=== App.jsx lines ===\" && wc -l src/App.jsx && echo \"=== hooks ===\" && ls src/hooks/",
     "lintCommand": null,
     "devCommand": "npm run dev",
     "scripts": {
@@ -197,8 +197,8 @@
   "hotPaths": [
     {
       "path": "src\\App.jsx",
-      "accessCount": 142,
-      "lastAccessed": 1782635823102,
+      "accessCount": 149,
+      "lastAccessed": 1782636735427,
       "type": "file"
     },
     {
@@ -214,16 +214,16 @@
       "type": "file"
     },
     {
+      "path": "CLAUDE.md",
+      "accessCount": 14,
+      "lastAccessed": 1782637502154,
+      "type": "file"
+    },
+    {
       "path": "src\\utils\\profileModel.js",
       "accessCount": 13,
       "lastAccessed": 1782631570043,
       "type": "directory"
-    },
-    {
-      "path": "CLAUDE.md",
-      "accessCount": 10,
-      "lastAccessed": 1782633575479,
-      "type": "file"
     },
     {
       "path": "src\\utils\\workflowEngine.js",

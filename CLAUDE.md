@@ -26,7 +26,7 @@ No test, lint, typecheck, or formatter commands exist. Do not run them.
 
 ### Frontend (`src/`)
 
-- **`App.jsx`** (10302 lines) — Main component containing ~180 useState hooks, routing logic, settings modal, and all page views. Being incrementally split into hooks below.
+- **`App.jsx`** (10097 lines) — Main component containing ~140 useState hooks, routing logic, settings modal, and all page views. Being incrementally split into hooks below.
 - **`AiElf.jsx`** (1354 lines) — AI assistant with multi-Agent conversation, drag-to-analyze, history management. Uses localStorage per-agent (50 messages, 20 sessions max).
 - **`GlobeView.jsx`** (999 lines) — 3D globe via `react-globe.gl`/Three.js. Fullscreen uses `createPortal` to `document.body`. Canvas needs `min-height: 420px`.
 - **`main.jsx`** — Mounts `<App />` inside `<ErrorBoundary>` + `<React.StrictMode>`.
@@ -61,6 +61,12 @@ src/hooks/
   useLocalStorage.js    Auto-syncing localStorage hook
   useAuth.js            认证与用户会话（user/token/auth表单/interests + 持久化 + handler）
   useLlmConfig.js       LLM配置与模型管理（config/models/test + allLlmModels useMemo）
+  useTrending.js        热门榜单 + GitHub trending（items/loading/filter/page + loadTrending/loadGithub）
+  useSourceManager.js   信息源管理（customSources/disabledSources/health/verify/discovery + 4 handler）
+  useCustomUrl.js       自定义URL抓取（input/result/loading/error/mode + fetchCustomUrl）
+  useCalendar.js        日历管理（calendarDate/events/eventForm + addEvent/removeEvent）
+  useUI.js              纯UI开关（showFollowDropdown/mobileMenuOpen/showBackToTop/moreNavOpen）
+  useWorkflowEngine.js  React wrapper over WorkflowEngine: run/result/history/actions state, persists to localStorage `agentWorkflowHistory` (max 12)
 ```
 
 #### v2 Intelligence Workbench Modules
@@ -190,5 +196,5 @@ Categories, source grades, and tag rules are defined **independently** in both `
 - `scripts/` contains deployment and test scripts; `docs/reports/` contains historical optimization reports
 - v2 localStorage keys: `agentWorkflowHistory` (workflow run records, max 12), `dailyBriefingReport` (last generated briefing). AI Elf uses per-agent keys. All `setItem` calls must be wrapped in try-catch for `QuotaExceededError`.
 - WorkflowEngine: `condition` node failure halts the entire rest of the chain (subsequent nodes marked `skipped`), it does NOT branch. LLM nodes require `ctx.llmConfig` (baseUrl/apiKey/selectedModel) and an agent with `systemPrompt`; local nodes ignore LLM config entirely.
-- The monolithic `App.jsx` (10440 lines) imports the v2 modules but ALSO retains inline copies of some logic — when editing workflow/profile/briefing behavior, check whether App.jsx calls the extracted module or its inline copy. Prefer the extracted module.
+- The monolithic `App.jsx` (10097 lines) imports the v2 modules but ALSO retains inline copies of some logic — when editing workflow/profile/briefing behavior, check whether App.jsx calls the extracted module or its inline copy. Prefer the extracted module. State has been progressively extracted into hooks (useAuth/useLlmConfig/useTrending/useSourceManager/useCustomUrl/useCalendar/useUI); ~140 useState remain in App.jsx, mostly cross-domain coupled (bookmarks/materials/agentWorkflow).
 - Runtime `ReferenceError: useMemo is not defined` means a component file uses `useMemo` without importing it from `react` — add `import { useMemo } from 'react'` to that file.
