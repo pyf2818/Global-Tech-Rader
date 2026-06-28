@@ -9,6 +9,7 @@ import ThemePicker from './ThemePicker.jsx';
 import { PALETTES } from './ThemePicker.jsx';
 import { getGradeColors } from './utils/format.js';
 import { useAuth } from './hooks/useAuth.js';
+import { useLlmConfig } from './hooks/useLlmConfig.js';
 
 const PRODUCT_NAME = '万般硅川';
 const PRODUCT_TAGLINE = '高质量多领域智能资讯生态';
@@ -1112,14 +1113,17 @@ function App() {
   const [monitorInterval, setMonitorInterval] = useState(() => loadLS('monitorInterval', 60)); // 分钟
   const [monitorAlerts, setMonitorAlerts] = useState([]);
   const [showAlertPanel, setShowAlertPanel] = useState(false);
-  const [llmConfig, setLlmConfig] = useState(() => loadLS('llmConfig', { baseUrl: '', apiKey: '', selectedModel: '', manualModels: [], provider: '' }));
-  const [llmModels, setLlmModels] = useState([]);
-  const [llmFetching, setLlmFetching] = useState(false);
-  const [llmFetchError, setLlmFetchError] = useState('');
-  const [llmTestResult, setLlmTestResult] = useState(null);
-  const [llmTesting, setLlmTesting] = useState(false);
-  const [llmManualInput, setLlmManualInput] = useState('');
-  const [showLlmQuickConfig, setShowLlmQuickConfig] = useState(false);
+  const {
+    llmConfig, setLlmConfig,
+    llmModels, setLlmModels,
+    llmFetching, setLlmFetching,
+    llmFetchError, setLlmFetchError,
+    llmTestResult, setLlmTestResult,
+    llmTesting, setLlmTesting,
+    llmManualInput, setLlmManualInput,
+    showLlmQuickConfig, setShowLlmQuickConfig,
+    allLlmModels,
+  } = useLlmConfig();
 
   // ========== 用户系统 ==========
   // 认证与用户会话 — 从 App.jsx 提取为独立 hook（减少 ~140 行）
@@ -1167,7 +1171,6 @@ function App() {
     return categories.filter(c => c.id !== 'all' && selectedInterests.includes(c.id));
   }, [selectedInterests]);
 
-  const allLlmModels = useMemo(() => [...llmModels, ...(llmConfig.manualModels || [])], [llmModels, llmConfig.manualModels]);
   const [allSources, setAllSources] = useState([]);
    const [sourceGrades, setSourceGrades] = useState({});
    const [serverCategories, setServerCategories] = useState([]);
