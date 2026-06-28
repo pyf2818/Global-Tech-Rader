@@ -43,7 +43,7 @@
   },
   "build": {
     "buildCommand": "cd \"E:/VStudio_Project/Silicon Meridian\" && echo \"=== 残留内联 gradeColors 检查 ===\" && grep -rn \"const gradeColors\" src/ || echo \">>> 无残留内联定义 ✓\" && echo \"\" && echo \"=== 残留 #ff0000 系刺眼色值 ===\" && grep -rn \"#ff0000\\|#ff8800\\|#00cc00\\|#0088ff\" src/ || echo \">>> 无刺眼色值残留 ✓\" && echo \"\" && echo \"=== 构建验证 ===\" && rtk npm run build 2>&1 | tail -20",
-    "testCommand": "cd \"E:/VStudio_Project/Silicon Meridian\" && echo \"=== api/ ===\" && ls api/ 2>/dev/null && echo \"=== workflows ===\" && ls .github/workflows/ 2>/dev/null && echo \"=== vitest? ===\" && (ls node_modules/.bin/vitest 2>/dev/null || echo \"no vitest installed\") && echo \"=== App.jsx useState count ===\" && grep -c \"useState\" src/App.jsx",
+    "testCommand": "cd \"E:/VStudio_Project/Silicon Meridian\" && taskkill //F //IM esbuild.exe 2>/dev/null; sleep 1 && node node_modules/vitest/vitest.mjs run 2>&1 | tail -15",
     "lintCommand": null,
     "devCommand": "npm run dev",
     "scripts": {
@@ -208,15 +208,39 @@
       "type": "file"
     },
     {
+      "path": "src\\utils\\__tests__\\workflowEngine.test.js",
+      "accessCount": 9,
+      "lastAccessed": 1782630657100,
+      "type": "file"
+    },
+    {
       "path": "",
       "accessCount": 7,
       "lastAccessed": 1782627492666,
       "type": "directory"
     },
     {
+      "path": "src\\utils\\workflowEngine.js",
+      "accessCount": 7,
+      "lastAccessed": 1782630227295,
+      "type": "file"
+    },
+    {
+      "path": "src\\utils\\profileModel.js",
+      "accessCount": 7,
+      "lastAccessed": 1782630851775,
+      "type": "directory"
+    },
+    {
       "path": "server\\news\\plugin.js",
       "accessCount": 5,
       "lastAccessed": 1782629110712,
+      "type": "file"
+    },
+    {
+      "path": "package.json",
+      "accessCount": 5,
+      "lastAccessed": 1782629778097,
       "type": "file"
     },
     {
@@ -232,15 +256,21 @@
       "type": "file"
     },
     {
-      "path": "package.json",
-      "accessCount": 3,
-      "lastAccessed": 1782628364062,
-      "type": "file"
-    },
-    {
       "path": "src\\components\\NewsItem.jsx",
       "accessCount": 3,
       "lastAccessed": 1782629377692,
+      "type": "file"
+    },
+    {
+      "path": "vitest.config.js",
+      "accessCount": 3,
+      "lastAccessed": 1782630355272,
+      "type": "file"
+    },
+    {
+      "path": "src\\utils\\__tests__\\profileModel.test.js",
+      "accessCount": 3,
+      "lastAccessed": 1782630987204,
       "type": "file"
     },
     {
@@ -283,6 +313,12 @@
       "path": "src\\utils\\format.js",
       "accessCount": 2,
       "lastAccessed": 1782629175309,
+      "type": "file"
+    },
+    {
+      "path": "src\\utils\\__tests__\\smoke.test.js",
+      "accessCount": 2,
+      "lastAccessed": 1782630381023,
       "type": "file"
     },
     {
@@ -352,16 +388,40 @@
       "type": "file"
     },
     {
-      "path": "src\\utils\\workflowEngine.js",
-      "accessCount": 1,
-      "lastAccessed": 1782628377547,
-      "type": "file"
-    },
-    {
       "path": "server\\news\\services\\newsService.js",
       "accessCount": 1,
       "lastAccessed": 1782629110616,
       "type": "directory"
+    },
+    {
+      "path": "C:\\Users\\ANLAN0~1\\AppData\\Local\\Temp\\claude\\E--VStudio-Project-Silicon-Meridian\\f4aa2875-8b0b-47d7-ab85-c3e385f405d1\\tasks\\bvuube1s3.output",
+      "accessCount": 1,
+      "lastAccessed": 1782629748718,
+      "type": "file"
+    },
+    {
+      "path": "C:\\Users\\ANLAN0~1\\AppData\\Local\\Temp\\claude\\E--VStudio-Project-Silicon-Meridian\\f4aa2875-8b0b-47d7-ab85-c3e385f405d1\\tasks\\bq7j8z3ct.output",
+      "accessCount": 1,
+      "lastAccessed": 1782630064049,
+      "type": "file"
+    },
+    {
+      "path": "src\\constants\\workflowConstants.js",
+      "accessCount": 1,
+      "lastAccessed": 1782630240232,
+      "type": "file"
+    },
+    {
+      "path": "C:\\Users\\anlan0725\\.claude\\projects\\E--VStudio-Project-Silicon-Meridian\\memory\\optimization-plan-progress.md",
+      "accessCount": 1,
+      "lastAccessed": 1782630257601,
+      "type": "file"
+    },
+    {
+      "path": "C:\\Users\\anlan0725\\.claude\\projects\\E--VStudio-Project-Silicon-Meridian\\memory\\MEMORY.md",
+      "accessCount": 1,
+      "lastAccessed": 1782630262411,
+      "type": "file"
     }
   ],
   "userDirectives": []

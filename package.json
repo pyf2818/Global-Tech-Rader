@@ -6,7 +6,9 @@
   "scripts": {
     "dev": "vite --host 0.0.0.0",
     "build": "vite build",
-    "preview": "vite preview --host 0.0.0.0"
+    "preview": "vite preview --host 0.0.0.0",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@vitejs/plugin-react": "^6.0.2",
@@ -19,5 +21,8 @@
     "three": "^0.184.0",
     "typescript": "^6.0.3",
     "vite": "^8.0.16"
+  },
+  "devDependencies": {
+    "vitest": "^3.2.6"
   }
 }
