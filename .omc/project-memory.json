@@ -220,6 +220,12 @@
       "type": "directory"
     },
     {
+      "path": "CLAUDE.md",
+      "accessCount": 10,
+      "lastAccessed": 1782633575479,
+      "type": "file"
+    },
+    {
       "path": "src\\utils\\workflowEngine.js",
       "accessCount": 8,
       "lastAccessed": 1782631248595,
@@ -230,12 +236,6 @@
       "accessCount": 7,
       "lastAccessed": 1782627492666,
       "type": "directory"
-    },
-    {
-      "path": "CLAUDE.md",
-      "accessCount": 6,
-      "lastAccessed": 1782631864552,
-      "type": "file"
     },
     {
       "path": "server\\news\\config\\constants.js",

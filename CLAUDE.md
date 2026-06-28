@@ -26,7 +26,7 @@ No test, lint, typecheck, or formatter commands exist. Do not run them.
 
 ### Frontend (`src/`)
 
-- **`App.jsx`** (10440 lines) — Main component containing ~150 useState hooks, routing logic, settings modal, and all page views. Being incrementally split into modules below.
+- **`App.jsx`** (10302 lines) — Main component containing ~180 useState hooks, routing logic, settings modal, and all page views. Being incrementally split into hooks below.
 - **`AiElf.jsx`** (1354 lines) — AI assistant with multi-Agent conversation, drag-to-analyze, history management. Uses localStorage per-agent (50 messages, 20 sessions max).
 - **`GlobeView.jsx`** (999 lines) — 3D globe via `react-globe.gl`/Three.js. Fullscreen uses `createPortal` to `document.body`. Canvas needs `min-height: 420px`.
 - **`main.jsx`** — Mounts `<App />` inside `<ErrorBoundary>` + `<React.StrictMode>`.
@@ -59,6 +59,8 @@ src/constants/
   index.jsx             All constants + ICONS (SVG icon map with JSX)
 src/hooks/
   useLocalStorage.js    Auto-syncing localStorage hook
+  useAuth.js            认证与用户会话（user/token/auth表单/interests + 持久化 + handler）
+  useLlmConfig.js       LLM配置与模型管理（config/models/test + allLlmModels useMemo）
 ```
 
 #### v2 Intelligence Workbench Modules
