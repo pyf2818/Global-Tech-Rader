@@ -12,6 +12,8 @@ import { useAuth } from './hooks/useAuth.js';
 import { useLlmConfig } from './hooks/useLlmConfig.js';
 import { useTrending } from './hooks/useTrending.js';
 import { useSourceManager } from './hooks/useSourceManager.js';
+import { useCustomUrl } from './hooks/useCustomUrl.js';
+import { useCalendar } from './hooks/useCalendar.js';
 
 const PRODUCT_NAME = '万般硅川';
 const PRODUCT_TAGLINE = '高质量多领域智能资讯生态';
@@ -1196,6 +1198,22 @@ function App() {
     [serverCategories]
   );
 
+  // calendar + customUrl hooks (independent domains)
+  const {
+    calendarDate, setCalendarDate,
+    events, setEvents,
+    eventForm, setEventForm,
+    showEventForm, setShowEventForm,
+    addEvent, removeEvent,
+  } = useCalendar();
+  const {
+    customUrlInput, setCustomUrlInput,
+    customUrlResult, setCustomUrlResult,
+    customUrlLoading, setCustomUrlLoading,
+    customUrlError, setCustomUrlError,
+    customUrlMode, setCustomUrlMode,
+    fetchCustomUrl,
+  } = useCustomUrl();
   // source management — uses allSources from /api/meta
   const {
     customSources, setCustomSources,
@@ -1210,10 +1228,7 @@ function App() {
     showSourceForm, setShowSourceForm,
     verifySource, discoverSource, addDiscoveredSource, verifyAllSources,
   } = useSourceManager({ allSources });  // githubLang/githubSince 已移入 useTrending
-  const [calendarDate, setCalendarDate] = useState(new Date());
-  const [events, setEvents] = useState(() => loadLS('calendarEvents', []));
-  const [eventForm, setEventForm] = useState({ title: '', time: '', color: '#22d3ee' });
-  const [showEventForm, setShowEventForm] = useState(false);
+  // calendar states moved to useCalendar hook
 
   const [bookmarks, setBookmarks] = useState(() => loadLS('bookmarks', []));
   const [materials, setMaterials] = useState(() => loadLS('materials', []));
@@ -1240,11 +1255,7 @@ function App() {
   const [exportCategory, setExportCategory] = useState('all');
   const [exportRange, setExportRange] = useState('all');
 
-  const [customUrlInput, setCustomUrlInput] = useState('');
-  const [customUrlResult, setCustomUrlResult] = useState(null);
-  const [customUrlLoading, setCustomUrlLoading] = useState(false);
-  const [customUrlError, setCustomUrlError] = useState('');
-  const [customUrlMode, setCustomUrlMode] = useState('basic');
+  // customUrl states moved to useCustomUrl hook
   const [showFollowDropdown, setShowFollowDropdown] = useState(false);
   const [recentVisits, setRecentVisits] = useState(() => loadLS('recentVisits', []));
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -5371,20 +5382,7 @@ ${signals}
     setSearchOpen(false);
   }
 
-  function addEvent() {
-    if (!eventForm.title) return;
-    setEvents(prev => [...prev, {
-      id: Date.now(),
-      title: eventForm.title,
-      time: eventForm.time,
-      color: eventForm.color,
-      date: `${calendarDate.getFullYear()}-${String(calendarDate.getMonth() + 1).padStart(2, '0')}-${String(calendarDate.getDate()).padStart(2, '0')}`
-    }]);
-    setEventForm({ title: '', time: '', color: '#22d3ee' });
-    setShowEventForm(false);
-  }
-
-  function removeEvent(id) { setEvents(prev => prev.filter(e => e.id !== id)); }
+  // addEvent/removeEvent moved to useCalendar
 
   function getEventsForDay(dayInfo) {
     if (!dayInfo.isCurrentMonth) return [];
@@ -9434,42 +9432,7 @@ ${signals}
     }).finally(() => setLlmFetching(false));
   }
 
-  async function fetchCustomUrl(url, mode = 'basic') {
-    if (!url.trim()) {
-      setCustomUrlError('请输入 URL');
-      return;
-    }
-
-    setCustomUrlLoading(true);
-    setCustomUrlError('');
-    setCustomUrlResult(null);
-
-    try {
-      const response = await fetch('/api/scrape', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          url: url.trim(),
-          mode: mode,
-          timeout: 30
-        })
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || '抓取失败');
-      }
-
-      setCustomUrlResult(data);
-    } catch (error) {
-      setCustomUrlError(error.message || '抓取失败，请稍后重试');
-    } finally {
-      setCustomUrlLoading(false);
-    }
-  }
+  // fetchCustomUrl moved to useCustomUrl
 
   function addManualModel() {
     if (!llmManualInput.trim()) return;
