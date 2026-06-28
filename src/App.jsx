@@ -514,7 +514,7 @@ function normalizeWorkflowTemplate(workflow, fallback = DEFAULT_AGENT_WORKFLOW) 
   };
 }
 
-const CATEGORIES = [
+const FALLBACK_CATEGORIES = [
   { id: 'ai-models', label: 'AI 大模型', icon: 'cpu' },
   { id: 'research', label: '科研前沿', icon: 'beaker' },
   { id: 'open-source', label: '开源生态', icon: 'code' },
@@ -788,7 +788,7 @@ const SCROLLING_NEWS_ITEMS = [
   }
 ];
 
-const AGENT_CATEGORIES = ['全部', '指挥', '分析', '技术', '商业', '创作', '记忆', '风险', '语言', '教育', '思辨'];
+const AGENT_categories = ['全部', '指挥', '分析', '技术', '商业', '创作', '记忆', '风险', '语言', '教育', '思辨'];
 
 const MODES = [
   { id: 'all', label: '全部' },
@@ -1306,13 +1306,14 @@ function App() {
 
   // 获取用户兴趣分类的详细信息
   const userInterestCategories = useMemo(() => {
-    return CATEGORIES.filter(c => c.id !== 'all' && selectedInterests.includes(c.id));
+    return categories.filter(c => c.id !== 'all' && selectedInterests.includes(c.id));
   }, [selectedInterests]);
 
   const allLlmModels = useMemo(() => [...llmModels, ...(llmConfig.manualModels || [])], [llmModels, llmConfig.manualModels]);
   const [allSources, setAllSources] = useState([]);
    const [sourceGrades, setSourceGrades] = useState({});
-   const [gradeFilter, setGradeFilter] = useState('all');
+   const [serverCategories, setServerCategories] = useState([]);
+  const [gradeFilter, setGradeFilter] = useState('all');
   const [sourceTypeTab, setSourceTypeTab] = useState('builtin');
   const [trendingItems, setTrendingItems] = useState([]);
   const [trendingLoading, setTrendingLoading] = useState(false);
@@ -1330,11 +1331,17 @@ function App() {
       .then(data => {
         if (Array.isArray(data.sources)) setAllSources(data.sources);
         if (data.sourceGrades) setSourceGrades(data.sourceGrades);
+        if (Array.isArray(data.categories)) setServerCategories(data.categories);
       })
       .catch(error => {
         console.warn('Failed to load source metadata:', error);
       });
   }, []);
+  // 分类单一来源：服务端 /api/meta 下发，离线时用 fallback
+  const categories = useMemo(
+    () => (serverCategories.length > 0 ? serverCategories : FALLBACK_CATEGORIES),
+    [serverCategories]
+  );
   const [githubLang, setGithubLang] = useState('');
   const [githubSince, setGithubSince] = useState('weekly');
   const [calendarDate, setCalendarDate] = useState(new Date());
@@ -1803,7 +1810,7 @@ function App() {
     let maxVal = 0;
     regions.forEach(r => {
       matrix[r] = {};
-      CATEGORIES.forEach(c => {
+      categories.forEach(c => {
         const count = items.filter(i => i.region === r && i.category === c.id).length;
         matrix[r][c.id] = count;
         if (count > maxVal) maxVal = count;
@@ -1875,7 +1882,7 @@ function App() {
     const day30 = buildDayKeys(30);
 
     // 近30天赛道趋势数据（用于趋势对比图）
-    const categoryTrend30 = CATEGORIES.map(cat => {
+    const categoryTrend30 = categories.map(cat => {
       const daily30 = day30.map(d => items.filter(i => i.category === cat.id && i.publishedAt?.slice(0, 10) === d).length);
       return { id: cat.id, label: cat.label, daily30 };
     }).filter(c => c.daily30.some(v => v > 0));
@@ -1896,14 +1903,14 @@ function App() {
     });
     catPairCounts.forEach((count, pair) => {
       const [cat1, cat2] = pair.split('::');
-      const label1 = CATEGORIES.find(c => c.id === cat1)?.label || cat1;
-      const label2 = CATEGORIES.find(c => c.id === cat2)?.label || cat2;
+      const label1 = categories.find(c => c.id === cat1)?.label || cat1;
+      const label2 = categories.find(c => c.id === cat2)?.label || cat2;
       categoryCorrelations.push({ cat1, cat2, label1, label2, count });
     });
     categoryCorrelations.sort((a, b) => b.count - a.count);
 
     // 赛道增长率（近7天 vs 前7天）+ 7日趋势线
-    const categoryGrowth = CATEGORIES.map(cat => {
+    const categoryGrowth = categories.map(cat => {
       const daily7 = day7.map(d => items.filter(i => i.category === cat.id && i.publishedAt?.slice(0, 10) === d).length);
       const recent = daily7.reduce((a, b) => a + b, 0);
       const prev = day7prev.map(d => items.filter(i => i.category === cat.id && i.publishedAt?.slice(0, 10) === d).length).reduce((a, b) => a + b, 0);
@@ -1913,7 +1920,7 @@ function App() {
 
     // 赛道动量分数（近3天加权）
     const day3 = day7.slice(4);
-    const categoryMomentum = CATEGORIES.map(cat => {
+    const categoryMomentum = categories.map(cat => {
       const weights = [1, 2, 3];
       const score = day3.reduce((sum, d, idx) => {
         return sum + items.filter(i => i.category === cat.id && i.publishedAt?.slice(0, 10) === d).length * weights[idx];
@@ -2007,7 +2014,7 @@ function App() {
     // 试验(Trial): 中高频 + 增长快
     // 评估(Assess): 低频但增长极快（新兴）
     // 暂缓(Hold): 低频 + 负增长或持平
-    const techRadar = CATEGORIES.map(cat => {
+    const techRadar = categories.map(cat => {
       const growth = categoryGrowth.find(c => c.id === cat.id)?.growth || 0;
       const recent = categoryGrowth.find(c => c.id === cat.id)?.recent || 0;
       const sources = trendData.categoryStats.find(([id]) => id === cat.id)?.[1]?.sources?.size || 0;
@@ -2108,7 +2115,7 @@ function App() {
       interestDist[cat] = (interestDist[cat] || 0) + 1;
     });
     const topInterests = Object.entries(interestDist).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([id, count]) => ({
-      id, label: CATEGORIES.find(c => c.id === id)?.label || id, count,
+      id, label: categories.find(c => c.id === id)?.label || id, count,
       pct: bookmarks.length ? Math.round(count / bookmarks.length * 100) : 0
     }));
 
@@ -2527,7 +2534,7 @@ function App() {
   const workbenchAiInsight = useMemo(() => {
     const topItems = workbenchItems.slice(0, 3);
     const categoryCounts = workbenchItems.reduce((acc, item) => {
-      const label = CATEGORIES.find(cat => cat.id === item.category)?.label || item.category || '综合科技';
+      const label = categories.find(cat => cat.id === item.category)?.label || item.category || '综合科技';
       acc[label] = (acc[label] || 0) + 1;
       return acc;
     }, {});
@@ -2591,11 +2598,11 @@ function App() {
   }, [selectedDateItems, items, workbenchItems, feedbackLearningCount, followKeywords, selectedInterests, workbenchAiInsight, bookmarks, materials]);
 
   const intelligenceProfile = useMemo(() => {
-    const focusLabels = selectedInterests.map(id => CATEGORIES.find(c => c.id === id)?.label || id);
+    const focusLabels = selectedInterests.map(id => categories.find(c => c.id === id)?.label || id);
     const boosted = Object.entries(recommendationFeedback.boostedCategories || {})
       .sort((a, b) => b[1] - a[1])
       .slice(0, 3)
-      .map(([id]) => CATEGORIES.find(c => c.id === id)?.label || id);
+      .map(([id]) => categories.find(c => c.id === id)?.label || id);
     const muted = Object.keys(recommendationFeedback.mutedSources || {}).slice(0, 3);
     const tracked = [...new Set([...followKeywords, ...Object.keys(recommendationFeedback.trackedTerms || {})])].slice(0, 8);
 
@@ -2683,9 +2690,9 @@ function App() {
   ], [workbenchAiInsight.oneLine, workbenchItems.length, selectedInterests.length, materials.length, followKeywords.length, agents.length, articles, bookmarks.length, user]);
 
   const profilePriorityItems = useMemo(() => {
-    const base = selectedInterests.length ? selectedInterests : CATEGORIES.slice(0, 6).map(c => c.id);
+    const base = selectedInterests.length ? selectedInterests : categories.slice(0, 6).map(c => c.id);
     return base.slice(0, 8).map((id, index) => {
-      const category = CATEGORIES.find(c => c.id === id);
+      const category = categories.find(c => c.id === id);
       return {
         id,
         label: category?.label || id,
@@ -2738,7 +2745,7 @@ function App() {
       .slice(0, 5)
       .map(([id, score]) => ({
         id,
-        label: CATEGORIES.find(cat => cat.id === id)?.label || id,
+        label: categories.find(cat => cat.id === id)?.label || id,
         score: Math.round(score)
       }));
     const topSources = [...sourceMap.entries()]
@@ -2752,7 +2759,7 @@ function App() {
 
     const selectedSet = new Set(selectedInterests);
     const readCategorySet = new Set(readingHistory.map(item => item.category).filter(Boolean));
-    const blindSpots = CATEGORIES
+    const blindSpots = categories
       .filter(cat => cat.id !== 'all' && !selectedSet.has(cat.id) && !readCategorySet.has(cat.id))
       .slice(0, 4)
       .map(cat => cat.label);
@@ -3247,7 +3254,7 @@ ${agentWorkflowDraft.nodes.map((node, index) => `${index + 1}. [${workflowTypeMe
     return `${prompt}
 
 日期：${selectedNewsDate || new Date().toISOString().slice(0, 10)}
-关注领域：${selectedInterests.map(id => CATEGORIES.find(c => c.id === id)?.label || id).join('、') || '未设置'}
+关注领域：${selectedInterests.map(id => categories.find(c => c.id === id)?.label || id).join('、') || '未设置'}
 追踪关键词：${followKeywords.join('、') || '未设置'}
 用户画像：
 - 当前深度：${intelligenceProfile.depth}
@@ -3606,7 +3613,7 @@ ${lines}`;
       }));
     };
 
-    const getCategoryLabel = (categoryId) => CATEGORIES.find(c => c.id === categoryId)?.label || categoryId || '未分类';
+    const getCategoryLabel = (categoryId) => categories.find(c => c.id === categoryId)?.label || categoryId || '未分类';
     const trackedTerms = intelligenceProfile.tracked || [];
     const mediaItems = scopedAgentItems.filter(item => item.imageUrl || item.videoUrl);
     const savedScopedItems = scopedAgentItems.filter(item =>
@@ -5988,7 +5995,7 @@ ${signals}
               {nav === 'all' && (
                 <div className="category-dropdown-wrap">
                   <button className="category-dropdown-btn" onClick={() => setCategoryOpen(o => !o)}>
-                    <span>{category === 'all' ? '全部赛道' : CATEGORIES.find(c => c.id === category)?.label || '全部赛道'}</span>
+                    <span>{category === 'all' ? '全部赛道' : categories.find(c => c.id === category)?.label || '全部赛道'}</span>
                     <span className={`chevron ${categoryOpen ? 'open' : ''}`}>{ICONS.chevronDown}</span>
                   </button>
                   {categoryOpen && (
@@ -6004,7 +6011,7 @@ ${signals}
                             </div>
                             <div className="category-group-items">
                               {group.categories.map(catId => {
-                                const cat = CATEGORIES.find(c => c.id === catId);
+                                const cat = categories.find(c => c.id === catId);
                                 if (!cat) return null;
                                 return (
                                   <button key={cat.id} className={`category-option ${category === cat.id ? 'active' : ''}`} onClick={() => { setCategory(cat.id); setCategoryOpen(false); }}>
@@ -6160,7 +6167,7 @@ ${signals}
                   <div className="workbench-block-title">关注领域</div>
                   <ColorfulBubbles
                     interests={selectedInterests}
-                    categories={CATEGORIES}
+                    categories={categories}
                     onBubbleClick={(catId) => setCategory(catId)}
                     onEmptyClick={() => setShowInterestModal(true)}
                   />
@@ -6285,7 +6292,7 @@ ${signals}
                 intelligenceProfile={intelligenceProfile}
                 workbenchItems={workbenchItems}
                 selectedInterests={selectedInterests}
-                categories={CATEGORIES}
+                categories={categories}
                 allLlmModels={allLlmModels}
                 onOpenLlmConfig={() => setShowLlmQuickConfig(true)}
                 pendingMessage={copilotPendingMessage}
@@ -6956,7 +6963,7 @@ ${signals}
                   <div className="interest-tags-bar">
                     <span className="interest-tags-label">已选领域：</span>
                     {selectedInterests.map(id => {
-                      const cat = CATEGORIES.find(c => c.id === id);
+                      const cat = categories.find(c => c.id === id);
                       return cat ? (
                         <span key={id} className="interest-tag-badge">
                           {ICONS[cat.icon]} {cat.label}
@@ -7214,7 +7221,7 @@ ${signals}
                           <div className="bookmark-meta">
                             <span className="bookmark-source">{b.source}</span>
                             <span className="bookmark-date">{new Date(b.savedAt).toLocaleDateString('zh-CN')}</span>
-                            {b.category && <span className="bookmark-category">{CATEGORIES.find(c => c.id === b.category)?.label || b.category}</span>}
+                            {b.category && <span className="bookmark-category">{categories.find(c => c.id === b.category)?.label || b.category}</span>}
                           </div>
                           {b.summary && <p className="bookmark-summary">{b.summary}</p>}
                         </div>
@@ -7733,7 +7740,7 @@ ${signals}
                           <span className="heatmap-label" />
                           {insightData.day7.map(d => <span key={d} className="heatmap-day">{d.slice(5)}</span>)}
                         </div>
-                        {CATEGORIES.map(cat => {
+                        {categories.map(cat => {
                           const maxVal = Math.max(...insightData.day7.map(d => items.filter(i => i.category === cat.id && i.publishedAt?.slice(0, 10) === d).length), 1);
                           return (
                             <div key={cat.id} className="heatmap-row">
@@ -8483,7 +8490,7 @@ ${signals}
                 <div className="export-filters">
                   <select value={exportCategory} onChange={(e) => setExportCategory(e.target.value)}>
                     <option value="all">全部赛道</option>
-                    {CATEGORIES.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
+                    {categories.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
                   </select>
                   <select value={exportRange} onChange={(e) => setExportRange(e.target.value)}>
                     <option value="all">全部时间</option>
@@ -9249,7 +9256,7 @@ ${signals}
                   <div className="profile-interest-tags">
                     {selectedInterests.length === 0 && <span className="profile-interest-empty">暂无</span>}
                     {selectedInterests.map(id => {
-                      const cat = CATEGORIES.find(c => c.id === id);
+                      const cat = categories.find(c => c.id === id);
                       return cat ? (
                         <span key={id} className="profile-interest-tag">
                           {ICONS[cat.icon]} {cat.label}
@@ -9305,7 +9312,7 @@ ${signals}
                     </div>
                     <div className="interest-group-items">
                       {group.categories.map(catId => {
-                        const cat = CATEGORIES.find(c => c.id === catId);
+                        const cat = categories.find(c => c.id === catId);
                         if (!cat) return null;
                         const isSelected = selectedInterests.includes(cat.id);
                         return (

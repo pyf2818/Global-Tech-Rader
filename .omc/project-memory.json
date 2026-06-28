@@ -42,8 +42,8 @@
     "runtime": null
   },
   "build": {
-    "buildCommand": "cd \"E:/VStudio_Project/Silicon Meridian\" && echo \"=== 残留内联 gradeColors 检查 ===\" && grep -rn \"const gradeColors\" src/ || echo \">>> 无残留内联定义 ✓\" && echo \"\" && echo \"=== 残留 #ff0000 系刺眼色值 ===\" && grep -rn \"#ff0000\\|#ff8800\\|#00cc00\\|#0088ff\" src/ || echo \">>> 无刺眼色值残留 ✓\" && echo \"\" && echo \"=== 构建验证 ===\" && rtk npm run build 2>&1 | tail -20",
-    "testCommand": "cd \"E:/VStudio_Project/Silicon Meridian\" && node node_modules/vitest/vitest.mjs run 2>&1 | tail -10",
+    "buildCommand": "cd \"E:/VStudio_Project/Silicon Meridian\" && taskkill //F //IM esbuild.exe 2>/dev/null; sleep 1 && npm run build 2>&1 | tail -12",
+    "testCommand": "cd \"E:/VStudio_Project/Silicon Meridian\" && taskkill //F //IM esbuild.exe 2>/dev/null; sleep 1 && node node_modules/vitest/vitest.mjs run 2>&1 | tail -10",
     "lintCommand": null,
     "devCommand": "npm run dev",
     "scripts": {
@@ -197,8 +197,8 @@
   "hotPaths": [
     {
       "path": "src\\App.jsx",
-      "accessCount": 47,
-      "lastAccessed": 1782629436070,
+      "accessCount": 71,
+      "lastAccessed": 1782632730476,
       "type": "file"
     },
     {
@@ -238,6 +238,12 @@
       "type": "file"
     },
     {
+      "path": "server\\news\\config\\constants.js",
+      "accessCount": 6,
+      "lastAccessed": 1782632564600,
+      "type": "file"
+    },
+    {
       "path": "server\\news\\plugin.js",
       "accessCount": 5,
       "lastAccessed": 1782629110712,
@@ -247,12 +253,6 @@
       "path": "package.json",
       "accessCount": 5,
       "lastAccessed": 1782629778097,
-      "type": "file"
-    },
-    {
-      "path": "server\\news\\config\\constants.js",
-      "accessCount": 5,
-      "lastAccessed": 1782631649051,
       "type": "file"
     },
     {
