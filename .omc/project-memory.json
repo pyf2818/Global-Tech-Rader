@@ -42,8 +42,8 @@
     "runtime": null
   },
   "build": {
-    "buildCommand": "cd \"E:/VStudio_Project/Silicon Meridian\" && taskkill //F //IM esbuild.exe 2>/dev/null; sleep 1 && npm run build 2>&1 | tail -12",
-    "testCommand": "cd \"E:/VStudio_Project/Silicon Meridian\" && taskkill //F //IM esbuild.exe 2>/dev/null; sleep 1 && node node_modules/vitest/vitest.mjs run 2>&1 | tail -10",
+    "buildCommand": "cd \"E:/VStudio_Project/Silicon Meridian\" && taskkill //F //IM esbuild.exe 2>/dev/null; sleep 1 && npm run build 2>&1 | tail -10",
+    "testCommand": "cd \"E:/VStudio_Project/Silicon Meridian\" && wc -l src/App.jsx src/hooks/useAuth.js && echo \"=== tests ===\" && node node_modules/vitest/vitest.mjs run 2>&1 | tail -8",
     "lintCommand": null,
     "devCommand": "npm run dev",
     "scripts": {
@@ -197,8 +197,8 @@
   "hotPaths": [
     {
       "path": "src\\App.jsx",
-      "accessCount": 71,
-      "lastAccessed": 1782632730476,
+      "accessCount": 92,
+      "lastAccessed": 1782633172938,
       "type": "file"
     },
     {
@@ -271,6 +271,12 @@
       "path": "src\\components\\NewsItem.jsx",
       "accessCount": 3,
       "lastAccessed": 1782629377692,
+      "type": "file"
+    },
+    {
+      "path": "src\\hooks\\useAuth.js",
+      "accessCount": 3,
+      "lastAccessed": 1782632958773,
       "type": "file"
     },
     {

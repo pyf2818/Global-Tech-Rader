@@ -8,6 +8,7 @@ import AiChatPanel from './components/AiChatPanel.jsx';
 import ThemePicker from './ThemePicker.jsx';
 import { PALETTES } from './ThemePicker.jsx';
 import { getGradeColors } from './utils/format.js';
+import { useAuth } from './hooks/useAuth.js';
 
 const PRODUCT_NAME = '万般硅川';
 const PRODUCT_TAGLINE = '高质量多领域智能资讯生态';
@@ -1121,29 +1122,18 @@ function App() {
   const [showLlmQuickConfig, setShowLlmQuickConfig] = useState(false);
 
   // ========== 用户系统 ==========
-  const [user, setUser] = useState(() => {
-    try {
-      const saved = localStorage.getItem('user');
-      return saved ? JSON.parse(saved) : null;
-    } catch {
-      return null;
-    }
-  });
-  const [token, setToken] = useState(() => localStorage.getItem('token') || '');
-  const [showAuthModal, setShowAuthModal] = useState(false);
-  const [authMode, setAuthMode] = useState('login');
-  const [authForm, setAuthForm] = useState({ username: '', password: '', email: '', confirmPassword: '' });
-  const [authLoading, setAuthLoading] = useState(false);
-  const [authError, setAuthError] = useState('');
-  const [showInterestModal, setShowInterestModal] = useState(false);
-  const [selectedInterests, setSelectedInterests] = useState(() => {
-    try {
-      const saved = localStorage.getItem('selectedInterests');
-      return saved ? JSON.parse(saved) : [];
-    } catch {
-      return [];
-    }
-  });
+  // 认证与用户会话 — 从 App.jsx 提取为独立 hook（减少 ~140 行）
+  const {
+    user, token, showAuthModal, authMode, authForm, authLoading, authError,
+    showInterestModal, selectedInterests, isLoggedIn,
+    setUser, setToken, setShowAuthModal, setAuthMode, setAuthForm,
+    setSelectedInterests, setShowInterestModal,
+    handleRegister, handleLogin, handleLogout, updateUserInterests, updateUserProfile,
+  } = useAuth({ setSelectedInterests: (interests) => {
+    setSelectedInterests(interests);
+    // 同步更新外部 state
+  } });
+
   const [profilePage, setProfilePage] = useState(1);
   const [copilotPendingMessage, setCopilotPendingMessage] = useState('');
   const [showUserMenu, setShowUserMenu] = useState(false);
@@ -1163,146 +1153,14 @@ function App() {
     }
   }, [showProfileModal, user]);
 
-  const isLoggedIn = !!user && !!token;
-
-  // 保存用户数据到 localStorage
-  useEffect(() => {
-    if (user) localStorage.setItem('user', JSON.stringify(user));
-    else localStorage.removeItem('user');
-  }, [user]);
-  useEffect(() => {
-    if (token) localStorage.setItem('token', token);
-    else localStorage.removeItem('token');
-  }, [token]);
-  useEffect(() => {
-    localStorage.setItem('selectedInterests', JSON.stringify(selectedInterests));
-  }, [selectedInterests]);
+  // user/token/selectedInterests 持久化由 useAuth 内部处理，此处不再重复
   useEffect(() => {
     saveLS('domainPriorities', domainPriorities);
     saveLS('sourcePriorities', sourcePriorities);
     saveLS('dailyProfileSnapshots', dailyProfileSnapshots);
   }, [domainPriorities, sourcePriorities, dailyProfileSnapshots]);
 
-  // 认证函数
-  const handleRegister = async () => {
-    if (!authForm.username || !authForm.password) {
-      setAuthError('用户名和密码不能为空');
-      return;
-    }
-    if (authForm.password !== authForm.confirmPassword) {
-      setAuthError('两次输入的密码不一致');
-      return;
-    }
-    setAuthLoading(true);
-    setAuthError('');
-    try {
-      const res = await fetch('/api/auth/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          username: authForm.username,
-          password: authForm.password,
-          email: authForm.email,
-          interests: selectedInterests
-        })
-      });
-      const data = await res.json();
-      if (data.ok) {
-        setUser(data.user);
-        setToken(data.token);
-        setShowAuthModal(false);
-        setAuthForm({ username: '', password: '', email: '', confirmPassword: '' });
-        showToast('注册成功！');
-      } else {
-        setAuthError(data.message || '注册失败');
-      }
-    } catch (e) {
-      setAuthError('网络错误，请重试');
-    } finally {
-      setAuthLoading(false);
-    }
-  };
-
-  const handleLogin = async () => {
-    if (!authForm.username || !authForm.password) {
-      setAuthError('用户名和密码不能为空');
-      return;
-    }
-    setAuthLoading(true);
-    setAuthError('');
-    try {
-      const res = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          username: authForm.username,
-          password: authForm.password
-        })
-      });
-      const data = await res.json();
-      if (data.ok) {
-        setUser(data.user);
-        setToken(data.token);
-        if (data.user.interests) {
-          setSelectedInterests(data.user.interests);
-        }
-        setShowAuthModal(false);
-        setAuthForm({ username: '', password: '', email: '', confirmPassword: '' });
-        showToast('登录成功！');
-      } else {
-        setAuthError(data.message || '登录失败');
-      }
-    } catch (e) {
-      setAuthError('网络错误，请重试');
-    } finally {
-      setAuthLoading(false);
-    }
-  };
-
-  const handleLogout = () => {
-    setUser(null);
-    setToken('');
-    setSelectedInterests([]);
-    localStorage.removeItem('user');
-    localStorage.removeItem('token');
-    localStorage.removeItem('selectedInterests');
-    setShowUserMenu(false);
-    showToast('已退出登录');
-  };
-
-  const updateUserInterests = async (interests) => {
-    if (!token) return;
-    try {
-      await fetch('/api/user/interests', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token, interests })
-      });
-      setSelectedInterests(interests);
-      if (user) {
-        setUser({ ...user, interests });
-      }
-    } catch (e) {
-      console.error('Failed to update interests:', e);
-    }
-  };
-
-  const updateUserProfile = async (updates) => {
-    if (!token) return;
-    try {
-      const res = await fetch('/api/user/profile', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token, ...updates })
-      });
-      const data = await res.json();
-      if (data.ok && data.user) {
-        setUser(data.user);
-      }
-    } catch (e) {
-      console.error('Failed to update profile:', e);
-    }
-  };
+  // 认证函数已抽取至 useAuth — 这里不再定义
 
   // 获取用户兴趣分类的详细信息
   const userInterestCategories = useMemo(() => {
@@ -9283,7 +9141,7 @@ ${signals}
                   >
                     保存
                   </button>
-                  <button className="profile-logout-btn" onClick={() => { setShowProfileModal(false); handleLogout(); }}>
+                  <button className="profile-logout-btn" onClick={() => { setShowProfileModal(false); setShowUserMenu(false); handleLogout(); }}>
                     {ICONS.power} 退出登录
                   </button>
                 </div>
