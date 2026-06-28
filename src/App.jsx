@@ -14,6 +14,7 @@ import { useTrending } from './hooks/useTrending.js';
 import { useSourceManager } from './hooks/useSourceManager.js';
 import { useCustomUrl } from './hooks/useCustomUrl.js';
 import { useCalendar } from './hooks/useCalendar.js';
+import { useUI } from './hooks/useUI.js';
 
 const PRODUCT_NAME = '万般硅川';
 const PRODUCT_TAGLINE = '高质量多领域智能资讯生态';
@@ -1198,6 +1199,8 @@ function App() {
     [serverCategories]
   );
 
+  // UI switch states
+  const { showFollowDropdown, setShowFollowDropdown, mobileMenuOpen, setMobileMenuOpen, showBackToTop, setShowBackToTop, moreNavOpen, setMoreNavOpen } = useUI();
   // calendar + customUrl hooks (independent domains)
   const {
     calendarDate, setCalendarDate,
@@ -1256,10 +1259,7 @@ function App() {
   const [exportRange, setExportRange] = useState('all');
 
   // customUrl states moved to useCustomUrl hook
-  const [showFollowDropdown, setShowFollowDropdown] = useState(false);
-  const [recentVisits, setRecentVisits] = useState(() => loadLS('recentVisits', []));
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [showBackToTop, setShowBackToTop] = useState(false);
+  // UI switch states (showFollowDropdown/mobileMenuOpen/showBackToTop) moved to useUI
   const [trackTargets, setTrackTargets] = useState(() => loadLS('trackTargets', []));
   const [briefingConfig, setBriefingConfig] = useState(() => loadLS('briefingConfig', { length: 'standard', includeRead: false }));
   const [newTrackTarget, setNewTrackTarget] = useState('');
@@ -1269,7 +1269,7 @@ function App() {
   const [elfQuotedContext, setElfQuotedContext] = useState(null);
   const [translationOpen, setTranslationOpen] = useState({});
   const [translatingItems, setTranslatingItems] = useState({});
-  const [moreNavOpen, setMoreNavOpen] = useState(false);
+  // moreNavOpen moved to useUI
   const [currentArticleId, setCurrentArticleId] = useState(null);
   const [materialFilter, setMaterialFilter] = useState('all');
   const [materialSearch, setMaterialSearch] = useState('');

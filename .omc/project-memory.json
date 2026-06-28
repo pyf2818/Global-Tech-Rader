@@ -197,8 +197,8 @@
   "hotPaths": [
     {
       "path": "src\\App.jsx",
-      "accessCount": 140,
-      "lastAccessed": 1782635733725,
+      "accessCount": 142,
+      "lastAccessed": 1782635823102,
       "type": "file"
     },
     {
@@ -457,6 +457,12 @@
       "path": "src\\hooks\\useCalendar.js",
       "accessCount": 1,
       "lastAccessed": 1782635118562,
+      "type": "file"
+    },
+    {
+      "path": "src\\hooks\\useUI.js",
+      "accessCount": 1,
+      "lastAccessed": 1782635853049,
       "type": "file"
     }
   ],
