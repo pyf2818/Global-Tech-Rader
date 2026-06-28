@@ -11,6 +11,7 @@ import { getGradeColors } from './utils/format.js';
 import { useAuth } from './hooks/useAuth.js';
 import { useLlmConfig } from './hooks/useLlmConfig.js';
 import { useTrending } from './hooks/useTrending.js';
+import { useSourceManager } from './hooks/useSourceManager.js';
 
 const PRODUCT_NAME = '万般硅川';
 const PRODUCT_TAGLINE = '高质量多领域智能资讯生态';
@@ -1091,18 +1092,7 @@ function App() {
     return MOTIVATIONAL_QUOTES[idx];
   }, []);
   const [panelCollapsed, setPanelCollapsed] = useState(() => localStorage.getItem('panelCollapsed') === 'true');
-  const [customSources, setCustomSources] = useState(() => loadLS('customSources', []));
-  const [disabledSources, setDisabledSources] = useState(() => loadLS('disabledSources', []));
-  const [newSource, setNewSource] = useState({ name: '', url: '', region: 'overseas', category: '', tags: '', notes: '' });
-  const [sourceVerifyResult, setSourceVerifyResult] = useState(null);
-  const [sourceVerifying, setSourceVerifying] = useState(false);
-  const [sourceDiscoveryUrl, setSourceDiscoveryUrl] = useState('');
-  const [sourceDiscoveryState, setSourceDiscoveryState] = useState({ loading: false, result: null, error: '' });
-  const [verifyingAllSources, setVerifyingAllSources] = useState(false);
-  const [allSourcesVerifyResults, setAllSourcesVerifyResults] = useState(null);
-  const [sourceHealth, setSourceHealth] = useState(() => loadLS('sourceHealth', {}));
-  const [editingSource, setEditingSource] = useState(null);
-  const [showSourceForm, setShowSourceForm] = useState(false);
+  // source management states moved to useSourceManager hook (called after allSources)
   
   const [searchQuery, setSearchQuery] = useState('');
   const [customSourceFilter, setCustomSourceFilter] = useState('all');
@@ -1205,7 +1195,21 @@ function App() {
     () => (serverCategories.length > 0 ? serverCategories : FALLBACK_CATEGORIES),
     [serverCategories]
   );
-  // githubLang/githubSince 已移入 useTrending
+
+  // source management — uses allSources from /api/meta
+  const {
+    customSources, setCustomSources,
+    disabledSources, setDisabledSources,
+    newSource, setNewSource,
+    sourceVerifyResult, sourceVerifying,
+    sourceDiscoveryUrl, setSourceDiscoveryUrl,
+    sourceDiscoveryState,
+    verifyingAllSources, allSourcesVerifyResults,
+    sourceHealth, setSourceHealth,
+    editingSource, setEditingSource,
+    showSourceForm, setShowSourceForm,
+    verifySource, discoverSource, addDiscoveredSource, verifyAllSources,
+  } = useSourceManager({ allSources });  // githubLang/githubSince 已移入 useTrending
   const [calendarDate, setCalendarDate] = useState(new Date());
   const [events, setEvents] = useState(() => loadLS('calendarEvents', []));
   const [eventForm, setEventForm] = useState({ title: '', time: '', color: '#22d3ee' });
@@ -9163,107 +9167,7 @@ ${signals}
     setCustomSources(prev => prev.filter(s => s.id !== id));
   }
 
-  function verifySource() {
-    if (!newSource.url) return;
-    setSourceVerifying(true);
-    setSourceVerifyResult(null);
-    fetch(`/api/verify-source?url=${encodeURIComponent(newSource.url)}`).then(r => r.json()).then(d => {
-      setSourceVerifyResult(d);
-      if (d.ok && !newSource.name && d.title) {
-        setNewSource(prev => ({ ...prev, name: d.title }));
-      }
-    }).catch(() => {
-      setSourceVerifyResult({ ok: false, message: 'Network error' });
-    }).finally(() => setSourceVerifying(false));
-  }
-
-  async function discoverSource() {
-    const url = sourceDiscoveryUrl.trim();
-    if (!url) return;
-    setSourceDiscoveryState({ loading: true, result: null, error: '' });
-    try {
-      const response = await fetch(`/api/discover-source?url=${encodeURIComponent(url)}`);
-      const data = await response.json();
-      setSourceDiscoveryState({ loading: false, result: data, error: data.ok ? '' : data.message || 'No feed discovered' });
-    } catch (error) {
-      setSourceDiscoveryState({ loading: false, result: null, error: error.message || 'Network error' });
-    }
-  }
-
-  function addDiscoveredSource(candidate) {
-    if (!candidate?.url) return;
-    const candidateUrl = normalizeSourceUrl(candidate.url);
-    const exists = customSources.some(source => normalizeSourceUrl(source.url) === candidateUrl) || allSources.some(source => normalizeSourceUrl(source.url) === candidateUrl);
-    if (exists) {
-      showToast('Source already exists');
-      return;
-    }
-    const source = {
-      id: Date.now(),
-      name: candidate.title || candidate.name || 'Custom Feed',
-      url: candidate.url,
-      region: candidate.suggestedRegion || 'global',
-      category: candidate.suggestedCategory || '',
-      grade: candidate.suggestedGrade || 'D',
-      tags: candidate.tags || ['discovered'],
-      notes: `Discovered via ${candidate.discoveredVia || 'source discovery'}`
-    };
-    setCustomSources(prev => [...prev, source]);
-    setSourceHealth(prev => ({
-      ...prev,
-      [source.id]: {
-        status: 'healthy',
-        lastCheck: Date.now(),
-        responseTime: 0,
-        failCount: 0,
-        itemCount: candidate.itemCount || 0
-      }
-    }));
-    showToast('Source added');
-  }
-
-  function verifyAllSources() {
-    if (!allSources || !allSources.length) {
-      console.log('verifyAllSources: No sources to verify', allSources);
-      return;
-    }
-    
-    console.log('verifyAllSources: Starting verification for', allSources.length, 'sources');
-    setVerifyingAllSources(true);
-    setAllSourcesVerifyResults(null);
-    
-    const results = [];
-    let completed = 0;
-    
-    allSources.forEach(source => {
-      if (!source.url) {
-        console.warn('Source without URL:', source.name);
-        return;
-      }
-      
-      console.log('Verifying:', source.name, source.url);
-      
-      fetch(`/api/verify-source?url=${encodeURIComponent(source.url)}`)
-        .then(r => r.json())
-        .then(d => {
-          console.log('Verification result for', source.name, ':', d);
-          results.push({ name: source.name, ...d });
-        })
-        .catch(e => {
-          console.error('Verification failed for', source.name, ':', e);
-          results.push({ name: source.name, ok: false, message: 'Network error' });
-        })
-        .finally(() => {
-          completed++;
-          console.log('Verification progress:', completed, '/', allSources.length);
-          if (completed === allSources.length) {
-            console.log('Verification complete, results:', results);
-            setAllSourcesVerifyResults(results);
-            setVerifyingAllSources(false);
-          }
-        });
-    });
-  }
+  // source handlers (verifySource/discoverSource/addDiscoveredSource/verifyAllSources) moved to useSourceManager
 
   // 辅助函数：截断 URL
   function truncateUrl(url, maxLength) {
