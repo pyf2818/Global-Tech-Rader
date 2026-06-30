@@ -47,7 +47,7 @@
     "runtime": null
   },
   "build": {
-    "buildCommand": "cd \"E:/VStudio_Project/Silicon Meridian\" && taskkill //F //IM esbuild.exe 2>/dev/null; sleep 1 && npm run build 2>&1 | tail -3 && node node_modules/vitest/vitest.mjs run 2>&1 | tail -5",
+    "buildCommand": "cd \"E:/VStudio_Project/Silicon Meridian\" && taskkill //F //IM esbuild.exe 2>/dev/null; sleep 1 && npm run build 2>&1 | tail -5",
     "testCommand": "cd \"E:/VStudio_Project/Silicon Meridian\" && taskkill //F //IM esbuild.exe 2>/dev/null; sleep 1 && npm run build 2>&1 | tail -3 && node node_modules/vitest/vitest.mjs run 2>&1 | tail -5",
     "lintCommand": null,
     "devCommand": "npm run dev",
@@ -213,8 +213,8 @@
   "hotPaths": [
     {
       "path": "src\\App.jsx",
-      "accessCount": 23,
-      "lastAccessed": 1782807348136,
+      "accessCount": 32,
+      "lastAccessed": 1782811922037,
       "type": "directory"
     },
     {
@@ -228,6 +228,12 @@
       "accessCount": 4,
       "lastAccessed": 1782807893370,
       "type": "file"
+    },
+    {
+      "path": "src\\hooks\\useSourceManager.js",
+      "accessCount": 3,
+      "lastAccessed": 1782811725704,
+      "type": "directory"
     },
     {
       "path": "CLAUDE.md",

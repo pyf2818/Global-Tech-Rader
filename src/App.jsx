@@ -1226,7 +1226,7 @@ function App() {
     sourceVerifyResult, sourceVerifying,
     sourceDiscoveryUrl, setSourceDiscoveryUrl,
     sourceDiscoveryState,
-    verifyingAllSources, allSourcesVerifyResults,
+    verifyingAllSources, allSourcesVerifyResults, setAllSourcesVerifyResults,
     sourceHealth, setSourceHealth,
     editingSource, setEditingSource,
     showSourceForm, setShowSourceForm,
@@ -8394,18 +8394,20 @@ ${signals}
           )}
         </div>
 
-        {/* Copilot — fixed right side, always visible */}
-        <AiChatPanel
-          llmConfig={llmConfig}
-          intelligenceProfile={intelligenceProfile}
-          workbenchItems={workbenchItems}
-          selectedInterests={selectedInterests}
-          categories={categories}
-          allLlmModels={allLlmModels}
-          onOpenLlmConfig={() => setShowLlmQuickConfig(true)}
-          pendingMessage={copilotPendingMessage}
-          onMessageSent={() => setCopilotPendingMessage('')}
-        />
+        {/* Copilot — 仅在每日汇报页显示，固定右侧 */}
+        {nav === 'today' && (
+          <AiChatPanel
+            llmConfig={llmConfig}
+            intelligenceProfile={intelligenceProfile}
+            workbenchItems={workbenchItems}
+            selectedInterests={selectedInterests}
+            categories={categories}
+            allLlmModels={allLlmModels}
+            onOpenLlmConfig={() => setShowLlmQuickConfig(true)}
+            pendingMessage={copilotPendingMessage}
+            onMessageSent={() => setCopilotPendingMessage('')}
+          />
+        )}
       </main>
 
       {/* Right Panel */}

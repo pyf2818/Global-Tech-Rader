@@ -112,7 +112,7 @@ export function useSourceManager({ allSources = [] } = {}) {
     sourceVerifyResult, sourceVerifying,
     sourceDiscoveryUrl, setSourceDiscoveryUrl,
     sourceDiscoveryState,
-    verifyingAllSources, allSourcesVerifyResults,
+    verifyingAllSources, allSourcesVerifyResults, setAllSourcesVerifyResults,
     sourceHealth, setSourceHealth,
     editingSource, setEditingSource,
     showSourceForm, setShowSourceForm,
