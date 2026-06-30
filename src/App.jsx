@@ -1160,14 +1160,21 @@ function App() {
 
   // 认证函数已抽取至 useAuth — 这里不再定义
 
+  const [allSources, setAllSources] = useState([]);
+  const [sourceGrades, setSourceGrades] = useState({});
+  const [serverCategories, setServerCategories] = useState([]);
+
+  // 分类单一来源：服务端 /api/meta 下发，离线时用 fallback
+  const categories = useMemo(
+    () => (serverCategories.length > 0 ? serverCategories : FALLBACK_CATEGORIES),
+    [serverCategories]
+  );
+
   // 获取用户兴趣分类的详细信息
   const userInterestCategories = useMemo(() => {
     return categories.filter(c => c.id !== 'all' && selectedInterests.includes(c.id));
-  }, [selectedInterests]);
+  }, [categories, selectedInterests]);
 
-  const [allSources, setAllSources] = useState([]);
-   const [sourceGrades, setSourceGrades] = useState({});
-   const [serverCategories, setServerCategories] = useState([]);
   const [gradeFilter, setGradeFilter] = useState('all');
   const [sourceTypeTab, setSourceTypeTab] = useState('builtin');
   const {
@@ -1193,12 +1200,6 @@ function App() {
         console.warn('Failed to load source metadata:', error);
       });
   }, []);
-  // 分类单一来源：服务端 /api/meta 下发，离线时用 fallback
-  const categories = useMemo(
-    () => (serverCategories.length > 0 ? serverCategories : FALLBACK_CATEGORIES),
-    [serverCategories]
-  );
-
   // UI switch states
   const { showFollowDropdown, setShowFollowDropdown, mobileMenuOpen, setMobileMenuOpen, showBackToTop, setShowBackToTop, moreNavOpen, setMoreNavOpen } = useUI();
   // calendar + customUrl hooks (independent domains)
@@ -1342,6 +1343,9 @@ function App() {
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, [showTemplateMenu]);
+
+  const [recentVisits, setRecentVisits] = useState(() => loadLS('recentVisits', []));
+
   // 30+ 个 saveLS 合并为一个统一同步 effect — 任何 state 变化只触发一次写入
   useEffect(() => {
     const map = {
@@ -6078,17 +6082,6 @@ ${signals}
                 )}
               </section>
 
-              <AiChatPanel
-                llmConfig={llmConfig}
-                intelligenceProfile={intelligenceProfile}
-                workbenchItems={workbenchItems}
-                selectedInterests={selectedInterests}
-                categories={categories}
-                allLlmModels={allLlmModels}
-                onOpenLlmConfig={() => setShowLlmQuickConfig(true)}
-                pendingMessage={copilotPendingMessage}
-                onMessageSent={() => setCopilotPendingMessage('')}
-              />
             </div>
           )}
 
@@ -8400,6 +8393,19 @@ ${signals}
             </div>
           )}
         </div>
+
+        {/* Copilot — fixed right side, always visible */}
+        <AiChatPanel
+          llmConfig={llmConfig}
+          intelligenceProfile={intelligenceProfile}
+          workbenchItems={workbenchItems}
+          selectedInterests={selectedInterests}
+          categories={categories}
+          allLlmModels={allLlmModels}
+          onOpenLlmConfig={() => setShowLlmQuickConfig(true)}
+          pendingMessage={copilotPendingMessage}
+          onMessageSent={() => setCopilotPendingMessage('')}
+        />
       </main>
 
       {/* Right Panel */}

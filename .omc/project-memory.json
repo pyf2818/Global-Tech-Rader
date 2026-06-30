@@ -1,7 +1,7 @@
 {
   "version": "1.0.0",
-  "lastScanned": 1782626275293,
-  "projectRoot": "E:\\VStudio_Project\\Global Tech Rader_V1\\Global-Tech-Rader",
+  "lastScanned": 1782739261328,
+  "projectRoot": "E:\\VStudio_Project\\Silicon Meridian",
   "techStack": {
     "languages": [
       {
@@ -36,20 +36,27 @@
         "name": "vite",
         "version": "8.0.16",
         "category": "build"
+      },
+      {
+        "name": "vitest",
+        "version": "3.2.6",
+        "category": "testing"
       }
     ],
     "packageManager": "npm",
     "runtime": null
   },
   "build": {
-    "buildCommand": "cd \"E:/VStudio_Project/Silicon Meridian\" && taskkill //F //IM esbuild.exe 2>/dev/null; sleep 1 && npm run build 2>&1 | tail -5 && echo \"=== tests ===\" && node node_modules/vitest/vitest.mjs run 2>&1 | tail -6 && echo \"=== App.jsx lines ===\" && wc -l src/App.jsx && echo \"=== hooks ===\" && ls src/hooks/",
-    "testCommand": "cd \"E:/VStudio_Project/Silicon Meridian\" && taskkill //F //IM esbuild.exe 2>/dev/null; sleep 1 && npm run build 2>&1 | tail -5 && echo \"=== tests ===\" && node node_modules/vitest/vitest.mjs run 2>&1 | tail -6 && echo \"=== App.jsx lines ===\" && wc -l src/App.jsx && echo \"=== hooks ===\" && ls src/hooks/",
+    "buildCommand": "cd \"E:/VStudio_Project/Silicon Meridian\" && taskkill //F //IM esbuild.exe 2>/dev/null; sleep 1 && npm run build 2>&1 | tail -5",
+    "testCommand": "npm test",
     "lintCommand": null,
     "devCommand": "npm run dev",
     "scripts": {
       "dev": "vite --host 0.0.0.0",
       "build": "vite build",
-      "preview": "vite preview --host 0.0.0.0"
+      "preview": "vite preview --host 0.0.0.0",
+      "test": "vitest run",
+      "test:watch": "vitest"
     }
   },
   "conventions": {
@@ -78,20 +85,20 @@
       "path": "api",
       "purpose": "API routes",
       "fileCount": 7,
-      "lastAccessed": 1782626275088,
+      "lastAccessed": 1782739261207,
       "keyFiles": [
         "ai-generate.js",
-        "news.js",
         "trending.js",
         "verify-source.js",
-        "discover-source.js"
+        "discover-source.js",
+        "meta.js"
       ]
     },
     "docs": {
       "path": "docs",
       "purpose": "Documentation",
       "fileCount": 25,
-      "lastAccessed": 1782626275089,
+      "lastAccessed": 1782739261269,
       "keyFiles": [
         "globe-extension-design.md",
         "reactflow-implementation-guide.md",
@@ -104,7 +111,7 @@
       "path": "public",
       "purpose": "Public files",
       "fileCount": 5,
-      "lastAccessed": 1782626275090,
+      "lastAccessed": 1782739261271,
       "keyFiles": [
         "ai-elf-avatar.png",
         "manifest.json",
@@ -117,7 +124,7 @@
       "path": "server",
       "purpose": null,
       "fileCount": 1,
-      "lastAccessed": 1782626275090,
+      "lastAccessed": 1782739261272,
       "keyFiles": [
         "newsPlugin.js"
       ]
@@ -126,7 +133,7 @@
       "path": "src",
       "purpose": "Source code",
       "fileCount": 7,
-      "lastAccessed": 1782626275092,
+      "lastAccessed": 1782739261273,
       "keyFiles": [
         "main.jsx",
         "GlobeView.jsx",
@@ -139,7 +146,7 @@
       "path": "dist",
       "purpose": "Distribution/build output",
       "fileCount": 6,
-      "lastAccessed": 1782626275228,
+      "lastAccessed": 1782739261274,
       "keyFiles": [
         "ai-elf-avatar.png",
         "manifest.json",
@@ -152,7 +159,7 @@
       "path": "scripts",
       "purpose": "Build/utility scripts",
       "fileCount": 40,
-      "lastAccessed": 1782626275229,
+      "lastAccessed": 1782739261274,
       "keyFiles": [
         "financial_scraper_example.py",
         "quick_sources_test.py",
@@ -161,22 +168,31 @@
         "test_integration.sh"
       ]
     },
+    "coverage": {
+      "path": "coverage",
+      "purpose": null,
+      "fileCount": 1,
+      "lastAccessed": 1782739261275,
+      "keyFiles": [
+        "coverage-summary.json"
+      ]
+    },
     "src\\utils": {
       "path": "src\\utils",
       "purpose": "Utility functions",
       "fileCount": 6,
-      "lastAccessed": 1782626275232,
+      "lastAccessed": 1782739261278,
       "keyFiles": [
         "localStorage.js",
-        "format.js",
-        "toast.js"
+        "toast.js",
+        "markdown.jsx"
       ]
     },
     "src\\components": {
       "path": "src\\components",
       "purpose": "UI components",
       "fileCount": 15,
-      "lastAccessed": 1782626275232,
+      "lastAccessed": 1782739261278,
       "keyFiles": [
         "SkeletonCard.jsx",
         "TrendLineChart.jsx",
@@ -187,9 +203,9 @@
       "path": "dist\\assets",
       "purpose": "Static assets",
       "fileCount": 2,
-      "lastAccessed": 1782626275234,
+      "lastAccessed": 1782739261279,
       "keyFiles": [
-        "index-B_P2edLU.js",
+        "index-BOTZHSNo.js",
         "index-ByNyzH98.css"
       ]
     }
@@ -197,272 +213,26 @@
   "hotPaths": [
     {
       "path": "src\\App.jsx",
-      "accessCount": 149,
-      "lastAccessed": 1782636735427,
-      "type": "file"
+      "accessCount": 23,
+      "lastAccessed": 1782807348136,
+      "type": "directory"
     },
     {
-      "path": "api\\news.js",
-      "accessCount": 17,
-      "lastAccessed": 1782631734244,
-      "type": "file"
+      "path": "src\\styles.css",
+      "accessCount": 10,
+      "lastAccessed": 1782807369170,
+      "type": "directory"
     },
     {
-      "path": "src\\utils\\__tests__\\workflowEngine.test.js",
-      "accessCount": 14,
-      "lastAccessed": 1782631951218,
+      "path": "src\\components\\AiChatPanel.jsx",
+      "accessCount": 2,
+      "lastAccessed": 1782807072252,
       "type": "file"
     },
     {
       "path": "CLAUDE.md",
-      "accessCount": 14,
-      "lastAccessed": 1782637502154,
-      "type": "file"
-    },
-    {
-      "path": "src\\utils\\profileModel.js",
-      "accessCount": 13,
-      "lastAccessed": 1782631570043,
-      "type": "directory"
-    },
-    {
-      "path": "src\\utils\\workflowEngine.js",
-      "accessCount": 8,
-      "lastAccessed": 1782631248595,
-      "type": "file"
-    },
-    {
-      "path": "",
-      "accessCount": 7,
-      "lastAccessed": 1782627492666,
-      "type": "directory"
-    },
-    {
-      "path": "server\\news\\config\\constants.js",
-      "accessCount": 6,
-      "lastAccessed": 1782632564600,
-      "type": "file"
-    },
-    {
-      "path": "server\\news\\plugin.js",
-      "accessCount": 5,
-      "lastAccessed": 1782629110712,
-      "type": "file"
-    },
-    {
-      "path": "package.json",
-      "accessCount": 5,
-      "lastAccessed": 1782629778097,
-      "type": "file"
-    },
-    {
-      "path": "src\\utils\\__tests__\\profileModel.test.js",
-      "accessCount": 4,
-      "lastAccessed": 1782631236250,
-      "type": "file"
-    },
-    {
-      "path": "vitest.config.js",
-      "accessCount": 4,
-      "lastAccessed": 1782631288858,
-      "type": "file"
-    },
-    {
-      "path": "src\\components\\NewsItem.jsx",
-      "accessCount": 3,
-      "lastAccessed": 1782629377692,
-      "type": "file"
-    },
-    {
-      "path": "src\\hooks\\useAuth.js",
-      "accessCount": 3,
-      "lastAccessed": 1782632958773,
-      "type": "file"
-    },
-    {
-      "path": "C:\\Users\\anlan0725\\.claude\\projects\\E--VStudio-Project-Silicon-Meridian\\memory\\MEMORY.md",
-      "accessCount": 3,
-      "lastAccessed": 1782633625912,
-      "type": "file"
-    },
-    {
-      "path": "src\\styles.css",
-      "accessCount": 2,
-      "lastAccessed": 1782449126940,
-      "type": "file"
-    },
-    {
-      "path": "AGENTS.md",
-      "accessCount": 2,
-      "lastAccessed": 1782627546916,
-      "type": "file"
-    },
-    {
-      "path": "README.md",
-      "accessCount": 2,
-      "lastAccessed": 1782627558991,
-      "type": "file"
-    },
-    {
-      "path": "server\\newsPlugin.js",
-      "accessCount": 2,
-      "lastAccessed": 1782627576425,
-      "type": "file"
-    },
-    {
-      "path": "server\\news\\config\\sourceGrades.js",
-      "accessCount": 2,
-      "lastAccessed": 1782628928894,
-      "type": "directory"
-    },
-    {
-      "path": "api\\meta.js",
-      "accessCount": 2,
-      "lastAccessed": 1782628978757,
-      "type": "file"
-    },
-    {
-      "path": "src\\utils\\format.js",
-      "accessCount": 2,
-      "lastAccessed": 1782629175309,
-      "type": "file"
-    },
-    {
-      "path": "src\\utils\\__tests__\\smoke.test.js",
-      "accessCount": 2,
-      "lastAccessed": 1782630381023,
-      "type": "file"
-    },
-    {
-      "path": "C:\\Users\\anlan0725\\.claude\\projects\\E--VStudio-Project-Silicon-Meridian\\memory\\optimization-plan-progress.md",
-      "accessCount": 2,
-      "lastAccessed": 1782633670256,
-      "type": "file"
-    },
-    {
-      "path": "vite.config.js",
       "accessCount": 1,
-      "lastAccessed": 1782627426449,
-      "type": "file"
-    },
-    {
-      "path": "tailwind.config.js",
-      "accessCount": 1,
-      "lastAccessed": 1782627427444,
-      "type": "file"
-    },
-    {
-      "path": "postcss.config.js",
-      "accessCount": 1,
-      "lastAccessed": 1782627427906,
-      "type": "file"
-    },
-    {
-      "path": ".env.example",
-      "accessCount": 1,
-      "lastAccessed": 1782627427994,
-      "type": "file"
-    },
-    {
-      "path": "vercel.json",
-      "accessCount": 1,
-      "lastAccessed": 1782627429055,
-      "type": "file"
-    },
-    {
-      "path": "Dockerfile",
-      "accessCount": 1,
-      "lastAccessed": 1782627429900,
-      "type": "file"
-    },
-    {
-      "path": "docker-compose.yml",
-      "accessCount": 1,
-      "lastAccessed": 1782627430546,
-      "type": "file"
-    },
-    {
-      "path": "nginx.conf",
-      "accessCount": 1,
-      "lastAccessed": 1782627431066,
-      "type": "file"
-    },
-    {
-      "path": "requirements.txt",
-      "accessCount": 1,
-      "lastAccessed": 1782627431266,
-      "type": "file"
-    },
-    {
-      "path": "index.html",
-      "accessCount": 1,
-      "lastAccessed": 1782627431369,
-      "type": "file"
-    },
-    {
-      "path": ".claude\\settings.local.json",
-      "accessCount": 1,
-      "lastAccessed": 1782627465813,
-      "type": "file"
-    },
-    {
-      "path": "server\\news\\services\\newsService.js",
-      "accessCount": 1,
-      "lastAccessed": 1782629110616,
-      "type": "directory"
-    },
-    {
-      "path": "C:\\Users\\ANLAN0~1\\AppData\\Local\\Temp\\claude\\E--VStudio-Project-Silicon-Meridian\\f4aa2875-8b0b-47d7-ab85-c3e385f405d1\\tasks\\bvuube1s3.output",
-      "accessCount": 1,
-      "lastAccessed": 1782629748718,
-      "type": "file"
-    },
-    {
-      "path": "C:\\Users\\ANLAN0~1\\AppData\\Local\\Temp\\claude\\E--VStudio-Project-Silicon-Meridian\\f4aa2875-8b0b-47d7-ab85-c3e385f405d1\\tasks\\bq7j8z3ct.output",
-      "accessCount": 1,
-      "lastAccessed": 1782630064049,
-      "type": "file"
-    },
-    {
-      "path": "src\\constants\\workflowConstants.js",
-      "accessCount": 1,
-      "lastAccessed": 1782630240232,
-      "type": "file"
-    },
-    {
-      "path": "src\\hooks\\useLlmConfig.js",
-      "accessCount": 1,
-      "lastAccessed": 1782633306912,
-      "type": "file"
-    },
-    {
-      "path": "src\\hooks\\useTrending.js",
-      "accessCount": 1,
-      "lastAccessed": 1782634013394,
-      "type": "file"
-    },
-    {
-      "path": "src\\hooks\\useSourceManager.js",
-      "accessCount": 1,
-      "lastAccessed": 1782634469634,
-      "type": "file"
-    },
-    {
-      "path": "src\\hooks\\useCustomUrl.js",
-      "accessCount": 1,
-      "lastAccessed": 1782635113517,
-      "type": "file"
-    },
-    {
-      "path": "src\\hooks\\useCalendar.js",
-      "accessCount": 1,
-      "lastAccessed": 1782635118562,
-      "type": "file"
-    },
-    {
-      "path": "src\\hooks\\useUI.js",
-      "accessCount": 1,
-      "lastAccessed": 1782635853049,
+      "lastAccessed": 1782739314157,
       "type": "file"
     }
   ],
