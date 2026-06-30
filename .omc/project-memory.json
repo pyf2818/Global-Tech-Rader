@@ -47,8 +47,8 @@
     "runtime": null
   },
   "build": {
-    "buildCommand": "cd \"E:/VStudio_Project/Silicon Meridian\" && taskkill //F //IM esbuild.exe 2>/dev/null; sleep 1 && npm run build 2>&1 | tail -5",
-    "testCommand": "npm test",
+    "buildCommand": "cd \"E:/VStudio_Project/Silicon Meridian\" && taskkill //F //IM esbuild.exe 2>/dev/null; sleep 1 && npm run build 2>&1 | tail -3 && node node_modules/vitest/vitest.mjs run 2>&1 | tail -5",
+    "testCommand": "cd \"E:/VStudio_Project/Silicon Meridian\" && taskkill //F //IM esbuild.exe 2>/dev/null; sleep 1 && npm run build 2>&1 | tail -3 && node node_modules/vitest/vitest.mjs run 2>&1 | tail -5",
     "lintCommand": null,
     "devCommand": "npm run dev",
     "scripts": {
@@ -219,14 +219,14 @@
     },
     {
       "path": "src\\styles.css",
-      "accessCount": 10,
-      "lastAccessed": 1782807369170,
+      "accessCount": 12,
+      "lastAccessed": 1782807868646,
       "type": "directory"
     },
     {
       "path": "src\\components\\AiChatPanel.jsx",
-      "accessCount": 2,
-      "lastAccessed": 1782807072252,
+      "accessCount": 4,
+      "lastAccessed": 1782807893370,
       "type": "file"
     },
     {

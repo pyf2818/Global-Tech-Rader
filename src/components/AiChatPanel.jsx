@@ -56,7 +56,7 @@ export default function AiChatPanel({
     resizeStartRef.current = { x: e.clientX, w: panelWidth };
     const onMove = (ev) => {
       const dx = ev.clientX - resizeStartRef.current.x;
-      setPanelWidth(clamp(resizeStartRef.current.w + dx, 320, 700));
+      setPanelWidth(clamp(resizeStartRef.current.w - dx, 320, 700));
     };
     const onUp = () => { window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); };
     window.addEventListener('mousemove', onMove);
