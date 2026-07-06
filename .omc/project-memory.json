@@ -213,8 +213,8 @@
   "hotPaths": [
     {
       "path": "src/App.jsx",
-      "accessCount": 45,
-      "lastAccessed": 1783359450000,
+      "accessCount": 47,
+      "lastAccessed": 1783359937498,
       "type": "directory"
     },
     {
@@ -269,6 +269,12 @@
       "path": "src/utils/profileModel.js",
       "accessCount": 1,
       "lastAccessed": 1783357830984,
+      "type": "file"
+    },
+    {
+      "path": "src/components/StudioPage.jsx",
+      "accessCount": 1,
+      "lastAccessed": 1783359727403,
       "type": "file"
     }
   ],
