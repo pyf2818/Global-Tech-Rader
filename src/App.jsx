@@ -56,8 +56,7 @@ const MOTIVATIONAL_QUOTES = [
 const NAV_ITEMS = [
   { id: 'today', label: '每日汇报', icon: 'sparkle' },
   { id: 'all', label: '全部动态', icon: 'grid' },
-  { id: 'recommendations', label: '推荐池', icon: 'sparkle' },
-  { id: 'briefing', label: '今日态势', icon: 'document' },
+
   { id: 'tracker', label: '我的追踪', icon: 'follow' },
   { id: 'trending', label: '热门榜单', icon: 'fire' },
   { id: 'github', label: 'GitHub 热门', icon: 'github' },
@@ -69,10 +68,7 @@ const NAV_ITEMS = [
   { id: 'square', label: '用户广场', icon: 'user' },
   { id: 'profile-center', label: '用户画像', icon: 'target' },
   { id: 'calendar', label: '日历管理', icon: 'calendar' },
-  { id: 'reading-list', label: '阅读列表', icon: 'bookmark' },
   { id: 'trends', label: '赛道矩阵', icon: 'chart' },
-  { id: 'reading-stats', label: '阅读画像', icon: 'rows' },
-  { id: 'knowledge-export', label: '导出发布', icon: 'link' }
 ];
 
 const PRIMARY_NAV_ITEMS = [
@@ -111,11 +107,11 @@ const NAV_CONTEXT_SECTIONS = {
   },
   tools: {
     label: '隐藏工具',
-    items: ['recommendations', 'briefing', 'tracker', 'trends', 'reading-stats', 'calendar', 'reading-list', 'knowledge-export', 'trending', 'custom-url']
+    items: ['tracker', 'trends', 'calendar', 'trending', 'custom-url']
   }
 };
 
-const MORE_NAV_ITEMS = ['recommendations', 'briefing', 'tracker', 'trends', 'reading-stats', 'calendar', 'reading-list', 'knowledge-export', 'trending', 'custom-url'];
+const MORE_NAV_ITEMS = ['tracker', 'trends', 'calendar', 'trending', 'custom-url'];
 
 const DEFAULT_AGENT_WORKFLOW = {
   name: '个人情报协作流',
@@ -5410,18 +5406,13 @@ ${signals}
 
   const navToPrimary = {
     today: 'today',
-    recommendations: 'today',
     all: 'all',
-    briefing: 'today',
     tracker: 'profile-center',
     trends: 'profile-center',
-    'reading-stats': 'profile-center',
     calendar: 'profile-center',
     studio: 'studio',
     editor: 'studio',
     materials: 'studio',
-    'reading-list': 'studio',
-    'knowledge-export': 'studio',
     agents: 'studio',
     square: 'square',
     'profile-center': 'profile-center',

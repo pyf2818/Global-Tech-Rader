@@ -47,8 +47,8 @@
     "runtime": null
   },
   "build": {
-    "buildCommand": "npm run build",
-    "testCommand": "cd \"E:/VStudio_Project/Silicon Meridian\" && echo \"=== 校验 CLAUDE.md 关键事实 ===\" && grep -n \"10097\\|No tests\\|Do not run them\\|CATEGORIES 副本仍存在\" CLAUDE.md || echo \"✓ 过时内容已清除\" && echo \"=== App.jsx 实际行数 ===\" && wc -l src/App.jsx && echo \"=== 测试 ===\" && node node_modules/vitest/vitest.mjs run 2>&1 | tail -5",
+    "buildCommand": "cd \"E:/VStudio_Project/Silicon Meridian\" && taskkill //F //IM esbuild.exe 2>/dev/null; sleep 1 && npm run build 2>&1 | tail -4",
+    "testCommand": "cd \"E:/VStudio_Project/Silicon Meridian\" && curl -s -o /dev/null -w \"HTTP %{http_code}\" http://localhost:5175/ 2>/dev/null && echo \"\" && node node_modules/vitest/vitest.mjs run 2>&1 | tail -4",
     "lintCommand": null,
     "devCommand": "npm run dev",
     "scripts": {
@@ -211,6 +211,12 @@
     }
   },
   "hotPaths": [
+    {
+      "path": "src/App.jsx",
+      "accessCount": 13,
+      "lastAccessed": 1783353083103,
+      "type": "directory"
+    },
     {
       "path": "CLAUDE.md",
       "accessCount": 7,
