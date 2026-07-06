@@ -9,12 +9,17 @@ npm install                              # Install dependencies
 npm run dev                              # Dev server on 0.0.0.0:5175 (with API middleware)
 npm run build                            # Production build -> dist/
 npm run preview                          # Preview production build (static only, no API)
+npm test                                 # Run unit tests (vitest) — 143 tests in src/utils/__tests__/
+npm run test:watch                       # Watch mode
+node node_modules/vitest/vitest.mjs run <file>  # Run a single test file (bin symlink not created on Windows)
 python scrapling_server.py               # Flask API on port 5000 (optional, for Scrapling scraping)
 ```
 
-No test, lint, typecheck, or formatter commands exist. Do not run them.
+No lint, typecheck, or formatter commands exist.
 
 **Important**: `vite preview` only serves static files — it does NOT run `server/newsPlugin.js`. Use `npm run dev` for a working instance with API endpoints. The `vite.config.js` port is **5175**, not the default 5173.
+
+**Vitest on Windows**: `npx vitest` fails (bin symlink not created); use `node node_modules/vitest/vitest.mjs run` instead. If esbuild throws `EBUSY`, kill stale processes: `taskkill //F //IM esbuild.exe`. Vitest 4.x triggers rolldown native binding failures — pin to **vitest 3.x**.
 
 ## Architecture
 
@@ -26,16 +31,16 @@ No test, lint, typecheck, or formatter commands exist. Do not run them.
 
 ### Frontend (`src/`)
 
-- **`App.jsx`** (10097 lines) — Main component containing ~140 useState hooks, routing logic, settings modal, and all page views. Being incrementally split into hooks below.
+- **`App.jsx`** (10105 lines) — Main component containing ~140 useState hooks, routing logic, settings modal, and all page views. Being incrementally split into hooks below.
 - **`AiElf.jsx`** (1354 lines) — AI assistant with multi-Agent conversation, drag-to-analyze, history management. Uses localStorage per-agent (50 messages, 20 sessions max).
 - **`GlobeView.jsx`** (999 lines) — 3D globe via `react-globe.gl`/Three.js. Fullscreen uses `createPortal` to `document.body`. Canvas needs `min-height: 420px`.
 - **`main.jsx`** — Mounts `<App />` inside `<ErrorBoundary>` + `<React.StrictMode>`.
 - **`styles.css`** (14560 lines) — CSS custom properties for dark/light themes. Tailwind config only sets content paths — no Tailwind utilities used in practice.
 - **`themes.css`** (884 lines) — Multi-palette theme definitions.
 
-#### Extracted Modules (Phase 1 refactoring)
+#### Extracted Modules (Phase 1-3 refactoring)
 
-Components, utilities, constants, and hooks extracted from App.jsx. Currently imported but App.jsx also has inline copies — these will diverge as App.jsx is further refactored.
+Components, utilities, constants, and hooks extracted from App.jsx. State has been progressively moved into hooks (useAuth/useLlmConfig/useTrending/useSourceManager/useCustomUrl/useCalendar/useUI). Some logic (e.g. `generateDailyBriefing`) still lives inline in App.jsx and hasn't been extracted yet.
 
 ```
 src/components/
@@ -171,11 +176,11 @@ Categories, source grades, and tag rules are defined **independently** in both `
 | Source Grades | `SOURCE_GRADES` with color/icon | `gradeColors` object (different hex values!) |
 | Grade Badge Colors | S=#dc2626, A=#ea580c, B=#16a34a, C=#2563eb, D=#64748b | S=#ff0000, A=#ff8800, B=#00cc00, C=#0088ff, D=#666666 |
 
-> **Note**: Phase 1 统一了分级色值——App.jsx 和 NewsItem.jsx 已改用服务端 `SOURCE_GRADES` 权威色（#dc2626 系）。`api/news.js` 和 `api/meta.js` 已复用 `server/news/config/constants.js`。App.jsx 内的 `CATEGORIES` 副本仍存在，是唯一剩余的双源问题。
+> **Note**: Phase 1 统一了分级色值——App.jsx 和 NewsItem.jsx 已改用服务端 `SOURCE_GRADES` 权威色（#dc2626 系）。`api/news.js` 和 `api/meta.js` 已复用 `server/news/config/constants.js`。App.jsx 的 `categories` 现从 `/api/meta` 加载（`serverCategories`），离线时降级到 `FALLBACK_CATEGORIES`——双源问题已消除。
 
 ## Known Issues
 
-- **No tests** — zero unit, integration, or E2E tests exist
+- **Tests limited to pure-logic engines** — 143 unit tests cover `workflowEngine.js` (69) + `profileModel.js` (70) + format utils (4); no integration/E2E tests, no component tests
 - **RSS failure rate ~40-50%** — many sources return 403/404 or HTML instead of RSS
 - **Auth is dev-only** — register/login routes exist in newsPlugin.js but have no serverless equivalents in `api/`
 - **`package.json` type: "module"** — all `.js` files use ESM; CI workflows using `require()` will crash
@@ -196,5 +201,5 @@ Categories, source grades, and tag rules are defined **independently** in both `
 - `scripts/` contains deployment and test scripts; `docs/reports/` contains historical optimization reports
 - v2 localStorage keys: `agentWorkflowHistory` (workflow run records, max 12), `dailyBriefingReport` (last generated briefing). AI Elf uses per-agent keys. All `setItem` calls must be wrapped in try-catch for `QuotaExceededError`.
 - WorkflowEngine: `condition` node failure halts the entire rest of the chain (subsequent nodes marked `skipped`), it does NOT branch. LLM nodes require `ctx.llmConfig` (baseUrl/apiKey/selectedModel) and an agent with `systemPrompt`; local nodes ignore LLM config entirely.
-- The monolithic `App.jsx` (10097 lines) imports the v2 modules but ALSO retains inline copies of some logic — when editing workflow/profile/briefing behavior, check whether App.jsx calls the extracted module or its inline copy. Prefer the extracted module. State has been progressively extracted into hooks (useAuth/useLlmConfig/useTrending/useSourceManager/useCustomUrl/useCalendar/useUI); ~140 useState remain in App.jsx, mostly cross-domain coupled (bookmarks/materials/agentWorkflow).
+- The monolithic `App.jsx` (10105 lines) imports the v2 modules but ALSO retains inline copies of some logic — when editing workflow/profile/briefing behavior, check whether App.jsx calls the extracted module or its inline copy. Prefer the extracted module. State has been progressively extracted into hooks (useAuth/useLlmConfig/useTrending/useSourceManager/useCustomUrl/useCalendar/useUI); ~140 useState remain in App.jsx, mostly cross-domain coupled (bookmarks/materials/agentWorkflow).
 - Runtime `ReferenceError: useMemo is not defined` means a component file uses `useMemo` without importing it from `react` — add `import { useMemo } from 'react'` to that file.

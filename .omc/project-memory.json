@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "lastScanned": 1782739261328,
+  "lastScanned": 1783305388896,
   "projectRoot": "E:\\VStudio_Project\\Silicon Meridian",
   "techStack": {
     "languages": [
@@ -47,8 +47,8 @@
     "runtime": null
   },
   "build": {
-    "buildCommand": "cd \"E:/VStudio_Project/Silicon Meridian\" && taskkill //F //IM esbuild.exe 2>/dev/null; sleep 1 && npm run build 2>&1 | tail -5",
-    "testCommand": "cd \"E:/VStudio_Project/Silicon Meridian\" && taskkill //F //IM esbuild.exe 2>/dev/null; sleep 1 && npm run build 2>&1 | tail -3 && node node_modules/vitest/vitest.mjs run 2>&1 | tail -5",
+    "buildCommand": "npm run build",
+    "testCommand": "cd \"E:/VStudio_Project/Silicon Meridian\" && echo \"=== 校验 CLAUDE.md 关键事实 ===\" && grep -n \"10097\\|No tests\\|Do not run them\\|CATEGORIES 副本仍存在\" CLAUDE.md || echo \"✓ 过时内容已清除\" && echo \"=== App.jsx 实际行数 ===\" && wc -l src/App.jsx && echo \"=== 测试 ===\" && node node_modules/vitest/vitest.mjs run 2>&1 | tail -5",
     "lintCommand": null,
     "devCommand": "npm run dev",
     "scripts": {
@@ -85,7 +85,7 @@
       "path": "api",
       "purpose": "API routes",
       "fileCount": 7,
-      "lastAccessed": 1782739261207,
+      "lastAccessed": 1783305388749,
       "keyFiles": [
         "ai-generate.js",
         "trending.js",
@@ -98,7 +98,7 @@
       "path": "docs",
       "purpose": "Documentation",
       "fileCount": 25,
-      "lastAccessed": 1782739261269,
+      "lastAccessed": 1783305388801,
       "keyFiles": [
         "globe-extension-design.md",
         "reactflow-implementation-guide.md",
@@ -111,7 +111,7 @@
       "path": "public",
       "purpose": "Public files",
       "fileCount": 5,
-      "lastAccessed": 1782739261271,
+      "lastAccessed": 1783305388803,
       "keyFiles": [
         "ai-elf-avatar.png",
         "manifest.json",
@@ -124,7 +124,7 @@
       "path": "server",
       "purpose": null,
       "fileCount": 1,
-      "lastAccessed": 1782739261272,
+      "lastAccessed": 1783305388805,
       "keyFiles": [
         "newsPlugin.js"
       ]
@@ -133,7 +133,7 @@
       "path": "src",
       "purpose": "Source code",
       "fileCount": 7,
-      "lastAccessed": 1782739261273,
+      "lastAccessed": 1783305388806,
       "keyFiles": [
         "main.jsx",
         "GlobeView.jsx",
@@ -146,7 +146,7 @@
       "path": "dist",
       "purpose": "Distribution/build output",
       "fileCount": 6,
-      "lastAccessed": 1782739261274,
+      "lastAccessed": 1783305388808,
       "keyFiles": [
         "ai-elf-avatar.png",
         "manifest.json",
@@ -159,7 +159,7 @@
       "path": "scripts",
       "purpose": "Build/utility scripts",
       "fileCount": 40,
-      "lastAccessed": 1782739261274,
+      "lastAccessed": 1783305388810,
       "keyFiles": [
         "financial_scraper_example.py",
         "quick_sources_test.py",
@@ -172,7 +172,7 @@
       "path": "coverage",
       "purpose": null,
       "fileCount": 1,
-      "lastAccessed": 1782739261275,
+      "lastAccessed": 1783305388812,
       "keyFiles": [
         "coverage-summary.json"
       ]
@@ -181,7 +181,7 @@
       "path": "src\\utils",
       "purpose": "Utility functions",
       "fileCount": 6,
-      "lastAccessed": 1782739261278,
+      "lastAccessed": 1783305388817,
       "keyFiles": [
         "localStorage.js",
         "toast.js",
@@ -192,7 +192,7 @@
       "path": "src\\components",
       "purpose": "UI components",
       "fileCount": 15,
-      "lastAccessed": 1782739261278,
+      "lastAccessed": 1783305388819,
       "keyFiles": [
         "SkeletonCard.jsx",
         "TrendLineChart.jsx",
@@ -203,42 +203,18 @@
       "path": "dist\\assets",
       "purpose": "Static assets",
       "fileCount": 2,
-      "lastAccessed": 1782739261279,
+      "lastAccessed": 1783305388821,
       "keyFiles": [
-        "index-BOTZHSNo.js",
-        "index-ByNyzH98.css"
+        "index-DLO4S2lK.js",
+        "index-CFxJJNJW.css"
       ]
     }
   },
   "hotPaths": [
     {
-      "path": "src\\App.jsx",
-      "accessCount": 32,
-      "lastAccessed": 1782811922037,
-      "type": "directory"
-    },
-    {
-      "path": "src\\styles.css",
-      "accessCount": 12,
-      "lastAccessed": 1782807868646,
-      "type": "directory"
-    },
-    {
-      "path": "src\\components\\AiChatPanel.jsx",
-      "accessCount": 4,
-      "lastAccessed": 1782807893370,
-      "type": "file"
-    },
-    {
-      "path": "src\\hooks\\useSourceManager.js",
-      "accessCount": 3,
-      "lastAccessed": 1782811725704,
-      "type": "directory"
-    },
-    {
       "path": "CLAUDE.md",
-      "accessCount": 1,
-      "lastAccessed": 1782739314157,
+      "accessCount": 7,
+      "lastAccessed": 1783342798132,
       "type": "file"
     }
   ],
