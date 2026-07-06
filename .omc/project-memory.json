@@ -47,7 +47,7 @@
     "runtime": null
   },
   "build": {
-    "buildCommand": "cd \"E:/VStudio_Project/Silicon Meridian\" && taskkill //F //IM esbuild.exe 2>/dev/null; sleep 1 && npm run build 2>&1 | grep -i \"error\\|built\" | head -3 && node node_modules/vitest/vitest.mjs run 2>&1 | tail -3",
+    "buildCommand": "cd \"E:/VStudio_Project/Silicon Meridian\" && taskkill //F //IM esbuild.exe 2>/dev/null; sleep 1 && npm run build 2>&1 | grep -i \"error\\|built\" | head -3 && curl -s -o /dev/null -w \"HTTP %{http_code}\" http://localhost:5175/ 2>/dev/null",
     "testCommand": "cd \"E:/VStudio_Project/Silicon Meridian\" && taskkill //F //IM esbuild.exe 2>/dev/null; sleep 1 && npm run build 2>&1 | grep -i \"error\\|built\" | head -3 && node node_modules/vitest/vitest.mjs run 2>&1 | tail -3",
     "lintCommand": null,
     "devCommand": "npm run dev",
@@ -213,8 +213,8 @@
   "hotPaths": [
     {
       "path": "src/App.jsx",
-      "accessCount": 47,
-      "lastAccessed": 1783359937498,
+      "accessCount": 48,
+      "lastAccessed": 1783360626494,
       "type": "directory"
     },
     {
