@@ -57,18 +57,13 @@ const NAV_ITEMS = [
   { id: 'today', label: '每日汇报', icon: 'sparkle' },
   { id: 'all', label: '全部动态', icon: 'grid' },
 
-  { id: 'tracker', label: '我的追踪', icon: 'follow' },
-  { id: 'trending', label: '热门榜单', icon: 'fire' },
   { id: 'github', label: 'GitHub 热门', icon: 'github' },
-  { id: 'custom-url', label: '自定义抓取', icon: 'link' },
   { id: 'materials', label: '素材库', icon: 'layers' },
   { id: 'studio', label: '智创中心', icon: 'edit' },
   { id: 'agents', label: '智能体', icon: 'bot' },
   { id: 'editor', label: '内容创作', icon: 'edit' },
   { id: 'square', label: '用户广场', icon: 'user' },
   { id: 'profile-center', label: '用户画像', icon: 'target' },
-  { id: 'calendar', label: '日历管理', icon: 'calendar' },
-  { id: 'trends', label: '赛道矩阵', icon: 'chart' },
 ];
 
 const PRIMARY_NAV_ITEMS = [
@@ -105,13 +100,8 @@ const NAV_CONTEXT_SECTIONS = {
     label: '个人生态',
     items: ['profile-center']
   },
-  tools: {
-    label: '隐藏工具',
-    items: ['tracker', 'trends', 'calendar', 'trending', 'custom-url']
-  }
 };
 
-const MORE_NAV_ITEMS = ['tracker', 'trends', 'calendar', 'trending', 'custom-url'];
 
 const DEFAULT_AGENT_WORKFLOW = {
   name: '个人情报协作流',
@@ -5416,14 +5406,11 @@ ${signals}
     agents: 'studio',
     square: 'square',
     'profile-center': 'profile-center',
-    trending: 'tools',
     github: 'github',
-    'custom-url': 'tools'
   };
   const activePrimaryNav = navToPrimary[nav] || 'today';
   const activeContextSection = NAV_CONTEXT_SECTIONS[activePrimaryNav] || NAV_CONTEXT_SECTIONS.today;
   const activeContextItems = activeContextSection.items.map(id => NAV_ITEMS.find(item => item.id === id)).filter(Boolean);
-  const moreNavItems = MORE_NAV_ITEMS.map(id => NAV_ITEMS.find(item => item.id === id)).filter(Boolean);
   const goNav = (nextNav) => {
     if (nextNav === 'agents') {
       setCurrentAgent('orchestrator');
@@ -5602,24 +5589,6 @@ ${signals}
             </div>
           )}
 
-          {!sidebarCollapsed && activePrimaryNav !== 'tools' && (
-            <div className="nav-context-group">
-              <button className="nav-group-toggle nav-more-toggle" onClick={() => setMoreNavOpen(v => !v)}>
-                <span className="nav-group-title">更多工具</span>
-                <span className={`nav-group-chevron ${moreNavOpen ? 'open' : ''}`}>{ICONS.chevronDown}</span>
-              </button>
-              {moreNavOpen && moreNavItems.map(item => (
-                <button
-                  key={item.id}
-                  className={`nav-item nav-sub-item ${nav === item.id ? 'active' : ''}`}
-                  onClick={() => { goNav(item.id); addRecentVisit('nav', item.id, item.label); }}
-                >
-                  <span className="nav-icon">{ICONS[item.icon]}</span>
-                  <span className="nav-label">{item.label}</span>
-                </button>
-              ))}
-            </div>
-          )}
 
           {!sidebarCollapsed && activePrimaryNav === 'profile-center' && (
             <div className="nav-group nav-follow-group">
