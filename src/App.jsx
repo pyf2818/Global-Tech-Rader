@@ -1136,6 +1136,11 @@ function App() {
   const [sourcePriorities, setSourcePriorities] = useState(() => loadLS('sourcePriorities', {}));
   const [dailyProfileSnapshots, setDailyProfileSnapshots] = useState(() => loadLS('dailyProfileSnapshots', []));
   const [specialFollows, setSpecialFollows] = useState(() => loadLS('specialFollows', []));
+  const [likedPosts, setLikedPosts] = useState(() => new Set(loadLS('likedPosts', [])));
+  const [savedPosts, setSavedPosts] = useState(() => new Set(loadLS('savedPosts', [])));
+  const [postComments, setPostComments] = useState(() => loadLS('postComments', {}));
+  const [commentTexts, setCommentTexts] = useState({});
+  const [showCommentPanel, setShowCommentPanel] = useState(null);
 
   // 打开资料弹窗时预填充表单
   useEffect(() => {
@@ -1153,7 +1158,11 @@ function App() {
     saveLS('sourcePriorities', sourcePriorities);
     saveLS('dailyProfileSnapshots', dailyProfileSnapshots);
     saveLS('specialFollows', specialFollows);
-  }, [domainPriorities, sourcePriorities, dailyProfileSnapshots, specialFollows]);
+    saveLS('likedPosts', [...likedPosts]);
+    saveLS('savedPosts', [...savedPosts]);
+    saveLS('postComments', postComments);
+  }, [domainPriorities, sourcePriorities, dailyProfileSnapshots, specialFollows, likedPosts, savedPosts, postComments]);
+
 
   // 认证函数已抽取至 useAuth — 这里不再定义
 
@@ -1166,6 +1175,15 @@ function App() {
     () => (serverCategories.length > 0 ? serverCategories : FALLBACK_CATEGORIES),
     [serverCategories]
   );
+
+  // 社区交互
+  const toggleLike = (id) => setLikedPosts(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  const toggleSave = (id) => setSavedPosts(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  const addComment = (postId, text) => {
+    if (!text.trim()) return;
+    setPostComments(prev => ({ ...prev, [postId]: [...(prev[postId] || []), { id: Date.now(), user: user?.displayName || '匿名', text, time: new Date().toISOString() }] }));
+    setCommentTexts(prev => ({ ...prev, [postId]: '' }));
+  };
 
   // 获取用户兴趣分类的详细信息
   const userInterestCategories = useMemo(() => {
