@@ -5,6 +5,7 @@ import SettingsModal from './components/SettingsModal.jsx';
 import ArticleEditor from './components/ArticleEditor.jsx';
 import ColorfulBubbles from './components/ColorfulBubbles.jsx';
 import AiChatPanel from './components/AiChatPanel.jsx';
+import StockPage from './components/StockPage.jsx';
 import ThemePicker from './ThemePicker.jsx';
 import { PALETTES } from './ThemePicker.jsx';
 import { getGradeColors } from './utils/format.js';
@@ -54,8 +55,9 @@ const MOTIVATIONAL_QUOTES = [
 ];
 
 const NAV_ITEMS = [
-  { id: 'today', label: '每日汇报', icon: 'sparkle' },
+  { id: 'today', label: '今日速报', icon: 'sparkle' },
   { id: 'all', label: '全部动态', icon: 'grid' },
+  { id: 'stock', label: '股市动向', icon: 'trendingUp' },
 
   { id: 'github', label: 'GitHub 热门', icon: 'github' },
   { id: 'materials', label: '素材库', icon: 'layers' },
@@ -67,8 +69,9 @@ const NAV_ITEMS = [
 ];
 
 const PRIMARY_NAV_ITEMS = [
-  { id: 'today', label: '每日汇报', desc: '精准推荐', icon: 'sparkle', nav: 'today' },
+  { id: 'today', label: '今日速报', desc: '精准推荐', icon: 'sparkle', nav: 'today' },
   { id: 'all', label: '全部动态', desc: '扩展视野', icon: 'grid', nav: 'all' },
+  { id: 'stock', label: '股市动向', desc: '行情分析', icon: 'trendingUp', nav: 'stock' },
   { id: 'github', label: 'GitHub 热门', desc: '三榜项目', icon: 'github', nav: 'github' },
   { id: 'studio', label: '智创中心', desc: '素材智能体创作', icon: 'edit', nav: 'studio' },
   { id: 'square', label: '用户广场', desc: '分享交流', icon: 'user', nav: 'square' },
@@ -5787,6 +5790,9 @@ ${signals}
                     </>
                   )}
                 </div>
+              )}
+              {nav === 'stock' && (
+                <StockPage llmConfig={llmConfig} categories={categories} />
               )}
               {nav === 'github' && (
                 <div className="github-filter-bar">

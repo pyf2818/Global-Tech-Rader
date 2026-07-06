@@ -5,6 +5,7 @@ import { users, userSessions, createUser, verifyUser, generateToken, getUserByTo
 import { getNews } from './services/newsService.js';
 import { getTrending, getGithubTrending } from './services/trendingService.js';
 import { discoverSourceCandidates, validateFeedUrl } from './services/sourceDiscovery.js';
+import { getDashboard, getRealtime, getKline, searchStock, resolveSecid } from './services/stockService.js';
 
 export function newsPlugin() {
   return {
@@ -155,6 +156,38 @@ export function newsPlugin() {
           const payload = await getGithubTrending(lang, since);
           return sendJson(res, payload);
         }
+
+        // ===== 股市动向 API =====
+        if (requestUrl.pathname === '/api/stock/dashboard') {
+          const payload = await getDashboard();
+          return sendJson(res, payload);
+        }
+
+        if (requestUrl.pathname === '/api/stock/realtime') {
+          const code = requestUrl.searchParams.get('code') || '';
+          const secid = resolveSecid(code);
+          if (!secid) return sendJson(res, { ok: false, message: '无效的股票代码' }, 400);
+          const data = await getRealtime([secid]);
+          return sendJson(res, data[0] || { ok: false, message: '未获取到数据' });
+        }
+
+        if (requestUrl.pathname === '/api/stock/kline') {
+          const code = requestUrl.searchParams.get('code') || '';
+          const period = requestUrl.searchParams.get('period') || '101';
+          const count = parseInt(requestUrl.searchParams.get('count') || '60', 10);
+          const secid = resolveSecid(code);
+          if (!secid) return sendJson(res, { ok: false, message: '无效的股票代码' }, 400);
+          const data = await getKline(secid, { period, count });
+          return sendJson(res, data || { ok: false, message: '未获取到K线数据' });
+        }
+
+        if (requestUrl.pathname === '/api/stock/search') {
+          const keyword = requestUrl.searchParams.get('keyword') || '';
+          if (!keyword) return sendJson(res, []);
+          const data = await searchStock(keyword);
+          return sendJson(res, data);
+        }
+        // ===== 股市动向 API END =====
 
         if (requestUrl.pathname === '/api/verify-source') {
           const url = requestUrl.searchParams.get('url') || '';
