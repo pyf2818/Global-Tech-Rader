@@ -5910,6 +5910,12 @@ ${signals}
                   <div className="workbench-kicker">Personal Intelligence</div>
                   <h1 className="workbench-title">今日情报工作台</h1>
                   <p className="workbench-subtitle">少看一点，理解更深一点。系统会按日期、关注领域和来源质量帮你收敛到真正值得读的内容。</p>
+                <div className="hero-briefing-summary">
+                  <div className="hero-briefing-stat"><span className="hero-briefing-stat-num">{insightData.todayCount}</span><span>今日资讯</span></div>
+                  <div className="hero-briefing-stat"><span className="hero-briefing-stat-num">{topMustRead.length}</span><span>必读推荐</span></div>
+                  <div className="hero-briefing-stat"><span className="hero-briefing-stat-num">{selectedInterests.length}</span><span>关注领域</span></div>
+                  <div className="hero-briefing-stat"><span className="hero-briefing-stat-num">{Math.abs(insightData.dailyChange || 0)}%</span><span>日变化</span></div>
+                </div>
                 </div>
 
                 <div className="date-manager">

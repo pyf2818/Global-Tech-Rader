@@ -14685,3 +14685,9 @@ body {
 .special-follow-form input:focus { border-color: var(--accent-cyan); }
 .special-follow-form button { padding: 8px 16px; border: 1px solid var(--accent-cyan); border-radius: 8px; background: var(--accent-cyan-soft); color: var(--accent-cyan); font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap; }
 .special-follow-form button:hover { background: var(--accent-cyan); color: #fff; }
+
+/* Hero Briefing Summary 今日摘要统计 */
+.hero-briefing-summary { display: flex; gap: 16px; margin-top: 12px; padding: 12px 0; border-top: 1px solid var(--border-color); }
+.hero-briefing-stat { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.hero-briefing-stat-num { font-family: var(--font-mono); font-size: 20px; font-weight: 700; color: var(--accent-cyan); }
+.hero-briefing-stat span:last-child { font-size: 11px; color: var(--text-muted); }
