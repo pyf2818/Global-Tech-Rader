@@ -14670,3 +14670,18 @@ body {
   .stock-header { flex-direction: column; align-items: flex-start; }
   .stock-indices-grid { grid-template-columns: 1fr; }
 }
+
+/* Special Follows 特别关注 */
+.profile-special-follows { margin-top: 20px; padding: 20px; border: 1px solid var(--border-color); border-radius: 12px; background: var(--bg-card); }
+.special-follows-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px; }
+.special-follow-item { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border: 1px solid var(--border-color); border-radius: 8px; background: var(--surface-workbench-inset); font-size: 13px; }
+.special-follow-name { font-weight: 600; color: var(--text-primary); min-width: 100px; }
+.special-follow-url { flex: 1; color: var(--accent-cyan); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.special-follow-note { color: var(--text-muted); font-size: 12px; max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.special-follow-remove { padding: 4px 10px; border: 1px solid var(--signal-critical-soft); border-radius: 6px; background: transparent; color: var(--signal-critical); font-size: 11px; cursor: pointer; transition: all 0.15s; }
+.special-follow-remove:hover { background: var(--signal-critical-soft); }
+.special-follow-form { display: flex; gap: 8px; align-items: center; }
+.special-follow-form input { flex: 1; padding: 8px 12px; border: 1px solid var(--border-color); border-radius: 8px; background: var(--bg-primary); color: var(--text-primary); font-size: 13px; outline: none; }
+.special-follow-form input:focus { border-color: var(--accent-cyan); }
+.special-follow-form button { padding: 8px 16px; border: 1px solid var(--accent-cyan); border-radius: 8px; background: var(--accent-cyan-soft); color: var(--accent-cyan); font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap; }
+.special-follow-form button:hover { background: var(--accent-cyan); color: #fff; }

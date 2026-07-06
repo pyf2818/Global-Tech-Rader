@@ -2231,6 +2231,9 @@ function App() {
         if (sourcePriority > 0) {
           score += (sourcePriority - 3) * 5;
         }
+        // 特别关注来源额外加权
+        const sf = specialFollows.find(f => item.source?.includes(f.name) || item.title?.toLowerCase().includes(f.url?.toLowerCase()));
+        if (sf) score += 20;
 
         // 5. 互动热度（基于用户行为）
         if (bookmarkIds.has(item.id)) score += 15; // 已收藏
@@ -6915,6 +6918,12 @@ ${signals}
                     ))}
                   </div>
                 </div>
+              </section>
+
+              <section className="profile-special-follows">
+                <div className="section-header"><h2 className="section-title">{ICONS.star} 特别关注</h2><p className="section-desc">手动添加小众信息源、博主或特定URL，始终优先推荐。</p></div>
+                {specialFollows.length === 0 ? <div className="empty-state"><p>暂无特别关注</p><p style={{fontSize:12,opacity:0.6}}>添加后这些来源的资讯会被优先推荐到每日速报</p></div> : <div className="special-follows-list">{specialFollows.map(f => <div key={f.id} className="special-follow-item"><span className="special-follow-name">{f.name}</span><span className="special-follow-url">{f.url}</span><span className="special-follow-note">{f.note || ""}</span><button className="special-follow-remove" onClick={() => setSpecialFollows(prev => prev.filter(x => x.id !== f.id))}>删除</button></div>)}</div>}
+                <div className="special-follow-form"><input placeholder="名称" id="sf-name" /><input placeholder="URL或关键词" id="sf-url" /><input placeholder="备注(可选)" id="sf-note" /><button onClick={() => {const n=document.getElementById("sf-name");const u=document.getElementById("sf-url");const t=document.getElementById("sf-note");if(n.value&&u.value){setSpecialFollows(prev => [...prev, {id:Date.now(),name:n.value,url:u.value,note:t.value}]);n.value="";u.value="";t.value="";}}}>添加</button></div>
               </section>
 
               <section className="profile-calibration-panel">
