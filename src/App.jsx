@@ -1135,6 +1135,7 @@ function App() {
   const [domainPriorities, setDomainPriorities] = useState(() => loadLS('domainPriorities', {}));
   const [sourcePriorities, setSourcePriorities] = useState(() => loadLS('sourcePriorities', {}));
   const [dailyProfileSnapshots, setDailyProfileSnapshots] = useState(() => loadLS('dailyProfileSnapshots', []));
+  const [specialFollows, setSpecialFollows] = useState(() => loadLS('specialFollows', []));
 
   // 打开资料弹窗时预填充表单
   useEffect(() => {
@@ -1151,7 +1152,8 @@ function App() {
     saveLS('domainPriorities', domainPriorities);
     saveLS('sourcePriorities', sourcePriorities);
     saveLS('dailyProfileSnapshots', dailyProfileSnapshots);
-  }, [domainPriorities, sourcePriorities, dailyProfileSnapshots]);
+    saveLS('specialFollows', specialFollows);
+  }, [domainPriorities, sourcePriorities, dailyProfileSnapshots, specialFollows]);
 
   // 认证函数已抽取至 useAuth — 这里不再定义
 

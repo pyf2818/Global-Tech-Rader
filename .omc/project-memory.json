@@ -213,8 +213,8 @@
   "hotPaths": [
     {
       "path": "src/App.jsx",
-      "accessCount": 32,
-      "lastAccessed": 1783357622311,
+      "accessCount": 42,
+      "lastAccessed": 1783358065643,
       "type": "directory"
     },
     {
@@ -233,6 +233,12 @@
       "path": "src/styles.css",
       "accessCount": 4,
       "lastAccessed": 1783357437046,
+      "type": "file"
+    },
+    {
+      "path": "src/components/ProfileCenterPage.jsx",
+      "accessCount": 2,
+      "lastAccessed": 1783357904611,
       "type": "file"
     },
     {
@@ -257,6 +263,12 @@
       "path": "src/components/StockPage.jsx",
       "accessCount": 1,
       "lastAccessed": 1783357246758,
+      "type": "file"
+    },
+    {
+      "path": "src/utils/profileModel.js",
+      "accessCount": 1,
+      "lastAccessed": 1783357830984,
       "type": "file"
     }
   ],
