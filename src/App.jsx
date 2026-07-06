@@ -1054,8 +1054,14 @@ function App() {
     finishedAt: '',
     trace: []
   }));
-  const [agentWorkflowHistory, setAgentWorkflowHistory] = useState(() => loadLS('agentWorkflowHistory', []));
-  const [agentWorkflowActions, setAgentWorkflowActions] = useState(() => loadLS('agentWorkflowActions', []));
+  const [agentWorkflowHistory, setAgentWorkflowHistory] = useState(() => {
+    const saved = loadLS('agentWorkflowHistory', []);
+    return Array.isArray(saved) ? saved : [];
+  });
+  const [agentWorkflowActions, setAgentWorkflowActions] = useState(() => {
+    const saved = loadLS('agentWorkflowActions', []);
+    return Array.isArray(saved) ? saved : [];
+  });
   const [agentWorkflowPrompt, setAgentWorkflowPrompt] = useState('');
   const [agentWorkflowScope, setAgentWorkflowScope] = useState('daily');
   const [agentWorkflowDraft, setAgentWorkflowDraft] = useState(() => {
