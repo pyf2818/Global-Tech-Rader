@@ -14691,3 +14691,35 @@ body {
 .hero-briefing-stat { display: flex; flex-direction: column; align-items: center; gap: 2px; }
 .hero-briefing-stat-num { font-family: var(--font-mono); font-size: 20px; font-weight: 700; color: var(--accent-cyan); }
 .hero-briefing-stat span:last-child { font-size: 11px; color: var(--text-muted); }
+
+/* Timeline Manager 精准推荐时间线 */
+.timeline-manager { padding: 16px 0; }
+.timeline-manager-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+.timeline-manager-head span { font-size: 12px; font-weight: 600; color: var(--text-muted); letter-spacing: 0.08em; text-transform: uppercase; }
+.timeline-manager-head input[type="date"] { padding: 6px 12px; border: 1px solid var(--border-color); border-radius: 8px; background: var(--bg-primary); color: var(--text-primary); font-size: 13px; font-family: var(--font-mono); }
+.timeline-manager-head input[type="date"]:focus { border-color: var(--accent-cyan); outline: none; }
+.date-pill-row { display: flex; gap: 0; position: relative; padding: 8px 0; }
+.date-pill-row::before { content: ''; position: absolute; top: 50%; left: 0; right: 0; height: 2px; background: var(--border-color); z-index: 0; }
+.date-pill { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 8px 16px; border: 2px solid transparent; border-radius: 20px; background: var(--bg-primary); cursor: pointer; transition: all 0.2s; min-width: 64px; }
+.date-pill:hover { background: var(--bg-hover); }
+.date-pill.active { border-color: var(--accent-cyan); background: var(--accent-cyan-soft); }
+.date-pill.active::before { content: ''; position: absolute; top: -12px; left: 50%; width: 8px; height: 8px; border-radius: 50%; background: var(--accent-cyan); transform: translateX(-50%); box-shadow: 0 0 8px var(--accent-cyan); }
+.date-pill span { font-size: 13px; font-weight: 600; color: var(--text-primary); font-family: var(--font-mono); }
+.date-pill small { font-size: 11px; color: var(--text-muted); }
+.date-pill.active span { color: var(--accent-cyan); }
+
+/* Timeline Manager */
+.timeline-manager { padding: 16px 0; }
+.timeline-manager-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+.timeline-manager-head span { font-size: 12px; font-weight: 600; color: var(--text-muted); letter-spacing: 0.08em; text-transform: uppercase; }
+.timeline-manager-head input[type="date"] { padding: 6px 12px; border: 1px solid var(--border-color); border-radius: 8px; background: var(--bg-primary); color: var(--text-primary); font-size: 13px; font-family: var(--font-mono); }
+.timeline-manager-head input[type="date"]:focus { border-color: var(--accent-cyan); outline: none; }
+.date-pill-row { display: flex; gap: 0; position: relative; padding: 8px 0; }
+.date-pill-row::before { content: ""; position: absolute; top: 50%; left: 0; right: 0; height: 2px; background: var(--border-color); z-index: 0; }
+.date-pill { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 8px 16px; border: 2px solid transparent; border-radius: 20px; background: var(--bg-primary); cursor: pointer; transition: all 0.2s; min-width: 64px; }
+.date-pill:hover { background: var(--bg-hover); }
+.date-pill.active { border-color: var(--accent-cyan); background: var(--accent-cyan-soft); }
+.date-pill.active::before { content: ""; position: absolute; top: -12px; left: 50%; width: 8px; height: 8px; border-radius: 50%; background: var(--accent-cyan); transform: translateX(-50%); box-shadow: 0 0 8px var(--accent-cyan); }
+.date-pill span { font-size: 13px; font-weight: 600; color: var(--text-primary); font-family: var(--font-mono); }
+.date-pill small { font-size: 11px; color: var(--text-muted); }
+.date-pill.active span { color: var(--accent-cyan); }

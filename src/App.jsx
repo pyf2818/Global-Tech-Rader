@@ -5918,7 +5918,7 @@ ${signals}
                 </div>
                 </div>
 
-                <div className="date-manager">
+                <div className="timeline-manager">
                   <div className="date-manager-head">
                     <span>日期管理</span>
                     <input
