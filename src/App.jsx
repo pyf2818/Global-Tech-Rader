@@ -17,6 +17,7 @@ import { useCustomUrl } from './hooks/useCustomUrl.js';
 import { useCalendar } from './hooks/useCalendar.js';
 import { useUI } from './hooks/useUI.js';
 import { BlockGrid, BlockPanel, BlockStat, BlockToolbar } from './blocks/index.js';
+import CommandPalette from './shell/CommandPalette.jsx';
 
 const PRODUCT_NAME = '万般硅川';
 const PRODUCT_TAGLINE = '高质量多领域智能资讯生态';
@@ -1274,6 +1275,7 @@ function App() {
   const [searchSort, setSearchSort] = useState('time');
   const [focusedIndex, setFocusedIndex] = useState(-1);
   const [showShortcuts, setShowShortcuts] = useState(false);
+  const [showCommandPalette, setShowCommandPalette] = useState(false);
   const [lightbox, setLightbox] = useState({ open: false, src: '', title: '', images: [], index: 0 });
   const [expandedEvents, setExpandedEvents] = useState({});
   const [exportCategory, setExportCategory] = useState('all');
@@ -4091,6 +4093,12 @@ ${blueprintSummary}`,
   // Keyboard shortcuts
   useEffect(() => {
     function handleKey(e) {
+      // Ctrl+K / Cmd+K 全局唤出命令面板（任何上下文都可触发）
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'k' || e.key === 'K')) {
+        e.preventDefault();
+        setShowCommandPalette(v => !v);
+        return;
+      }
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return;
       const currentItems = nav === 'all' ? filtered : nav === 'trending' ? trendingItems : [];
       if (e.key === 'j' || e.key === 'J') {
@@ -8908,6 +8916,20 @@ ${signals}
         />
       )}
 
+      {/* Command Palette (Ctrl+K) */}
+      <CommandPalette
+        open={showCommandPalette}
+        onClose={() => setShowCommandPalette(false)}
+        navItems={PRIMARY_NAV_ITEMS}
+        onNavigate={(navId) => goNav(navId)}
+        onSearch={(q) => executeSearch(q)}
+        actions={[
+          { id: 'refresh', label: '刷新资讯', icon: 'refresh', hint: '动作', run: () => loadNews() },
+          { id: 'theme', label: '切换主题', icon: 'palette', hint: '动作', run: () => setShowThemePicker(true) },
+          { id: 'settings', label: '打开设置', icon: 'settings', hint: '动作', run: () => setShowSettings(true) },
+        ]}
+      />
+
       {/* Shortcuts Modal */}
       {showShortcuts && (
         <div className="modal-overlay" onClick={() => setShowShortcuts(false)}>
@@ -8915,6 +8937,7 @@ ${signals}
             <div className="modal-header"><h3>快捷键</h3><button className="modal-close" onClick={() => setShowShortcuts(false)}>{ICONS.x}</button></div>
             <div className="modal-body">
               <div className="shortcuts-list">
+                <div className="shortcut-row"><kbd>Ctrl K</kbd><span>命令面板</span></div>
                 <div className="shortcut-row"><kbd>J</kbd><span>下一条资讯</span></div>
                 <div className="shortcut-row"><kbd>K</kbd><span>上一条资讯</span></div>
                 <div className="shortcut-row"><kbd>O</kbd><span>打开原文链接</span></div>
