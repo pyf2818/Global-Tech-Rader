@@ -364,13 +364,15 @@ export default function StockPage({ llmConfig, onOpenLlmConfig }) {
       {/* 大盘指数横条 */}
       {/* 大盘指数横条 + 涨跌家数 */}
       <section className="stock3-indices">
-        {(dashboard?.indices || []).map(idx => (
-          <button key={idx.secid} className={`stock3-index ${idx.changePct >= 0 ? 'up' : 'down'} ${selectedCode === idx.code ? 'active' : ''}`} onClick={() => setSelectedCode(idx.code)}>
-            <span className="idx-name">{idx.name}</span>
-            <span className="idx-price">{idx.price?.toFixed(2)}</span>
-            <span className="idx-chg">{idx.changePct >= 0 ? '+' : ''}{idx.changePct?.toFixed(2)}%</span>
-          </button>
-        ))}
+        {loading && !dashboard
+          ? Array.from({ length: 4 }).map((_, i) => <div key={i} className="stock3-index-skeleton-card" />)
+          : (dashboard?.indices || []).map(idx => (
+            <button key={idx.secid} className={`stock3-index ${idx.changePct >= 0 ? 'up' : 'down'} ${selectedCode === idx.code ? 'active' : ''}`} onClick={() => setSelectedCode(idx.code)}>
+              <span className="idx-name">{idx.name}</span>
+              <span className="idx-price">{idx.price?.toFixed(2)}</span>
+              <span className="idx-chg">{idx.changePct >= 0 ? '+' : ''}{idx.changePct?.toFixed(2)}%</span>
+            </button>
+          ))}
         {dashboard?.stocks && (
           <div className="stock3-breadth">
             {(() => {
@@ -385,7 +387,6 @@ export default function StockPage({ llmConfig, onOpenLlmConfig }) {
             })()}
           </div>
         )}
-        {loading && <span className="stock3-index-skeleton">加载中…</span>}
       </section>
 
       {/* 板块涨幅榜（行业/概念切换） */}
@@ -398,13 +399,15 @@ export default function StockPage({ llmConfig, onOpenLlmConfig }) {
           </div>
         </div>
         <div className="stock3-sectors-strip">
-          {sectors.slice(0, 12).map(s => (
-            <div key={s.code} className={`stock3-sector ${s.changePct >= 0 ? 'up' : 'down'}`} title={`${s.name} ${s.changePct >= 0 ? '+' : ''}${s.changePct?.toFixed(2)}%`}>
-              <span className="sector-name">{s.name}</span>
-              <span className="sector-chg">{s.changePct >= 0 ? '+' : ''}{s.changePct?.toFixed(2)}%</span>
-            </div>
-          ))}
-          {sectors.length === 0 && <span className="stock3-sector-empty">暂无板块数据</span>}
+          {loading && sectors.length === 0
+            ? Array.from({ length: 10 }).map((_, i) => <div key={i} className="stock3-sector-skeleton" />)
+            : sectors.slice(0, 12).map(s => (
+              <div key={s.code} className={`stock3-sector ${s.changePct >= 0 ? 'up' : 'down'}`} title={`${s.name} ${s.changePct >= 0 ? '+' : ''}${s.changePct?.toFixed(2)}%`}>
+                <span className="sector-name">{s.name}</span>
+                <span className="sector-chg">{s.changePct >= 0 ? '+' : ''}{s.changePct?.toFixed(2)}%</span>
+              </div>
+            ))}
+          {!loading && sectors.length === 0 && <span className="stock3-sector-empty">暂无板块数据</span>}
         </div>
       </section>
 

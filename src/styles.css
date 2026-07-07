@@ -16007,3 +16007,22 @@ body {
   font-size: 12px;
   padding: 8px;
 }
+
+/* ---------- 股市骨架屏 ---------- */
+.stock3-index-skeleton-card {
+  width: 120px;
+  height: 52px;
+  border-radius: 8px;
+  background: linear-gradient(90deg, var(--surface-workbench-control) 0%, var(--surface-workbench-ai) 50%, var(--surface-workbench-control) 100%);
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.4s ease infinite;
+}
+.stock3-sector-skeleton {
+  flex-shrink: 0;
+  width: 72px;
+  height: 42px;
+  border-radius: 6px;
+  background: linear-gradient(90deg, var(--surface-workbench-control) 0%, var(--surface-workbench-ai) 50%, var(--surface-workbench-control) 100%);
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.4s ease infinite;
+}
