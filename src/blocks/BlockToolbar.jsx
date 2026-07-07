@@ -15,7 +15,8 @@ import { ICONS } from '../constants/index.jsx';
  *
  * Pills options 形态: [{ id, label }] 或 [id1, id2]（label 取 id）
  */
-export default function BlockToolbar({ children, wrap = true }) {
+export default function BlockToolbar({ children, wrap = true, hidden = false }) {
+  if (hidden) return null;
   return (
     <div className={`block-toolbar${wrap ? ' block-toolbar-wrap' : ''}`}>
       {children}

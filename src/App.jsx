@@ -16,7 +16,7 @@ import { useSourceManager } from './hooks/useSourceManager.js';
 import { useCustomUrl } from './hooks/useCustomUrl.js';
 import { useCalendar } from './hooks/useCalendar.js';
 import { useUI } from './hooks/useUI.js';
-import { BlockGrid, BlockPanel, BlockStat } from './blocks/index.js';
+import { BlockGrid, BlockPanel, BlockStat, BlockToolbar } from './blocks/index.js';
 
 const PRODUCT_NAME = '万般硅川';
 const PRODUCT_TAGLINE = '高质量多领域智能资讯生态';
@@ -6040,13 +6040,20 @@ ${signals}
                   </div>
                 </div>
 
-                <div className="workbench-filter-row">
-                  <button className={`filter-pill ${mode === 'all' ? 'active' : ''}`} onClick={() => setMode('all')}>全部</button>
-                  {MODES.filter(m => m.id !== 'all').map(m => <button key={m.id} className={`filter-pill ${mode === m.id ? 'active' : ''}`} onClick={() => setMode(m.id)}>{m.label}</button>)}
-                  <button className={`filter-pill ${regionFilter === 'all' ? 'active' : ''}`} onClick={() => setRegionFilter('all')}>全球</button>
-                  <button className={`filter-pill ${regionFilter === 'domestic' ? 'active' : ''}`} onClick={() => setRegionFilter('domestic')}>国内</button>
-                  <button className={`filter-pill ${regionFilter === 'overseas' ? 'active' : ''}`} onClick={() => setRegionFilter('overseas')}>海外</button>
-                </div>
+                <BlockToolbar hidden>
+                  <BlockToolbar.Pills
+                    options={[{ id: 'all', label: '全部' }, ...MODES.filter(m => m.id !== 'all').map(m => ({ id: m.id, label: m.label }))]}
+                    value={mode}
+                    onChange={setMode}
+                    ariaLabel="模式筛选"
+                  />
+                  <BlockToolbar.Pills
+                    options={[{ id: 'all', label: '全球' }, { id: 'domestic', label: '国内' }, { id: 'overseas', label: '海外' }]}
+                    value={regionFilter}
+                    onChange={setRegionFilter}
+                    ariaLabel="地区筛选"
+                  />
+                </BlockToolbar>
 
                 {loading && <div className="feed-list">{Array.from({ length: 5 }).map((_, i) => <SkeletonCard key={i} viewMode="standard" />)}</div>}
                 {error && <div className="error-state"><p>加载失败: {error}</p><button onClick={() => loadNews()}>重试</button></div>}
@@ -6965,12 +6972,12 @@ ${signals}
                 </div>
               </section>
 
-              <section className="profile-summary-grid">
-                <div><span>关注领域</span><strong>{selectedInterests.length}</strong><p>{intelligenceProfile.focusLabels.slice(0, 4).join('、') || '尚未设置'}</p></div>
-                <div><span>阅读点击</span><strong>{readingHistory.length}</strong><p>近 100 条点击记录用于校准推荐</p></div>
-                <div><span>收藏资讯</span><strong>{bookmarks.length}</strong><p>收藏会提高相似主题和来源权重</p></div>
-                <div><span>每日画像</span><strong>{dailyProfileSnapshots.length}</strong><p>按日期保留 AI 对你的理解变化</p></div>
-              </section>
+              <BlockGrid columns={3}>
+                <BlockStat variant="card" label="关注领域" value={selectedInterests.length} desc={intelligenceProfile.focusLabels.slice(0, 4).join('、') || '尚未设置'} />
+                <BlockStat variant="card" label="阅读点击" value={readingHistory.length} desc="近 100 条点击记录用于校准推荐" />
+                <BlockStat variant="card" label="收藏资讯" value={bookmarks.length} desc="收藏会提高相似主题和来源权重" />
+                <BlockStat variant="card" label="每日画像" value={dailyProfileSnapshots.length} desc="按日期保留 AI 对你的理解变化" />
+              </BlockGrid>
 
               <section className="profile-learning-panel">
                 <div className="profile-learning-main">
