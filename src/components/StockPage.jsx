@@ -479,7 +479,7 @@ export default function StockPage({ llmConfig, onOpenLlmConfig }) {
               <span className="stock3-code">{selectedCode}</span>
               {realtime && (
                 <span className={`stock3-price ${realtime.changePct >= 0 ? 'up' : 'down'}`}>
-                  <strong>{realtime.price?.toFixed(2)}</strong>
+                  <strong key={realtime.price} className={`price-flash ${realtime.changePct >= 0 ? 'flash-up' : 'flash-down'}`}>{realtime.price?.toFixed(2)}</strong>
                   <em>{realtime.change >= 0 ? '+' : ''}{realtime.change?.toFixed(2)} ({realtime.changePct >= 0 ? '+' : ''}{realtime.changePct?.toFixed(2)}%)</em>
                 </span>
               )}

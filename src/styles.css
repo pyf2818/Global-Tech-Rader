@@ -16026,3 +16026,16 @@ body {
   background-size: 200% 100%;
   animation: skeleton-shimmer 1.4s ease infinite;
 }
+
+/* ---------- 股市价格闪烁动画（实时刷新反馈） ---------- */
+.price-flash { animation: price-flash-anim 0.6s ease-out; }
+.price-flash.flash-up { animation-name: price-flash-up; }
+.price-flash.flash-down { animation-name: price-flash-down; }
+@keyframes price-flash-up {
+  0% { background: rgba(239, 68, 68, 0.35); }
+  100% { background: transparent; }
+}
+@keyframes price-flash-down {
+  0% { background: rgba(34, 197, 94, 0.35); }
+  100% { background: transparent; }
+}
