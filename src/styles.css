@@ -15913,3 +15913,97 @@ body {
   color: var(--accent-cyan);
 }
 .sidebar:not(.collapsed) .nav-short-label { display: none; }
+
+/* ---------- 股市：涨跌家数 + 板块轮动 ---------- */
+.stock3-breadth {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 10px;
+  border-left: 1px solid var(--border-color);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 700;
+}
+.stock3-breadth .breadth-up { color: #ef4444; }
+.stock3-breadth .breadth-flat { color: var(--text-muted); }
+.stock3-breadth .breadth-down { color: #22c55e; }
+
+.stock3-sectors {
+  border: var(--panel-border);
+  border-radius: 10px;
+  background: var(--bg-card);
+  padding: 8px 12px;
+  margin-bottom: 10px;
+}
+.stock3-sectors-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+.stock3-sectors-label {
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--text-secondary);
+  letter-spacing: 0.04em;
+}
+.stock3-sectors-tabs { display: flex; gap: 4px; }
+.stock3-sector-tab {
+  padding: 3px 10px;
+  border: 1px solid var(--border-color);
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.stock3-sector-tab.active {
+  color: var(--accent-cyan);
+  border-color: var(--accent-cyan-border);
+  background: var(--accent-cyan-soft);
+}
+.stock3-sectors-strip {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+.stock3-sector {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 5px 10px;
+  border-radius: 6px;
+  background: var(--surface-workbench-control);
+  min-width: 72px;
+  cursor: default;
+  transition: transform 0.12s;
+}
+.stock3-sector:hover { transform: translateY(-1px); }
+.stock3-sector .sector-name {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-primary);
+  max-width: 80px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.stock3-sector .sector-chg {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 800;
+}
+.stock3-sector.up .sector-chg { color: #ef4444; }
+.stock3-sector.down .sector-chg { color: #22c55e; }
+.stock3-sector-empty {
+  color: var(--text-muted);
+  font-size: 12px;
+  padding: 8px;
+}

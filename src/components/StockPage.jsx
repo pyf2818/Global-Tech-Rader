@@ -169,6 +169,7 @@ export default function StockPage({ llmConfig, onOpenLlmConfig }) {
   const [timelineData, setTimelineData] = useState(null);
   const [realtime, setRealtime] = useState(null);
   const [sectors, setSectors] = useState([]);
+  const [sectorType, setSectorType] = useState('industry'); // industry | concept
   const [period, setPeriod] = useState('timeline');
 
   // 搜索
@@ -197,14 +198,27 @@ export default function StockPage({ llmConfig, onOpenLlmConfig }) {
     try {
       const [dRes, sRes] = await Promise.all([
         fetch('/api/stock/dashboard'),
-        fetch('/api/stock/sectors?type=industry'),
+        fetch(`/api/stock/sectors?type=${sectorType}`),
       ]);
       setDashboard(await dRes.json());
       const sd = await sRes.json();
       setSectors(sd?.sectors || []);
     } catch { setDashboard(null); }
     setLoading(false);
-  }, []);
+  }, [sectorType]);
+
+  // 切换板块类型时重新加载板块数据（不重载大盘）
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const sRes = await fetch(`/api/stock/sectors?type=${sectorType}`);
+        const sd = await sRes.json();
+        if (!cancelled) setSectors(sd?.sectors || []);
+      } catch { /* ignore */ }
+    })();
+    return () => { cancelled = true; };
+  }, [sectorType]);
 
   // 触发 AI 诊断（自动加载日K数据供诊断用）
   const runDiagnosis = useCallback(async () => {
@@ -348,6 +362,7 @@ export default function StockPage({ llmConfig, onOpenLlmConfig }) {
       </header>
 
       {/* 大盘指数横条 */}
+      {/* 大盘指数横条 + 涨跌家数 */}
       <section className="stock3-indices">
         {(dashboard?.indices || []).map(idx => (
           <button key={idx.secid} className={`stock3-index ${idx.changePct >= 0 ? 'up' : 'down'} ${selectedCode === idx.code ? 'active' : ''}`} onClick={() => setSelectedCode(idx.code)}>
@@ -356,7 +371,41 @@ export default function StockPage({ llmConfig, onOpenLlmConfig }) {
             <span className="idx-chg">{idx.changePct >= 0 ? '+' : ''}{idx.changePct?.toFixed(2)}%</span>
           </button>
         ))}
+        {dashboard?.stocks && (
+          <div className="stock3-breadth">
+            {(() => {
+              const up = dashboard.stocks.filter(s => s.changePct > 0).length;
+              const down = dashboard.stocks.filter(s => s.changePct < 0).length;
+              const flat = dashboard.stocks.length - up - down;
+              return <>
+                <span className="breadth-up">↑{up}</span>
+                <span className="breadth-flat">—{flat}</span>
+                <span className="breadth-down">↓{down}</span>
+              </>;
+            })()}
+          </div>
+        )}
         {loading && <span className="stock3-index-skeleton">加载中…</span>}
+      </section>
+
+      {/* 板块涨幅榜（行业/概念切换） */}
+      <section className="stock3-sectors">
+        <div className="stock3-sectors-head">
+          <span className="stock3-sectors-label">板块轮动</span>
+          <div className="stock3-sectors-tabs">
+            <button className={`stock3-sector-tab ${sectorType === 'industry' ? 'active' : ''}`} onClick={() => setSectorType('industry')}>行业</button>
+            <button className={`stock3-sector-tab ${sectorType === 'concept' ? 'active' : ''}`} onClick={() => setSectorType('concept')}>概念</button>
+          </div>
+        </div>
+        <div className="stock3-sectors-strip">
+          {sectors.slice(0, 12).map(s => (
+            <div key={s.code} className={`stock3-sector ${s.changePct >= 0 ? 'up' : 'down'}`} title={`${s.name} ${s.changePct >= 0 ? '+' : ''}${s.changePct?.toFixed(2)}%`}>
+              <span className="sector-name">{s.name}</span>
+              <span className="sector-chg">{s.changePct >= 0 ? '+' : ''}{s.changePct?.toFixed(2)}%</span>
+            </div>
+          ))}
+          {sectors.length === 0 && <span className="stock3-sector-empty">暂无板块数据</span>}
+        </div>
       </section>
 
       {/* 三栏主体 */}
