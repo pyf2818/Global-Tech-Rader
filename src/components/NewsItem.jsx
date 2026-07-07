@@ -6,7 +6,7 @@ import { formatRelative, getGradeColors } from '../utils/format.js';
 function NewsItem({ item, index, viewMode = 'standard', isFocused = false, isBookmarked = false, isInMaterials = false, onBookmark, onSummary, isSummaryOpen, summaryText, isFollowed = false, onRead, showTranslation, onToggleTranslation, onRequestTranslation, isTranslating, translation, onOpenLightbox, onAddMaterial, onAskAi, showRecommendation = false }) {
   const isCompact = viewMode === 'compact';
   const isCard = viewMode === 'card';
-  const hasMedia = item.imageUrl || item.videoUrl;
+  const hasMedia = item.imageUrl || item.videoUrl || (item.images && item.images.length > 0);
 
   const isEnglish = /^[a-zA-Z0-9\s\-.,!?"'():;&%$#@*+\[\]{}|\\\/<>`~+=]+$/.test(item.title) && !/^[\u4e00-\u9fff]/.test(item.title);
 
@@ -127,8 +127,18 @@ function NewsItem({ item, index, viewMode = 'standard', isFocused = false, isBoo
                     </div>
                   )}
                 </a>
+              ) : item.images && item.images.length > 1 ? (
+                // 多图网格（2-4 张）
+                <div className="item-media-grid">
+                  {item.images.slice(0, 4).map((img, i) => (
+                    <div key={i} className="item-media-grid-cell" onClick={() => onOpenLightbox?.(img, item.title, item.images, i)}>
+                      <img src={img} alt="" loading="lazy" onError={e => { e.target.style.opacity = '0'; }} />
+                      {i === 3 && item.images.length > 4 && <span className="item-media-more">+{item.images.length - 4}</span>}
+                    </div>
+                  ))}
+                </div>
               ) : item.imageUrl && (
-                // 没有视频，显示图片
+                // 单图
                 <div className="item-media-thumb" onClick={() => onOpenLightbox?.(item.imageUrl, item.title)}>
                   <img src={item.imageUrl} alt="" loading="lazy" onError={e => { e.target.style.display = 'none'; }} />
                 </div>

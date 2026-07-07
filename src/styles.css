@@ -2106,6 +2106,14 @@ body {
 .item-media-thumb:hover img { transform: scale(1.05); }
 .item-media-play { position: absolute; inset: 0; z-index: 2; display: grid; place-items: center; background: rgba(0, 0, 0, 0.4); border-radius: 8px; color: white; }
 .item-media-play svg { width: 24px; height: 24px; }
+
+/* 多图网格（2-4 张） */
+.item-media-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; width: 140px; height: 90px; }
+.item-media-grid-cell { position: relative; overflow: hidden; border-radius: 6px; cursor: pointer; background: var(--bg-card); border: 1px solid var(--border-color); }
+.item-media-grid-cell img { width: 100%; height: 100%; object-fit: cover; transition: transform 0.2s; }
+.item-media-grid-cell:hover img { transform: scale(1.08); }
+.item-media-more { position: absolute; inset: 0; display: grid; place-items: center; background: rgba(0, 0, 0, 0.55); color: #fff; font-size: 18px; font-weight: 800; font-family: var(--font-mono); }
+.feed-list.card-grid .item-media-grid { width: 100%; height: 200px; grid-template-columns: repeat(auto-fit, minmax(80px, 1fr)); }
 .item-media-play.video-play { background: rgba(0, 0, 0, 0.5); }
 .item-media-play.video-play svg { width: 32px; height: 32px; filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3)); }
 .item-media-video-link { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; width: 140px; height: 90px; border-radius: 8px; background: var(--bg-card); border: 1px solid var(--border-color); color: var(--text-secondary); font-size: 12px; transition: all 0.15s; }
@@ -4068,6 +4076,12 @@ body {
 .lightbox-close:hover { background: rgba(255, 255, 255, 0.3); }
 .lightbox-close svg { width: 18px; height: 18px; }
 .lightbox-title { color: rgba(255, 255, 255, 0.8); font-size: 13px; margin-top: 12px; text-align: center; max-width: 90vw; }
+.lightbox-nav { position: absolute; top: 50%; transform: translateY(-50%); width: 40px; height: 40px; display: grid; place-items: center; background: rgba(255, 255, 255, 0.12); border: none; border-radius: 50%; color: #fff; cursor: pointer; transition: background 0.15s; z-index: 5; }
+.lightbox-nav:hover { background: rgba(255, 255, 255, 0.28); }
+.lightbox-nav svg { width: 22px; height: 22px; }
+.lightbox-prev { left: -56px; }
+.lightbox-next { right: -56px; }
+.lightbox-counter { color: rgba(255, 255, 255, 0.6); font-size: 12px; font-family: var(--font-mono); margin-top: 6px; }
 
 /* Scrollbar */
 .custom-scrollbar::-webkit-scrollbar { width: 6px; }

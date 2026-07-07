@@ -172,7 +172,7 @@ export async function getNews(blocked, customSources, page = 0, pageSize = PAGE_
       const imageSettled = await Promise.allSettled(itemsWithoutImage.slice(0, MEDIA_CONFIG.MAX_RESOLVE_ITEMS).map(async (item) => {
         try {
           const resolved = await resolveImageWithScrapling(item.url);
-          return { id: item.id, imageUrl: resolved.imageUrl, videoUrl: resolved.videoUrl || item.videoUrl };
+          return { id: item.id, imageUrl: resolved.imageUrl, videoUrl: resolved.videoUrl || item.videoUrl, images: resolved.images || [] };
         } catch { return null; }
       }));
 
@@ -182,6 +182,7 @@ export async function getNews(blocked, customSources, page = 0, pageSize = PAGE_
           if (idx >= 0) {
             if (result.value.imageUrl) fullItems[idx].imageUrl = result.value.imageUrl;
             if (result.value.videoUrl) fullItems[idx].videoUrl = result.value.videoUrl;
+            if (result.value.images?.length) fullItems[idx].images = result.value.images;
           }
         }
       });

@@ -163,14 +163,14 @@ export async function resolveImageWithRetry(articleUrl, maxRetries = 2) {
     }
   }
 
-  return { imageUrl: '', videoUrl: '' };
+  return { imageUrl: '', videoUrl: '', images: [] };
 }
 
 // 图片解析缓存（模块内部）
 const imageResolveCache = {};
 
 export async function resolveImageFromArticle(articleUrl) {
-  if (!articleUrl) return { imageUrl: '', videoUrl: '' };
+  if (!articleUrl) return { imageUrl: '', videoUrl: '', images: [] };
   if (imageResolveCache[articleUrl]) return imageResolveCache[articleUrl];
 
   try {
@@ -182,7 +182,7 @@ export async function resolveImageFromArticle(articleUrl) {
       },
       signal: AbortSignal.timeout(MEDIA_CONFIG.RESOLVE_TIMEOUT)
     });
-    if (!res.ok) return { imageUrl: '', videoUrl: '' };
+    if (!res.ok) return { imageUrl: '', videoUrl: '', images: [] };
 
     const html = await res.text();
     const structuredImageCandidates = collectStructuredImageCandidates(html, articleUrl);
@@ -444,7 +444,16 @@ export async function resolveImageFromArticle(articleUrl) {
           reasons: best.reasons.join(', ')
         });
 
-        const result = { imageUrl: bestUrl, videoUrl };
+        const result = { imageUrl: bestUrl, videoUrl, images: [] };
+        // 多图：取评分前 4 张（去重），供前端网格展示
+        const seenKeys = new Set([normalizeImageKey(bestUrl)]);
+        for (const img of scoredImages) {
+          if (result.images.length >= 4) break;
+          const key = normalizeImageKey(img.url);
+          if (seenKeys.has(key)) continue;
+          seenKeys.add(key);
+          result.images.push(optimizeImageUrl(img.url));
+        }
         imageResolveCache[articleUrl] = result;
 
         // 统计
@@ -474,7 +483,7 @@ export async function resolveImageFromArticle(articleUrl) {
               score: candidate.score
             });
 
-            const result = { imageUrl: candidateUrl, videoUrl };
+            const result = { imageUrl: candidateUrl, videoUrl, images: [candidateUrl] };
             imageResolveCache[articleUrl] = result;
             mediaStats.resolvedImageCount++;
             mediaStats.totalImageScore += candidate.score;
@@ -486,13 +495,13 @@ export async function resolveImageFromArticle(articleUrl) {
 
     // 返回空结果（不使用社交媒体图片作为fallback，避免重复）
     console.log(`[resolveImage] No valid image found for ${articleUrl}`);
-    const result = { imageUrl: '', videoUrl };
+    const result = { imageUrl: '', videoUrl, images: [] };
     imageResolveCache[articleUrl] = result;
     return result;
   } catch (e) {
     console.error(`[resolveImage] Error for ${articleUrl}:`, e.message);
     mediaStats.failedResolves++;
-    return { imageUrl: '', videoUrl: '' };
+    return { imageUrl: '', videoUrl: '', images: [] };
   }
 }
 
@@ -543,7 +552,7 @@ export async function resolveImageWithScrapling(articleUrl) {
             continue;
           }
           incrementImageUsage(optimizedUrl);
-          const result = { imageUrl: optimizedUrl, videoUrl: '' };
+          const result = { imageUrl: optimizedUrl, videoUrl: '', images: [optimizedUrl] };
           imageResolveCache[articleUrl] = result;
           mediaStats.scraplingImageCount = (mediaStats.scraplingImageCount || 0) + 1;
           mediaStats.totalImageScore += candidate.score;
