@@ -16,6 +16,7 @@ import { useSourceManager } from './hooks/useSourceManager.js';
 import { useCustomUrl } from './hooks/useCustomUrl.js';
 import { useCalendar } from './hooks/useCalendar.js';
 import { useUI } from './hooks/useUI.js';
+import { BlockGrid, BlockPanel } from './blocks/index.js';
 
 const PRODUCT_NAME = '万般硅川';
 const PRODUCT_TAGLINE = '高质量多领域智能资讯生态';
@@ -6165,19 +6166,19 @@ ${signals}
                 </button>
               </section>
 
-              <section className="studio-module-grid">
+              <BlockGrid columns={3}>
                 {studioModules.map(module => (
-                  <button key={module.id} className={`studio-module-card ${module.id === 'agents' ? 'primary' : ''}`} onClick={() => goNav(module.nav)}>
-                    <span className="studio-module-icon">{ICONS[module.icon]}</span>
-                    <span className="studio-module-title">{module.title}</span>
-                    <span className="studio-module-desc">{module.desc}</span>
-                    <span className="studio-module-meta">
-                      <strong>{module.metric}</strong>
-                      <em>{module.action}</em>
-                    </span>
-                  </button>
+                  <BlockGrid.Card
+                    key={module.id}
+                    icon={module.icon}
+                    title={module.title}
+                    desc={module.desc}
+                    meta={{ metric: module.metric, action: module.action }}
+                    variant={module.id === 'agents' ? 'primary' : 'default'}
+                    onClick={() => goNav(module.nav)}
+                  />
                 ))}
-              </section>
+              </BlockGrid>
 
               <section className="workflow-builder-preview">
                 <div className="section-header">
@@ -6197,8 +6198,7 @@ ${signals}
               </section>
 
               <section className="studio-asset-row">
-                <div className="studio-asset-panel">
-                  <span>最近素材</span>
+                <BlockPanel title="最近素材" action={<button onClick={() => goNav('materials')}>管理素材库（{materials.length}）</button>}>
                   {materials.length > 0 ? (
                     <ul className="studio-asset-list">
                       {materials.slice(0, 3).map(m => (
@@ -6208,10 +6208,8 @@ ${signals}
                   ) : (
                     <div className="studio-asset-empty"><strong>还没有沉淀素材</strong><p>从资讯卡片、每日汇报或本地上传开始收集。</p></div>
                   )}
-                  <button onClick={() => goNav('materials')}>管理素材库（{materials.length}）</button>
-                </div>
-                <div className="studio-asset-panel">
-                  <span>创作资产</span>
+                </BlockPanel>
+                <BlockPanel title="创作资产" action={<button onClick={() => goNav('editor')}>打开编辑器（{articles.length}）</button>}>
                   {articles.length > 0 ? (
                     <ul className="studio-asset-list">
                       {articles.slice(0, 3).map(a => (
@@ -6219,10 +6217,9 @@ ${signals}
                       ))}
                     </ul>
                   ) : (
-                    <div className="studio-asset-empty"><strong>准备你的第��篇内容</strong><p>内容创作区联动素材库与智能体输出。</p></div>
+                    <div className="studio-asset-empty"><strong>准备你的第一篇内容</strong><p>内容创作区联动素材库与智能体输出。</p></div>
                   )}
-                  <button onClick={() => goNav('editor')}>打开编辑器（{articles.length}）</button>
-                </div>
+                </BlockPanel>
               </section>
             </div>
           )}
