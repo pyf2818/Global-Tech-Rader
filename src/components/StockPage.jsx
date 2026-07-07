@@ -266,6 +266,22 @@ export default function StockPage({ llmConfig, onOpenLlmConfig }) {
     } catch { /* ignore */ }
   }, []);
 
+  // 轻量刷新：只拉实时行情，不清空 K线/分时（定时轮询用）
+  const refreshRealtime = useCallback(async (code) => {
+    try {
+      const rRes = await fetch(`/api/stock/realtime?code=${code}`);
+      const r = await rRes.json();
+      if (r) setRealtime(r);
+    } catch { /* ignore */ }
+  }, []);
+
+  // 实时行情轮询：每 10 秒刷新选中个股行情（东方财富级实时体验）
+  useEffect(() => {
+    if (!selectedCode) return;
+    const timer = setInterval(() => refreshRealtime(selectedCode), 10000);
+    return () => clearInterval(timer);
+  }, [selectedCode, refreshRealtime]);
+
   // K线按需加载（切到日K/周K/月K时）
   useEffect(() => {
     if (period === 'timeline' || !selectedCode) return;
