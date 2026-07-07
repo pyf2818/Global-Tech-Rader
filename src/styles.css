@@ -39,6 +39,8 @@
   --panel-border: 1px solid var(--border-color);
   /* 圆角 token（卡片/面板级） */
   --radius-card: 12px;
+  /* 阴影 token（容器面板去 shadow，内容卡片用轻 shadow） */
+  --shadow-subtle: 0 2px 8px rgba(0, 0, 0, 0.18);
   /* 动画 token（统一 4 种时长 + 2 种缓动） */
   --ease-fast: 0.15s ease;
   --ease-base: 0.2s ease;
@@ -15453,7 +15455,6 @@ body {
   border: var(--panel-border);
   border-radius: var(--radius-card);
   background: var(--bg-card);
-  box-shadow: var(--shadow-card);
   padding: 16px;
   display: flex;
   flex-direction: column;
@@ -15674,7 +15675,7 @@ body {
   border: var(--panel-border);
   border-radius: var(--radius-card);
   background: var(--bg-card);
-  box-shadow: var(--shadow-card);
+  box-shadow: var(--shadow-subtle);
   transition: transform var(--ease-base), border-color var(--ease-base), background var(--ease-base);
 }
 .block-grid-card-clickable:hover {
