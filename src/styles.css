@@ -2025,7 +2025,7 @@ body {
 .cluster-items { border-top: 1px solid var(--border-color); padding: 8px; display: flex; flex-direction: column; gap: 6px; }
 
 /* News Item */
-.news-item { display: flex; gap: 16px; padding: 14px 16px; background: var(--bg-card); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: var(--panel-border); border-radius: 10px; transition: border-color 0.2s, transform 0.2s, box-shadow 0.2s; animation: fadeUp 0.4s ease backwards; position: relative; }
+.news-item { display: flex; gap: 16px; padding: 14px 16px; background: var(--bg-card-solid); border: var(--panel-border); border-radius: 10px; transition: border-color 0.2s, transform 0.2s, box-shadow 0.2s; animation: fadeUp 0.4s ease backwards; position: relative; }
 .news-item:hover { border-color: var(--border-active); transform: translateY(-2px); box-shadow: 0 4px 14px var(--border-glow); }
 .news-item.focused { border-color: var(--accent-cyan); box-shadow: 0 0 0 1px var(--accent-cyan), 0 0 18px var(--border-glow); }
 .news-item.followed { border-left: 3px solid var(--accent-amber); }
@@ -2965,7 +2965,7 @@ body {
 
 /* GitHub Grid */
 .github-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 12px; }
-.github-card { padding: 14px 16px 14px; background: var(--bg-card); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: var(--panel-border); border-radius: 10px; transition: border-color 0.2s, transform 0.2s; animation: fadeUp 0.4s ease backwards; display: flex; flex-direction: column; gap: 10px; position: relative; min-height: 100%; }
+.github-card { padding: 14px 16px 14px; background: var(--bg-card-solid); border: var(--panel-border); border-radius: 10px; transition: border-color 0.2s, transform 0.2s; animation: fadeUp 0.4s ease backwards; display: flex; flex-direction: column; gap: 10px; position: relative; min-height: 100%; }
 .github-card:hover { border-color: var(--border-active); transform: translateY(-2px); box-shadow: 0 4px 16px rgba(201, 169, 97, 0.06); }
 
 /* 操作栏 —— 底部 flex，不再 absolute 避免重叠 */
