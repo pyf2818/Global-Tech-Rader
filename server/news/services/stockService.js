@@ -65,6 +65,8 @@ const REALTIME_FIELDS = 'f43,f44,f45,f46,f47,f48,f57,f58,f60,f170,f171';
 
 // 腾讯实时接口（降级源）—— 东方财富失败时使用
 const TENCENT_URL = 'https://qt.gtimg.cn/q=';
+// 东方财富分时图接口
+const TIMELINE_URL = 'https://push2his.eastmoney.com/api/qt/stock/trends2/get';
 
 // 东方财富 secid（如 1.000001）→ 腾讯 code（如 sh000001）
 function secidToTencentCode(secid) {
@@ -76,9 +78,10 @@ function secidToTencentCode(secid) {
 }
 
 // 解析腾讯单行返回：v_sh000001="1~上证指数~000001~3999.03~..."
-// 字段索引（~ 分隔）：
-//   1=市场 2=名称 3=代码 4=当前价 5=昨收 6=今开 7=成交量
-//   33=时间 34=涨跌额 35=涨跌幅 36=最高 37=最低
+// 字段索引（~ 分隔，共 88 段）：
+//   1=名称 2=代码 3=当前价 4=昨收 5=今开 6=成交量
+//   9-18=买五档(价/量交替) 19-28=卖五档(价/量交替)
+//   30=时间 31=涨跌额 32=涨跌幅 33=最高 34=最低
 function parseTencentLine(line) {
   const m = /^v_(\w+)="([^"]*)"/.exec(line.trim());
   if (!m) return null;
@@ -93,6 +96,17 @@ function parseTencentLine(line) {
   const changePct = parseFloat(parts[32]) || 0;
   const high = parseFloat(parts[33]) || 0;
   const low = parseFloat(parts[34]) || 0;
+  // 买卖五档（每档 2 字段：价格、数量）
+  const bids = [];
+  const asks = [];
+  for (let i = 0; i < 5; i++) {
+    const bPrice = parseFloat(parts[9 + i * 2]) || 0;
+    const bVol = parseInt(parts[10 + i * 2], 10) || 0;
+    const aPrice = parseFloat(parts[19 + i * 2]) || 0;
+    const aVol = parseInt(parts[20 + i * 2], 10) || 0;
+    if (bPrice > 0) bids.push({ price: bPrice, volume: bVol });
+    if (aPrice > 0) asks.push({ price: aPrice, volume: aVol });
+  }
   // 反推 secid
   const prefixMatch = /^(sh|sz|us|hk)/.exec(tcCode);
   const secidPrefix = prefixMatch ? PREFIX_MAP[prefixMatch[1]] : '1';
@@ -110,6 +124,8 @@ function parseTencentLine(line) {
     changePct: Math.round(changePct * 100) / 100,
     volume,
     amount: 0,
+    bids,
+    asks,
     timestamp: nowMs(),
   };
 }
@@ -264,6 +280,47 @@ export async function getKline(secid, { period = '101', count = 60, adjust = '1'
     });
     const result = { secid, code, name, klines: parsed };
     klineCache.set(key, { data: result, t: nowMs() });
+    return result;
+  } catch (e) {
+    return null;
+  }
+}
+
+// 分时图：当日分钟走势（东方财富 trends2 接口）
+// 返回 { secid, code, name, preClose, points: [{ time, price, avg, volume }] }
+const timelineCache = new Map();
+const TIMELINE_TTL = 60 * 1000;
+
+export async function getTimeline(secid) {
+  if (!secid) return null;
+  const cached = timelineCache.get(secid);
+  if (cached && nowMs() - cached.t < TIMELINE_TTL) return cached.data;
+
+  const url = `${TIMELINE_URL}?secid=${secid}&fields1=f1,f2,f3,f4,f5,f6,f7,f8,f9,f10,f11,f12,f13&fields2=f51,f52,f53,f54,f55,f56,f57,f58&iscr=0&ndays=1&rtntype=6`;
+  try {
+    const res = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } });
+    const json = await res.json();
+    const d = json?.data;
+    if (!d || !Array.isArray(d.trends)) return null;
+    const preClose = d.preClose || 0;
+    const points = d.trends.map(line => {
+      const parts = line.split(',');
+      // 格式：时间,开,收,高,低,成交量,成交额,均价
+      return {
+        time: parts[0],
+        price: parseFloat(parts[2]) || 0,
+        avg: parseFloat(parts[7]) || 0,
+        volume: parseInt(parts[5], 10) || 0,
+      };
+    });
+    const result = {
+      secid,
+      code: d.code || secid.split('.')[1],
+      name: d.name || '',
+      preClose,
+      points,
+    };
+    timelineCache.set(secid, { data: result, t: nowMs() });
     return result;
   } catch (e) {
     return null;

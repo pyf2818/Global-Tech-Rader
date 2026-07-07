@@ -5,7 +5,7 @@ import { users, userSessions, createUser, verifyUser, generateToken, getUserByTo
 import { getNews } from './services/newsService.js';
 import { getTrending, getGithubTrending } from './services/trendingService.js';
 import { discoverSourceCandidates, validateFeedUrl } from './services/sourceDiscovery.js';
-import { getDashboard, getRealtime, getKline, searchStock, resolveSecid } from './services/stockService.js';
+import { getDashboard, getRealtime, getKline, getTimeline, searchStock, resolveSecid } from './services/stockService.js';
 
 export function newsPlugin() {
   return {
@@ -186,6 +186,14 @@ export function newsPlugin() {
           if (!keyword) return sendJson(res, []);
           const data = await searchStock(keyword);
           return sendJson(res, data);
+        }
+
+        if (requestUrl.pathname === '/api/stock/timeline') {
+          const code = requestUrl.searchParams.get('code') || '';
+          const secid = resolveSecid(code);
+          if (!secid) return sendJson(res, { ok: false, message: '无效的股票代码' }, 400);
+          const data = await getTimeline(secid);
+          return sendJson(res, data || { ok: false, message: '未获取到分时数据' });
         }
         // ===== 股市动向 API END =====
 
