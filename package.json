@@ -13,6 +13,7 @@
   "dependencies": {
     "@vitejs/plugin-react": "^6.0.2",
     "autoprefixer": "^10.5.0",
+    "klinecharts": "^10.0.0-beta3",
     "postcss": "^8.5.15",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
