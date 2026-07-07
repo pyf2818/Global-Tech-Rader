@@ -443,38 +443,42 @@ export default function StockPage({ llmConfig, onOpenLlmConfig }) {
               ))}
             </div>
           </section>
-
-          {/* AI 个股诊断 */}
-          <section className="stock3-panel stock-ai-panel">
-            <div className="stock3-panel-label">
-              AI 个股诊断
-              {!ai.llmReady && <span className="stock-ai-unready" onClick={onOpenLlmConfig}>未配置</span>}
-            </div>
-            {ai.llmReady ? (
-              <>
-                {!ai.diagnosis && !ai.diagnosing && !ai.diagnoseError && (
-                  <button className="stock-ai-run" onClick={runDiagnosis} disabled={!realtime}>
-                    {ICONS.sparkle}<span>生成 AI 诊断</span>
-                  </button>
-                )}
-                {ai.diagnosing && <div className="stock-ai-loading"><div className="spinner" /><span>AI 分析中…</span></div>}
-                {ai.diagnoseError && <div className="stock-ai-error">{ai.diagnoseError}<button onClick={runDiagnosis}>重试</button></div>}
-                {ai.diagnosis && (
-                  <div className="stock-ai-result">
-                    <div className="stock-ai-text">{ai.diagnosis.content}</div>
-                    <button className="stock-ai-rerun" onClick={runDiagnosis} disabled={ai.diagnosing}>{ICONS.refresh}<span>重新诊断</span></button>
-                  </div>
-                )}
-              </>
-            ) : (
-              <div className="stock-ai-guide">
-                <p>配置大模型后，AI 可综合 K线、盘口、板块给出个股诊断。</p>
-                <button onClick={onOpenLlmConfig}>配置大模型</button>
-              </div>
-            )}
-          </section>
         </aside>
       </div>
+
+      {/* AI 个股诊断 —— 三栏下方全宽面板，可独立滚动 */}
+      <section className="stock3-panel stock-ai-panel">
+        <div className="stock-ai-panel-head">
+          <div className="stock3-panel-label">
+            {ICONS.sparkle} AI 个股诊断
+            {!ai.llmReady && <span className="stock-ai-unready" onClick={onOpenLlmConfig}>未配置</span>}
+          </div>
+          {ai.llmReady && (ai.diagnosis || ai.diagnoseError) && (
+            <button className="stock-ai-rerun" onClick={runDiagnosis} disabled={ai.diagnosing}>{ICONS.refresh}<span>重新诊断</span></button>
+          )}
+        </div>
+        {ai.llmReady ? (
+          <>
+            {!ai.diagnosis && !ai.diagnosing && !ai.diagnoseError && (
+              <button className="stock-ai-run" onClick={runDiagnosis} disabled={!realtime}>
+                {ICONS.sparkle}<span>生成 AI 诊断</span>
+              </button>
+            )}
+            {ai.diagnosing && <div className="stock-ai-loading"><div className="spinner" /><span>AI 分析中…</span></div>}
+            {ai.diagnoseError && <div className="stock-ai-error">{ai.diagnoseError}<button onClick={runDiagnosis}>重试</button></div>}
+            {ai.diagnosis && (
+              <div className="stock-ai-result">
+                <div className="stock-ai-text">{ai.diagnosis.content}</div>
+              </div>
+            )}
+          </>
+        ) : (
+          <div className="stock-ai-guide">
+            <p>配置大模型后，AI 可综合 K线、盘口、板块给出个股诊断。</p>
+            <button onClick={onOpenLlmConfig}>配置大模型</button>
+          </div>
+        )}
+      </section>
 
       {/* AI 早报弹窗 */}
       {showBriefing && (

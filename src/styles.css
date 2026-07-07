@@ -15027,7 +15027,7 @@ body {
 .stock3-index-skeleton { font-size: 12px; color: var(--text-muted); padding: 8px 12px; }
 
 /* 三栏主体 */
-.stock3-body { display: grid; grid-template-columns: 240px 1fr 320px; gap: 12px; min-height: 0; flex: 1; }
+.stock3-body { display: grid; grid-template-columns: 240px 1fr 320px; gap: 12px; min-height: 0; flex: 1 1 auto; min-height: 520px; }
 
 /* 左栏 */
 .stock3-left { display: flex; flex-direction: column; border: 1px solid var(--border-color); border-radius: 10px; background: var(--bg-card); overflow: hidden; min-height: 480px; }
@@ -15068,7 +15068,7 @@ body {
 .stock-chart-empty { display: flex; align-items: center; justify-content: center; width: 100%; min-height: 380px; color: var(--text-muted); font-size: 13px; }
 
 /* 右栏 */
-.stock3-right { display: flex; flex-direction: column; gap: 12px; min-height: 480px; }
+.stock3-right { display: flex; flex-direction: column; gap: 12px; min-height: 0; overflow-y: auto; }
 .stock3-panel { border: 1px solid var(--border-color); border-radius: 10px; background: var(--bg-card); padding: 12px 14px; }
 .stock3-panel-label { font-size: 11px; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-muted); margin-bottom: 10px; }
 
@@ -15111,7 +15111,10 @@ body {
 .stock-ai-action:hover { background: rgba(201, 169, 97, 0.22); border-color: var(--accent-amber); }
 .stock-ai-action svg { width: 14px; height: 14px; }
 
-.stock-ai-panel { display: flex; flex-direction: column; gap: 10px; }
+.stock-ai-panel { display: flex; flex-direction: column; gap: 10px; flex-shrink: 0; }
+.stock-ai-panel-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.stock-ai-panel-head .stock3-panel-label { display: inline-flex; align-items: center; gap: 6px; margin-bottom: 0; }
+.stock-ai-panel-head .stock3-panel-label svg { width: 14px; height: 14px; color: var(--accent-amber); }
 .stock-ai-unready { margin-left: auto; font-size: 10px; color: var(--accent-amber); cursor: pointer; border: 1px solid var(--accent-amber); padding: 1px 6px; border-radius: 4px; font-weight: 600; }
 .stock-ai-run {
   display: inline-flex; align-items: center; justify-content: center; gap: 6px;
@@ -15129,7 +15132,7 @@ body {
 .stock-ai-error { padding: 10px; border-radius: 8px; background: rgba(239, 68, 68, 0.08); border: 1px solid rgba(239, 68, 68, 0.3); color: var(--signal-critical); font-size: 12px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .stock-ai-error button { padding: 4px 10px; border: 1px solid var(--signal-critical); border-radius: 4px; background: transparent; color: var(--signal-critical); font-size: 11px; cursor: pointer; }
 .stock-ai-result { display: flex; flex-direction: column; gap: 8px; }
-.stock-ai-text { font-size: 12.5px; line-height: 1.7; color: var(--text-secondary); white-space: pre-wrap; padding: 10px; background: var(--bg-primary); border-radius: 8px; border-left: 2px solid var(--accent-amber); }
+.stock-ai-text { font-size: 13px; line-height: 1.8; color: var(--text-secondary); white-space: pre-wrap; padding: 14px 16px; background: var(--bg-primary); border-radius: 8px; border-left: 3px solid var(--accent-amber); max-height: 280px; overflow-y: auto; }
 .stock-ai-rerun { display: inline-flex; align-items: center; gap: 6px; align-self: flex-start; padding: 5px 12px; border: 1px solid var(--border-color); border-radius: 6px; background: transparent; color: var(--text-muted); font-size: 11px; cursor: pointer; }
 .stock-ai-rerun svg { width: 12px; height: 12px; }
 .stock-ai-rerun:hover { color: var(--accent-amber); border-color: var(--accent-amber); }
