@@ -16,7 +16,7 @@ import { useSourceManager } from './hooks/useSourceManager.js';
 import { useCustomUrl } from './hooks/useCustomUrl.js';
 import { useCalendar } from './hooks/useCalendar.js';
 import { useUI } from './hooks/useUI.js';
-import { BlockGrid, BlockPanel } from './blocks/index.js';
+import { BlockGrid, BlockPanel, BlockStat } from './blocks/index.js';
 
 const PRODUCT_NAME = '万般硅川';
 const PRODUCT_TAGLINE = '高质量多领域智能资讯生态';
@@ -5980,10 +5980,10 @@ ${signals}
                   <h1 className="workbench-title">今日情报工作台</h1>
                   <p className="workbench-subtitle">少看一点，理解更深一点。系统会按日期、关注领域和来源质量帮你收敛到真正值得读的内容。</p>
                 <div className="hero-briefing-summary">
-                  <div className="hero-briefing-stat"><span className="hero-briefing-stat-num">{insightData.todayCount}</span><span>今日资讯</span></div>
-                  <div className="hero-briefing-stat"><span className="hero-briefing-stat-num">{topMustRead.length}</span><span>必读推荐</span></div>
-                  <div className="hero-briefing-stat"><span className="hero-briefing-stat-num">{selectedInterests.length}</span><span>关注领域</span></div>
-                  <div className="hero-briefing-stat"><span className="hero-briefing-stat-num">{Math.abs(insightData.dailyChange || 0)}%</span><span>日变化</span></div>
+                  <BlockStat value={insightData.todayCount} label="今日资讯" size="md" />
+                  <BlockStat value={topMustRead.length} label="必读推荐" size="md" />
+                  <BlockStat value={selectedInterests.length} label="关注领域" size="md" />
+                  <BlockStat value={`${Math.abs(insightData.dailyChange || 0)}%`} label="日变化" size="md" trendDir={(insightData.dailyChange || 0) >= 0 ? 'up' : 'down'} />
                 </div>
                 </div>
 
