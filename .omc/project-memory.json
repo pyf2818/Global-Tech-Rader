@@ -47,8 +47,8 @@
     "runtime": null
   },
   "build": {
-    "buildCommand": "cd \"E:/VStudio_Project/Silicon Meridian\" && taskkill //F //IM esbuild.exe 2>/dev/null; sleep 1 && npm run build 2>&1 | grep -i \"error\\|built\" | head -3 && curl -s -o /dev/null -w \"HTTP %{http_code}\" http://localhost:5175/ 2>/dev/null",
-    "testCommand": "cd \"E:/VStudio_Project/Silicon Meridian\" && taskkill //F //IM esbuild.exe 2>/dev/null; sleep 1 && npm run build 2>&1 | grep -i \"error\\|built\" | head -3 && node node_modules/vitest/vitest.mjs run 2>&1 | tail -3",
+    "buildCommand": "cd \"E:/VStudio_Project/Silicon Meridian\" && npm run build 2>&1 | tail -30",
+    "testCommand": "cd \"E:/VStudio_Project/Silicon Meridian\" && node node_modules/vitest/vitest.mjs run 2>&1 | tail -20",
     "lintCommand": null,
     "devCommand": "npm run dev",
     "scripts": {
@@ -213,8 +213,8 @@
   "hotPaths": [
     {
       "path": "src/App.jsx",
-      "accessCount": 48,
-      "lastAccessed": 1783360626494,
+      "accessCount": 61,
+      "lastAccessed": 1783387889776,
       "type": "directory"
     },
     {
@@ -224,15 +224,27 @@
       "type": "file"
     },
     {
+      "path": "src/styles.css",
+      "accessCount": 6,
+      "lastAccessed": 1783386601524,
+      "type": "file"
+    },
+    {
+      "path": "C:/Users/anlan0725/.claude/projects/E--VStudio-Project-Silicon-Meridian/memory/MEMORY.md",
+      "accessCount": 5,
+      "lastAccessed": 1783386739475,
+      "type": "file"
+    },
+    {
       "path": "server/news/plugin.js",
       "accessCount": 4,
       "lastAccessed": 1783357184519,
       "type": "file"
     },
     {
-      "path": "src/styles.css",
-      "accessCount": 4,
-      "lastAccessed": 1783357437046,
+      "path": "src/components/GithubRepoCard.jsx",
+      "accessCount": 3,
+      "lastAccessed": 1783387879361,
       "type": "file"
     },
     {
@@ -242,10 +254,16 @@
       "type": "file"
     },
     {
-      "path": "C:/Users/anlan0725/.claude/projects/E--VStudio-Project-Silicon-Meridian/memory/MEMORY.md",
+      "path": "C:/Users/anlan0725/.claude/projects/E--VStudio-Project-Silicon-Meridian/memory/optimization-plan-progress.md",
       "accessCount": 2,
-      "lastAccessed": 1783360112369,
+      "lastAccessed": 1783386345656,
       "type": "file"
+    },
+    {
+      "path": "src",
+      "accessCount": 2,
+      "lastAccessed": 1783386379603,
+      "type": "directory"
     },
     {
       "path": "C:/Users/ANLAN0~1/AppData/Local/Temp/claude/E--VStudio-Project-Silicon-Meridian/a34281bd-63c0-4603-a811-890f30b9f678/tasks/b24dyjvr2.output",
@@ -275,6 +293,12 @@
       "path": "src/components/StudioPage.jsx",
       "accessCount": 1,
       "lastAccessed": 1783359727403,
+      "type": "file"
+    },
+    {
+      "path": "C:/Users/anlan0725/.claude/projects/E--VStudio-Project-Silicon-Meridian/memory/seven-modules-goal.md",
+      "accessCount": 1,
+      "lastAccessed": 1783386721668,
       "type": "file"
     }
   ],

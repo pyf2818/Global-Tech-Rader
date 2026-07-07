@@ -1651,6 +1651,33 @@ function App() {
     return [...counts.entries()].sort((a, b) => b[1] - a[1]);
   }, [items, category, mode]);
 
+  // 「全部动态」当前活动筛选 —— 用于 chip 条展示与一键清除
+  const allActiveFilters = useMemo(() => {
+    const chips = [];
+    if (query.trim()) chips.push({ key: 'query', label: `搜索: ${query.trim()}`, clear: () => setQuery('') });
+    if (category !== 'all') {
+      const cat = categories.find(c => c.id === category);
+      chips.push({ key: 'category', label: cat?.label || category, clear: () => setCategory('all') });
+    }
+    if (mode !== 'all') {
+      const m = MODES.find(x => x.id === mode);
+      chips.push({ key: 'mode', label: m?.label || mode, clear: () => setMode('all') });
+    }
+    if (regionFilter !== 'all') {
+      chips.push({ key: 'region', label: regionFilter === 'domestic' ? '国内' : '国外', clear: () => setRegionFilter('all') });
+    }
+    if (sourceFilter !== 'all') chips.push({ key: 'source', label: sourceFilter, clear: () => setSourceFilter('all') });
+    return chips;
+  }, [query, category, mode, regionFilter, sourceFilter, categories]);
+
+  const clearAllFilters = () => {
+    setQuery('');
+    setCategory('all');
+    setMode('all');
+    setRegionFilter('all');
+    setSourceFilter('all');
+  };
+
   const addRecentVisit = useCallback((type, value, label) => {
     setRecentVisits(prev => {
       const filtered = prev.filter(v => !(v.type === type && v.value === value));
@@ -5837,9 +5864,9 @@ ${signals}
                     {MODES.map(m => <button key={m.id} className={`mode-tab ${mode === m.id ? 'active' : ''}`} onClick={() => setMode(m.id)}>{m.label}</button>)}
                   </div>
                   <div className="region-filter-wrap">
-                    <button className={`region-filter-btn ${regionFilter === 'all' ? 'active' : ''}`} onClick={() => { console.log('[Region] Setting to: all'); setRegionFilter('all'); }}>全部</button>
-<button className={`region-filter-btn ${regionFilter === 'domestic' ? 'active' : ''}`} onClick={() => { console.log('[Region] Setting to: domestic'); setRegionFilter('domestic'); }}>国内</button>
-                    <button className={`region-filter-btn ${regionFilter === 'overseas' ? 'active' : ''}`} onClick={() => { console.log('[Region] Setting to: overseas'); setRegionFilter('overseas'); }}>国外</button>
+                    <button className={`region-filter-btn ${regionFilter === 'all' ? 'active' : ''}`} onClick={() => setRegionFilter('all')}>全部</button>
+                    <button className={`region-filter-btn ${regionFilter === 'domestic' ? 'active' : ''}`} onClick={() => setRegionFilter('domestic')}>国内</button>
+                    <button className={`region-filter-btn ${regionFilter === 'overseas' ? 'active' : ''}`} onClick={() => setRegionFilter('overseas')}>国外</button>
                   </div>
                   {nav === 'all' && (
                     <div className="source-filter-wrap">
@@ -5919,6 +5946,21 @@ ${signals}
           <div className="stat-item time">{ICONS.clock}<span>{stats.updatedAt ? formatTime(stats.updatedAt) : '--'}</span></div>
           <button className="panel-toggle" onClick={() => setPanelCollapsed(c => !c)}>{panelCollapsed ? ICONS.chevronLeft : ICONS.chevronRight}</button>
         </div>}
+
+        {nav === 'all' && allActiveFilters.length > 0 && (
+          <div className="active-filters-bar">
+            <span className="active-filters-label">当前筛选</span>
+            <div className="active-filters-chips">
+              {allActiveFilters.map(chip => (
+                <button key={chip.key} className="filter-chip" onClick={chip.clear} title="点击移除">
+                  <span>{chip.label}</span>
+                  <span className="filter-chip-x">×</span>
+                </button>
+              ))}
+              <button className="filter-chip-clear-all" onClick={clearAllFilters}>清空全部</button>
+            </div>
+          </div>
+        )}
 
         <div className={`feed custom-scrollbar ${nav === 'today' ? 'feed-workbench' : ''}`} ref={feedRef}>
           {nav === 'today' && (
@@ -6682,7 +6724,7 @@ ${signals}
 
               {loading && <div className={`feed-list view-${viewMode} ${viewMode === 'card' ? 'card-grid' : ''}`}>{Array.from({ length: 6 }).map((_, i) => <SkeletonCard key={i} viewMode={viewMode} />)}</div>}
               {error && <div className="error-state"><p>加载失败: {error}</p><button onClick={() => loadNews()}>重试</button></div>}
-              {!loading && !error && filtered.length === 0 && <div className="empty-state"><p>没有匹配的资讯</p><button onClick={() => { setQuery(''); setCategory('all'); setMode('all'); setSourceFilter('all'); }}>重置筛选</button></div>}
+              {!loading && !error && filtered.length === 0 && <div className="empty-state"><p>{allActiveFilters.length > 0 ? `共 ${items.length} 条资讯，当前 ${allActiveFilters.length} 个筛选条件均不匹配` : '没有匹配的资讯'}</p><button onClick={clearAllFilters}>清空全部筛选</button></div>}
               <div className={`feed-list view-${viewMode} ${viewMode === 'card' ? 'card-grid' : ''}`}>
                 {filtered.map((item, i) => {
                   const summaryEntry = getSummaryEntry(item);

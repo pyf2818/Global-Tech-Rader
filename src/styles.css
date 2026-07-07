@@ -579,6 +579,74 @@ body {
 .region-filter-btn:hover { color: var(--text-primary); background: var(--bg-hover); }
 .region-filter-btn.active { color: var(--accent-cyan); background: var(--accent-cyan-soft); }
 
+/* 活动筛选 chip 条 —— 「全部动态」当前筛选可视化 */
+.active-filters-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 16px;
+  background: var(--bg-card);
+  border-bottom: 1px solid var(--border-color);
+  flex-wrap: wrap;
+  animation: fadeUp 0.25s ease;
+}
+.active-filters-label {
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--text-muted);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.active-filters-chips {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.filter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  background: var(--accent-cyan-soft);
+  border: 1px solid rgba(34, 211, 238, 0.35);
+  border-radius: 999px;
+  color: var(--accent-cyan);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  animation: fadeUp 0.2s ease backwards;
+}
+.filter-chip:hover {
+  background: rgba(34, 211, 238, 0.22);
+  border-color: var(--accent-cyan);
+}
+.filter-chip-x {
+  font-size: 14px;
+  line-height: 1;
+  opacity: 0.7;
+  font-weight: 900;
+}
+.filter-chip:hover .filter-chip-x { opacity: 1; }
+.filter-chip-clear-all {
+  padding: 4px 10px;
+  background: transparent;
+  border: 1px dashed var(--border-color);
+  border-radius: 999px;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.filter-chip-clear-all:hover {
+  color: var(--text-primary);
+  border-color: var(--text-secondary);
+  border-style: solid;
+}
+
 .trending-toolbar, .recommendations-toolbar { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; padding: 10px 14px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 10px; }
 
 .topbar-trending .mode-tabs .mode-tab { padding: 6px 11px; font-size: 12px; }
