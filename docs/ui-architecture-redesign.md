@@ -430,3 +430,47 @@ App.jsx 退化成路由器：`<AppShell><CurrentPage /></AppShell>`，从 10240 
 1. **用户层面**：跨页面一致的导航体验 + 全局上下文常驻 + 统一搜索
 2. **开发层面**：新页面 30 分钟内可搭完（选布局 + 填 Block）
 3. **维护层面**：styles.css 从 3784 个类收敛到 ~200 个语义类，修改一处全局生效
+
+---
+
+## 十一、落地记录（2026-07-07 实际执行）
+
+### 已完成
+
+| 阶段 | commit | 内容 |
+|------|--------|------|
+| P1.1 | `fbc370b` | 新增 5 个 Block 原语组件（BlockStat/BlockPanel/BlockList/BlockToolbar/BlockGrid）+ index.js，375 行 |
+| P1.2 | `f57453d` | styles.css 追加 .block-* 样式，57 个类，338 行 |
+| P1.3 | `cb46c9a` | StudioPage 迁移：studio-module-grid→BlockGrid，2×asset-panel→BlockPanel |
+| P2   | `373e2df` | today 页 hero-briefing-summary 4 个 stat→BlockStat |
+| P3   | `8d54e18` | profile-summary-grid 4 个卡→BlockStat card 变体；BlockStat 扩展 variant=card；BlockToolbar 扩展 hidden；today filter-row→BlockToolbar hidden |
+| P4   | `feb8581` | 命令面板 Ctrl+K（src/shell/CommandPalette.jsx），290 行 |
+
+### 原语使用覆盖
+
+- **BlockStat**：today hero（inline）+ profile summary（card）— 2 种变体均验证
+- **BlockPanel**：studio asset-panel ×2 — 已验证
+- **BlockGrid**：studio module-grid + profile summary-grid — 已验证
+- **BlockToolbar**：today filter-row（hidden）— 已验证
+- **BlockList**：未使用（现有列表都是高度定制业务组件，语义不匹配）
+
+### 调整结论
+
+1. **AppShell 完整抽取推迟**：sidebar 依赖 35+ 状态，当前抽取 props 传递成本过高。正确顺序是先拆页面让状态聚拢到 hook，再抽 AppShell。
+
+2. **P5 剩余页面不强替换**：github/square/all/agents 的内部元素都是高度定制的业务组件（GithubRepoCard/square-post/agent-workflow-mission 等），强行用通用 Block 原语替换会扭曲语义。Block 原语适用于"统计块/容器面板/筛选条/卡片网格"这类通用结构，特化业务组件保留原样更合理。
+
+3. **styles.css 旧类不删除**：3784 个旧类与 57 个 .block-* 类共存，前缀隔离零冲突。大规模删类需确认无引用后进行，当前阶段保留以降低风险。
+
+### 技术要点
+
+- App.jsx 是混合行尾（10240 CRLF + 1 LF），替换脚本需先统一行尾
+- App.jsx 中 '准备你的第一篇内容' 的 '一' 字曾损坏为 U+FFFD×2，已修复
+- today 页 workbench-filter-row 原是 display:none 废弃代码，替换为 BlockToolbar hidden 保持行为
+- 所有改动经 vite build + 152 tests 验证无回归
+
+### 后续方向
+
+- 拆分 App.jsx 为 pages/ 目录（today/all/github 等各自独立文件），为 AppShell 抽取铺路
+- 命令面板扩展：素材/文章搜索、最近访问、智能体快捷调用
+- 视觉一致性巡检：统一 hero 区为 PageHeader 组件
