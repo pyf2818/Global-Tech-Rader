@@ -7,6 +7,7 @@ import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { init, dispose } from 'klinecharts';
 import { ICONS } from '../constants/index.jsx';
 import { useStockWatchlist } from '../hooks/useStockWatchlist.js';
+import { useStockAi, ALERT_CONDITIONS } from '../hooks/useStockAi.js';
 
 const UP_COLOR = '#ef4444';
 const DOWN_COLOR = '#22c55e';
@@ -157,8 +158,9 @@ function OrderBook({ realtime }) {
   );
 }
 
-export default function StockPage({ llmConfig }) {
+export default function StockPage({ llmConfig, onOpenLlmConfig }) {
   const { watchlist, inWatchlist, toggleStock, moveStock } = useStockWatchlist();
+  const ai = useStockAi(llmConfig);
   const [dashboard, setDashboard] = useState(null);
   const [loading, setLoading] = useState(true);
   const [selectedCode, setSelectedCode] = useState('sh000001');
@@ -166,6 +168,7 @@ export default function StockPage({ llmConfig }) {
   const [klineData, setKlineData] = useState(null);
   const [timelineData, setTimelineData] = useState(null);
   const [realtime, setRealtime] = useState(null);
+  const [sectors, setSectors] = useState([]);
   const [period, setPeriod] = useState('timeline');
 
   // 搜索
@@ -173,12 +176,68 @@ export default function StockPage({ llmConfig }) {
   const [searchResults, setSearchResults] = useState([]);
   const [listTab, setListTab] = useState('hot'); // hot | watchlist
 
+  // 早报弹窗
+  const [showBriefing, setShowBriefing] = useState(false);
+  // 监控配置弹窗
+  const [showAlertConfig, setShowAlertConfig] = useState(false);
+  const [alertConditions, setAlertConditions] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('stockAlertConditions') || '{}'); } catch { return {}; }
+  });
+  const setAlertCondition = (code, condId) => {
+    setAlertConditions(prev => {
+      const next = { ...prev };
+      if (condId) next[code] = condId; else delete next[code];
+      try { localStorage.setItem('stockAlertConditions', JSON.stringify(next)); } catch { /* ignore */ }
+      return next;
+    });
+  };
+
   const loadDashboard = useCallback(async () => {
     setLoading(true);
-    try { const res = await fetch('/api/stock/dashboard'); setDashboard(await res.json()); }
-    catch { setDashboard(null); }
+    try {
+      const [dRes, sRes] = await Promise.all([
+        fetch('/api/stock/dashboard'),
+        fetch('/api/stock/sectors?type=industry'),
+      ]);
+      setDashboard(await dRes.json());
+      const sd = await sRes.json();
+      setSectors(sd?.sectors || []);
+    } catch { setDashboard(null); }
     setLoading(false);
   }, []);
+
+  // 触发 AI 诊断（自动加载日K数据供诊断用）
+  const runDiagnosis = useCallback(async () => {
+    let klineForDiag = klineData;
+    // 当前是分时图时，临时拉一份日K供诊断
+    if (period === 'timeline' || !klineForDiag) {
+      try {
+        const res = await fetch(`/api/stock/kline?code=${selectedCode}&period=101&count=30`);
+        klineForDiag = await res.json();
+      } catch { /* ignore */ }
+    }
+    ai.diagnoseStock({
+      stock: { name: selectedName, code: selectedCode },
+      kline: klineForDiag,
+      realtime,
+      sectors,
+    });
+  }, [ai, klineData, period, selectedCode, selectedName, realtime, sectors]);
+
+  // 触发 AI 早报
+  const runBriefing = useCallback(() => {
+    ai.generateMorningBrief({
+      indices: dashboard?.indices || [],
+      stocks: dashboard?.stocks || [],
+      sectors,
+    });
+    setShowBriefing(true);
+  }, [ai, dashboard, sectors]);
+
+  // 触发自选监控
+  const runAlerts = useCallback(() => {
+    ai.checkAlerts(watchlist, alertConditions);
+  }, [ai, watchlist, alertConditions]);
 
   const loadStock = useCallback(async (code) => {
     setKlineData(null); setTimelineData(null); setRealtime(null);
@@ -282,6 +341,9 @@ export default function StockPage({ llmConfig }) {
         <button className={`stock-watch-btn ${isSelectedInWatchlist ? 'active' : ''}`} onClick={() => toggleStock(selectedStock)} title={isSelectedInWatchlist ? '移出自选' : '加入自选'}>
           {ICONS.star}<span>{isSelectedInWatchlist ? '已自选' : '加自选'}</span>
         </button>
+        <button className="stock-ai-action" onClick={runBriefing} title="AI 生成今日市场早报">
+          {ICONS.sparkle}<span>AI 早报</span>
+        </button>
         <button className="btn-refresh" onClick={loadDashboard}>{ICONS.refresh}<span>刷新</span></button>
       </header>
 
@@ -304,7 +366,24 @@ export default function StockPage({ llmConfig }) {
           <div className="stock3-left-tabs">
             <button className={`stock3-left-tab ${listTab === 'hot' ? 'active' : ''}`} onClick={() => setListTab('hot')}>热门</button>
             <button className={`stock3-left-tab ${listTab === 'watchlist' ? 'active' : ''}`} onClick={() => setListTab('watchlist')}>自选 {watchlist.length > 0 && `(${watchlist.length})`}</button>
+            {listTab === 'watchlist' && watchlist.length > 0 && (
+              <button className="stock3-left-tab stock-alert-tab" onClick={() => setShowAlertConfig(true)} title="智能监控配置">
+                {ICONS.sparkle}<span>监控</span>
+              </button>
+            )}
           </div>
+          {listTab === 'watchlist' && ai.alertResults.length > 0 && (
+            <div className="stock-alert-hits">
+              <div className="stock-alert-hits-label">命中提醒</div>
+              {ai.alertResults.map((h, i) => (
+                <div key={i} className={`stock-alert-hit ${(h.realtime.changePct || 0) >= 0 ? 'up' : 'down'}`}>
+                  <strong>{h.stock.name}</strong>
+                  <span className="stock-alert-hit-price">{h.realtime.price?.toFixed(2)} ({h.realtime.changePct >= 0 ? '+' : ''}{h.realtime.changePct?.toFixed(2)}%)</span>
+                  <p>{h.aiText}</p>
+                </div>
+              ))}
+            </div>
+          )}
           <div className="stock3-left-list">
             {listTab === 'watchlist' && watchlist.length === 0 && (
               <div className="stock3-list-empty">还没有自选，搜索个股后点「加自选」</div>
@@ -364,8 +443,116 @@ export default function StockPage({ llmConfig }) {
               ))}
             </div>
           </section>
+
+          {/* AI 个股诊断 */}
+          <section className="stock3-panel stock-ai-panel">
+            <div className="stock3-panel-label">
+              AI 个股诊断
+              {!ai.llmReady && <span className="stock-ai-unready" onClick={onOpenLlmConfig}>未配置</span>}
+            </div>
+            {ai.llmReady ? (
+              <>
+                {!ai.diagnosis && !ai.diagnosing && !ai.diagnoseError && (
+                  <button className="stock-ai-run" onClick={runDiagnosis} disabled={!realtime}>
+                    {ICONS.sparkle}<span>生成 AI 诊断</span>
+                  </button>
+                )}
+                {ai.diagnosing && <div className="stock-ai-loading"><div className="spinner" /><span>AI 分析中…</span></div>}
+                {ai.diagnoseError && <div className="stock-ai-error">{ai.diagnoseError}<button onClick={runDiagnosis}>重试</button></div>}
+                {ai.diagnosis && (
+                  <div className="stock-ai-result">
+                    <div className="stock-ai-text">{ai.diagnosis.content}</div>
+                    <button className="stock-ai-rerun" onClick={runDiagnosis} disabled={ai.diagnosing}>{ICONS.refresh}<span>重新诊断</span></button>
+                  </div>
+                )}
+              </>
+            ) : (
+              <div className="stock-ai-guide">
+                <p>配置大模型后，AI 可综合 K线、盘口、板块给出个股诊断。</p>
+                <button onClick={onOpenLlmConfig}>配置大模型</button>
+              </div>
+            )}
+          </section>
         </aside>
       </div>
+
+      {/* AI 早报弹窗 */}
+      {showBriefing && (
+        <div className="stock-modal-overlay" onClick={() => setShowBriefing(false)}>
+          <div className="stock-modal stock-briefing-modal" onClick={e => e.stopPropagation()}>
+            <div className="stock-modal-head">
+              <h3>{ICONS.sparkle} AI 市场早报</h3>
+              <button className="stock-modal-close" onClick={() => setShowBriefing(false)}>×</button>
+            </div>
+            <div className="stock-modal-body">
+              {!ai.llmReady ? (
+                <div className="stock-ai-guide">
+                  <p>配置大模型后，AI 可生成今日市场早报。</p>
+                  <button onClick={() => { setShowBriefing(false); onOpenLlmConfig?.(); }}>配置大模型</button>
+                </div>
+              ) : ai.briefingLoading ? (
+                <div className="stock-ai-loading"><div className="spinner" /><span>正在生成早报…</span></div>
+              ) : ai.briefingError ? (
+                <div className="stock-ai-error">{ai.briefingError}<button onClick={runBriefing}>重试</button></div>
+              ) : ai.briefing ? (
+                <div className="stock-briefing-text">{ai.briefing.content}</div>
+              ) : (
+                <div className="stock-ai-guide"><p>点击下方按钮生成今日市场早报。</p></div>
+              )}
+            </div>
+            {ai.llmReady && !ai.briefingLoading && (
+              <div className="stock-modal-foot">
+                <button className="stock-ai-run" onClick={runBriefing}>{ICONS.refresh}<span>{ai.briefing ? '重新生成' : '生成早报'}</span></button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* 智能监控配置弹窗 */}
+      {showAlertConfig && (
+        <div className="stock-modal-overlay" onClick={() => setShowAlertConfig(false)}>
+          <div className="stock-modal stock-alert-modal" onClick={e => e.stopPropagation()}>
+            <div className="stock-modal-head">
+              <h3>{ICONS.sparkle} 自选股智能监控</h3>
+              <button className="stock-modal-close" onClick={() => setShowAlertConfig(false)}>×</button>
+            </div>
+            <div className="stock-modal-body">
+              {!ai.llmReady ? (
+                <div className="stock-ai-guide">
+                  <p>配置大模型后，AI 可监控自选股异动并生成提醒。</p>
+                  <button onClick={() => { setShowAlertConfig(false); onOpenLlmConfig?.(); }}>配置大模型</button>
+                </div>
+              ) : watchlist.length === 0 ? (
+                <div className="stock-ai-guide"><p>还没有自选股，先添加自选再设置监控。</p></div>
+              ) : (
+                <>
+                  <div className="stock-alert-run-bar">
+                    <span>为每只自选股设置监控条件，AI 命中后生成提醒文案。</span>
+                    <button className="stock-ai-run" onClick={runAlerts} disabled={ai.alertChecking}>
+                      {ai.alertChecking ? '检查中…' : '立即检查'}
+                    </button>
+                  </div>
+                  <div className="stock-alert-config-list">
+                    {watchlist.map(s => (
+                      <div key={s.code} className="stock-alert-config-row">
+                        <div className="stock-alert-config-name">
+                          <strong>{s.name}</strong>
+                          <span>{s.code}</span>
+                        </div>
+                        <select value={alertConditions[s.code] || ''} onChange={e => setAlertCondition(s.code, e.target.value)}>
+                          <option value="">不监控</option>
+                          {ALERT_CONDITIONS.map(c => <option key={c.id} value={c.id}>{c.label}</option>)}
+                        </select>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -5850,7 +5850,7 @@ ${signals}
                 </div>
               )}
               {nav === 'stock' && (
-                <StockPage llmConfig={llmConfig} categories={categories} />
+                <StockPage llmConfig={llmConfig} categories={categories} onOpenLlmConfig={() => setShowLlmQuickConfig(true)} />
               )}
               {nav === 'github' && (
                 <div className="github-filter-bar">

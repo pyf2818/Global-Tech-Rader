@@ -5,7 +5,7 @@ import { users, userSessions, createUser, verifyUser, generateToken, getUserByTo
 import { getNews } from './services/newsService.js';
 import { getTrending, getGithubTrending } from './services/trendingService.js';
 import { discoverSourceCandidates, validateFeedUrl } from './services/sourceDiscovery.js';
-import { getDashboard, getRealtime, getKline, getTimeline, searchStock, resolveSecid } from './services/stockService.js';
+import { getDashboard, getRealtime, getKline, getTimeline, getSectors, searchStock, resolveSecid } from './services/stockService.js';
 
 export function newsPlugin() {
   return {
@@ -194,6 +194,12 @@ export function newsPlugin() {
           if (!secid) return sendJson(res, { ok: false, message: '无效的股票代码' }, 400);
           const data = await getTimeline(secid);
           return sendJson(res, data || { ok: false, message: '未获取到分时数据' });
+        }
+
+        if (requestUrl.pathname === '/api/stock/sectors') {
+          const type = requestUrl.searchParams.get('type') === 'concept' ? 'concept' : 'industry';
+          const data = await getSectors(type);
+          return sendJson(res, data);
         }
         // ===== 股市动向 API END =====
 

@@ -15097,6 +15097,80 @@ body {
 .stock3-metric span { font-size: 10px; color: var(--text-muted); letter-spacing: 0.04em; }
 .stock3-metric strong { font-family: var(--font-mono); font-size: 13px; font-weight: 700; color: var(--text-primary); }
 
+/* ===== 股市 AI 智能模块 ===== */
+.stock-ai-action {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 8px 14px;
+  border: 1px solid rgba(201, 169, 97, 0.5);
+  border-radius: 10px;
+  background: rgba(201, 169, 97, 0.12);
+  color: var(--accent-amber);
+  font-size: 13px; font-weight: 700;
+  cursor: pointer; transition: all 0.15s;
+}
+.stock-ai-action:hover { background: rgba(201, 169, 97, 0.22); border-color: var(--accent-amber); }
+.stock-ai-action svg { width: 14px; height: 14px; }
+
+.stock-ai-panel { display: flex; flex-direction: column; gap: 10px; }
+.stock-ai-unready { margin-left: auto; font-size: 10px; color: var(--accent-amber); cursor: pointer; border: 1px solid var(--accent-amber); padding: 1px 6px; border-radius: 4px; font-weight: 600; }
+.stock-ai-run {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  width: 100%; padding: 10px;
+  border: 1px solid var(--accent-amber); border-radius: 8px;
+  background: rgba(201, 169, 97, 0.12); color: var(--accent-amber);
+  font-size: 13px; font-weight: 700; cursor: pointer; transition: all 0.15s;
+}
+.stock-ai-run:hover { background: var(--accent-amber); color: #1a1300; }
+.stock-ai-run:disabled { opacity: 0.5; cursor: not-allowed; }
+.stock-ai-run svg { width: 14px; height: 14px; }
+.stock-ai-loading { display: flex; align-items: center; gap: 8px; padding: 12px; color: var(--text-muted); font-size: 13px; }
+.stock-ai-loading .spinner { width: 14px; height: 14px; border: 2px solid var(--border-color); border-top-color: var(--accent-amber); border-radius: 50%; animation: spin 0.8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.stock-ai-error { padding: 10px; border-radius: 8px; background: rgba(239, 68, 68, 0.08); border: 1px solid rgba(239, 68, 68, 0.3); color: var(--signal-critical); font-size: 12px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.stock-ai-error button { padding: 4px 10px; border: 1px solid var(--signal-critical); border-radius: 4px; background: transparent; color: var(--signal-critical); font-size: 11px; cursor: pointer; }
+.stock-ai-result { display: flex; flex-direction: column; gap: 8px; }
+.stock-ai-text { font-size: 12.5px; line-height: 1.7; color: var(--text-secondary); white-space: pre-wrap; padding: 10px; background: var(--bg-primary); border-radius: 8px; border-left: 2px solid var(--accent-amber); }
+.stock-ai-rerun { display: inline-flex; align-items: center; gap: 6px; align-self: flex-start; padding: 5px 12px; border: 1px solid var(--border-color); border-radius: 6px; background: transparent; color: var(--text-muted); font-size: 11px; cursor: pointer; }
+.stock-ai-rerun svg { width: 12px; height: 12px; }
+.stock-ai-rerun:hover { color: var(--accent-amber); border-color: var(--accent-amber); }
+.stock-ai-guide { padding: 16px; text-align: center; display: flex; flex-direction: column; gap: 10px; align-items: center; }
+.stock-ai-guide p { margin: 0; font-size: 12px; color: var(--text-muted); line-height: 1.6; }
+.stock-ai-guide button { padding: 6px 16px; border: 1px solid var(--accent-amber); border-radius: 6px; background: rgba(201, 169, 97, 0.12); color: var(--accent-amber); font-size: 12px; font-weight: 700; cursor: pointer; }
+
+/* 智能监控 */
+.stock-alert-tab { flex: 0 0 auto; padding: 0 10px !important; gap: 4px; border-bottom: 2px solid transparent !important; color: var(--accent-amber); }
+.stock-alert-tab svg { width: 12px; height: 12px; }
+.stock-alert-hits { padding: 8px; border-bottom: 1px solid var(--border-color); background: rgba(201, 169, 97, 0.06); max-height: 180px; overflow-y: auto; }
+.stock-alert-hits-label { font-size: 10px; font-weight: 800; color: var(--accent-amber); letter-spacing: 0.1em; margin-bottom: 6px; }
+.stock-alert-hit { padding: 8px; border-radius: 6px; background: var(--bg-card); margin-bottom: 6px; display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px; }
+.stock-alert-hit strong { font-size: 12px; color: var(--text-primary); }
+.stock-alert-hit-price { font-family: var(--font-mono); font-size: 11px; font-weight: 700; }
+.stock-alert-hit.up .stock-alert-hit-price { color: var(--signal-positive); }
+.stock-alert-hit.down .stock-alert-hit-price { color: var(--signal-critical); }
+.stock-alert-hit p { margin: 4px 0 0; width: 100%; font-size: 11px; color: var(--text-secondary); line-height: 1.5; }
+.stock-alert-run-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 12px; background: rgba(201, 169, 97, 0.08); border-radius: 8px; margin-bottom: 12px; }
+.stock-alert-run-bar span { font-size: 12px; color: var(--text-muted); flex: 1; }
+.stock-alert-run-bar .stock-ai-run { width: auto; padding: 6px 16px; }
+.stock-alert-config-list { display: flex; flex-direction: column; gap: 6px; max-height: 360px; overflow-y: auto; }
+.stock-alert-config-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 10px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-primary); }
+.stock-alert-config-name { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.stock-alert-config-name strong { font-size: 13px; color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.stock-alert-config-name span { font-family: var(--font-mono); font-size: 10px; color: var(--text-muted); }
+.stock-alert-config-row select { padding: 4px 8px; border: 1px solid var(--border-color); border-radius: 4px; background: var(--bg-card); color: var(--text-primary); font-size: 12px; outline: none; }
+
+/* 弹窗 */
+.stock-modal-overlay { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.6); backdrop-filter: blur(4px); z-index: 200; display: flex; align-items: center; justify-content: center; padding: 20px; animation: fadeIn 0.2s ease; }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+.stock-modal { background: var(--bg-card-solid); border: 1px solid var(--border-color); border-radius: 14px; max-width: 560px; width: 100%; max-height: 80vh; display: flex; flex-direction: column; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4); }
+.stock-modal-head { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; border-bottom: 1px solid var(--border-color); }
+.stock-modal-head h3 { margin: 0; font-size: 16px; font-weight: 700; color: var(--text-primary); display: inline-flex; align-items: center; gap: 8px; }
+.stock-modal-head h3 svg { width: 16px; height: 16px; color: var(--accent-amber); }
+.stock-modal-close { width: 28px; height: 28px; border: none; border-radius: 6px; background: transparent; color: var(--text-muted); font-size: 20px; cursor: pointer; line-height: 1; }
+.stock-modal-close:hover { background: var(--bg-hover); color: var(--text-primary); }
+.stock-modal-body { padding: 20px; overflow-y: auto; flex: 1; }
+.stock-modal-foot { padding: 12px 20px; border-top: 1px solid var(--border-color); display: flex; justify-content: flex-end; }
+.stock-briefing-text { font-size: 14px; line-height: 1.8; color: var(--text-secondary); white-space: pre-wrap; padding: 16px; background: var(--bg-primary); border-radius: 10px; border-left: 3px solid var(--accent-amber); }
+
 /* 响应式 */
 @media (max-width: 1100px) {
   .stock3-body { grid-template-columns: 200px 1fr 280px; }

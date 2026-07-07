@@ -67,6 +67,8 @@ const REALTIME_FIELDS = 'f43,f44,f45,f46,f47,f48,f57,f58,f60,f170,f171';
 const TENCENT_URL = 'https://qt.gtimg.cn/q=';
 // 东方财富分时图接口
 const TIMELINE_URL = 'https://push2his.eastmoney.com/api/qt/stock/trends2/get';
+// 东方财富板块涨跌接口（m:90 t:2=行业板块 t:3=概念板块）
+const SECTOR_LIST_URL = 'https://push2.eastmoney.com/api/qt/clist/get';
 
 // 东方财富 secid（如 1.000001）→ 腾讯 code（如 sh000001）
 function secidToTencentCode(secid) {
@@ -324,6 +326,36 @@ export async function getTimeline(secid) {
     return result;
   } catch (e) {
     return null;
+  }
+}
+
+// 板块涨跌（行业板块 + 概念板块）—— 用于 AI 诊断输入和市场热力
+// type: 'industry' (m:90 t:2) | 'concept' (m:90 t:3)
+const sectorCache = new Map();
+const SECTOR_TTL = 60 * 1000;
+
+export async function getSectors(type = 'industry') {
+  const fs = type === 'concept' ? 'm:90+t:3' : 'm:90+t:2';
+  const key = `sectors-${type}`;
+  const cached = sectorCache.get(key);
+  if (cached && nowMs() - cached.t < SECTOR_TTL) return cached.data;
+
+  const url = `${SECTOR_LIST_URL}?pn=1&pz=30&po=1&np=1&fltt=2&invt=2&fid=f3&fs=${fs}&fields=f2,f3,f12,f14`;
+  try {
+    const res = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } });
+    const json = await res.json();
+    const diff = json?.data?.diff || [];
+    const items = diff.map(d => ({
+      code: d.f12 || '',
+      name: d.f14 || '',
+      price: d.f2 || 0,
+      changePct: d.f3 || 0,
+    }));
+    const result = { type, sectors: items, updatedAt: new Date().toISOString() };
+    sectorCache.set(key, { data: result, t: nowMs() });
+    return result;
+  } catch (e) {
+    return { type, sectors: [], updatedAt: new Date().toISOString() };
   }
 }
 
