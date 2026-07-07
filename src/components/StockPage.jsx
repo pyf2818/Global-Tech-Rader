@@ -438,13 +438,13 @@ export default function StockPage({ llmConfig, onOpenLlmConfig }) {
               <div className="stock3-list-empty">还没有自选，搜索个股后点「加自选」</div>
             )}
             {listItems.map(s => (
-              <button key={s.code} className={`stock3-list-item ${selectedCode === s.code ? 'active' : ''} ${(s.changePct || 0) >= 0 ? 'up' : 'down'}`} onClick={() => pickStock(s.code, s.name)}>
-                <div className="li-name-row">
+              <button key={s.code} className={`stock3-list-item ${selectedCode === s.code ? 'active' : ''} ${(s.changePct || 0) >= 0 ? 'up' : 'down'}`} onClick={() => pickStock(s.code, s.name)} title={s.name}>
+                <div className="li-left">
                   <span className="li-name">{s.name}</span>
-                  <span className="li-price">{s.price?.toFixed(2)}</span>
-                </div>
-                <div className="li-code-row">
                   <span className="li-code">{s.code}</span>
+                </div>
+                <div className="li-right">
+                  <span className="li-price">{s.price?.toFixed(2)}</span>
                   <span className="li-chg">{s.changePct !== undefined ? `${s.changePct >= 0 ? '+' : ''}${s.changePct.toFixed(2)}%` : '--'}</span>
                 </div>
               </button>
