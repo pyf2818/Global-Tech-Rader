@@ -8936,6 +8936,7 @@ ${signals}
         navItems={PRIMARY_NAV_ITEMS}
         onNavigate={(navId) => goNav(navId)}
         onSearch={(q) => executeSearch(q)}
+        recentVisits={recentVisits}
         actions={[
           { id: 'refresh', label: '刷新资讯', icon: 'refresh', hint: '动作', run: () => loadNews() },
           { id: 'theme', label: '切换主题', icon: 'palette', hint: '动作', run: () => setShowThemePicker(true) },

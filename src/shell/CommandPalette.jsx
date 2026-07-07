@@ -18,6 +18,7 @@ import { ICONS } from '../constants/index.jsx';
  *   navItems     — [{ id, label, icon, nav }] 页面跳转项
  *   onNavigate   — (navId) => void 跳转回调
  *   onSearch     — (query) => void 资讯搜索回调
+ *   recentVisits — [{ type, value, label, timestamp }] 最近访问记录
  *   actions      — [{ id, label, icon, run }] 额外快捷动作
  */
 export default function CommandPalette({
@@ -26,6 +27,7 @@ export default function CommandPalette({
   navItems = [],
   onNavigate,
   onSearch,
+  recentVisits = [],
   actions = [],
 }) {
   const [query, setQuery] = useState('');
@@ -45,6 +47,19 @@ export default function CommandPalette({
   // 构建命令列表
   const commands = useMemo(() => {
     const q = query.trim().toLowerCase();
+
+    // 最近访问（仅无查询时显示，放最前）
+    const recentCommands = (!q && recentVisits.length)
+      ? recentVisits.map(v => ({
+          id: `recent:${v.type}:${v.value}`,
+          type: 'recent',
+          label: v.label,
+          icon: 'clock',
+          hint: '最近',
+          run: () => { onNavigate?.(v.value); onClose?.(); },
+        }))
+      : [];
+
     const navCommands = navItems.map(item => ({
       id: `nav:${item.id}`,
       type: 'nav',
@@ -74,10 +89,10 @@ export default function CommandPalette({
         }]
       : [];
 
-    const all = [...navCommands, ...actionCommands, ...searchCommand];
+    const all = [...recentCommands, ...navCommands, ...actionCommands, ...searchCommand];
     if (!q) return all;
     return all.filter(c => c.label.toLowerCase().includes(q));
-  }, [query, navItems, actions, onNavigate, onSearch, onClose]);
+  }, [query, navItems, actions, recentVisits, onNavigate, onSearch, onClose]);
 
   // activeIndex 越界保护
   useEffect(() => {
