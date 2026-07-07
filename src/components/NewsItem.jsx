@@ -182,4 +182,4 @@ function NewsItem({ item, index, viewMode = 'standard', isFocused = false, isBoo
   );
 }
 
-export default NewsItem;
+export default React.memo(NewsItem);

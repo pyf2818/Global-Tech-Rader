@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, memo } from 'react';
 import { ICONS } from '../constants/index.jsx';
 import { formatStars } from '../utils/format.js';
 import { deriveRepoInsight } from '../utils/repoInsight.js';
@@ -90,5 +90,5 @@ function GithubRepoCard({ repo, index, since = 'weekly', isBookmarked = false, i
   );
 }
 
-export default GithubRepoCard;
+export default memo(GithubRepoCard);
 
