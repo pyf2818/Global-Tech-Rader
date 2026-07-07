@@ -282,6 +282,13 @@ export default function StockPage({ llmConfig, onOpenLlmConfig }) {
     return () => clearInterval(timer);
   }, [selectedCode, refreshRealtime]);
 
+  // 大盘指数轮询：每 30 秒刷新 dashboard（指数 + 涨跌家数）
+  useEffect(() => {
+    if (!dashboard) return;
+    const timer = setInterval(() => loadDashboard(), 30000);
+    return () => clearInterval(timer);
+  }, [dashboard, loadDashboard]);
+
   // K线按需加载（切到日K/周K/月K时）
   useEffect(() => {
     if (period === 'timeline' || !selectedCode) return;
@@ -385,7 +392,7 @@ export default function StockPage({ llmConfig, onOpenLlmConfig }) {
           : (dashboard?.indices || []).map(idx => (
             <button key={idx.secid} className={`stock3-index ${idx.changePct >= 0 ? 'up' : 'down'} ${selectedCode === idx.code ? 'active' : ''}`} onClick={() => setSelectedCode(idx.code)}>
               <span className="idx-name">{idx.name}</span>
-              <span className="idx-price">{idx.price?.toFixed(2)}</span>
+              <span key={idx.price} className="idx-price price-flash">{idx.price?.toFixed(2)}</span>
               <span className="idx-chg">{idx.changePct >= 0 ? '+' : ''}{idx.changePct?.toFixed(2)}%</span>
             </button>
           ))}
