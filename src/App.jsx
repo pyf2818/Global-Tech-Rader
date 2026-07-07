@@ -5785,6 +5785,7 @@ ${signals}
           </button>
           <div className={`topbar-main ${nav === 'all' ? 'topbar-main-all' : ''}`}>
             <div className={`topbar-main-row ${nav === 'all' ? 'topbar-main-row-all' : ''}`}>
+              {nav === 'all' && (
               <div className="search-wrap">
                 {ICONS.search}
                 <input ref={searchInputRef} value={query} onChange={e => { setQuery(e.target.value); setSearchOpen(true); }} onFocus={() => setSearchOpen(true)} placeholder="搜索技术、公司、项目..." />
@@ -5810,6 +5811,7 @@ ${signals}
                   </>
                 )}
               </div>
+              )}
             </div>
             <div className={`topbar-actions ${(nav === 'trending' || nav === 'recommendations') ? 'singleline' : ''} ${nav === 'all' ? 'topbar-actions-all' : ''}`}>
               {nav === 'all' && (
