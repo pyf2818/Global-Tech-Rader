@@ -15858,3 +15858,20 @@ body {
 .cmd-palette-item.active .cmd-palette-item-hint {
   color: var(--accent-cyan);
 }
+
+/* ---------- 代码分割 Suspense fallback ---------- */
+.page-loading-skeleton {
+  min-height: 320px;
+  display: grid;
+  place-items: center;
+  color: var(--text-muted);
+  font-size: 13px;
+  background:
+    linear-gradient(90deg, transparent, var(--surface-workbench-ai), transparent) center / 200% 100% no-repeat,
+    var(--bg-secondary);
+  animation: skeleton-shimmer 1.4s ease infinite;
+}
+@keyframes skeleton-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}

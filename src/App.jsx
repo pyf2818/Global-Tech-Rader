@@ -1,11 +1,8 @@
-import { useEffect, useMemo, useState, useRef, useCallback } from 'react';
-import GlobeView from './GlobeView.jsx';
-import AiElf from './AiElf.jsx';
+import { useEffect, useMemo, useState, useRef, useCallback, lazy, Suspense } from 'react';
 import SettingsModal from './components/SettingsModal.jsx';
 import ArticleEditor from './components/ArticleEditor.jsx';
 import ColorfulBubbles from './components/ColorfulBubbles.jsx';
 import AiChatPanel from './components/AiChatPanel.jsx';
-import StockPage from './components/StockPage.jsx';
 import ThemePicker from './ThemePicker.jsx';
 import { PALETTES } from './ThemePicker.jsx';
 import { getGradeColors } from './utils/format.js';
@@ -18,6 +15,11 @@ import { useCalendar } from './hooks/useCalendar.js';
 import { useUI } from './hooks/useUI.js';
 import { BlockGrid, BlockPanel, BlockStat, BlockToolbar } from './blocks/index.js';
 import CommandPalette from './shell/CommandPalette.jsx';
+
+// 代码分割：三个重组件按需加载，避免首屏全量打包 Three.js / klinecharts
+const GlobeView = lazy(() => import('./GlobeView.jsx'));
+const AiElf = lazy(() => import('./AiElf.jsx'));
+const StockPage = lazy(() => import('./components/StockPage.jsx'));
 
 const PRODUCT_NAME = '万般硅川';
 const PRODUCT_TAGLINE = '高质量多领域智能资讯生态';
@@ -5859,7 +5861,9 @@ ${signals}
                 </div>
               )}
               {nav === 'stock' && (
-                <StockPage llmConfig={llmConfig} categories={categories} onOpenLlmConfig={() => setShowLlmQuickConfig(true)} />
+                <Suspense fallback={<div className="page-loading-skeleton" />}>
+                  <StockPage llmConfig={llmConfig} categories={categories} onOpenLlmConfig={() => setShowLlmQuickConfig(true)} />
+                </Suspense>
               )}
               {nav === 'github' && (
                 <div className="github-filter-bar">
@@ -9059,10 +9063,11 @@ ${signals}
       </button>
 
       {/* AI精灵助手 */}
-      <AiElf 
-        llmConfig={llmConfig} 
-        avatarImage={elfAvatar} 
-        elfName={elfName} 
+      <Suspense fallback={null}>
+      <AiElf
+        llmConfig={llmConfig}
+        avatarImage={elfAvatar}
+        elfName={elfName}
         agents={agents}
         currentAgent={currentAgent}
         onChangeAgent={setCurrentAgent}
@@ -9082,6 +9087,7 @@ ${signals}
           spaceId: null
         });
       }} />
+      </Suspense>
 
       {/* 登录/注册弹窗 */}
       {showAuthModal && (
@@ -9309,7 +9315,9 @@ ${signals}
 
       {/* 全球科技大屏全屏 */}
       {globeFullscreenOpen && (
-        <GlobeView items={items} externalFullscreen={globeFullscreenOpen} onFullscreenChange={setGlobeFullscreenOpen} />
+        <Suspense fallback={<div className="page-loading-skeleton" />}>
+          <GlobeView items={items} externalFullscreen={globeFullscreenOpen} onFullscreenChange={setGlobeFullscreenOpen} />
+        </Suspense>
       )}
     </div>
   );
