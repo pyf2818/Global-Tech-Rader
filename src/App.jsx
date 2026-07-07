@@ -10132,14 +10132,12 @@ function buildGithubMaterial(repo = {}, since = 'weekly') {
 
 function GithubRepoCard({ repo, index, since = 'weekly', isBookmarked = false, isInMaterials = false, onBookmark, onAddMaterial, showTranslation, onToggleTranslation, translation, onOpenLightbox }) {
   const [tutorialExpanded, setTutorialExpanded] = useState(false);
-  const tutorialLines = repo.tutorial ? repo.tutorial.split('\n') : [];
-  const hasLongTutorial = tutorialLines.length > 4;
+  const [insightExpanded, setInsightExpanded] = useState(false);
   const isEnglish = /^[a-zA-Z0-9\s\-.,!?':\(\)\[\]{}]+$/.test(repo.fullName) || /^[a-zA-Z0-9\s\-.,!?':\(\)\[\]{}]+$/.test(repo.description);
   const scenarioText = inferGithubScenario(repo);
   const audienceText = inferGithubAudience(repo);
   const valueText = inferGithubValue(repo);
   const difficultyText = inferGithubDifficulty(repo);
-  const readmeIntro = repo.readmeIntro && repo.readmeIntro !== repo.description ? repo.readmeIntro : '';
   const periodValue = repo.starsToday || repo.starsThisWeek || repo.starsThisMonth || 0;
   const periodLabel = GITHUB_PERIODS.find(p => p.id === since)?.label || '周榜';
 
@@ -10158,6 +10156,11 @@ function GithubRepoCard({ repo, index, since = 'weekly', isBookmarked = false, i
           <a href={repo.url} target="_blank" rel="noreferrer" className="gh-full-name">{repo.fullName}</a>
           {repo.language && <span className="gh-lang"><span className="gh-lang-dot" />{repo.language}</span>}
         </div>
+        {periodValue > 0 && (
+          <span className="gh-growth-badge" title={`本期${periodLabel}新增`}>
+            {ICONS.star}<span>+{formatStars(periodValue)}</span><em>{periodLabel}</em>
+          </span>
+        )}
       </div>
       {repo.imageUrl && (
         <div className="gh-card-image" onClick={() => onOpenLightbox?.(repo.imageUrl, repo.fullName)}>
@@ -10165,41 +10168,42 @@ function GithubRepoCard({ repo, index, since = 'weekly', isBookmarked = false, i
         </div>
       )}
       <p className="gh-desc">{repo.description}</p>
-      {readmeIntro && <p className="gh-readme-intro">{readmeIntro}</p>}
-      <div className="gh-scenario">
-        <span>应用场景</span>
-        <p>{scenarioText}</p>
-      </div>
-      <div className="gh-intel-grid">
-        <div>
-          <span>适合谁</span>
-          <strong>{audienceText}</strong>
-        </div>
-        <div>
-          <span>落地难度</span>
-          <strong>{difficultyText}</strong>
-        </div>
-      </div>
-      <div className="gh-value">
-        <span>价值判断</span>
-        <p>{valueText}</p>
-      </div>
       {showTranslation && translation && <p className="gh-translation">{translation.title}{translation.summary ? ` - ${translation.summary}` : ''}</p>}
-      {repo.tutorial && <div className="gh-tutorial">
-        <span className="gh-tutorial-label">使用教程</span>
-        <pre className={`gh-tutorial-text ${tutorialExpanded ? 'expanded' : ''}`}>{tutorialExpanded ? repo.tutorial : tutorialLines.slice(0, 4).join('\n')}</pre>
-        {hasLongTutorial && <button className="gh-tutorial-toggle" onClick={() => setTutorialExpanded(v => !v)}>{tutorialExpanded ? '收起' : '展开全文'}</button>}
-      </div>}
-      {repo.topics?.length > 0 && <div className="gh-topics">{repo.topics.slice(0, 4).map(t => <span key={t} className="gh-topic">{t}</span>)}</div>}
+      {repo.topics?.length > 0 && <div className="gh-topics">{repo.topics.slice(0, 3).map(t => <span key={t} className="gh-topic">{t}</span>)}</div>}
+
       <div className="gh-card-stats">
         <span className="gh-stat">{ICONS.star}<span className="gh-stat-val">{formatStars(repo.totalStars)}</span><span className="gh-stat-label">stars</span></span>
-        <span className="gh-stat"><span className="gh-stat-val">+{formatStars(periodValue)}</span><span className="gh-stat-label">{periodLabel}</span></span>
         <span className="gh-stat">{ICONS.fork}<span className="gh-stat-val">{formatStars(repo.forks)}</span><span className="gh-stat-label">forks</span></span>
       </div>
+
+      {/* AI 情报 —— 默认折叠，含场景/人群/难度/价值/教程 */}
+      <div className="gh-insight">
+        <button className="gh-insight-toggle" onClick={() => setInsightExpanded(v => !v)}>
+          <span className="gh-insight-label">{ICONS.sparkle} AI 情报</span>
+          <span className={`gh-insight-chevron ${insightExpanded ? 'open' : ''}`}>{ICONS.chevronDown}</span>
+        </button>
+        {insightExpanded && (
+          <div className="gh-insight-body">
+            <div className="gh-insight-row"><span className="gh-insight-key">应用场景</span><p>{scenarioText}</p></div>
+            <div className="gh-insight-row"><span className="gh-insight-key">适合谁</span><p>{audienceText}</p></div>
+            <div className="gh-insight-row"><span className="gh-insight-key">落地难度</span><p>{difficultyText}</p></div>
+            <div className="gh-insight-row"><span className="gh-insight-key">价值判断</span><p>{valueText}</p></div>
+            {repo.tutorial && (
+              <div className="gh-insight-tutorial">
+                <button className="gh-tutorial-toggle" onClick={() => setTutorialExpanded(v => !v)}>
+                  <span>使用教程</span><span className={`gh-tutorial-chevron ${tutorialExpanded ? 'open' : ''}`}>{ICONS.chevronDown}</span>
+                </button>
+                {tutorialExpanded && <pre className="gh-tutorial-text expanded">{repo.tutorial}</pre>}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
       <div className="gh-card-actions">
-        <button className={`gh-bookmark-btn ${isBookmarked ? 'active' : ''}`} onClick={onBookmark} title={isBookmarked ? '取消收藏' : '收藏'}>{isBookmarked ? ICONS.bookmarkFill : ICONS.bookmark}</button>
-        {onAddMaterial && <button className={`gh-add-material-btn ${isInMaterials ? 'active' : ''}`} onClick={onAddMaterial} title={isInMaterials ? '已在素材库' : '收藏为素材'}>{ICONS.layers}</button>}
-        {isEnglish && onToggleTranslation && <button className={`gh-translate-btn ${showTranslation ? 'active' : ''}`} onClick={onToggleTranslation} title="翻译">{ICONS.globe}</button>}
+        <button className={`gh-bookmark-btn ${isBookmarked ? 'active' : ''}`} onClick={onBookmark} title={isBookmarked ? '取消收藏' : '收藏'}>{isBookmarked ? ICONS.bookmarkFill : ICONS.bookmark}<span>收藏</span></button>
+        {onAddMaterial && <button className={`gh-add-material-btn ${isInMaterials ? 'active' : ''}`} onClick={onAddMaterial} title={isInMaterials ? '已在素材库' : '收藏为素材'}>{ICONS.layers}<span>素材</span></button>}
+        {isEnglish && onToggleTranslation && <button className={`gh-translate-btn ${showTranslation ? 'active' : ''}`} onClick={onToggleTranslation} title="翻译">{ICONS.globe}<span>译</span></button>}
       </div>
     </article>
   );
