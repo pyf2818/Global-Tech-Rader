@@ -15893,3 +15893,23 @@ body {
   0% { background-position: 200% 0; }
   100% { background-position: -200% 0; }
 }
+
+/* ---------- 侧边栏缩进态：图标 + 简短标签 ---------- */
+.sidebar.collapsed .nav-primary-item {
+  flex-direction: column;
+  gap: 2px;
+  padding: 4px 2px;
+  min-height: 48px;
+}
+.nav-short-label {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text-muted);
+  line-height: 1;
+  letter-spacing: 0.02em;
+  transition: opacity 0.15s;
+}
+.nav-primary-item.active .nav-short-label {
+  color: var(--accent-cyan);
+}
+.sidebar:not(.collapsed) .nav-short-label { display: none; }

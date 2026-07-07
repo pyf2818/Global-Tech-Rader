@@ -73,13 +73,13 @@ const NAV_ITEMS = [
 ];
 
 const PRIMARY_NAV_ITEMS = [
-  { id: 'today', label: '今日速报', desc: '精准推荐', icon: 'sparkle', nav: 'today' },
-  { id: 'all', label: '全部动态', desc: '扩展视野', icon: 'grid', nav: 'all' },
-  { id: 'stock', label: '股市动向', desc: '行情分析', icon: 'trendingUp', nav: 'stock' },
-  { id: 'github', label: 'GitHub 热门', desc: '三榜项目', icon: 'github', nav: 'github' },
-  { id: 'studio', label: '智创中心', desc: '素材智能体创作', icon: 'edit', nav: 'studio' },
-  { id: 'square', label: '用户广场', desc: '分享交流', icon: 'user', nav: 'square' },
-  { id: 'profile-center', label: '用户画像', desc: '越用越懂你', icon: 'target', nav: 'profile-center' }
+  { id: 'today', label: '今日速报', desc: '精准推荐', short: '速报', icon: 'sparkle', nav: 'today' },
+  { id: 'all', label: '全部动态', desc: '扩展视野', short: '动态', icon: 'grid', nav: 'all' },
+  { id: 'stock', label: '股市动向', desc: '行情分析', short: '股市', icon: 'trendingUp', nav: 'stock' },
+  { id: 'github', label: 'GitHub 热门', desc: '三榜项目', short: '开源', icon: 'github', nav: 'github' },
+  { id: 'studio', label: '智创中心', desc: '素材智能体创作', short: '智创', icon: 'edit', nav: 'studio' },
+  { id: 'square', label: '用户广场', desc: '分享交流', short: '广场', icon: 'user', nav: 'square' },
+  { id: 'profile-center', label: '用户画像', desc: '越用越懂你', short: '画像', icon: 'target', nav: 'profile-center' }
 ];
 
 const NAV_CONTEXT_SECTIONS = {
@@ -1094,7 +1094,11 @@ function App() {
   const [newWorkflowNodeType, setNewWorkflowNodeType] = useState('llm');
   const [draggingWorkflowNodeId, setDraggingWorkflowNodeId] = useState('');
   const [stats, setStats] = useState({ sourceCount: 40, failedSources: 0, updatedAt: '', blockedCount: 0 });
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => localStorage.getItem('sidebarCollapsed') === 'true');
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    // 首次访问（无存储）默认缩进，腾出视觉空间；用户切换后记住偏好
+    const stored = localStorage.getItem('sidebarCollapsed');
+    return stored === null ? true : stored === 'true';
+  });
   const motivationalQuote = useMemo(() => {
     const idx = Math.floor(Math.random() * MOTIVATIONAL_QUOTES.length);
     return MOTIVATIONAL_QUOTES[idx];
@@ -5595,6 +5599,9 @@ ${signals}
                 title={sidebarCollapsed ? item.label : undefined}
               >
                 <span className="nav-icon">{ICONS[item.icon]}</span>
+                {sidebarCollapsed && item.short && (
+                  <span className="nav-short-label">{item.short}</span>
+                )}
                 {!sidebarCollapsed && (
                   <span className="nav-label-wrap">
                     <span className="nav-label">{item.label}</span>
