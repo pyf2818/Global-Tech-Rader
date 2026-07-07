@@ -996,6 +996,7 @@ function App() {
   const [newsPage, setNewsPage] = useState(0);
   const [newsHasMore, setNewsHasMore] = useState(true);
   const [renderLimit, setRenderLimit] = useState(30);
+  const filteredRef = useRef(0);
   const [debouncedQuery, setDebouncedQuery] = useState('');
   const [error, setError] = useState('');
   const [blocked, setBlocked] = useState('');
@@ -1482,7 +1483,7 @@ function App() {
       (entries) => {
         if (!entries[0].isIntersecting) return;
         // 优先增加渲染数（渲染分页），已加载数据渲染完才请求 API 加载更多
-        if (filtered.length > renderLimit) {
+        if (filteredRef.current > renderLimit) {
           setRenderLimit(r => r + 30);
         } else if (newsHasMore && !loadingMore) {
           loadMoreNews();
@@ -1493,7 +1494,7 @@ function App() {
     const sentinel = document.getElementById('load-more-sentinel');
     if (sentinel) observer.observe(sentinel);
     return () => observer.disconnect();
-  }, [nav, newsHasMore, loadingMore, loading, filtered.length, renderLimit]);
+  }, [nav, newsHasMore, loadingMore, loading, renderLimit]);
 
   const scrollToTop = () => {
     feedRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
@@ -1656,6 +1657,9 @@ function App() {
 
     return result;
   }, [items, category, mode, sourceFilter, followKeywords, regionFilter]);
+
+  // 同步 filtered.length 到 ref，供 IntersectionObserver 回调读取（避免 TDZ）
+  filteredRef.current = filtered.length;
 
   const sourceOptions = useMemo(() => {
     const counts = new Map();
