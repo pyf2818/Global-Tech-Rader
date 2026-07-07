@@ -6853,19 +6853,19 @@ ${signals}
                   {!loading && !error && filtered.length === 0 && <div className="empty-state"><p>暂无推荐内容</p></div>}
                   {!loading && !error && filtered.length > 0 && (
                     <div className={`feed-list view-${viewMode} ${viewMode === 'card' ? 'card-grid' : ''}`}>
-                      {filtered.map((item, i) => {
+                      {filtered.slice(0, renderLimit).map((item, i) => {
                         const summaryEntry = getSummaryEntry(item);
                         return <NewsItem key={item.id} item={item} index={i} viewMode={viewMode} isFocused={focusedIndex === i} isBookmarked={isBookmarked(item.id)} isInMaterials={isInMaterials(item.id)} onBookmark={() => toggleBookmark(item)} onAddMaterial={() => toggleMaterial(item)} onSummary={() => handleSummaryToggle(item)} isSummaryOpen={expandedSummary[item.id]} summaryText={summaryEntry?.text || ''} summaryMode={summaryEntry?.mode || ''} summaryLoading={Boolean(summaryLoading[item.id])} isFollowed={followKeywords.some(kw => `${item.title} ${item.summary}`.toLowerCase().includes(kw.toLowerCase()))} onRead={() => recordReading(item)} showTranslation={translationOpen[item.id]} onToggleTranslation={() => setTranslationOpen(p => ({ ...p, [item.id]: !p[item.id] }))} onRequestTranslation={() => requestTranslation(item)} isTranslating={translatingItems[item.id]} translation={getTranslation(item)} onOpenLightbox={(src, title, images, index) => setLightbox({ open: true, src, title, images: images || [], index: index || 0 })} />;
                       })}
                     </div>
                   )}
-                  {newsHasMore && (
+                  {(newsHasMore || filtered.length > renderLimit) && (
                     <div id="load-more-sentinel" className="load-more-area">
                       {loadingMore && <div className="load-more-spinner"><div className="spinner" /><span>加载中...</span></div>}
                       {!loadingMore && <span className="load-more-hint">滚动加载更多</span>}
                     </div>
                   )}
-                  {!newsHasMore && filtered.length > 0 && (
+                  {!newsHasMore && filtered.length <= renderLimit && (
                     <div className="load-more-area load-more-done">已全部加载</div>
                   )}
                 </>
