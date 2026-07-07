@@ -5486,7 +5486,8 @@ ${signals}
     setMobileMenuOpen(false);
   };
   const wideWorkspaceNavs = ['today', 'studio', 'agents', 'editor', 'materials', 'square', 'profile-center'];
-  const showRightPanel = !wideWorkspaceNavs.includes(nav);
+  // 右侧关注面板只在「全部动态」显示，其他页面不再带，避免拥挤
+  const showRightPanel = nav === 'all';
   const showStatsBar = showRightPanel && nav !== 'today';
 
   return (

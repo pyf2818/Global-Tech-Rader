@@ -14919,18 +14919,68 @@ body {
 .stock-ai-btn { padding: 6px 16px; border: 1px solid var(--border-active); border-radius: 8px; background: var(--accent-cyan-soft); color: var(--accent-cyan); font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.15s; }
 .stock-ai-btn:hover { background: var(--accent-cyan); color: #fff; }
 .stock-ai-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-.stock-analysis-summary { font-size: 14px; line-height: 1.7; color: var(--text-secondary); margin-bottom: 14px; padding-bottom: 14px; border-bottom: 1px solid var(--border-color); }
-.stock-analysis-signals { display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px; }
-.stock-signal { display: flex; align-items: flex-start; gap: 8px; font-size: 13px; color: var(--text-secondary); line-height: 1.5; }
-.stock-signal-dot { width: 6px; height: 6px; border-radius: 50%; margin-top: 6px; flex-shrink: 0; }
-.stock-signal.bullish .stock-signal-dot { background: var(--signal-positive); }
-.stock-signal.bearish .stock-signal-dot { background: var(--signal-critical); }
-.stock-signal.neutral .stock-signal-dot { background: var(--signal-neutral); }
-.stock-signal.warning .stock-signal-dot { background: #f59e0b; }
-.stock-analysis-metrics { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-.stock-metric { display: flex; flex-direction: column; gap: 2px; padding: 8px 10px; border: 1px solid var(--border-color); border-radius: 8px; background: var(--surface-workbench-inset); }
-.stock-metric span { font-size: 11px; color: var(--text-muted); }
-.stock-metric strong { font-family: var(--font-mono); font-size: 14px; color: var(--text-primary); }
+/* 趋势结论卡 —— 视觉焦点 */
+.stock-verdict {
+  margin-bottom: 14px;
+  padding: 14px 16px;
+  border-radius: 10px;
+  border-left: 3px solid var(--text-muted);
+  background: var(--surface-workbench-inset);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.stock-verdict.up { border-left-color: var(--signal-positive); background: rgba(34, 197, 94, 0.08); }
+.stock-verdict.down { border-left-color: var(--signal-critical); background: rgba(239, 68, 68, 0.08); }
+.stock-verdict.flat { border-left-color: var(--text-muted); }
+.stock-verdict-label { font-size: 10px; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-muted); }
+.stock-verdict-trend { font-size: 22px; font-weight: 800; line-height: 1.2; }
+.stock-verdict.up .stock-verdict-trend { color: var(--signal-positive); }
+.stock-verdict.down .stock-verdict-trend { color: var(--signal-critical); }
+.stock-verdict.flat .stock-verdict-trend { color: var(--text-secondary); }
+.stock-verdict-chg { font-size: 12px; color: var(--text-muted); }
+.stock-verdict-chg strong { font-family: var(--font-mono); color: var(--text-secondary); font-weight: 700; }
+
+/* 信号 chips —— 横向流式 */
+.stock-signal-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
+.stock-signal-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.4;
+  background: var(--surface-workbench-action);
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+}
+.stock-signal-chip-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+.stock-signal-chip.bullish { background: rgba(34, 197, 94, 0.1); border-color: rgba(34, 197, 94, 0.35); color: var(--signal-positive); }
+.stock-signal-chip.bullish .stock-signal-chip-dot { background: var(--signal-positive); }
+.stock-signal-chip.bearish { background: rgba(239, 68, 68, 0.1); border-color: rgba(239, 68, 68, 0.35); color: var(--signal-critical); }
+.stock-signal-chip.bearish .stock-signal-chip-dot { background: var(--signal-critical); }
+.stock-signal-chip.warning { background: rgba(245, 158, 11, 0.1); border-color: rgba(245, 158, 11, 0.35); color: #f59e0b; }
+.stock-signal-chip.warning .stock-signal-chip-dot { background: #f59e0b; }
+.stock-signal-chip.neutral { color: var(--text-muted); }
+.stock-signal-chip.neutral .stock-signal-chip-dot { background: var(--text-muted); }
+
+/* 关键指标 —— 紧凑横向条 */
+.stock-metrics-row { display: flex; gap: 8px; }
+.stock-metric-mini {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 8px 6px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: var(--bg-primary);
+}
+.stock-metric-mini span { font-size: 10px; color: var(--text-muted); letter-spacing: 0.04em; }
+.stock-metric-mini strong { font-family: var(--font-mono); font-size: 14px; font-weight: 700; color: var(--text-primary); }
 .stock-hot { margin-bottom: 20px; }
 .stock-hot-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
 .stock-hot-card { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 12px 10px; border: 1px solid var(--border-color); border-radius: 10px; background: var(--bg-card); cursor: pointer; transition: all 0.2s; text-align: center; }
@@ -14951,6 +15001,115 @@ body {
 @media (max-width: 600px) {
   .stock-header { flex-direction: column; align-items: flex-start; }
   .stock-indices-grid { grid-template-columns: 1fr; }
+}
+
+/* ===== StockPage v2 增强样式 ===== */
+.stock-page-v2 { padding: 20px 24px; max-width: 1400px; margin: 0 auto; }
+.stock-header-left { display: flex; flex-direction: column; gap: 4px; }
+.stock-watch-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 8px 14px;
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  background: var(--bg-card);
+  color: var(--text-secondary);
+  font-size: 13px; font-weight: 600;
+  cursor: pointer; transition: all 0.15s;
+}
+.stock-watch-btn:hover { border-color: var(--accent-amber); color: var(--accent-amber); }
+.stock-watch-btn.active { background: rgba(245, 158, 11, 0.12); color: var(--accent-amber); border-color: rgba(245, 158, 11, 0.5); }
+.stock-watch-btn svg { width: 16px; height: 16px; }
+.stock-watch-btn.active svg { fill: var(--accent-amber); }
+
+/* 搜索结果实时价预览 */
+.stock-search-item { position: relative; }
+.stock-search-price {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--accent-cyan);
+  margin-left: auto;
+  font-weight: 700;
+}
+
+/* klinecharts 容器 */
+.stock-kline-container { width: 100%; height: 360px; }
+
+/* 我的自选 */
+.stock-watchlist { margin-bottom: 28px; }
+.stock-watchlist-count {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--accent-cyan-soft);
+  color: var(--accent-cyan);
+  font-size: 11px;
+  font-weight: 700;
+}
+.stock-watchlist-empty {
+  padding: 28px 20px;
+  text-align: center;
+  border: 1px dashed var(--border-color);
+  border-radius: 12px;
+  background: var(--bg-card);
+}
+.stock-watchlist-empty p { margin: 0 0 4px; font-size: 14px; font-weight: 600; color: var(--text-secondary); }
+.stock-watchlist-empty span { font-size: 12px; color: var(--text-muted); }
+.stock-watchlist-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 10px;
+}
+.stock-watch-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  background: var(--bg-card);
+  transition: border-color 0.15s;
+}
+.stock-watch-item:hover { border-color: var(--border-active); }
+.stock-watch-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  min-width: 0;
+}
+.stock-watch-name { font-size: 13px; font-weight: 700; color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+.stock-watch-code { font-family: var(--font-mono); font-size: 11px; color: var(--text-muted); }
+.stock-watch-ops { display: flex; gap: 4px; flex-shrink: 0; }
+.stock-watch-op {
+  width: 24px; height: 24px;
+  display: grid; place-items: center;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.15s;
+  padding: 0;
+}
+.stock-watch-op:hover:not(:disabled) { color: var(--text-primary); border-color: var(--border-active); }
+.stock-watch-op:disabled { opacity: 0.3; cursor: not-allowed; }
+.stock-watch-op.remove:hover { color: var(--signal-critical); border-color: var(--signal-critical); }
+.stock-watch-op svg { width: 12px; height: 12px; }
+
+@media (max-width: 900px) {
+  .stock-kline-container { height: 280px; }
+  .stock-header-actions { flex-wrap: wrap; }
+}
+@media (max-width: 600px) {
+  .stock-watchlist-grid { grid-template-columns: 1fr; }
+  .stock-kline-container { height: 240px; }
 }
 
 /* Special Follows 特别关注 */
