@@ -255,7 +255,7 @@ body {
 .sidebar.collapsed .sidebar-action span { opacity: 0; }
 
 /* Main */
-.main { margin-left: var(--sidebar-w); margin-right: var(--panel-w); height: 100vh; display: flex; flex-direction: column; background: transparent; transition: margin-left 0.3s ease, margin-right 0.3s ease; position: relative; z-index: 1; }
+.main { margin-left: var(--sidebar-w); margin-right: var(--panel-w); height: 100vh; display: flex; flex-direction: column; background: transparent; transition: margin-left 0.3s ease, margin-right 0.3s ease; position: relative; z-index: 1; overflow-y: auto; }
 .app.sidebar-collapsed .main { margin-left: var(--sidebar-collapsed-w); }
 .app.panel-collapsed .main { margin-right: var(--panel-collapsed-w); }
 .app.sidebar-collapsed.panel-collapsed .main { margin-left: var(--sidebar-collapsed-w); margin-right: var(--panel-collapsed-w); }
@@ -15004,7 +15004,7 @@ body {
 }
 
 /* ===== StockPage v3 三栏行情终端 ===== */
-.stock-page-v3 { padding: 16px 20px; max-width: 1600px; margin: 0 auto; display: flex; flex-direction: column; gap: 12px; height: 100%; }
+.stock-page-v3 { padding: 16px 20px; max-width: 1600px; margin: 0 auto; display: flex; flex-direction: column; gap: 12px; }
 
 /* 顶栏 */
 .stock3-header { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
@@ -15027,7 +15027,7 @@ body {
 .stock3-index-skeleton { font-size: 12px; color: var(--text-muted); padding: 8px 12px; }
 
 /* 三栏主体 */
-.stock3-body { display: grid; grid-template-columns: 240px 1fr 320px; gap: 12px; min-height: 0; flex: 1 1 auto; min-height: 520px; }
+.stock3-body { display: grid; grid-template-columns: 240px 1fr 320px; gap: 12px; min-height: 520px; }
 
 /* 左栏 */
 .stock3-left { display: flex; flex-direction: column; border: 1px solid var(--border-color); border-radius: 10px; background: var(--bg-card); overflow: hidden; min-height: 480px; }
@@ -15068,7 +15068,7 @@ body {
 .stock-chart-empty { display: flex; align-items: center; justify-content: center; width: 100%; min-height: 380px; color: var(--text-muted); font-size: 13px; }
 
 /* 右栏 */
-.stock3-right { display: flex; flex-direction: column; gap: 12px; min-height: 0; overflow-y: auto; }
+.stock3-right { display: flex; flex-direction: column; gap: 12px; min-height: 0; }
 .stock3-panel { border: 1px solid var(--border-color); border-radius: 10px; background: var(--bg-card); padding: 12px 14px; }
 .stock3-panel-label { font-size: 11px; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-muted); margin-bottom: 10px; }
 
