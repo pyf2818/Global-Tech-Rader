@@ -91,6 +91,10 @@ const NAV_CONTEXT_SECTIONS = {
     label: '开源发现',
     items: ['github']
   },
+  stock: {
+    label: '行情分析',
+    items: []
+  },
   studio: {
     label: '智创中心',
     items: ['materials', 'agents', 'editor']
@@ -5456,6 +5460,7 @@ ${signals}
   const navToPrimary = {
     today: 'today',
     all: 'all',
+    stock: 'stock',
     tracker: 'profile-center',
     trends: 'profile-center',
     calendar: 'profile-center',
