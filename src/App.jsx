@@ -6794,6 +6794,11 @@ ${signals}
                   return <NewsItem key={item.id} item={item} index={i} viewMode={viewMode} isFocused={focusedIndex === i} isBookmarked={isBookmarked(item.id)} isInMaterials={isInMaterials(item.id)} onBookmark={() => toggleBookmark(item)} onAddMaterial={() => toggleMaterial(item)} onSummary={() => handleSummaryToggle(item)} isSummaryOpen={expandedSummary[item.id]} summaryText={summaryEntry?.text || ''} summaryMode={summaryEntry?.mode || ''} summaryLoading={Boolean(summaryLoading[item.id])} isFollowed={followKeywords.some(kw => `${item.title} ${item.summary}`.toLowerCase().includes(kw.toLowerCase()))} onRead={() => recordReading(item)} showTranslation={translationOpen[item.id]} onToggleTranslation={() => setTranslationOpen(p => ({ ...p, [item.id]: !p[item.id] }))} onRequestTranslation={() => requestTranslation(item)} isTranslating={translatingItems[item.id]} translation={getTranslation(item)} onOpenLightbox={(src, title, images, index) => setLightbox({ open: true, src, title, images: images || [], index: index || 0 })} />;
                 })}
               </div>
+              {nav === 'all' && loadingMore && (
+                <div className={`feed-list view-${viewMode} ${viewMode === 'card' ? 'card-grid' : ''}`}>
+                  {Array.from({ length: 3 }).map((_, i) => <SkeletonCard key={`more-${i}`} viewMode={viewMode} />)}
+                </div>
+              )}
               {nav === 'all' && (newsHasMore || filtered.length > renderLimit) && (
                 <div id="load-more-sentinel" className="load-more-area">
                   {loadingMore && <div className="load-more-spinner"><div className="spinner" /><span>加载中...</span></div>}
