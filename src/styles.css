@@ -37,6 +37,18 @@
   --border-glow: rgba(201,169,97,0.18);
   /* 布局原语变量（P1：收敛重复 border 规则） */
   --panel-border: 1px solid var(--border-color);
+  /* 动画 token（统一 4 种时长 + 2 种缓动） */
+  --ease-fast: 0.15s ease;
+  --ease-base: 0.2s ease;
+  --ease-slow: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-instant: 0.1s ease;
+  /* 间距 token（4px 阶梯） */
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 12px;
+  --space-lg: 16px;
+  --space-xl: 24px;
+  --space-2xl: 32px;
   --bg-glow-1: rgba(201,169,97,0.1);
   --bg-glow-2: rgba(140,140,140,0.07);
   --particle-c1: rgba(201,169,97,0.5);
@@ -15498,7 +15510,7 @@ body {
 .block-panel-body { min-width: 0; }
 
 .block-panel-clickable { cursor: pointer; text-align: left; color: inherit; }
-.block-panel-interactive { transition: transform 0.18s ease, border-color 0.18s ease, background 0.18s ease; }
+.block-panel-interactive { transition: transform var(--ease-base), border-color var(--ease-base), background var(--ease-base); }
 .block-panel-interactive:hover {
   transform: translateY(-2px);
   border-color: var(--border-active);
@@ -15650,7 +15662,7 @@ body {
 /* BlockGrid.Card */
 .block-grid-card {
   min-height: 186px;
-  padding: 16px;
+  padding: var(--space-lg);
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -15661,7 +15673,7 @@ body {
   border-radius: 12px;
   background: var(--bg-card);
   box-shadow: var(--shadow-card);
-  transition: transform 0.18s ease, border-color 0.18s ease, background 0.18s ease;
+  transition: transform var(--ease-base), border-color var(--ease-base), background var(--ease-base);
 }
 .block-grid-card-clickable:hover {
   transform: translateY(-2px);
