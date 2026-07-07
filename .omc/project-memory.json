@@ -47,7 +47,7 @@
     "runtime": null
   },
   "build": {
-    "buildCommand": "npm run build 2>&1 | tail -5",
+    "buildCommand": "npm run build 2>&1 | grep -E \"built|error\" | head -3",
     "testCommand": "npm test 2>&1 | tail -10",
     "lintCommand": null,
     "devCommand": "npm run dev",
@@ -213,8 +213,8 @@
   "hotPaths": [
     {
       "path": "src/App.jsx",
-      "accessCount": 50,
-      "lastAccessed": 1783443287581,
+      "accessCount": 55,
+      "lastAccessed": 1783444964212,
       "type": "file"
     },
     {
@@ -225,8 +225,8 @@
     },
     {
       "path": "src/styles.css",
-      "accessCount": 40,
-      "lastAccessed": 1783442108207,
+      "accessCount": 41,
+      "lastAccessed": 1783444989664,
       "type": "file"
     },
     {

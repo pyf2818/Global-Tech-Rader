@@ -6070,7 +6070,7 @@ ${signals}
                     <div className="hotspot-list">
                       <div className="hotspot-header">
                         <h3>🔥 当前热点</h3>
-                        <span style={{marginLeft: 'auto', opacity: 0.6, fontSize: 12}}>多信源热度 · 随时间消退</span>
+                        <span className="hotspot-subtitle">多信源热度 · 随时间消退</span>
                       </div>
                       {topMustRead.slice(0, 5).map((item, i) => (
                         <div
@@ -6095,7 +6095,7 @@ ${signals}
                     <div className="profile-recommendations">
                       <div className="profile-rec-header">
                         <h3>为你推荐</h3>
-                        <span style={{marginLeft: 'auto', opacity: 0.6, fontSize: 12}}>基于你的画像偏好</span>
+                        <span className="hotspot-subtitle">基于你的画像偏好</span>
                       </div>
                       {profileRecommendations.slice(0, profilePage * 10).map((item, i) => (
                         <div key={item.id} className="profile-rec-item-wrap">
