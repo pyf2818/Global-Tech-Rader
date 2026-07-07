@@ -6807,7 +6807,16 @@ ${signals}
 
               <section className="square-layout">
                 <div className="square-feed">
-                  {squareSeedItems.map(item => (
+                  {squareSeedItems.map(item => {
+                    const liked = likedPosts.has(item.id);
+                    const saved = savedPosts.has(item.id);
+                    const likeCount = item.likes + (liked ? 1 : 0);
+                    const saveCount = item.saves + (saved ? 1 : 0);
+                    const comments = postComments[item.id] || [];
+                    const commentCount = item.comments + comments.length;
+                    const panelOpen = showCommentPanel === item.id;
+                    const draft = commentTexts[item.id] || '';
+                    return (
                     <article key={item.id} className="square-post">
                       <div className="square-post-head">
                         <span className="square-post-type">{item.type}</span>
@@ -6816,13 +6825,38 @@ ${signals}
                       <h2>{item.title}</h2>
                       <p>由 {item.author} 分享。后续会接入真实用户、评论线程、关注关系和公开/私密发布权限。</p>
                       <div className="square-post-actions">
-                        <button>{ICONS.heart}<span>{item.likes}</span></button>
-                        <button>{ICONS.bookmark}<span>{item.saves}</span></button>
-                        <button>{ICONS.document}<span>{item.comments}</span></button>
+                        <button className={liked ? 'active liked' : ''} onClick={() => toggleLike(item.id)}>{ICONS.heart}<span>{likeCount}</span></button>
+                        <button className={saved ? 'active saved' : ''} onClick={() => toggleSave(item.id)}>{ICONS.bookmark}<span>{saveCount}</span></button>
+                        <button className={panelOpen ? 'active' : ''} onClick={() => setShowCommentPanel(panelOpen ? null : item.id)}>{ICONS.document}<span>{commentCount}</span></button>
                         <button onClick={() => showToast('关注能力将在社区阶段接入')}>{ICONS.follow}<span>关注</span></button>
                       </div>
+                      {panelOpen && (
+                        <div className="square-post-comments">
+                          <div className="square-comments-list">
+                            {comments.length === 0 && <p className="square-comments-empty">还没有评论，成为第一个分享观点的人。</p>}
+                            {comments.map(c => (
+                              <div key={c.id} className="square-comment">
+                                <span className="square-comment-user">{c.user}</span>
+                                <span className="square-comment-time">{formatRelative(c.time)}</span>
+                                <p>{c.text}</p>
+                              </div>
+                            ))}
+                          </div>
+                          <div className="square-comment-input">
+                            <input
+                              type="text"
+                              placeholder="写下你的观点…"
+                              value={draft}
+                              onChange={(e) => setCommentTexts(prev => ({ ...prev, [item.id]: e.target.value }))}
+                              onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addComment(item.id, draft); } }}
+                            />
+                            <button onClick={() => addComment(item.id, draft)}>发送</button>
+                          </div>
+                        </div>
+                      )}
                     </article>
-                  ))}
+                    );
+                  })}
                 </div>
                 <aside className="square-side">
                   <div>

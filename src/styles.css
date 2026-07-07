@@ -2356,6 +2356,70 @@ body {
 .square-post-actions svg { width: 14px; height: 14px; }
 .square-side div { padding: 14px; }
 
+.square-post-actions button.active { color: var(--text-primary); border-color: var(--accent-cyan); }
+.square-post-actions button.liked { color: #ef4444; border-color: rgba(239, 68, 68, 0.5); background: rgba(239, 68, 68, 0.12); }
+.square-post-actions button.liked svg { fill: #ef4444; stroke: #ef4444; }
+.square-post-actions button.saved { color: var(--accent-cyan); border-color: rgba(34, 211, 238, 0.5); background: var(--accent-cyan-soft); }
+.square-post-actions button.saved svg { fill: var(--accent-cyan); stroke: var(--accent-cyan); }
+
+.square-post-comments {
+  margin-top: 12px;
+  border-top: 1px dashed var(--border-color);
+  padding-top: 12px;
+}
+.square-comments-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 220px;
+  overflow-y: auto;
+}
+.square-comments-empty {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-style: italic;
+}
+.square-comment {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-areas: "user time" "text text";
+  gap: 2px 8px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: var(--surface-workbench-action);
+}
+.square-comment-user { grid-area: user; font-size: 12px; font-weight: 800; color: var(--accent-cyan); }
+.square-comment-time { grid-area: time; justify-self: end; font-size: 11px; color: var(--text-muted); }
+.square-comment p { grid-area: text; margin: 4px 0 0; font-size: 13px; color: var(--text-secondary); line-height: 1.6; }
+.square-comment-input {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+.square-comment-input input {
+  flex: 1;
+  min-height: 34px;
+  padding: 0 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 999px;
+  background: var(--surface-base);
+  color: var(--text-primary);
+  font-size: 13px;
+}
+.square-comment-input input:focus { outline: none; border-color: var(--accent-cyan); }
+.square-comment-input button {
+  padding: 0 16px;
+  border: none;
+  border-radius: 999px;
+  background: var(--accent-cyan);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+.square-comment-input button:hover { filter: brightness(1.1); }
+
 .profile-summary-grid div {
   min-height: 110px;
   padding: 14px;
