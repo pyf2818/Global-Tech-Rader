@@ -6135,8 +6135,8 @@ ${signals}
 
                     {/* 滚动加载 sentinel — 让 IntersectionObserver 在 today 视图也能触发 */}
                     {workbenchItems.length > 0 && (
-                      <div id="load-more-sentinel" className="load-more-area" style={{textAlign: 'center', padding: '12px'}}>
-                        <span className="load-more-hint" style={{opacity: 0.5}}>已展示全部推荐内容</span>
+                      <div id="load-more-sentinel" className="load-more-area load-more-sentinel-center">
+                        <span className="load-more-hint load-more-sentinel-done">已展示全部推荐内容</span>
                       </div>
                     )}
                   </div>

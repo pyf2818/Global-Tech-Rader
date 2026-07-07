@@ -213,20 +213,20 @@
   "hotPaths": [
     {
       "path": "src/App.jsx",
-      "accessCount": 55,
-      "lastAccessed": 1783444964212,
+      "accessCount": 61,
+      "lastAccessed": 1783445417556,
       "type": "file"
     },
     {
       "path": "src/components/StockPage.jsx",
-      "accessCount": 47,
-      "lastAccessed": 1783444413480,
+      "accessCount": 48,
+      "lastAccessed": 1783445147847,
       "type": "file"
     },
     {
       "path": "src/styles.css",
-      "accessCount": 41,
-      "lastAccessed": 1783444989664,
+      "accessCount": 44,
+      "lastAccessed": 1783445470064,
       "type": "file"
     },
     {
@@ -242,6 +242,12 @@
       "type": "file"
     },
     {
+      "path": "src",
+      "accessCount": 7,
+      "lastAccessed": 1783445083736,
+      "type": "directory"
+    },
+    {
       "path": "server/news/plugin.js",
       "accessCount": 6,
       "lastAccessed": 1783400972882,
@@ -254,15 +260,15 @@
       "type": "file"
     },
     {
-      "path": "src",
-      "accessCount": 6,
-      "lastAccessed": 1783441902432,
-      "type": "directory"
-    },
-    {
       "path": "src/components/ProfileCenterPage.jsx",
       "accessCount": 4,
       "lastAccessed": 1783414445209,
+      "type": "file"
+    },
+    {
+      "path": "C:/Users/anlan0725/.claude/projects/E--VStudio-Project-Silicon-Meridian/memory/ui-architecture-redesign.md",
+      "accessCount": 4,
+      "lastAccessed": 1783445197642,
       "type": "file"
     },
     {
@@ -281,12 +287,6 @@
       "path": "src/blocks/BlockToolbar.jsx",
       "accessCount": 3,
       "lastAccessed": 1783418219599,
-      "type": "file"
-    },
-    {
-      "path": "C:/Users/anlan0725/.claude/projects/E--VStudio-Project-Silicon-Meridian/memory/ui-architecture-redesign.md",
-      "accessCount": 3,
-      "lastAccessed": 1783440786669,
       "type": "file"
     },
     {
@@ -317,6 +317,12 @@
       "path": "src/components/GithubRepoCard.jsx",
       "accessCount": 2,
       "lastAccessed": 1783439563428,
+      "type": "file"
+    },
+    {
+      "path": "C:/Users/anlan0725/.claude/projects/E--VStudio-Project-Silicon-Meridian/memory/MEMORY.md",
+      "accessCount": 2,
+      "lastAccessed": 1783445189310,
       "type": "file"
     },
     {
@@ -368,9 +374,9 @@
       "type": "file"
     },
     {
-      "path": "C:/Users/anlan0725/.claude/projects/E--VStudio-Project-Silicon-Meridian/memory/MEMORY.md",
+      "path": "index.html",
       "accessCount": 1,
-      "lastAccessed": 1783418848662,
+      "lastAccessed": 1783445207155,
       "type": "file"
     }
   ],
