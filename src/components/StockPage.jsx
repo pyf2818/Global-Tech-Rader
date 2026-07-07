@@ -256,29 +256,6 @@ export default function StockPage({ llmConfig }) {
     <div className="stock-page stock-page-v3">
       {/* 顶栏 */}
       <header className="stock3-header">
-        <div className="stock3-search">
-          {ICONS.search}
-          <input
-            value={searchKeyword}
-            onChange={e => setSearchKeyword(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && doSearch()}
-            placeholder="搜索股票代码/名称（如 600519 / 茅台 / AAPL）"
-          />
-          {searchResults.length > 0 && (
-            <>
-              <div className="dropdown-backdrop" onClick={() => setSearchResults([])} />
-              <div className="stock-search-dropdown">
-                {searchResults.map(s => (
-                  <button key={s.secid} className="stock-search-item" onClick={() => pickStock(s.code, s.name)}>
-                    <span className="stock-search-code">{s.code}</span>
-                    <span className="stock-search-name">{s.name}</span>
-                    <span className="stock-search-market">{s.market}</span>
-                  </button>
-                ))}
-              </div>
-            </>
-          )}
-        </div>
         <button className={`stock-watch-btn ${isSelectedInWatchlist ? 'active' : ''}`} onClick={() => toggleStock(selectedStock)} title={isSelectedInWatchlist ? '移出自选' : '加入自选'}>
           {ICONS.star}<span>{isSelectedInWatchlist ? '已自选' : '加自选'}</span>
         </button>
@@ -299,8 +276,31 @@ export default function StockPage({ llmConfig }) {
 
       {/* 三栏主体 */}
       <div className="stock3-body">
-        {/* 左栏：列表 */}
+        {/* 左栏：搜索 + 列表 */}
         <aside className="stock3-left">
+          <div className="stock3-left-search">
+            {ICONS.search}
+            <input
+              value={searchKeyword}
+              onChange={e => setSearchKeyword(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && doSearch()}
+              placeholder="搜索股票代码/名称"
+            />
+            {searchResults.length > 0 && (
+              <>
+                <div className="dropdown-backdrop" onClick={() => setSearchResults([])} />
+                <div className="stock-search-dropdown">
+                  {searchResults.map(s => (
+                    <button key={s.secid} className="stock-search-item" onClick={() => pickStock(s.code, s.name)}>
+                      <span className="stock-search-code">{s.code}</span>
+                      <span className="stock-search-name">{s.name}</span>
+                      <span className="stock-search-market">{s.market}</span>
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
           <div className="stock3-left-tabs">
             <button className={`stock3-left-tab ${listTab === 'hot' ? 'active' : ''}`} onClick={() => setListTab('hot')}>热门</button>
             <button className={`stock3-left-tab ${listTab === 'watchlist' ? 'active' : ''}`} onClick={() => setListTab('watchlist')}>自选 {watchlist.length > 0 && `(${watchlist.length})`}</button>
