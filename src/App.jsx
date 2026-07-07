@@ -1432,7 +1432,6 @@ function App() {
         })
       });
       const data = await res.json();
-      console.log('[AI Insights] Response:', data);
       if (data.error) {
         const msg = data.raw ? `AI 返回格式错误：${data.error}。原始输出：${data.raw.slice(0, 200)}` : data.error;
         throw new Error(msg);
@@ -1641,10 +1640,8 @@ function App() {
       return cat && md && src && reg;
     });
 
-    console.log('[Filter] category:', category, 'mode:', mode, 'sourceFilter:', sourceFilter, 'regionFilter:', regionFilter, 'filtered.length:', result.length);
     if (items.length > 0) {
       const sampleRegions = items.slice(0, 5).map(i => ({ title: i.title?.substring(0, 30), region: i.region }));
-      console.log('[Region Filter] Sample items:', sampleRegions);
     }
 
     if (followKeywords.length > 0) {
@@ -4160,17 +4157,8 @@ ${blueprintSummary}`,
     fetch(`/api/news?blocked=${encodeURIComponent(b)}&page=${page}&pageSize=40${searchParam}${disabledParam}${interestsParam}${customParams ? '&' + customParams : ''}`)
       .then(r => r.json())
       .then(d => {
-        console.log('[loadNews] Received data:', { 
-          items: d.items?.length || 0, 
-          total: d.total, 
-          page: d.page, 
-          pageSize: d.pageSize, 
-          hasMore: d.hasMore,
-          currentNewsPage: newsPage 
-        });
         if (d.items && d.items.length > 0) {
           const sampleRegions = d.items.slice(0, 3).map(i => ({ title: i.title?.substring(0, 30), region: i.region }));
-          console.log('[loadNews] Sample regions:', sampleRegions);
         }
         
         // 标记涉华内容
@@ -4200,9 +4188,7 @@ ${blueprintSummary}`,
   }
 
   function loadMoreNews() {
-    console.log('[loadMoreNews] Called:', { newsHasMore, loadingMore, loading, newsPage });
     if (!newsHasMore || loadingMore || loading) return;
-    console.log('[loadMoreNews] Loading more news...');
     setLoadingMore(true);
     loadNews(blocked, true, debouncedQuery);
   }
@@ -5339,34 +5325,25 @@ ${signals}
   }
 
   async function requestTranslation(item) {
-    console.log('[Translation] Called for item:', item.id, item.title);
-
     const existing = translations[item.id];
     // 如果存在旧翻译且格式正确（有 summary 字段），直接返回；否则重新翻译
     if (existing && existing.title && existing.title !== item.title && existing.summary !== undefined) {
-      console.log('[Translation] Using existing translation:', existing);
       return existing;
     }
     if (translatingItems[item.id]) {
-      console.log('[Translation] Already translating, skipping');
       return null;
     }
 
     const isEnglish = /^[a-zA-Z0-9\s\-.,!?"'():;&%$#@*+\[\]{}|\\\/<>`~+=]+$/.test(item.title) && !/^[\u4e00-\u9fff]/.test(item.title);
-    console.log('[Translation] isEnglish check:', isEnglish, 'title:', item.title);
     if (!isEnglish) {
-      console.log('[Translation] Not English content, skipping');
       return null;
     }
 
-    console.log('[Translation] llmConfig:', { baseUrl: llmConfig.baseUrl, selectedModel: llmConfig.selectedModel });
     if (!llmConfig.baseUrl || !llmConfig.selectedModel) {
-      console.log('[Translation] LLM config missing');
       showToast('请先在设置中配置大模型 API');
       return null;
     }
 
-    console.log('[Translation] Starting translation request...');
     setTranslatingItems(prev => ({ ...prev, [item.id]: true }));
 
     try {
@@ -5384,8 +5361,6 @@ ${signals}
       });
 
       const data = await response.json();
-      console.log('[Translation] API response:', data);
-
       if (data.error) {
         showToast(`翻译失败: ${data.error}`);
         return null;
@@ -5402,8 +5377,6 @@ ${signals}
       const filteredLines = lines.filter(line => !skipPrefixes.some(prefix => line.toLowerCase().startsWith(prefix.toLowerCase())));
       const finalLines = filteredLines.length > 0 ? filteredLines : lines;
 
-      console.log('[Translation] Parsed lines:', finalLines);
-
       if (finalLines.length === 0) {
         showToast('翻译返回空内容');
         return null;
@@ -5412,8 +5385,6 @@ ${signals}
       // 第一行作为标题，其余作为摘要
       const title = finalLines[0] || item.title;
       const summary = finalLines.slice(1).join('\n') || '';
-
-      console.log('[Translation] Translated:', { title, summary });
 
       if (!title || title === item.title) {
         showToast('翻译失败：无法获取翻译结果');
@@ -5429,7 +5400,6 @@ ${signals}
 
       const translated = { title, summary };
       setTranslations(prev => ({ ...prev, [item.id]: translated }));
-      console.log('[Translation] Saved to state:', translated);
       return translated;
     } catch (e) {
       console.error('[Translation] Error:', e);
@@ -9405,14 +9375,10 @@ ${signals}
     const startTime = Date.now();
     setSourceVerifying(true);
     
-    console.log('verifySingleSource: Verifying', source.name || sourceKey, url);
-    
     fetch(`/api/verify-source?url=${encodeURIComponent(url)}`)
       .then(r => r.json())
       .then(d => {
         const responseTime = Date.now() - startTime;
-        console.log('verifySingleSource: Result for', source.name || sourceKey, ':', d);
-        
         const previousHealth = sourceHealth[sourceKey];
         const failCount = d.ok ? 0 : (previousHealth?.failCount || 0) + 1;
         
@@ -9839,7 +9805,7 @@ function NewsItem({ item, index, viewMode = 'standard', isFocused = false, isBoo
           {onBookmark && <button className={`bookmark-btn ${isBookmarked ? 'active' : ''}`} onClick={onBookmark} title={isBookmarked ? '取消收藏' : '收藏'}>{isBookmarked ? ICONS.bookmarkFill : ICONS.bookmark}</button>}
           {onAddMaterial && <button className={`add-material-btn ${isInMaterials ? 'active' : ''}`} onClick={() => onAddMaterial(item)} title={isInMaterials ? '已在素材库' : '收藏为素材'}>{ICONS.layers}</button>}
           {onSummary && <button className={`summary-btn ${summaryLoading ? 'loading' : ''}`} onClick={onSummary} title="生成短摘要" disabled={summaryLoading}>{summaryLoading ? ICONS.spinner : ICONS.sparkle}</button>}
-          {isEnglish && onToggleTranslation && <button className={`translate-btn ${showTranslation ? 'active' : ''} ${isTranslating ? 'translating' : ''}`} onClick={() => { console.log('[NewsItem] Translate button clicked:', { isTranslating, translation, onRequestTranslation: !!onRequestTranslation }); if (isTranslating) return; if (!translation && onRequestTranslation) { onRequestTranslation().then(result => { console.log('[NewsItem] Translation result:', result); if (result) onToggleTranslation(); }); } else { onToggleTranslation(); } }} title="翻译" disabled={isTranslating}>{isTranslating ? ICONS.spinner : ICONS.globe}</button>}
+          {isEnglish && onToggleTranslation && <button className={`translate-btn ${showTranslation ? 'active' : ''} ${isTranslating ? 'translating' : ''}`} onClick={() => { if (isTranslating) return; if (!translation && onRequestTranslation) { onRequestTranslation().then(result => { if (result) onToggleTranslation(); }); } else { onToggleTranslation(); } }} title="翻译" disabled={isTranslating}>{isTranslating ? ICONS.spinner : ICONS.globe}</button>}
         </div>
       </div>
       <div className="item-main">
