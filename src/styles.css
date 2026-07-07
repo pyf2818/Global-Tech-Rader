@@ -2316,6 +2316,132 @@ body {
   gap: 12px;
 }
 
+/* 快速创建按钮条 */
+.studio-quick-create {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+.quick-create-btn {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 1px dashed var(--border-active);
+  border-radius: 12px;
+  background: var(--surface-workbench-ai);
+  cursor: pointer;
+  transition: all 0.18s ease;
+  text-align: left;
+  color: inherit;
+}
+.quick-create-btn:hover {
+  border-style: solid;
+  border-color: var(--accent-cyan);
+  background: var(--accent-cyan-soft);
+  transform: translateY(-1px);
+}
+.quick-create-icon {
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+  background: var(--accent-cyan-soft);
+  color: var(--accent-cyan);
+  flex-shrink: 0;
+}
+.quick-create-icon svg { width: 18px; height: 18px; }
+.quick-create-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.quick-create-text strong { font-size: 14px; font-weight: 800; color: var(--text-primary); }
+.quick-create-text em { font-style: normal; font-size: 11px; color: var(--text-muted); }
+
+/* 主推模块卡高亮 */
+.studio-module-card.primary {
+  background: linear-gradient(135deg, var(--accent-cyan-soft), var(--surface-workbench-ai));
+  border-color: var(--accent-cyan-border);
+}
+.studio-module-card.primary .studio-module-icon {
+  background: var(--accent-cyan);
+  color: #071d18;
+}
+
+/* 工作流节点改为按钮后的交互态 */
+.workflow-node-card {
+  cursor: pointer;
+  text-align: left;
+  color: inherit;
+  transition: transform 0.15s ease, border-color 0.15s ease;
+  display: flex;
+  flex-direction: column;
+}
+.workflow-node-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--accent-cyan);
+}
+.workflow-node-cta {
+  margin-top: auto;
+  padding-top: 8px;
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--accent-cyan);
+  font-style: normal;
+}
+
+/* 素材/文章列表 */
+.studio-asset-panel { padding: 16px; display: flex; flex-direction: column; gap: 10px; }
+.studio-asset-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.studio-asset-list li {
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--surface-workbench-action);
+  border: 1px solid var(--border-color);
+}
+.studio-asset-list li strong {
+  display: block;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.studio-asset-list li p {
+  margin: 2px 0 0;
+  font-size: 11px;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.studio-asset-empty strong { display: block; font-size: 14px; font-weight: 700; color: var(--text-primary); margin-bottom: 4px; }
+.studio-asset-empty p { margin: 0; font-size: 12px; color: var(--text-secondary); line-height: 1.6; }
+.studio-asset-panel > button {
+  margin-top: auto;
+  align-self: flex-start;
+  padding: 6px 14px;
+  border: 1px solid var(--border-color);
+  border-radius: 999px;
+  background: var(--surface-workbench-action);
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.studio-asset-panel > button:hover {
+  border-color: var(--accent-cyan);
+  color: var(--accent-cyan);
+  background: var(--accent-cyan-soft);
+}
+
 .studio-asset-panel {
   padding: 16px;
 }

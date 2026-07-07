@@ -6142,9 +6142,24 @@ ${signals}
                 </div>
               </section>
 
+              <section className="studio-quick-create">
+                <button className="quick-create-btn" onClick={() => { const a = createArticle('blank'); setCurrentArticleId(a.id); setEditorTab('edit'); goNav('editor'); }}>
+                  <span className="quick-create-icon">{ICONS.edit}</span>
+                  <span className="quick-create-text"><strong>新建文章</strong><em>空白模板起步</em></span>
+                </button>
+                <button className="quick-create-btn" onClick={() => { setEditingAgent(null); setNewAgent({ name: '', description: '', systemPrompt: '', category: '分析', avatar: '' }); setShowAgentForm(true); goNav('agents'); }}>
+                  <span className="quick-create-icon">{ICONS.bot}</span>
+                  <span className="quick-create-text"><strong>新建智能体</strong><em>自定义 Prompt 与技能</em></span>
+                </button>
+                <button className="quick-create-btn" onClick={() => goNav('materials')}>
+                  <span className="quick-create-icon">{ICONS.layers}</span>
+                  <span className="quick-create-text"><strong>添加素材</strong><em>从资讯或本地上传</em></span>
+                </button>
+              </section>
+
               <section className="studio-module-grid">
                 {studioModules.map(module => (
-                  <button key={module.id} className="studio-module-card" onClick={() => goNav(module.nav)}>
+                  <button key={module.id} className={`studio-module-card ${module.id === 'agents' ? 'primary' : ''}`} onClick={() => goNav(module.nav)}>
                     <span className="studio-module-icon">{ICONS[module.icon]}</span>
                     <span className="studio-module-title">{module.title}</span>
                     <span className="studio-module-desc">{module.desc}</span>
@@ -6159,15 +6174,16 @@ ${signals}
               <section className="workflow-builder-preview">
                 <div className="section-header">
                   <h2 className="section-title">{ICONS.bot} 可视化智能体工作流</h2>
-                  <p className="section-desc">第一阶段先建立清晰的工作流语言；下一阶段会把这些节点做成可拖拽编排画布。</p>
+                  <p className="section-desc">点击节点类型，前往智能体页面用对应节点搭建工作流。</p>
                 </div>
                 <div className="workflow-node-strip">
                   {workflowNodeTypes.map((node, index) => (
-                    <div key={node.type} className="workflow-node-card">
+                    <button key={node.type} className="workflow-node-card" onClick={() => goNav('agents')}>
                       <span>{String(index + 1).padStart(2, '0')}</span>
                       <strong>{node.type}</strong>
                       <p>{node.desc}</p>
-                    </div>
+                      <em className="workflow-node-cta">前往编排 →</em>
+                    </button>
                   ))}
                 </div>
               </section>
@@ -6175,15 +6191,29 @@ ${signals}
               <section className="studio-asset-row">
                 <div className="studio-asset-panel">
                   <span>最近素材</span>
-                  <strong>{materials[0]?.title || '还没有沉淀素材'}</strong>
-                  <p>{materials[0]?.summary || '从资讯卡片、每日汇报或本地上传开始收集，素材会成为智能体和文章创作的上下文。'}</p>
-                  <button onClick={() => goNav('materials')}>管理素材库</button>
+                  {materials.length > 0 ? (
+                    <ul className="studio-asset-list">
+                      {materials.slice(0, 3).map(m => (
+                        <li key={m.id}><strong>{m.title}</strong><p>{m.summary}</p></li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <div className="studio-asset-empty"><strong>还没有沉淀素材</strong><p>从资讯卡片、每日汇报或本地上传开始收集。</p></div>
+                  )}
+                  <button onClick={() => goNav('materials')}>管理素材库（{materials.length}）</button>
                 </div>
                 <div className="studio-asset-panel">
                   <span>创作资产</span>
-                  <strong>{articles[0]?.title || '准备你的第一篇内容'}</strong>
-                  <p>{articles.length ? `当前已有 ${articles.length} 篇文章，可继续导出为本地知识库资产。` : '内容创作区会保留大空间编辑体验，并联动素材库与智能体输出。'}</p>
-                  <button onClick={() => goNav('editor')}>打开编辑器</button>
+                  {articles.length > 0 ? (
+                    <ul className="studio-asset-list">
+                      {articles.slice(0, 3).map(a => (
+                        <li key={a.id}><strong>{a.title}</strong><p>{a.template === 'briefing' ? '简报模板' : a.template === 'weekly' ? '周报模板' : '空白文章'} · {new Date(a.updatedAt).toLocaleDateString('zh-CN')}</p></li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <div className="studio-asset-empty"><strong>准备你的第��篇内容</strong><p>内容创作区联动素材库与智能体输出。</p></div>
+                  )}
+                  <button onClick={() => goNav('editor')}>打开编辑器（{articles.length}）</button>
                 </div>
               </section>
             </div>
