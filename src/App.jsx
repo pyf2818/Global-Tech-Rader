@@ -995,6 +995,7 @@ function App() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [newsPage, setNewsPage] = useState(0);
   const [newsHasMore, setNewsHasMore] = useState(true);
+  const [renderLimit, setRenderLimit] = useState(30);
   const [debouncedQuery, setDebouncedQuery] = useState('');
   const [error, setError] = useState('');
   const [blocked, setBlocked] = useState('');
@@ -1476,15 +1477,23 @@ function App() {
   useEffect(() => {
     if (nav !== 'all' && nav !== 'recommendations' && nav !== 'today') return;
     const el = feedRef.current;
-    if (!el || !newsHasMore || loadingMore || loading) return;
+    if (!el || loading) return;
     const observer = new IntersectionObserver(
-      (entries) => { if (entries[0].isIntersecting) loadMoreNews(); },
+      (entries) => {
+        if (!entries[0].isIntersecting) return;
+        // 优先增加渲染数（渲染分页），已加载数据渲染完才请求 API 加载更多
+        if (filtered.length > renderLimit) {
+          setRenderLimit(r => r + 30);
+        } else if (newsHasMore && !loadingMore) {
+          loadMoreNews();
+        }
+      },
       { root: el, rootMargin: '200px' }
     );
     const sentinel = document.getElementById('load-more-sentinel');
     if (sentinel) observer.observe(sentinel);
     return () => observer.disconnect();
-}, [nav, newsHasMore, loadingMore, loading]);
+  }, [nav, newsHasMore, loadingMore, loading, filtered.length, renderLimit]);
 
   const scrollToTop = () => {
     feedRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
@@ -4134,7 +4143,7 @@ ${blueprintSummary}`,
   }, [focusedIndex]);
 
   function loadNews(b = blocked, append = false, searchQuery = '') {
-    if (!append) { setLoading(true); setError(''); setNewsPage(0); setNewsHasMore(true); }
+    if (!append) { setLoading(true); setError(''); setNewsPage(0); setNewsHasMore(true); setRenderLimit(30); }
     const page = append ? newsPage + 1 : 0;
     const customParams = customSources.map(s => `custom=${encodeURIComponent(JSON.stringify(s))}`).join('&');
     const disabledParam = disabledSources.length > 0 ? `&disabledSources=${encodeURIComponent(disabledSources.join(','))}` : '';
@@ -6780,18 +6789,18 @@ ${signals}
               {error && <div className="error-state"><p>加载失败: {error}</p><button onClick={() => loadNews()}>重试</button></div>}
               {!loading && !error && filtered.length === 0 && <div className="empty-state"><p>{allActiveFilters.length > 0 ? `共 ${items.length} 条资讯，当前 ${allActiveFilters.length} 个筛选条件均不匹配` : '没有匹配的资讯'}</p><button onClick={clearAllFilters}>清空全部筛选</button></div>}
               <div className={`feed-list view-${viewMode} ${viewMode === 'card' ? 'card-grid' : ''}`}>
-                {filtered.map((item, i) => {
+                {filtered.slice(0, renderLimit).map((item, i) => {
                   const summaryEntry = getSummaryEntry(item);
                   return <NewsItem key={item.id} item={item} index={i} viewMode={viewMode} isFocused={focusedIndex === i} isBookmarked={isBookmarked(item.id)} isInMaterials={isInMaterials(item.id)} onBookmark={() => toggleBookmark(item)} onAddMaterial={() => toggleMaterial(item)} onSummary={() => handleSummaryToggle(item)} isSummaryOpen={expandedSummary[item.id]} summaryText={summaryEntry?.text || ''} summaryMode={summaryEntry?.mode || ''} summaryLoading={Boolean(summaryLoading[item.id])} isFollowed={followKeywords.some(kw => `${item.title} ${item.summary}`.toLowerCase().includes(kw.toLowerCase()))} onRead={() => recordReading(item)} showTranslation={translationOpen[item.id]} onToggleTranslation={() => setTranslationOpen(p => ({ ...p, [item.id]: !p[item.id] }))} onRequestTranslation={() => requestTranslation(item)} isTranslating={translatingItems[item.id]} translation={getTranslation(item)} onOpenLightbox={(src, title, images, index) => setLightbox({ open: true, src, title, images: images || [], index: index || 0 })} />;
                 })}
               </div>
-              {nav === 'all' && newsHasMore && (
+              {nav === 'all' && (newsHasMore || filtered.length > renderLimit) && (
                 <div id="load-more-sentinel" className="load-more-area">
                   {loadingMore && <div className="load-more-spinner"><div className="spinner" /><span>加载中...</span></div>}
                   {!loadingMore && <span className="load-more-hint">滚动加载更多</span>}
                 </div>
               )}
-              {nav === 'all' && !newsHasMore && items.length > 0 && (
+              {nav === 'all' && !newsHasMore && filtered.length <= renderLimit && items.length > 0 && (
                 <div className="load-more-area load-more-done">已全部加载</div>
               )}
             </>
