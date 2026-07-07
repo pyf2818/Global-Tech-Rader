@@ -15009,6 +15009,7 @@ body {
 /* 顶栏 */
 .stock3-header { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .stock3-search { position: relative; display: flex; align-items: center; gap: 8px; flex: 1; min-width: 280px; padding: 8px 14px; border: 1px solid var(--border-color); border-radius: 10px; background: var(--bg-card); }
+.stock3-search > svg { width: 16px; height: 16px; color: var(--text-muted); flex-shrink: 0; }
 .stock3-search input { border: none; background: transparent; color: var(--text-primary); font-size: 14px; width: 100%; outline: none; }
 .stock3-search input::placeholder { color: var(--text-muted); }
 .stock3-search .stock-search-dropdown { position: absolute; top: 100%; left: 0; right: 0; margin-top: 4px; background: var(--bg-card-solid); border: 1px solid var(--border-color); border-radius: 10px; overflow: hidden; z-index: 30; max-height: 320px; overflow-y: auto; }
