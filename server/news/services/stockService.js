@@ -8,6 +8,8 @@ const LIST_URL = 'https://push2.eastmoney.com/api/qt/ulist.np/get';
 
 // 代码前缀映射：1=沪市 0=深市 105=美股 116=港股
 const PREFIX_MAP = { sh: '1', sz: '0', us: '105', hk: '116' };
+// 反向映射：东方财富 secid 前缀 → 腾讯 code 前缀
+const SECID_TO_TC = { '1': 'sh', '0': 'sz', '105': 'us', '116': 'hk' };
 
 // 默认指数（self-contained，不依赖外部配置）
 const DEFAULT_INDICES = [
@@ -61,6 +63,74 @@ export function resolveSecid(input) {
 //          f57=代码 f58=名称 f60=昨收 f170=涨跌幅 f171=涨跌额
 const REALTIME_FIELDS = 'f43,f44,f45,f46,f47,f48,f57,f58,f60,f170,f171';
 
+// 腾讯实时接口（降级源）—— 东方财富失败时使用
+const TENCENT_URL = 'https://qt.gtimg.cn/q=';
+
+// 东方财富 secid（如 1.000001）→ 腾讯 code（如 sh000001）
+function secidToTencentCode(secid) {
+  const [prefix, code] = String(secid).split('.');
+  const tcPrefix = SECID_TO_TC[prefix];
+  if (!tcPrefix) return null;
+  // 美股：105.AAPL → usAAPL；港股：116.00700 → hk00700
+  return tcPrefix + code;
+}
+
+// 解析腾讯单行返回：v_sh000001="1~上证指数~000001~3999.03~..."
+// 字段索引（~ 分隔）：
+//   1=市场 2=名称 3=代码 4=当前价 5=昨收 6=今开 7=成交量
+//   33=时间 34=涨跌额 35=涨跌幅 36=最高 37=最低
+function parseTencentLine(line) {
+  const m = /^v_(\w+)="([^"]*)"/.exec(line.trim());
+  if (!m) return null;
+  const tcCode = m[1];
+  const parts = m[2].split('~');
+  if (parts.length < 35) return null;
+  const price = parseFloat(parts[3]) || 0;
+  const prevClose = parseFloat(parts[4]) || 0;
+  const open = parseFloat(parts[5]) || 0;
+  const volume = parseInt(parts[6], 10) || 0;
+  const change = parseFloat(parts[31]) || 0;
+  const changePct = parseFloat(parts[32]) || 0;
+  const high = parseFloat(parts[33]) || 0;
+  const low = parseFloat(parts[34]) || 0;
+  // 反推 secid
+  const prefixMatch = /^(sh|sz|us|hk)/.exec(tcCode);
+  const secidPrefix = prefixMatch ? PREFIX_MAP[prefixMatch[1]] : '1';
+  const code = tcCode.replace(/^(sh|sz|us|hk)/, '');
+  return {
+    secid: `${secidPrefix}.${code}`,
+    code: tcCode,
+    name: parts[1] || '',
+    price,
+    prevClose,
+    open,
+    high,
+    low,
+    change: Math.round(change * 100) / 100,
+    changePct: Math.round(changePct * 100) / 100,
+    volume,
+    amount: 0,
+    timestamp: nowMs(),
+  };
+}
+
+// 腾讯批量实时查询（降级用）—— 返回 GBK 编码，需手动解码
+async function fetchTencentBatch(secids) {
+  const tcCodes = secids.map(secidToTencentCode).filter(Boolean);
+  if (tcCodes.length === 0) return [];
+  const url = `${TENCENT_URL}${tcCodes.join(',')}`;
+  const res = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } });
+  // 腾讯返回 GBK 编码，UTF-8 解码会乱码，用 TextDecoder('gbk') 正确解码中文
+  const buf = await res.arrayBuffer();
+  const text = new TextDecoder('gbk').decode(buf);
+  const items = text.split(';')
+    .map(l => l.trim())
+    .filter(Boolean)
+    .map(parseTencentLine)
+    .filter(Boolean);
+  return items;
+}
+
 export async function getRealtime(secids) {
   if (!secids || secids.length === 0) return [];
   const key = secids.join(',');
@@ -73,10 +143,17 @@ export async function getRealtime(secids) {
     const res = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } });
     const json = await res.json();
     const d = json?.data;
-    if (!d) return [];
-    const item = parseRealtimeItem(d, secids[0]);
-    realtimeCache.set(key, { data: [item], t: nowMs() });
-    return [item];
+    if (d) {
+      const item = parseRealtimeItem(d, secids[0]);
+      realtimeCache.set(key, { data: [item], t: nowMs() });
+      return [item];
+    }
+  } catch (e) { /* fall through to tencent */ }
+  // 降级：腾讯实时接口
+  try {
+    const items = await fetchTencentBatch(secids);
+    if (items.length > 0) realtimeCache.set(key, { data: items, t: nowMs() });
+    return items;
   } catch (e) {
     return [];
   }
@@ -94,8 +171,16 @@ export async function getRealtimeBatch(secids) {
     const res = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } });
     const json = await res.json();
     const diff = json?.data?.diff || [];
-    const items = diff.map(d => parseListItem(d, secids));
-    realtimeCache.set(key, { data: items, t: nowMs() });
+    if (diff.length > 0) {
+      const items = diff.map(d => parseListItem(d, secids));
+      realtimeCache.set(key, { data: items, t: nowMs() });
+      return items;
+    }
+  } catch (e) { /* fall through to tencent */ }
+  // 降级：腾讯实时接口
+  try {
+    const items = await fetchTencentBatch(secids);
+    if (items.length > 0) realtimeCache.set(key, { data: items, t: nowMs() });
     return items;
   } catch (e) {
     return [];
