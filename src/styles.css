@@ -717,6 +717,7 @@ body {
 .load-more-area { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 20px 0; color: var(--text-muted); font-size: 13px; }
 .load-more-sentinel-center { padding: 12px 0; }
 .load-more-sentinel-done { opacity: 0.5; }
+.form-group-flex { flex: 1; }
 .load-more-spinner { display: flex; align-items: center; gap: 10px; }
 .load-more-spinner .spinner { width: 20px; height: 20px; border-width: 2px; }
 .load-more-hint { opacity: 0.6; }

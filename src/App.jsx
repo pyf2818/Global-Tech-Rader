@@ -8291,7 +8291,7 @@ ${signals}
                     </select>
                   </div>
                   <div className="form-row">
-                    <div className="form-group" style={{ flex: 1 }}>
+                    <div className="form-group form-group-flex">
                       <label>所属空间</label>
                       <select name="spaceId" defaultValue="">
                         <option value="">默认空间</option>
@@ -8503,11 +8503,11 @@ ${signals}
                     <input name="title" type="text" placeholder="输入事件标题" autoFocus required />
                   </div>
                   <div className="form-row">
-                    <div className="form-group" style={{ flex: 1 }}>
+                    <div className="form-group form-group-flex">
                       <label>日期</label>
                       <input name="date" type="date" required />
                     </div>
-                    <div className="form-group" style={{ flex: 1 }}>
+                    <div className="form-group form-group-flex">
                       <label>时间</label>
                       <input name="time" type="time" />
                     </div>
