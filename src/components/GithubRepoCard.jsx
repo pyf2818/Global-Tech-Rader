@@ -41,7 +41,7 @@ function GithubRepoCard({ repo, index, since = 'weekly', isBookmarked = false, i
       </div>
       {repo.imageUrl && (
         <div className="gh-card-image" onClick={() => onOpenLightbox?.(repo.imageUrl, repo.fullName)}>
-          <img src={repo.imageUrl} alt={repo.name} loading="lazy" onError={e => { e.target.style.display = 'none'; }} />
+          <img src={repo.imageUrl} alt={repo.name} loading="lazy" decoding="async" onError={e => { e.target.style.display = 'none'; }} />
         </div>
       )}
       <p className="gh-desc">{repo.description}</p>

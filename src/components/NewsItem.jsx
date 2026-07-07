@@ -116,7 +116,7 @@ function NewsItem({ item, index, viewMode = 'standard', isFocused = false, isBoo
                   {item.imageUrl ? (
                     // 如果有封面图，显示封面图+播放图标
                     <div className="item-media-thumb">
-                      <img src={item.imageUrl} alt="" loading="lazy" onError={e => { e.target.style.display = 'none'; }} />
+                      <img src={item.imageUrl} alt="" loading="lazy" decoding="async" onError={e => { e.target.style.display = 'none'; }} />
                       <span className="item-media-play video-play">{ICONS.play}</span>
                     </div>
                   ) : (
@@ -132,7 +132,7 @@ function NewsItem({ item, index, viewMode = 'standard', isFocused = false, isBoo
                 <div className="item-media-grid">
                   {item.images.slice(0, 4).map((img, i) => (
                     <div key={i} className="item-media-grid-cell" onClick={() => onOpenLightbox?.(img, item.title, item.images, i)}>
-                      <img src={img} alt="" loading="lazy" onError={e => { e.target.style.opacity = '0'; }} />
+                      <img src={img} alt="" loading="lazy" decoding="async" onError={e => { e.target.style.opacity = '0'; }} />
                       {i === 3 && item.images.length > 4 && <span className="item-media-more">+{item.images.length - 4}</span>}
                     </div>
                   ))}
@@ -140,7 +140,7 @@ function NewsItem({ item, index, viewMode = 'standard', isFocused = false, isBoo
               ) : item.imageUrl && (
                 // 单图
                 <div className="item-media-thumb" onClick={() => onOpenLightbox?.(item.imageUrl, item.title)}>
-                  <img src={item.imageUrl} alt="" loading="lazy" onError={e => { e.target.style.display = 'none'; }} />
+                  <img src={item.imageUrl} alt="" loading="lazy" decoding="async" onError={e => { e.target.style.display = 'none'; }} />
                 </div>
               )}
             </div>
