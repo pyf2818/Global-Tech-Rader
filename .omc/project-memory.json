@@ -47,8 +47,8 @@
     "runtime": null
   },
   "build": {
-    "buildCommand": "npm run build 2>&1 | grep -E \"built|error\" | head -3",
-    "testCommand": "npm test 2>&1 | tail -10",
+    "buildCommand": "cd \"E:/VStudio_Project/Silicon Meridian\" && npm run build 2>&1 | grep -E \"built|error\" | head -2",
+    "testCommand": "node node_modules/vitest/vitest.mjs run 2>&1 | tail -5",
     "lintCommand": null,
     "devCommand": "npm run dev",
     "scripts": {
@@ -236,16 +236,16 @@
       "type": "file"
     },
     {
+      "path": "src",
+      "accessCount": 14,
+      "lastAccessed": 1783485878858,
+      "type": "directory"
+    },
+    {
       "path": "src/components/NewsItem.jsx",
       "accessCount": 9,
       "lastAccessed": 1783441882916,
       "type": "file"
-    },
-    {
-      "path": "src",
-      "accessCount": 7,
-      "lastAccessed": 1783445083736,
-      "type": "directory"
     },
     {
       "path": "server/news/plugin.js",
@@ -323,6 +323,12 @@
       "path": "C:/Users/anlan0725/.claude/projects/E--VStudio-Project-Silicon-Meridian/memory/MEMORY.md",
       "accessCount": 2,
       "lastAccessed": 1783445189310,
+      "type": "file"
+    },
+    {
+      "path": "src/hooks/useAuth.js",
+      "accessCount": 2,
+      "lastAccessed": 1783485632224,
       "type": "file"
     },
     {
