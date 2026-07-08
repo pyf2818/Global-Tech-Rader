@@ -30,17 +30,21 @@ export function useAuth({ setSelectedInterests: externalSetInterests } = {}) {
 
   // 持久化 user
   useEffect(() => {
-    if (user) localStorage.setItem('user', JSON.stringify(user));
-    else localStorage.removeItem('user');
+    try {
+      if (user) localStorage.setItem('user', JSON.stringify(user));
+      else localStorage.removeItem('user');
+    } catch { /* QuotaExceededError */ }
   }, [user]);
   // 持久化 token
   useEffect(() => {
-    if (token) localStorage.setItem('token', token);
-    else localStorage.removeItem('token');
+    try {
+      if (token) localStorage.setItem('token', token);
+      else localStorage.removeItem('token');
+    } catch { /* QuotaExceededError */ }
   }, [token]);
   // 持久化 selectedInterests
   useEffect(() => {
-    localStorage.setItem('selectedInterests', JSON.stringify(selectedInterests));
+    try { localStorage.setItem('selectedInterests', JSON.stringify(selectedInterests)); } catch { /* QuotaExceededError */ }
   }, [selectedInterests]);
 
   const handleRegister = async () => {
