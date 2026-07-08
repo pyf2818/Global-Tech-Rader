@@ -1176,7 +1176,8 @@ function App() {
     saveLS('likedPosts', [...likedPosts]);
     saveLS('savedPosts', [...savedPosts]);
     saveLS('postComments', postComments);
-  }, [domainPriorities, sourcePriorities, dailyProfileSnapshots, specialFollows, likedPosts, savedPosts, postComments]);
+    saveLS('translations', translations);
+  }, [domainPriorities, sourcePriorities, dailyProfileSnapshots, specialFollows, likedPosts, savedPosts, postComments, translations]);
 
 
   // 认证函数已抽取至 useAuth — 这里不再定义
