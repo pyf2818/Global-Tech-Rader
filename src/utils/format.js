@@ -32,3 +32,16 @@ export function hexToRgba(hex, alpha = 1) {
 export function getGradeColors(color) {
   return { primary: color || '#64748b', glow: hexToRgba(color || '#64748b', 0.28) };
 }
+
+// 判断文本是否为英文（纯 ASCII 字符，且不含中文）
+// 统一 NewsItem / GithubRepoCard / requestTranslation 的语言检测
+const ENGLISH_TEXT_RE = /^[a-zA-Z0-9\s\-.,!?"'():;&%$#@*+\[\]{}|\\\/<>`~+=]+$/;
+const CHINESE_CHAR_RE = /[一-鿿]/;
+
+export function isEnglishText(text = '') {
+  return ENGLISH_TEXT_RE.test(text) && !CHINESE_CHAR_RE.test(text);
+}
+
+export function isChineseText(text = '') {
+  return CHINESE_CHAR_RE.test(text);
+}

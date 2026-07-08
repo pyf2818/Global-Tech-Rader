@@ -5,7 +5,7 @@ import ColorfulBubbles from './components/ColorfulBubbles.jsx';
 import AiChatPanel from './components/AiChatPanel.jsx';
 import ThemePicker from './ThemePicker.jsx';
 import { PALETTES } from './ThemePicker.jsx';
-import { getGradeColors } from './utils/format.js';
+import { getGradeColors, isEnglishText, isChineseText } from './utils/format.js';
 import { buildGithubMaterial } from './utils/githubMaterial.js';
 import { useAuth } from './hooks/useAuth.js';
 import { useLlmConfig } from './hooks/useLlmConfig.js';
@@ -5340,7 +5340,7 @@ ${signals}
       return null;
     }
 
-    const isEnglish = /^[a-zA-Z0-9\s\-.,!?"'():;&%$#@*+\[\]{}|\\\/<>`~+=]+$/.test(item.title) && !/^[\u4e00-\u9fff]/.test(item.title);
+    const isEnglish = isEnglishText(item.title);
     if (!isEnglish) {
       return null;
     }
@@ -9730,7 +9730,7 @@ function NewsItem({ item, index, viewMode = 'standard', isFocused = false, isBoo
             ? '短摘要'
             : 'AI 短摘要';
 
-  const isEnglish = /^[a-zA-Z0-9\s\-.,!?"'():;&%$#@*+\[\]{}|\\\/<>`~+=]+$/.test(item.title) && !/^[\u4e00-\u9fff]/.test(item.title);
+  const isEnglish = isEnglishText(item.title);
 
   // 拖拽开始
   const handleDragStart = (e) => {
@@ -10078,7 +10078,7 @@ function TrendLineChart({ labels = [], series = [] }) {
 function GithubRepoCard({ repo, index, since = 'weekly', isBookmarked = false, isInMaterials = false, onBookmark, onAddMaterial, showTranslation, onToggleTranslation, translation, onOpenLightbox }) {
   const [tutorialExpanded, setTutorialExpanded] = useState(false);
   const [insightExpanded, setInsightExpanded] = useState(false);
-  const isEnglish = /^[a-zA-Z0-9\s\-.,!?':\(\)\[\]{}]+$/.test(repo.fullName) || /^[a-zA-Z0-9\s\-.,!?':\(\)\[\]{}]+$/.test(repo.description);
+  const isEnglish = isEnglishText(repo.fullName) || isEnglishText(repo.description);
   const scenarioText = inferGithubScenario(repo);
   const audienceText = inferGithubAudience(repo);
   const valueText = inferGithubValue(repo);
