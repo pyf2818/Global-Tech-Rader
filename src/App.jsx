@@ -1176,8 +1176,7 @@ function App() {
     saveLS('likedPosts', [...likedPosts]);
     saveLS('savedPosts', [...savedPosts]);
     saveLS('postComments', postComments);
-    saveLS('translations', translations);
-  }, [domainPriorities, sourcePriorities, dailyProfileSnapshots, specialFollows, likedPosts, savedPosts, postComments, translations]);
+  }, [domainPriorities, sourcePriorities, dailyProfileSnapshots, specialFollows, likedPosts, savedPosts, postComments]);
 
 
   // 认证函数已抽取至 useAuth — 这里不再定义
@@ -1298,6 +1297,7 @@ function App() {
   const [newTrackTarget, setNewTrackTarget] = useState('');
   const [readingHistory, setReadingHistory] = useState(() => loadLS('readingHistory', []));
   const [translations, setTranslations] = useState(() => loadLS('translations', {}));
+  useEffect(() => { saveLS('translations', translations); }, [translations]);
   const [aiInsights, setAiInsights] = useState({ loading: false, data: null, error: '' });
   const [elfQuotedContext, setElfQuotedContext] = useState(null);
   const [translationOpen, setTranslationOpen] = useState({});
