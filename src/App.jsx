@@ -5408,7 +5408,6 @@ ${signals}
       setTranslations(prev => ({ ...prev, [item.id]: translated }));
       return translated;
     } catch (e) {
-      console.error('[Translation] Error:', e);
       showToast(`翻译失败: ${e.message}`);
       return null;
     } finally {
