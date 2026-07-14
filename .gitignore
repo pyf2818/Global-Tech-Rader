@@ -175,3 +175,7 @@
 *.lz
 *.lzma
 *.iso
+
+# Codex/Superpowers temporary workspaces
+.worktrees/
+.superpowers/
