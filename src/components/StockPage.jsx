@@ -521,36 +521,47 @@ export default function StockPage({ llmConfig, onOpenLlmConfig }) {
         </aside>
       </div>
 
-      {/* AI 个股诊断 —— 三栏下方全宽面板，可独立滚动 */}
+      {/* 算法技术分析始终可用，LLM 仅增强自然语言表述 */}
       <section className="stock3-panel stock-ai-panel">
         <div className="stock-ai-panel-head">
           <div className="stock3-panel-label">
-            {ICONS.sparkle} AI 个股诊断
-            {!ai.llmReady && <span className="stock-ai-unready" onClick={onOpenLlmConfig}>未配置</span>}
+            {ICONS.sparkle} {ai.diagnosis?.mode === 'ai' ? 'AI 增强分析' : '算法技术分析'}
+            {!ai.llmReady && <button type="button" className="stock-ai-unready" onClick={onOpenLlmConfig}>配置 AI 增强</button>}
           </div>
-          {ai.llmReady && (ai.diagnosis || ai.diagnoseError) && (
-            <button className="stock-ai-rerun" onClick={runDiagnosis} disabled={ai.diagnosing}>{ICONS.refresh}<span>重新诊断</span></button>
+          {(ai.diagnosis || ai.diagnoseError) && (
+            <button className="stock-ai-rerun" onClick={runDiagnosis} disabled={ai.diagnosing}>{ICONS.refresh}<span>重新分析</span></button>
           )}
         </div>
-        {ai.llmReady ? (
-          <>
-            {!ai.diagnosis && !ai.diagnosing && !ai.diagnoseError && (
-              <button className="stock-ai-run" onClick={runDiagnosis} disabled={!realtime}>
-                {ICONS.sparkle}<span>生成 AI 诊断</span>
-              </button>
-            )}
-            {ai.diagnosing && <div className="stock-ai-loading"><div className="spinner" /><span>AI 分析中…</span></div>}
-            {ai.diagnoseError && <div className="stock-ai-error">{ai.diagnoseError}<button onClick={runDiagnosis}>重试</button></div>}
-            {ai.diagnosis && (
-              <div className="stock-ai-result">
-                <div className="stock-ai-text">{ai.diagnosis.content}</div>
+        {!ai.diagnosis && !ai.diagnosing && !ai.diagnoseError && (
+          <button className="stock-ai-run" onClick={runDiagnosis} disabled={!realtime}>
+            {ICONS.sparkle}<span>{ai.llmReady ? '生成 AI 增强分析' : '生成算法分析'}</span>
+          </button>
+        )}
+        {ai.diagnosing && <div className="stock-ai-loading"><div className="spinner" /><span>正在计算技术指标…</span></div>}
+        {ai.diagnoseError && <div className="stock-ai-error">{ai.diagnoseError}<button onClick={runDiagnosis}>重试</button></div>}
+        {ai.diagnosis && (
+          <div className="stock-ai-result stock-analysis-result">
+            <div className="stock-analysis-summary">
+              <div><span>综合评级</span><strong>{ai.diagnosis.rating}</strong></div>
+              <div><span>风险等级</span><strong>{({ high: '高', medium: '中', low: '低', unknown: '--' })[ai.diagnosis.risk] || '--'}</strong></div>
+              <div><span>分析模式</span><strong>{ai.diagnosis.mode === 'ai' ? 'AI 增强' : '确定性算法'}</strong></div>
+            </div>
+            {ai.diagnosis.status === 'ready' && (
+              <div className="stock-analysis-metrics">
+                {[
+                  ['MA5', ai.diagnosis.metrics.ma5], ['MA10', ai.diagnosis.metrics.ma10], ['MA20', ai.diagnosis.metrics.ma20],
+                  ['波动率', ai.diagnosis.metrics.volatility == null ? null : `${ai.diagnosis.metrics.volatility}%`],
+                  ['支撑', ai.diagnosis.metrics.support], ['压力', ai.diagnosis.metrics.resistance],
+                  ['5日动量', ai.diagnosis.metrics.momentum5 == null ? null : `${ai.diagnosis.metrics.momentum5}%`],
+                  ['量能', ({ expanding: '放大', contracting: '收缩', stable: '平稳' })[ai.diagnosis.metrics.volumeTrend] || '--'],
+                ].map(([label, value]) => <div key={label}><span>{label}</span><strong>{value ?? '--'}</strong></div>)}
               </div>
             )}
-          </>
-        ) : (
-          <div className="stock-ai-guide">
-            <p>配置大模型后，AI 可综合 K线、盘口、板块给出个股诊断。</p>
-            <button onClick={onOpenLlmConfig}>配置大模型</button>
+            <div className="stock-ai-text">{ai.diagnosis.content}</div>
+            {ai.diagnosis.aiError && <div className="stock-analysis-fallback">AI 增强失败，当前保留算法结果：{ai.diagnosis.aiError}</div>}
+            <div className="stock-analysis-evidence">
+              {(ai.diagnosis.evidence || []).map(item => <span key={item.key}>{item.label}：{item.value}</span>)}
+            </div>
           </div>
         )}
       </section>

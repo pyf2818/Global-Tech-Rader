@@ -1,7 +1,9 @@
 import { CATEGORIES, MODES, DEFAULT_SOURCES, SOURCE_GRADES, PAGE_SIZE } from './config/constants.js';
 import { getSourceGrade, getSourceGradeInfo } from './config/sourceGrades.js';
 import { sendJson, parseBody, isSafeUrl } from './utils/httpUtils.js';
-import { users, userSessions, createUser, verifyUser, generateToken, getUserByToken } from './auth/userAuth.js';
+import { handleAuthRequest } from '../http/authHandlers.js';
+import { handleCommunityRequest } from '../http/communityHandlers.js';
+import { handleProfileRequest } from '../http/profileHandlers.js';
 import { getNews } from './services/newsService.js';
 import { getTrending, getGithubTrending } from './services/trendingService.js';
 import { discoverSourceCandidates, validateFeedUrl } from './services/sourceDiscovery.js';
@@ -39,79 +41,21 @@ export function newsPlugin() {
           });
         }
 
-        // ========== 认证路由 ==========
-        if (requestUrl.pathname === '/api/auth/register') {
-          const body = await parseBody(req);
-          const { username, password, email, interests = [] } = body;
-          if (!username || !password) {
-            return sendJson(res, { ok: false, message: 'Username and password are required' }, 400);
-          }
-          if (users.has(username)) {
-            return sendJson(res, { ok: false, message: 'Username already exists' }, 400);
-          }
-          const user = await createUser(username, password, email, interests);
-          const token = generateToken();
-          userSessions.set(token, user);
-          return sendJson(res, {
-            ok: true,
-            token,
-            user: { id: user.id, username: user.username, email: user.email, interests: user.interests, displayName: user.displayName, avatar: user.avatar, signature: user.signature }
-          });
+        // 认证、社区使用同一组 service/handler，避免开发环境和生产函数行为分叉。
+        if (requestUrl.pathname.startsWith('/api/auth/')) {
+          const action = requestUrl.pathname.slice('/api/auth/'.length);
+          return handleAuthRequest(req, res, { action });
         }
-
-        if (requestUrl.pathname === '/api/auth/login') {
-          const body = await parseBody(req);
-          const { username, password } = body;
-          const user = await verifyUser(username, password);
-          if (!user) {
-            return sendJson(res, { ok: false, message: 'Invalid username or password' }, 401);
-          }
-          const token = generateToken();
-          userSessions.set(token, user);
-          return sendJson(res, {
-            ok: true,
-            token,
-            user: { id: user.id, username: user.username, email: user.email, interests: user.interests, displayName: user.displayName, avatar: user.avatar, signature: user.signature }
-          });
+        if (requestUrl.pathname === '/api/user/profile' || requestUrl.pathname === '/api/user/interests') {
+          const action = requestUrl.pathname.endsWith('/interests') ? 'interests' : 'profile';
+          return handleAuthRequest(req, res, { action });
         }
-
-        if (requestUrl.pathname === '/api/auth/me') {
-          const token = requestUrl.searchParams.get('token') || '';
-          const user = getUserByToken(token);
-          if (!user) {
-            return sendJson(res, { ok: false, message: 'Unauthorized' }, 401);
-          }
-          return sendJson(res, {
-            ok: true,
-            user: { id: user.id, username: user.username, email: user.email, interests: user.interests, displayName: user.displayName, avatar: user.avatar, signature: user.signature }
-          });
+        if (requestUrl.pathname.startsWith('/api/community/')) {
+          const path = requestUrl.pathname.slice('/api/community/'.length).split('/');
+          return handleCommunityRequest(req, res, { path });
         }
-
-        if (requestUrl.pathname === '/api/user/profile') {
-          const body = await parseBody(req);
-          const { token, displayName, avatar, signature } = body;
-          const user = getUserByToken(token);
-          if (!user) {
-            return sendJson(res, { ok: false, message: 'Unauthorized' }, 401);
-          }
-          if (displayName !== undefined) user.displayName = displayName;
-          if (avatar !== undefined) user.avatar = avatar;
-          if (signature !== undefined) user.signature = signature;
-          return sendJson(res, {
-            ok: true,
-            user: { id: user.id, username: user.username, email: user.email, interests: user.interests, displayName: user.displayName, avatar: user.avatar, signature: user.signature }
-          });
-        }
-
-        if (requestUrl.pathname === '/api/user/interests') {
-          const body = await parseBody(req);
-          const { token, interests } = body;
-          const user = getUserByToken(token);
-          if (!user) {
-            return sendJson(res, { ok: false, message: 'Unauthorized' }, 401);
-          }
-          user.interests = interests;
-          return sendJson(res, { ok: true, interests: user.interests });
+        if (requestUrl.pathname === '/api/profile/state') {
+          return handleProfileRequest(req, res, { action: 'state' });
         }
 
         if (requestUrl.pathname === '/api/news') {

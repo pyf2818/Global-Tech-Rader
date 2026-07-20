@@ -6,7 +6,13 @@ import AiChatPanel from './components/AiChatPanel.jsx';
 import ThemePicker from './ThemePicker.jsx';
 import { PALETTES } from './ThemePicker.jsx';
 import { getGradeColors, isEnglishText, isChineseText } from './utils/format.js';
-import { buildGithubMaterial } from './utils/githubMaterial.js';
+import {
+  buildGithubMaterial,
+  inferGithubAudience,
+  inferGithubDifficulty,
+  inferGithubScenario,
+  inferGithubValue,
+} from './utils/githubMaterial.js';
 import { useAuth } from './hooks/useAuth.js';
 import { useLlmConfig } from './hooks/useLlmConfig.js';
 import { useTrending } from './hooks/useTrending.js';
@@ -16,6 +22,23 @@ import { useCalendar } from './hooks/useCalendar.js';
 import { useUI } from './hooks/useUI.js';
 import { BlockGrid, BlockPanel, BlockStat, BlockToolbar } from './blocks/index.js';
 import CommandPalette from './shell/CommandPalette.jsx';
+import AiBriefingHome from './components/AiBriefingHome.jsx';
+import RecommendationTimeline from './components/RecommendationTimeline.jsx';
+import TodayNewspaper from './components/TodayNewspaper.jsx';
+import CommunityPage from './components/CommunityPage.jsx';
+import { useProfileSync } from './hooks/useProfileSync.js';
+import {
+  PROFILE_TIER_OPTIONS,
+  PROFILE_TIERS,
+  SPECIAL_FOLLOW_TYPES,
+  domainTierScore,
+  migratePreferenceState,
+  migrateSpecialFollows,
+  sourceTierScore,
+} from './domain/intelligence/profileTiers.js';
+import { buildRecommendation, clusterEvents, selectBriefingLanes } from './domain/intelligence/recommendationEngine.js';
+import { buildAlgorithmBriefing } from './domain/intelligence/briefingEngine.js';
+import { createSnapshotStore } from './domain/intelligence/snapshotStore.js';
 
 // 代码分割：三个重组件按需加载，避免首屏全量打包 Three.js / klinecharts
 const GlobeView = lazy(() => import('./GlobeView.jsx'));
@@ -60,7 +83,9 @@ const MOTIVATIONAL_QUOTES = [
 ];
 
 const NAV_ITEMS = [
+  { id: 'home', label: 'AI 情报', icon: 'sparkle' },
   { id: 'today', label: '今日速报', icon: 'sparkle' },
+  { id: 'recommendations', label: '精准推荐', icon: 'calendar' },
   { id: 'all', label: '全部动态', icon: 'grid' },
   { id: 'stock', label: '股市动向', icon: 'trendingUp' },
 
@@ -74,7 +99,9 @@ const NAV_ITEMS = [
 ];
 
 const PRIMARY_NAV_ITEMS = [
+  { id: 'home', label: 'AI 情报', desc: '今日总判断', short: '情报', icon: 'sparkle', nav: 'home' },
   { id: 'today', label: '今日速报', desc: '精准推荐', short: '速报', icon: 'sparkle', nav: 'today' },
+  { id: 'recommendations', label: '精准推荐', desc: '日历时间线', short: '推荐', icon: 'calendar', nav: 'recommendations' },
   { id: 'all', label: '全部动态', desc: '扩展视野', short: '动态', icon: 'grid', nav: 'all' },
   { id: 'stock', label: '股市动向', desc: '行情分析', short: '股市', icon: 'trendingUp', nav: 'stock' },
   { id: 'github', label: 'GitHub 热门', desc: '三榜项目', short: '开源', icon: 'github', nav: 'github' },
@@ -84,9 +111,17 @@ const PRIMARY_NAV_ITEMS = [
 ];
 
 const NAV_CONTEXT_SECTIONS = {
+  home: {
+    label: 'AI 情报中枢',
+    items: ['home']
+  },
   today: {
     label: '智能推荐',
-    items: ['today']
+    items: ['today', 'recommendations']
+  },
+  recommendations: {
+    label: '精准推荐',
+    items: ['today', 'recommendations']
   },
   all: {
     label: '多领域资讯',
@@ -982,7 +1017,10 @@ function App() {
     return (saved && PALETTES.some(p => p.id === saved)) ? saved : 'champagne';
   });
   const [editorFullscreen, setEditorFullscreen] = useState(false);
-  const [nav, setNav] = useState('today');
+  const [nav, setNav] = useState(() => {
+    const requested = new URLSearchParams(window.location.search).get('view');
+    return NAV_ITEMS.some(item => item.id === requested) ? requested : 'home';
+  });
   const [category, setCategory] = useState('all');
   const [categoryOpen, setCategoryOpen] = useState(false);
   const [verticalChannel, setVerticalChannel] = useState('all');
@@ -1147,10 +1185,21 @@ function App() {
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [profileForm, setProfileForm] = useState({ displayName: '', signature: '' });
-  const [domainPriorities, setDomainPriorities] = useState(() => loadLS('domainPriorities', {}));
-  const [sourcePriorities, setSourcePriorities] = useState(() => loadLS('sourcePriorities', {}));
+  const [domainTiers, setDomainTiers] = useState(() => migratePreferenceState({
+    'domainTiers:v1': loadLS('domainTiers:v1', null),
+    domainPriorities: loadLS('domainPriorities', {}),
+  }, 'domain'));
+  const [sourceTiers, setSourceTiers] = useState(() => migratePreferenceState({
+    'sourceTiers:v1': loadLS('sourceTiers:v1', null),
+    sourcePriorities: loadLS('sourcePriorities', {}),
+  }, 'source'));
   const [dailyProfileSnapshots, setDailyProfileSnapshots] = useState(() => loadLS('dailyProfileSnapshots', []));
-  const [specialFollows, setSpecialFollows] = useState(() => loadLS('specialFollows', []));
+  const [specialFollows, setSpecialFollows] = useState(() => migrateSpecialFollows(
+    loadLS('specialFollows:v2', null) ?? loadLS('specialFollows', [])
+  ));
+  const [specialFollowForm, setSpecialFollowForm] = useState({ type: 'source', target: '', note: '' });
+  const [editingSpecialFollowId, setEditingSpecialFollowId] = useState(null);
+  useProfileSync({ user, domainTiers, sourceTiers, specialFollows, setDomainTiers, setSourceTiers, setSpecialFollows });
   const [likedPosts, setLikedPosts] = useState(() => new Set(loadLS('likedPosts', [])));
   const [savedPosts, setSavedPosts] = useState(() => new Set(loadLS('savedPosts', [])));
   const [postComments, setPostComments] = useState(() => loadLS('postComments', {}));
@@ -1169,14 +1218,14 @@ function App() {
 
   // user/token/selectedInterests 持久化由 useAuth 内部处理，此处不再重复
   useEffect(() => {
-    saveLS('domainPriorities', domainPriorities);
-    saveLS('sourcePriorities', sourcePriorities);
+    saveLS('domainTiers:v1', domainTiers);
+    saveLS('sourceTiers:v1', sourceTiers);
     saveLS('dailyProfileSnapshots', dailyProfileSnapshots);
-    saveLS('specialFollows', specialFollows);
+    saveLS('specialFollows:v2', specialFollows);
     saveLS('likedPosts', [...likedPosts]);
     saveLS('savedPosts', [...savedPosts]);
     saveLS('postComments', postComments);
-  }, [domainPriorities, sourcePriorities, dailyProfileSnapshots, specialFollows, likedPosts, savedPosts, postComments]);
+  }, [domainTiers, sourceTiers, dailyProfileSnapshots, specialFollows, likedPosts, savedPosts, postComments]);
 
 
   // 认证函数已抽取至 useAuth — 这里不再定义
@@ -1198,6 +1247,47 @@ function App() {
     if (!text.trim()) return;
     setPostComments(prev => ({ ...prev, [postId]: [...(prev[postId] || []), { id: Date.now(), user: user?.displayName || '匿名', text, time: new Date().toISOString() }] }));
     setCommentTexts(prev => ({ ...prev, [postId]: '' }));
+  };
+
+  const resetSpecialFollowForm = () => {
+    setSpecialFollowForm({ type: 'source', target: '', note: '' });
+    setEditingSpecialFollowId(null);
+  };
+
+  const submitSpecialFollow = () => {
+    const target = specialFollowForm.target.trim();
+    const note = specialFollowForm.note.trim();
+    if (!target) {
+      showToast('请输入特别关注目标');
+      return;
+    }
+    const duplicate = specialFollows.some(item =>
+      item.id !== editingSpecialFollowId
+      && item.type === specialFollowForm.type
+      && item.target.toLocaleLowerCase() === target.toLocaleLowerCase()
+    );
+    if (duplicate) {
+      showToast('该特别关注已存在');
+      return;
+    }
+    if (editingSpecialFollowId) {
+      setSpecialFollows(previous => previous.map(item => item.id === editingSpecialFollowId
+        ? { ...item, type: specialFollowForm.type, target, note }
+        : item));
+    } else {
+      setSpecialFollows(previous => [...previous, {
+        id: globalThis.crypto?.randomUUID?.() || `follow-${Date.now()}`,
+        type: specialFollowForm.type,
+        target,
+        note,
+      }]);
+    }
+    resetSpecialFollowForm();
+  };
+
+  const editSpecialFollow = item => {
+    setEditingSpecialFollowId(item.id);
+    setSpecialFollowForm({ type: item.type, target: item.target, note: item.note || '' });
   };
 
   // 获取用户兴趣分类的详细信息
@@ -1278,6 +1368,10 @@ function App() {
     mutedSources: {},
     trackedTerms: {}
   }));
+  const [recommendationFeedbackEvents, setRecommendationFeedbackEvents] = useState(() => loadLS('recommendationFeedback:v2', []));
+  const snapshotStoreRef = useRef(null);
+  if (!snapshotStoreRef.current) snapshotStoreRef.current = createSnapshotStore(localStorage);
+  const [recommendationSnapshots, setRecommendationSnapshots] = useState(() => snapshotStoreRef.current.list());
   const [newKeyword, setNewKeyword] = useState('');
   const [searchHistory, setSearchHistory] = useState(() => loadLS('searchHistory', []));
   const [searchOpen, setSearchOpen] = useState(false);
@@ -1298,6 +1392,7 @@ function App() {
   const [readingHistory, setReadingHistory] = useState(() => loadLS('readingHistory', []));
   const [translations, setTranslations] = useState(() => loadLS('translations', {}));
   useEffect(() => { saveLS('translations', translations); }, [translations]);
+  useEffect(() => { saveLS('recommendationFeedback:v2', recommendationFeedbackEvents); }, [recommendationFeedbackEvents]);
   const [aiInsights, setAiInsights] = useState({ loading: false, data: null, error: '' });
   const [elfQuotedContext, setElfQuotedContext] = useState(null);
   const [translationOpen, setTranslationOpen] = useState({});
@@ -1510,7 +1605,10 @@ function App() {
     let title = `${PRODUCT_NAME} - ${PRODUCT_TAGLINE}`;
     let description = PRODUCT_DESCRIPTION;
     
-    if (nav === 'today') {
+    if (nav === 'home') {
+      title = `${PRODUCT_NAME} - AI 情报`;
+      description = '基于公共热点、用户画像和可验证来源生成每日情报总判断。';
+    } else if (nav === 'today') {
       title = `${PRODUCT_NAME} - 每日汇报`;
       description = '根据用户画像、阅读行为、信号源质量和大模型协作生成每日高质量情报汇报。';
     } else if (nav === 'trending') {
@@ -1537,6 +1635,9 @@ function App() {
     } else if (nav === 'profile-center') {
       title = `${PRODUCT_NAME} - 用户画像`;
       description = '管理关注领域、阅读记录、收藏资讯、领域优先级和信号源优先级。';
+    } else if (nav === 'recommendations') {
+      title = `${PRODUCT_NAME} - 精准推荐`;
+      description = '使用不可变日快照按日历和时间线回看精准推荐及其评分依据。';
     } else if (nav === 'all') {
       if (verticalChannel !== 'all') {
         const channel = VERTICAL_CHANNELS.find(ch => ch.id === verticalChannel);
@@ -2138,34 +2239,18 @@ function App() {
 
   const eventClusters = useMemo(() => {
     if (nav !== 'all') return [];
-    const clusters = [];
-    const used = new Set();
-    const titleWords = (t) => t.toLowerCase().replace(/[^\w\u4e00-\u9fff]/g, ' ').split(/\s+/).filter(w => w.length > 2);
-
-    for (let i = 0; i < filtered.length; i++) {
-      if (used.has(i)) continue;
-      const words = titleWords(filtered[i].title);
-      const group = [filtered[i]];
-      used.add(i);
-
-      for (let j = i + 1; j < filtered.length; j++) {
-        if (used.has(j)) continue;
-        const otherWords = titleWords(filtered[j].title);
-        const overlap = words.filter(w => otherWords.includes(w)).length;
-        const threshold = Math.max(2, Math.min(words.length, otherWords.length) * 0.4);
-        if (overlap >= threshold) {
-          group.push(filtered[j]);
-          used.add(j);
-        }
-      }
-
-      if (group.length >= 2) {
-        const kw = words.slice(0, 3).join(' ');
-        clusters.push({ id: `cluster-${i}`, keyword: kw, items: group });
-      }
-    }
-    return clusters;
+    return clusterEvents(filtered)
+      .filter(cluster => cluster.items.length >= 2)
+      .map(cluster => ({ ...cluster, keyword: cluster.primaryItem.title }));
   }, [filtered, nav]);
+
+  const allFeedItems = useMemo(() => {
+    if (nav !== 'all' || eventClusters.length === 0) return filtered;
+    const secondaryIds = new Set(eventClusters.flatMap(cluster =>
+      cluster.items.filter(item => item.id !== cluster.primaryItem.id).map(item => item.id)
+    ));
+    return filtered.filter(item => !secondaryIds.has(item.id));
+  }, [filtered, eventClusters, nav]);
 
   const smartRecommendations = useMemo(() => {
     if (readingHistory.length === 0) return [];
@@ -2239,6 +2324,17 @@ function App() {
       .sort((a, b) => b[1] - a[1])
       .slice(0, 50)
       .map(([word]) => word);
+    const eventClusters = clusterEvents(items);
+    const clusterByItemId = new Map();
+    eventClusters.forEach(cluster => cluster.itemIds.forEach(id => clusterByItemId.set(id, cluster)));
+    const effectiveDomainTiers = selectedInterests.reduce(
+      (tiers, id) => ({ ...tiers, [id]: tiers[id] || 'normal' }),
+      { ...domainTiers }
+    );
+    const effectiveSpecialFollows = [
+      ...specialFollows,
+      ...followKeywords.map(target => ({ type: 'keyword', target })),
+    ];
 
     return items
       .filter(item => !readIds.has(item.id))  // 已读过滤：避免重复推荐
@@ -2246,7 +2342,7 @@ function App() {
         let score = 0;
         
         // 1. 领域匹配分数（用户关注领域）
-        const domainPriority = Number(domainPriorities[item.category] || 0);
+        const domainPriority = domainTierScore(domainTiers[item.category]);
         if (domainPriority > 0) {
           score += (domainPriority - 3) * 6;
         }
@@ -2297,12 +2393,18 @@ function App() {
         if (highWeightSources.some(s => item.source?.includes(s))) score += 10;
         const mediumWeightSources = ['IEEE', 'Nature', 'Science', 'MIT', 'Stanford', 'Berkeley'];
         if (mediumWeightSources.some(s => item.source?.includes(s))) score += 5;
-        const sourcePriority = Number(sourcePriorities[item.source] || 0);
+        const sourcePriority = sourceTierScore(sourceTiers[item.source]);
         if (sourcePriority > 0) {
           score += (sourcePriority - 3) * 5;
         }
         // 特别关注来源额外加权
-        const sf = specialFollows.find(f => item.source?.includes(f.name) || item.title?.toLowerCase().includes(f.url?.toLowerCase()));
+        const sf = specialFollows.find(f => {
+          const target = f.target?.toLocaleLowerCase();
+          if (!target) return false;
+          if (f.type === 'source' || f.type === 'author') return item.source?.toLocaleLowerCase().includes(target);
+          if (f.type === 'url') return (item.url || item.link || '').toLocaleLowerCase().includes(target);
+          return `${item.title || ''} ${item.summary || ''}`.toLocaleLowerCase().includes(target);
+        });
         if (sf) score += 20;
 
         // 5. 互动热度（基于用户行为）
@@ -2365,17 +2467,55 @@ function App() {
         }
         const uniqueReasons = [...new Set(recommendationReasons)].slice(0, 3);
 
-        return {
+        const cluster = clusterByItemId.get(item.id);
+        const grade = item.sourceGradeLabel?.charAt(0) || item.grade;
+        const sourceQualityScore = ({ S: 20, A: 17, B: 13, C: 9, D: 4 })[grade] || 10;
+        return buildRecommendation({
           ...item,
-          mustReadScore: score,
-          recommendationScoreParts,
-          recommendationReasons: uniqueReasons,
-          recommendation: uniqueReasons.length ? uniqueReasons.join(' · ') : '综合热度、来源质量和新鲜度较高'
-        };
+          canonicalId: item.canonicalId || cluster?.id,
+          sourceQualityScore,
+        }, {
+          domainTiers: effectiveDomainTiers,
+          sourceTiers,
+          specialFollows: effectiveSpecialFollows,
+          independentSourceCount: cluster?.independentSourceCount || 1,
+          trendVelocity: categoryScore / maxCategoryPop,
+          behaviorSignal: bookmarkIds.has(item.id)
+            ? 10
+            : Math.min(categoryReadCount * 1.5 + sourceReadCount, 10),
+          isNovel: !readIds.has(item.id),
+        });
       })
       .sort((a, b) => b.mustReadScore - a.mustReadScore)
       .slice(0, 80);
-  }, [items, followKeywords, readingHistory, bookmarks, selectedInterests, domainPriorities, sourcePriorities]);
+  }, [items, followKeywords, readingHistory, bookmarks, selectedInterests, domainTiers, sourceTiers, specialFollows]);
+
+  const recommendationCandidates = useMemo(() => todayMustRead.filter(item =>
+    item.publishedAt?.slice(0, 10) === selectedNewsDate
+  ), [todayMustRead, selectedNewsDate]);
+
+  const recommendationLanes = useMemo(() => selectBriefingLanes(recommendationCandidates, {
+    perLane: 5,
+    maxPerSource: 2,
+    maxCategoryRatio: 0.4,
+  }), [recommendationCandidates]);
+
+  const algorithmBriefing = useMemo(() => buildAlgorithmBriefing({
+    date: selectedNewsDate,
+    lanes: recommendationLanes,
+  }), [selectedNewsDate, recommendationLanes]);
+
+  useEffect(() => {
+    if (loading || recommendationCandidates.length === 0) return;
+    snapshotStoreRef.current.create({
+      date: selectedNewsDate,
+      profileVersion: 1,
+      algorithmVersion: '1.0',
+      lanes: recommendationLanes,
+      briefing: algorithmBriefing,
+    });
+    setRecommendationSnapshots(snapshotStoreRef.current.list());
+  }, [loading, selectedNewsDate, recommendationCandidates.length, recommendationLanes, algorithmBriefing]);
 
   const workbenchItems = useMemo(() => {
     const seen = new Set();
@@ -2607,38 +2747,8 @@ function App() {
     { type: '输出', desc: '导出到素材库、文章或本地知识库' }
   ], []);
 
-  const squareSeedItems = useMemo(() => [
-    {
-      id: 'briefing-share',
-      type: '每日汇报',
-      title: workbenchAiInsight.oneLine || '今日智能汇报',
-      author: user?.displayName || user?.username || '万般硅川用户',
-      likes: Math.max(8, workbenchItems.length + selectedInterests.length),
-      saves: Math.max(3, materials.length),
-      comments: Math.max(2, followKeywords.length),
-      tag: '情报判断'
-    },
-    {
-      id: 'agent-share',
-      type: '智能体',
-      title: '个人情报智能体工作流模板',
-      author: '系统推荐',
-      likes: agents.length * 3,
-      saves: Math.max(6, agents.length),
-      comments: 4,
-      tag: 'Agent Workflow'
-    },
-    {
-      id: 'article-share',
-      type: '文章',
-      title: articles[0]?.title || '从高质量资讯到个人知识资产',
-      author: user?.displayName || user?.username || '创作者',
-      likes: Math.max(5, articles.length * 2),
-      saves: Math.max(2, bookmarks.length),
-      comments: 3,
-      tag: '智创中心'
-    }
-  ], [workbenchAiInsight.oneLine, workbenchItems.length, selectedInterests.length, materials.length, followKeywords.length, agents.length, articles, bookmarks.length, user]);
+  // Legacy square rendering below is unreachable; real posts come from CommunityPage.
+  const squareSeedItems = [];
 
   const profilePriorityItems = useMemo(() => {
     const base = selectedInterests.length ? selectedInterests : categories.slice(0, 6).map(c => c.id);
@@ -2647,11 +2757,11 @@ function App() {
       return {
         id,
         label: category?.label || id,
-        priority: domainPriorities[id] || Math.max(1, 5 - index),
+        tier: domainTiers[id] || (index < 2 ? 'focus' : index < 5 ? 'normal' : 'explore'),
         icon: category?.icon || 'target'
       };
     });
-  }, [selectedInterests, domainPriorities]);
+  }, [selectedInterests, domainTiers, categories]);
 
   const sourcePriorityItems = useMemo(() => {
     const fallbackSources = Array.isArray(insightData.sourceQuality) ? insightData.sourceQuality : [];
@@ -2661,9 +2771,9 @@ function App() {
     return sources.slice(0, 6).map((source, index) => ({
       name: source.name,
       count: source.count || 0,
-      priority: sourcePriorities[source.name] || Math.max(1, 5 - index)
+      tier: sourceTiers[source.name] || (index < 2 ? 'focus' : index < 4 ? 'normal' : 'explore')
     }));
-  }, [readingProfile.topSources, insightData.sourceQuality, sourcePriorities]);
+  }, [readingProfile.topSources, insightData.sourceQuality, sourceTiers]);
 
   const profileLearningEngine = useMemo(() => {
     const categoryMap = new Map();
@@ -2684,11 +2794,11 @@ function App() {
       });
     });
 
-    selectedInterests.forEach(id => categoryMap.set(id, (categoryMap.get(id) || 0) + Number(domainPriorities[id] || 3) * 2));
+    selectedInterests.forEach(id => categoryMap.set(id, (categoryMap.get(id) || 0) + domainTierScore(domainTiers[id])));
     Object.entries(recommendationFeedback.boostedCategories || {}).forEach(([id, count]) => categoryMap.set(id, (categoryMap.get(id) || 0) + count * 6));
     Object.entries(recommendationFeedback.trackedTerms || {}).forEach(([term, count]) => tagMap.set(term, (tagMap.get(term) || 0) + count * 5));
     followKeywords.forEach(term => tagMap.set(term, (tagMap.get(term) || 0) + 4));
-    Object.entries(sourcePriorities || {}).forEach(([source, priority]) => sourceMap.set(source, (sourceMap.get(source) || 0) + Number(priority || 0) * 2));
+    Object.entries(sourceTiers || {}).forEach(([source, tier]) => sourceMap.set(source, (sourceMap.get(source) || 0) + sourceTierScore(tier)));
     Object.entries(recommendationFeedback.mutedSources || {}).forEach(([source, count]) => sourceMap.set(source, Math.max(0, (sourceMap.get(source) || 0) - count * 8)));
 
     const topCategories = [...categoryMap.entries()]
@@ -2773,7 +2883,7 @@ function App() {
       recentReadCount: recentReads.length,
       multimediaReads
     };
-  }, [readingHistory, bookmarks, materials, selectedInterests, domainPriorities, recommendationFeedback, followKeywords, sourcePriorities, feedbackLearningCount]);
+  }, [readingHistory, bookmarks, materials, selectedInterests, domainTiers, recommendationFeedback, followKeywords, sourceTiers, feedbackLearningCount, categories]);
 
   const todayProfileSnapshot = useMemo(() => ({
     date: selectedNewsDate,
@@ -2793,8 +2903,8 @@ function App() {
   }), [selectedNewsDate, intelligenceProfile, profileLearningEngine, readingHistory.length, bookmarks.length, materials.length, sourcePriorityItems]);
 
   const profileCalibrationSignals = useMemo(() => {
-    const highDomainCount = profilePriorityItems.filter(item => item.priority >= 4).length;
-    const highSourceCount = sourcePriorityItems.filter(item => item.priority >= 4).length;
+    const highDomainCount = profilePriorityItems.filter(item => item.tier === 'focus').length;
+    const highSourceCount = sourcePriorityItems.filter(item => item.tier === 'focus').length;
     const clickedCategories = [...new Set(readingHistory.map(item => item.category).filter(Boolean))].length;
     return [
       { label: '高优先领域', value: highDomainCount, desc: '优先影响每日汇报排序' },
@@ -4007,6 +4117,11 @@ ${blueprintSummary}`,
 
   const handleRecommendationFeedback = useCallback((item, action) => {
     if (!item) return;
+    setRecommendationFeedbackEvents(previous => [{
+      itemId: item.id,
+      action,
+      at: new Date().toISOString(),
+    }, ...previous].slice(0, 500));
     if (action === 'hide') {
       setRecommendationFeedback(prev => ({
         ...prev,
@@ -5309,9 +5424,7 @@ ${signals}
   }
 
   function recordReading(item) {
-    // 动态反馈：阅读行为回写领域/信源权重（必须在 setReadingHistory 外部调用）
-    setDomainPriorities(p => { const n = { ...p }; n[item.category] = Math.min(10, (n[item.category] || 3) + 0.3); return n; });
-    setSourcePriorities(p => { const n = { ...p }; n[item.source] = Math.min(10, (n[item.source] || 3) + 0.2); return n; });
+    // 阅读行为单独进入行为校准，不得覆盖用户显式设置的领域/信源等级。
     setReadingHistory(prev => {
       const filtered = prev.filter(h => h.id !== item.id);
       return [{
@@ -5457,7 +5570,9 @@ ${signals}
   }
 
   const navToPrimary = {
+    home: 'home',
     today: 'today',
+    recommendations: 'recommendations',
     all: 'all',
     stock: 'stock',
     tracker: 'profile-center',
@@ -5471,8 +5586,8 @@ ${signals}
     'profile-center': 'profile-center',
     github: 'github',
   };
-  const activePrimaryNav = navToPrimary[nav] || 'today';
-  const activeContextSection = NAV_CONTEXT_SECTIONS[activePrimaryNav] || NAV_CONTEXT_SECTIONS.today;
+  const activePrimaryNav = navToPrimary[nav] || 'home';
+  const activeContextSection = NAV_CONTEXT_SECTIONS[activePrimaryNav] || NAV_CONTEXT_SECTIONS.home;
   const activeContextItems = activeContextSection.items.map(id => NAV_ITEMS.find(item => item.id === id)).filter(Boolean);
   const goNav = (nextNav) => {
     if (nextNav === 'agents') {
@@ -5485,11 +5600,14 @@ ${signals}
         suggestedPrompt: '请介绍当前智能体团队能为我做什么，并建议今天应该先运行哪个任务。'
       });
     }
+    const url = new URL(window.location.href);
+    url.searchParams.set('view', nextNav);
+    window.history.pushState({ view: nextNav }, '', url);
     setNav(nextNav);
     setFocusedIndex(-1);
     setMobileMenuOpen(false);
   };
-  const wideWorkspaceNavs = ['today', 'studio', 'agents', 'editor', 'materials', 'square', 'profile-center'];
+  const wideWorkspaceNavs = ['home', 'today', 'recommendations', 'studio', 'agents', 'editor', 'materials', 'square', 'profile-center'];
   // 右侧关注面板只在「全部动态」显示，其他页面不再带，避免拥挤
   const showRightPanel = nav === 'all';
   const showStatsBar = showRightPanel && nav !== 'today';
@@ -5728,7 +5846,7 @@ ${signals}
       <ThemePicker mode={themeMode} setMode={setThemeMode} palette={palette} setPalette={setPalette} show={showThemePicker} onClose={() => setShowThemePicker(false)} />
 
       {/* Main */}
-      <main className={`main ${nav === 'today' ? 'main-workbench' : ''}`}>
+      <main className={`main ${(nav === 'home' || nav === 'today' || nav === 'recommendations') ? 'main-workbench' : ''}`}>
         <header className={`topbar ${nav === 'all' ? 'topbar-all' : ''} ${(nav === 'trending' || nav === 'recommendations') ? 'topbar-trending' : ''}`}>
           {nav === 'all' && (
             <div className="topbar-brand">
@@ -5974,8 +6092,36 @@ ${signals}
           </div>
         )}
 
-        <div className={`feed custom-scrollbar ${nav === 'today' ? 'feed-workbench' : ''}`} ref={feedRef}>
+        <div className={`feed custom-scrollbar ${(nav === 'home' || nav === 'today' || nav === 'recommendations') ? 'feed-workbench' : ''}`} ref={feedRef}>
+          {nav === 'home' && (
+            <AiBriefingHome
+              briefing={algorithmBriefing}
+              lanes={recommendationLanes}
+              loading={loading}
+              onAsk={message => setCopilotPendingMessage(message)}
+              onNavigate={goNav}
+              onRefresh={() => loadNews()}
+              onOpenItem={item => {
+                recordReading(item);
+                if (item.url) window.open(item.url, '_blank', 'noopener,noreferrer');
+              }}
+            />
+          )}
           {nav === 'today' && (
+            <TodayNewspaper
+              briefing={algorithmBriefing}
+              lanes={recommendationLanes}
+              loading={loading}
+              onRefresh={() => loadNews()}
+              onOpenRecommendations={() => goNav('recommendations')}
+              onOpenItem={item => {
+                recordReading(item);
+                if (item.url) window.open(item.url, '_blank', 'noopener,noreferrer');
+              }}
+              onSaveItem={item => toggleMaterial(item, 'news', '今日速报')}
+            />
+          )}
+          {nav === 'today-legacy' && (
             <div className="workbench-shell">
               <section className="workbench-overview">
                 <div className="workbench-hero-copy">
@@ -6751,7 +6897,7 @@ ${signals}
                       <div className="cluster-header" onClick={() => setExpandedEvents(p => ({ ...p, [cluster.id]: !p[cluster.id] }))}>
                         <span className="cluster-icon">{ICONS.eventCard}</span>
                         <span className="cluster-keyword">{cluster.keyword}</span>
-                        <span className="cluster-count">{cluster.items.length}家媒体报道</span>
+                        <span className="cluster-count">{cluster.independentSourceCount} 个独立来源</span>
                         <span className={`cluster-chevron ${expandedEvents[cluster.id] ? 'open' : ''}`}>{ICONS.chevronDown}</span>
                       </div>
                       {expandedEvents[cluster.id] && (
@@ -6769,9 +6915,9 @@ ${signals}
 
               {loading && <div className={`feed-list view-${viewMode} ${viewMode === 'card' ? 'card-grid' : ''}`}>{Array.from({ length: 6 }).map((_, i) => <SkeletonCard key={i} viewMode={viewMode} />)}</div>}
               {error && <div className="error-state"><p>加载失败: {error}</p><button onClick={() => loadNews()}>重试</button></div>}
-              {!loading && !error && filtered.length === 0 && <div className="empty-state"><p>{allActiveFilters.length > 0 ? `共 ${items.length} 条资讯，当前 ${allActiveFilters.length} 个筛选条件均不匹配` : '没有匹配的资讯'}</p><button onClick={clearAllFilters}>清空全部筛选</button></div>}
+              {!loading && !error && allFeedItems.length === 0 && <div className="empty-state"><p>{allActiveFilters.length > 0 ? `共 ${items.length} 条资讯，当前 ${allActiveFilters.length} 个筛选条件均不匹配` : '没有匹配的资讯'}</p><button onClick={clearAllFilters}>清空全部筛选</button></div>}
               <div className={`feed-list view-${viewMode} ${viewMode === 'card' ? 'card-grid' : ''}`}>
-                {filtered.slice(0, renderLimit).map((item, i) => {
+                {allFeedItems.slice(0, renderLimit).map((item, i) => {
                   const summaryEntry = getSummaryEntry(item);
                   return <NewsItem key={item.id} item={item} index={i} viewMode={viewMode} isFocused={focusedIndex === i} isBookmarked={isBookmarked(item.id)} isInMaterials={isInMaterials(item.id)} onBookmark={() => toggleBookmark(item)} onAddMaterial={() => toggleMaterial(item)} onSummary={() => handleSummaryToggle(item)} isSummaryOpen={expandedSummary[item.id]} summaryText={summaryEntry?.text || ''} summaryMode={summaryEntry?.mode || ''} summaryLoading={Boolean(summaryLoading[item.id])} isFollowed={followKeywords.some(kw => `${item.title} ${item.summary}`.toLowerCase().includes(kw.toLowerCase()))} onRead={() => recordReading(item)} showTranslation={translationOpen[item.id]} onToggleTranslation={() => setTranslationOpen(p => ({ ...p, [item.id]: !p[item.id] }))} onRequestTranslation={() => requestTranslation(item)} isTranslating={translatingItems[item.id]} translation={getTranslation(item)} onOpenLightbox={(src, title, images, index) => setLightbox({ open: true, src, title, images: images || [], index: index || 0 })} />;
                 })}
@@ -6818,6 +6964,14 @@ ${signals}
 
           {/* SMART RECOMMENDATIONS - 基于兴趣的个性化推荐 */}
           {nav === 'recommendations' && (
+            <RecommendationTimeline
+              snapshots={recommendationSnapshots}
+              selectedDate={selectedNewsDate}
+              onSelectDate={setSelectedNewsDate}
+              onFeedback={handleRecommendationFeedback}
+            />
+          )}
+          {nav === 'recommendations-legacy' && (
             <>
               <div className="section-header">
                 <h2 className="section-title">{ICONS.sparkle} 智能推荐</h2>
@@ -6883,7 +7037,9 @@ ${signals}
             </>
            )}
 
-          {nav === 'square' && (
+          {nav === 'square' && <CommunityPage user={user} onRequireAuth={() => { setAuthMode('login'); setShowAuthModal(true); }} />}
+
+          {false && nav === 'square' && (
             <div className="product-page square-page">
               <section className="product-hero square-hero">
                 <div>
@@ -7028,21 +7184,27 @@ ${signals}
                 <div className="profile-control-panel">
                   <div className="section-header">
                     <h2 className="section-title">{ICONS.target} 领域优先级</h2>
-                    <p className="section-desc">数值越高，每日汇报越优先推荐该领域的高质量信息。</p>
+                    <p className="section-desc">一级进入核心必看，二级正常参与，三级保留探索价值但降低出现频率。</p>
                   </div>
                   <div className="priority-list">
                     {profilePriorityItems.map(item => (
-                      <label key={item.id} className="priority-row">
+                      <div key={item.id} className="priority-row">
                         <span>{ICONS[item.icon]} {item.label}</span>
-                        <input
-                          type="range"
-                          min="1"
-                          max="5"
-                          value={item.priority}
-                          onChange={e => setDomainPriorities(prev => ({ ...prev, [item.id]: Number(e.target.value) }))}
-                        />
-                        <strong>{item.priority}</strong>
-                      </label>
+                        <div className="profile-tier-control" role="group" aria-label={`${item.label}关注等级`}>
+                          {PROFILE_TIER_OPTIONS.map(option => (
+                            <button
+                              key={option.id}
+                              type="button"
+                              aria-pressed={item.tier === option.id}
+                              className={item.tier === option.id ? 'active' : ''}
+                              onClick={() => setDomainTiers(prev => ({ ...prev, [item.id]: option.id }))}
+                            >
+                              {option.label}
+                            </button>
+                          ))}
+                        </div>
+                        <strong>{PROFILE_TIERS[item.tier]?.shortLabel || '二级'}</strong>
+                      </div>
                     ))}
                   </div>
                 </div>
@@ -7050,21 +7212,27 @@ ${signals}
                 <div className="profile-control-panel">
                   <div className="section-header">
                     <h2 className="section-title">{ICONS.layers} 信号源优先级</h2>
-                    <p className="section-desc">结合阅读、收藏和来源健康度，手动校准你更信任的来源。</p>
+                    <p className="section-desc">显式信任等级优先于隐式行为，避免一次误点长期改变信源判断。</p>
                   </div>
                   <div className="priority-list">
                     {sourcePriorityItems.map(item => (
-                      <label key={item.name} className="priority-row">
+                      <div key={item.name} className="priority-row">
                         <span>{item.name}</span>
-                        <input
-                          type="range"
-                          min="1"
-                          max="5"
-                          value={item.priority}
-                          onChange={e => setSourcePriorities(prev => ({ ...prev, [item.name]: Number(e.target.value) }))}
-                        />
-                        <strong>{item.priority}</strong>
-                      </label>
+                        <div className="profile-tier-control" role="group" aria-label={`${item.name}信源等级`}>
+                          {PROFILE_TIER_OPTIONS.map(option => (
+                            <button
+                              key={option.id}
+                              type="button"
+                              aria-pressed={item.tier === option.id}
+                              className={item.tier === option.id ? 'active' : ''}
+                              onClick={() => setSourceTiers(prev => ({ ...prev, [item.name]: option.id }))}
+                            >
+                              {option.label}
+                            </button>
+                          ))}
+                        </div>
+                        <strong>{PROFILE_TIERS[item.tier]?.shortLabel || '二级'}</strong>
+                      </div>
                     ))}
                   </div>
                 </div>
@@ -7072,8 +7240,33 @@ ${signals}
 
               <section className="profile-special-follows">
                 <div className="section-header"><h2 className="section-title">{ICONS.star} 特别关注</h2><p className="section-desc">手动添加小众信息源、博主或特定URL，始终优先推荐。</p></div>
-                {specialFollows.length === 0 ? <div className="empty-state"><p>暂无特别关注</p><p className="empty-state-hint">添加后这些来源的资讯会被优先推荐到每日速报</p></div> : <div className="special-follows-list">{specialFollows.map(f => <div key={f.id} className="special-follow-item"><span className="special-follow-name">{f.name}</span><span className="special-follow-url">{f.url}</span><span className="special-follow-note">{f.note || ""}</span><button className="special-follow-remove" onClick={() => setSpecialFollows(prev => prev.filter(x => x.id !== f.id))}>删除</button></div>)}</div>}
-                <div className="special-follow-form"><input placeholder="名称" id="sf-name" /><input placeholder="URL或关键词" id="sf-url" /><input placeholder="备注(可选)" id="sf-note" /><button onClick={() => {const n=document.getElementById("sf-name");const u=document.getElementById("sf-url");const t=document.getElementById("sf-note");if(n.value&&u.value){setSpecialFollows(prev => [...prev, {id:Date.now(),name:n.value,url:u.value,note:t.value}]);n.value="";u.value="";t.value="";}}}>添加</button></div>
+                {specialFollows.length === 0 ? (
+                  <div className="empty-state"><p>暂无特别关注</p><p className="empty-state-hint">添加后这些目标的新内容会优先进入个人必看通道</p></div>
+                ) : (
+                  <div className="special-follows-list">
+                    {specialFollows.map(f => (
+                      <div key={f.id} className="special-follow-item">
+                        <span className="special-follow-type">{SPECIAL_FOLLOW_TYPES.find(type => type.id === f.type)?.label || '信源'}</span>
+                        <span className="special-follow-name">{f.target}</span>
+                        <span className="special-follow-note">{f.note || '无备注'}</span>
+                        <button type="button" className="special-follow-edit" onClick={() => editSpecialFollow(f)}>编辑</button>
+                        <button type="button" className="special-follow-remove" onClick={() => {
+                          setSpecialFollows(prev => prev.filter(x => x.id !== f.id));
+                          if (editingSpecialFollowId === f.id) resetSpecialFollowForm();
+                        }}>删除</button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <div className="special-follow-form">
+                  <select value={specialFollowForm.type} onChange={event => setSpecialFollowForm(prev => ({ ...prev, type: event.target.value }))} aria-label="特别关注类型">
+                    {SPECIAL_FOLLOW_TYPES.map(type => <option key={type.id} value={type.id}>{type.label}</option>)}
+                  </select>
+                  <input value={specialFollowForm.target} onChange={event => setSpecialFollowForm(prev => ({ ...prev, target: event.target.value }))} placeholder="信源、博主、关键词或 URL" />
+                  <input value={specialFollowForm.note} onChange={event => setSpecialFollowForm(prev => ({ ...prev, note: event.target.value }))} placeholder="备注（可选）" />
+                  <button type="button" onClick={submitSpecialFollow}>{editingSpecialFollowId ? '保存' : '添加'}</button>
+                  {editingSpecialFollowId && <button type="button" className="secondary-action" onClick={resetSpecialFollowForm}>取消</button>}
+                </div>
               </section>
 
               <section className="profile-calibration-panel">
@@ -8527,8 +8720,8 @@ ${signals}
           )}
         </div>
 
-        {/* Copilot — 仅在每日汇报页显示，固定右侧 */}
-        {nav === 'today' && (
+        {/* Copilot — AI 情报与每日速报共享同一段有界证据上下文 */}
+        {(nav === 'home' || nav === 'today') && (
           <AiChatPanel
             llmConfig={llmConfig}
             intelligenceProfile={intelligenceProfile}
@@ -8539,6 +8732,11 @@ ${signals}
             onOpenLlmConfig={() => setShowLlmQuickConfig(true)}
             pendingMessage={copilotPendingMessage}
             onMessageSent={() => setCopilotPendingMessage('')}
+            intelligenceContext={{
+              date: selectedNewsDate,
+              briefing: algorithmBriefing,
+              items: [...recommendationLanes.public, ...recommendationLanes.personal].slice(0, 12),
+            }}
           />
         )}
       </main>

@@ -1,6 +1,8 @@
 // Profile Model — pure functions for computing profile representations.
 // No React dependency; easy to unit test.
 
+import { domainTierScore, normalizeTier, sourceTierScore } from '../domain/intelligence/profileTiers.js';
+
 const CURRENT_DATE = () => new Date().toISOString().slice(0, 10);
 
 /**
@@ -141,11 +143,15 @@ export function computeProfileLearningEngine({
   bookmarks = [],
   materials = [],
   selectedInterests = [],
+  domainTiers = null,
   domainPriorities = {},
   recommendationFeedback = {},
   followKeywords = [],
+  sourceTiers = null,
   sourcePriorities = {},
 }) {
+  const resolvedDomainTiers = domainTiers || domainPriorities;
+  const resolvedSourceTiers = sourceTiers || sourcePriorities;
   const categoryMap = new Map();
   const sourceMap = new Map();
   const tagMap = new Map();
@@ -162,23 +168,37 @@ export function computeProfileLearningEngine({
   });
 
   // domain priorities
-  selectedInterests.forEach(id => categoryMap.set(id, (categoryMap.get(id) || 0) + Number(domainPriorities[id] || 3) * 2));
+  selectedInterests.forEach(id => categoryMap.set(id, (categoryMap.get(id) || 0) + domainTierScore(resolvedDomainTiers[id])));
   // recommendation feedback
   Object.entries(recommendationFeedback.boostedCategories || {}).forEach(([id, count]) => categoryMap.set(id, (categoryMap.get(id) || 0) + count * 6));
   Object.entries(recommendationFeedback.trackedTerms || {}).forEach(([term, count]) => tagMap.set(term, (tagMap.get(term) || 0) + count * 5));
   followKeywords.forEach(term => tagMap.set(term, (tagMap.get(term) || 0) + 4));
-  Object.entries(sourcePriorities || {}).forEach(([source, priority]) => sourceMap.set(source, (sourceMap.get(source) || 0) + Number(priority || 0) * 2));
+  Object.entries(resolvedSourceTiers || {}).forEach(([source, tier]) => sourceMap.set(source, (sourceMap.get(source) || 0) + sourceTierScore(tier)));
   // muted sources
   Object.entries(recommendationFeedback.mutedSources || {}).forEach(([source, count]) => sourceMap.set(source, Math.max(0, (sourceMap.get(source) || 0) - count * 8)));
 
   const topCategories = [...categoryMap.entries()]
     .sort((a, b) => b[1] - a[1])
     .slice(0, 5)
-    .map(([id, score]) => ({ id, score: Math.round(score) }));
+    .map(([id, score]) => {
+      const tier = normalizeTier(resolvedDomainTiers[id]);
+      return {
+        id,
+        ...(tier ? { tier, tierScore: domainTierScore(tier) } : {}),
+        score: Math.round(score),
+      };
+    });
   const topSources = [...sourceMap.entries()]
     .sort((a, b) => b[1] - a[1])
     .slice(0, 5)
-    .map(([name, score]) => ({ name, score: Math.round(score) }));
+    .map(([name, score]) => {
+      const tier = normalizeTier(resolvedSourceTiers[name]);
+      return {
+        name,
+        ...(tier ? { tier, tierScore: sourceTierScore(tier) } : {}),
+        score: Math.round(score),
+      };
+    });
   const topTags = [...tagMap.entries()]
     .sort((a, b) => b[1] - a[1])
     .slice(0, 8)

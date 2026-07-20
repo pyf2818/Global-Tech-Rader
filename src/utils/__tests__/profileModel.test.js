@@ -413,19 +413,19 @@ describe('computeProfileLearningEngine', () => {
 
   // --- domainPriorities ---
   describe('domainPriorities', () => {
-    it('adds domainPriority * 2 for each selectedInterest', () => {
+    it('uses the explicit focus tier score for a legacy priority of 5', () => {
       const r = computeProfileLearningEngine({
         selectedInterests: ['ai'],
         domainPriorities: { ai: 5 },
       });
-      expect(r.topCategories.find(c => c.id === 'ai').score).toBe(10);
+      expect(r.topCategories.find(c => c.id === 'ai').score).toBe(25);
     });
 
-    it('defaults domainPriority to 3 when not specified', () => {
+    it('uses the neutral unset-domain score when not specified', () => {
       const r = computeProfileLearningEngine({
         selectedInterests: ['ai'],
       });
-      expect(r.topCategories.find(c => c.id === 'ai').score).toBe(6); // 3*2
+      expect(r.topCategories.find(c => c.id === 'ai').score).toBe(8);
     });
   });
 
@@ -483,9 +483,9 @@ describe('computeProfileLearningEngine', () => {
 
   // --- sourcePriorities ---
   describe('sourcePriorities', () => {
-    it('adds priority * 2 to source score', () => {
+    it('uses the explicit focus source score for a legacy priority of 5', () => {
       const r = computeProfileLearningEngine({ sourcePriorities: { TC: 5 } });
-      expect(r.topSources.find(s => s.name === 'TC').score).toBe(10);
+      expect(r.topSources.find(s => s.name === 'TC').score).toBe(20);
     });
   });
 

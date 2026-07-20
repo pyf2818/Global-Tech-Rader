@@ -5,6 +5,7 @@
  * 合规：仅基于数据做技术面/资金面客观解读，不给买卖建议，标注「仅供参考」。
  */
 import { useState, useCallback } from 'react';
+import { analyzeStock } from '../domain/stock/algorithmAnalysis.js';
 
 const COMPLIANCE_SUFFIX = '\n\n（以上内容由 AI 基于公开行情数据生成，仅供参考，不构成投资建议）';
 
@@ -32,6 +33,39 @@ async function callLlm(llmConfig, systemPrompt, userPrompt) {
   return data.content;
 }
 
+export async function runStockAnalysis({ input, llmConfig, callLlm: invokeLlm = callLlm }) {
+  const algorithm = analyzeStock(input);
+  const algorithmResult = {
+    ...algorithm,
+    content: `${algorithm.summary}\n\n${algorithm.disclaimer}`,
+  };
+  const llmAvailable = Boolean(llmConfig?.baseUrl && llmConfig?.apiKey && llmConfig?.selectedModel);
+  if (!llmAvailable || algorithm.status !== 'ready') return algorithmResult;
+
+  const metrics = algorithm.metrics;
+  const systemPrompt = '你是专业的股市分析师。只能基于给定的确定性指标增强表述，不得改变算法评级或虚构数据。区分事实与推断，禁止给出买卖建议，180字内。';
+  const userPrompt = `股票：${algorithm.stock.name}（${algorithm.stock.code}）
+算法评级：${algorithm.rating}；风险：${algorithm.risk}
+现价：${metrics.price}；MA5/10/20：${metrics.ma5}/${metrics.ma10}/${metrics.ma20}
+5日动量：${metrics.momentum5}%；年化波动率：${metrics.volatility}%
+支撑/压力：${metrics.support}/${metrics.resistance}；量能：${metrics.volumeTrend}`;
+  try {
+    const aiNarrative = await invokeLlm(llmConfig, systemPrompt, userPrompt);
+    return {
+      ...algorithmResult,
+      mode: 'ai',
+      aiNarrative,
+      algorithm,
+      content: `${aiNarrative}${COMPLIANCE_SUFFIX}`,
+    };
+  } catch (error) {
+    return {
+      ...algorithmResult,
+      aiError: error?.message || 'AI 增强失败，已保留算法分析',
+    };
+  }
+}
+
 export function useStockAi(llmConfig) {
   const llmReady = useLlmReady(llmConfig);
   const [diagnosing, setDiagnosing] = useState(false);
@@ -45,42 +79,21 @@ export function useStockAi(llmConfig) {
   const [alertChecking, setAlertChecking] = useState(false);
   const [alertResults, setAlertResults] = useState([]);
 
-  // ===== 模块 A：AI 个股诊断 =====
-  // 输入：股票实时数据 + K线摘要 + 盘口 + 板块
+  // ===== 模块 A：确定性算法分析 + 可选 AI 增强 =====
   const diagnoseStock = useCallback(async ({ stock, kline, realtime, sectors }) => {
-    if (!llmReady) {
-      setDiagnoseError('请先配置大模型');
-      return;
-    }
     setDiagnosing(true);
     setDiagnoseError('');
     try {
-      const klineSummary = kline?.klines?.slice(-10).map(k => `${k.date} 开${k.open} 收${k.close} 高${k.high} 低${k.low} 量${k.volume}`).join('\n') || '无K线数据';
-      const bidSummary = (realtime?.bids || []).map((b, i) => `买${i + 1} ${b.price}@${b.volume}`).join(' / ') || '无';
-      const askSummary = (realtime?.asks || []).map((a, i) => `卖${i + 1} ${a.price}@${a.volume}`).join(' / ') || '无';
-      const topSectors = (sectors || []).slice(0, 5).map(s => `${s.name}(${s.changePct >= 0 ? '+' : ''}${s.changePct}%)`).join('、') || '无';
-
-      const systemPrompt = '你是专业的股市分析师。基于公开行情数据，用中文给出客观的技术面和资金面解读。要求：1) 综合评级（强势/震荡/弱势/超卖四选一）2) 技术面解读（趋势/支撑位/压力位，基于均线和K线形态）3) 资金面解读（盘口买卖力量对比）4) 风险提示。禁止给出买卖建议（不说「建议买入/卖出」）。200字内。';
-      const userPrompt = `股票：${stock.name}（${stock.code}）
-当前价：${realtime?.price ?? '未知'}  涨跌幅：${realtime?.changePct ?? '未知'}%
-今开：${realtime?.open ?? '--'}  最高：${realtime?.high ?? '--'}  最低：${realtime?.low ?? '--'}  昨收：${realtime?.prevClose ?? '--'}
-
-近10日K线：
-${klineSummary}
-
-五档盘口：
-${bidSummary}
-${askSummary}
-
-所属板块今日涨幅前5：${topSectors}`;
-
-      const content = await callLlm(llmConfig, systemPrompt, userPrompt);
-      setDiagnosis({ content: content + COMPLIANCE_SUFFIX, at: Date.now() });
+      const result = await runStockAnalysis({
+        input: { stock, realtime, klines: kline?.klines || [] },
+        llmConfig,
+      });
+      setDiagnosis({ ...result, at: Date.now() });
     } catch (e) {
-      setDiagnoseError(e.message || 'AI 诊断失败');
+      setDiagnoseError(e.message || '行情分析失败');
     }
     setDiagnosing(false);
-  }, [llmConfig, llmReady]);
+  }, [llmConfig]);
 
   // ===== 模块 B：AI 市场早报 =====
   // 输入：大盘指数 + 热门股 + 板块

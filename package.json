@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite --host 0.0.0.0",
     "build": "vite build",
+    "db:migrate": "node server/db/migrate.js",
     "preview": "vite preview --host 0.0.0.0",
     "test": "vitest run",
     "test:watch": "vitest"
@@ -15,6 +16,7 @@
     "autoprefixer": "^10.5.0",
     "klinecharts": "^10.0.0-beta3",
     "postcss": "^8.5.15",
+    "pg": "^8.16.3",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "react-globe.gl": "^2.38.0",

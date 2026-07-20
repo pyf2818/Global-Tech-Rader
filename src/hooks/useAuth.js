@@ -1,152 +1,108 @@
-// useAuth — 认证与用户会话状态，从 App.jsx 1124-1288 行提取
-// 含 user/token/auth* 全套状态 + 3 个 localStorage 持久化 useEffect + 5 个 handler
-
-import { useState, useEffect } from 'react';
-import { loadLS, saveLS } from '../utils/localStorage.js';
+// Cookie-backed authentication. No session token or serialized user credential is stored in localStorage.
+import { useEffect, useState } from 'react';
 import { showToast } from '../utils/toast.js';
 
-export function useAuth({ setSelectedInterests: externalSetInterests } = {}) {
-  const [user, setUser] = useState(() => {
-    try {
-      const saved = localStorage.getItem('user');
-      return saved ? JSON.parse(saved) : null;
-    } catch { return null; }
-  });
-  const [token, setToken] = useState(() => localStorage.getItem('token') || '');
+const EMPTY_FORM = { username: '', password: '', email: '', confirmPassword: '' };
+
+function payloadUser(data) {
+  return data?.data?.user || data?.user || null;
+}
+
+async function requestJson(url, options = {}) {
+  const response = await fetch(url, { ...options, credentials: 'include' });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok || data.ok === false) {
+    const error = new Error(data?.error?.message || data?.message || '请求失败');
+    error.status = response.status;
+    error.code = data?.error?.code;
+    throw error;
+  }
+  return data;
+}
+
+export function useAuth() {
+  const [user, setUser] = useState(null);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [authMode, setAuthMode] = useState('login');
-  const [authForm, setAuthForm] = useState({ username: '', password: '', email: '', confirmPassword: '' });
+  const [authForm, setAuthForm] = useState(EMPTY_FORM);
   const [authLoading, setAuthLoading] = useState(false);
   const [authError, setAuthError] = useState('');
   const [showInterestModal, setShowInterestModal] = useState(false);
   const [selectedInterests, setSelectedInterests] = useState(() => {
-    try {
-      const saved = localStorage.getItem('selectedInterests');
-      return saved ? JSON.parse(saved) : [];
-    } catch { return []; }
+    try { return JSON.parse(localStorage.getItem('selectedInterests') || '[]'); } catch { return []; }
   });
 
-  const isLoggedIn = !!user && !!token;
+  const isLoggedIn = Boolean(user);
 
-  // 持久化 user
   useEffect(() => {
-    try {
-      if (user) localStorage.setItem('user', JSON.stringify(user));
-      else localStorage.removeItem('user');
-    } catch { /* QuotaExceededError */ }
-  }, [user]);
-  // 持久化 token
-  useEffect(() => {
-    try {
-      if (token) localStorage.setItem('token', token);
-      else localStorage.removeItem('token');
-    } catch { /* QuotaExceededError */ }
-  }, [token]);
-  // 持久化 selectedInterests
-  useEffect(() => {
-    try { localStorage.setItem('selectedInterests', JSON.stringify(selectedInterests)); } catch { /* QuotaExceededError */ }
+    try { localStorage.setItem('selectedInterests', JSON.stringify(selectedInterests)); } catch { /* local preference only */ }
   }, [selectedInterests]);
+
+  useEffect(() => {
+    // Remove credentials left by the retired bearer-token implementation.
+    try { localStorage.removeItem('token'); localStorage.removeItem('user'); } catch { /* storage may be disabled */ }
+    let cancelled = false;
+    requestJson('/api/auth/me').then(data => {
+      if (!cancelled) {
+        const current = payloadUser(data);
+        setUser(current);
+        if (Array.isArray(current?.interests) && current.interests.length) setSelectedInterests(current.interests);
+      }
+    }).catch(error => {
+      if (!cancelled && error.status !== 401 && error.code !== 'DATABASE_UNAVAILABLE') setAuthError(error.message);
+    });
+    return () => { cancelled = true; };
+  }, []);
 
   const handleRegister = async () => {
     if (!authForm.username || !authForm.password) { setAuthError('用户名和密码不能为空'); return; }
+    if (authForm.password.length < 10) { setAuthError('密码长度需为 10-128 位'); return; }
     if (authForm.password !== authForm.confirmPassword) { setAuthError('两次输入的密码不一致'); return; }
-    setAuthLoading(true);
-    setAuthError('');
+    setAuthLoading(true); setAuthError('');
     try {
-      const res = await fetch('/api/auth/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: authForm.username, password: authForm.password, email: authForm.email, interests: selectedInterests })
-      });
-      const data = await res.json();
-      if (data.ok) {
-        setUser(data.user);
-        setToken(data.token);
-        setShowAuthModal(false);
-        setAuthForm({ username: '', password: '', email: '', confirmPassword: '' });
-        showToast('注册成功！');
-      } else {
-        setAuthError(data.message || '注册失败');
-      }
-    } catch {
-      setAuthError('网络错误，请重试');
-    } finally {
-      setAuthLoading(false);
-    }
+      const data = await requestJson('/api/auth/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: authForm.username, password: authForm.password, email: authForm.email }) });
+      const current = payloadUser(data); setUser(current);
+      if (Array.isArray(current?.interests)) setSelectedInterests(current.interests);
+      setShowAuthModal(false); setAuthForm({ ...EMPTY_FORM }); showToast('注册成功');
+    } catch (error) { setAuthError(error.message); } finally { setAuthLoading(false); }
   };
 
   const handleLogin = async () => {
     if (!authForm.username || !authForm.password) { setAuthError('用户名和密码不能为空'); return; }
-    setAuthLoading(true);
-    setAuthError('');
+    setAuthLoading(true); setAuthError('');
     try {
-      const res = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: authForm.username, password: authForm.password })
-      });
-      const data = await res.json();
-      if (data.ok) {
-        setUser(data.user);
-        setToken(data.token);
-        if (data.user.interests) setSelectedInterests(data.user.interests);
-        setShowAuthModal(false);
-        setAuthForm({ username: '', password: '', email: '', confirmPassword: '' });
-        showToast('登录成功！');
-      } else {
-        setAuthError(data.message || '登录失败');
-      }
-    } catch {
-      setAuthError('网络错误，请重试');
-    } finally {
-      setAuthLoading(false);
-    }
+      const data = await requestJson('/api/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: authForm.username, password: authForm.password }) });
+      const current = payloadUser(data); setUser(current);
+      if (Array.isArray(current?.interests) && current.interests.length) setSelectedInterests(current.interests);
+      setShowAuthModal(false); setAuthForm({ ...EMPTY_FORM }); showToast('登录成功');
+    } catch (error) { setAuthError(error.message); } finally { setAuthLoading(false); }
   };
 
-  const handleLogout = () => {
-    setUser(null);
-    setToken('');
-    setSelectedInterests([]);
-    localStorage.removeItem('user');
-    localStorage.removeItem('token');
-    localStorage.removeItem('selectedInterests');
-    showToast('已退出登录');
+  const handleLogout = async () => {
+    try { await requestJson('/api/auth/logout', { method: 'POST' }); } catch { /* local state still clears */ }
+    setUser(null); setSelectedInterests([]); showToast('已退出登录');
   };
 
   const updateUserInterests = async (interests) => {
-    if (!token) return;
+    if (!user) return;
     try {
-      await fetch('/api/user/interests', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token, interests })
-      });
-      setSelectedInterests(interests);
-      if (user) setUser({ ...user, interests });
-    } catch (e) {
-      console.error('Failed to update interests:', e);
-    }
+      const data = await requestJson('/api/auth/interests', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ interests }) });
+      const current = payloadUser(data); setSelectedInterests(interests); if (current) setUser(current);
+    } catch (error) { showToast(error.message); }
   };
 
   const updateUserProfile = async (updates) => {
-    if (!token) return;
+    if (!user) return;
     try {
-      const res = await fetch('/api/user/profile', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token, ...updates })
-      });
-      const data = await res.json();
-      if (data.ok && data.user) setUser(data.user);
-    } catch (e) {
-      console.error('Failed to update profile:', e);
-    }
+      const data = await requestJson('/api/auth/profile', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(updates) });
+      const current = payloadUser(data); if (current) setUser(current);
+    } catch (error) { showToast(error.message); }
   };
 
   return {
-    user, token, showAuthModal, authMode, authForm, authLoading, authError,
+    user, token: '', showAuthModal, authMode, authForm, authLoading, authError,
     showInterestModal, selectedInterests, isLoggedIn,
-    setUser, setToken, setShowAuthModal, setAuthMode, setAuthForm, setSelectedInterests, setShowInterestModal,
+    setUser, setToken: () => {}, setShowAuthModal, setAuthMode, setAuthForm, setSelectedInterests, setShowInterestModal,
     handleRegister, handleLogin, handleLogout, updateUserInterests, updateUserProfile,
   };
 }
