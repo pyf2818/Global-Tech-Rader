@@ -181,12 +181,12 @@ server/news/
     imageResolver.js          Image resolution pipeline with Scrapling fallback (~21KB). Returns { imageUrl, videoUrl, images[] } - images is top-4 scored article images for grid display
   parsing/
     feedParser.js             RSS/Atom feed parsing and normalization
-  auth/
-    userAuth.js               DEAD - legacy in-memory auth, no runtime imports
   utils/
     httpUtils.js              SSRF protection (isSafeUrl), sendJson, parseBody
     textProcessing.js         Text processing helpers
 ```
+
+> **Note**: Auth no longer lives under `server/news/` - it moved to the platform layer (`server/auth/` + `server/http/authHandlers.js`). The old `server/news/auth/userAuth.js` was deleted.
 
 **Route handling**: `plugin.js` uses `if (pathname === '/api/xxx')` pattern for each endpoint. When adding new API routes, add the handler in `plugin.js` and import services from the appropriate module.
 
