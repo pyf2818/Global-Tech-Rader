@@ -1,7 +1,6 @@
 import { createAuthService } from '../auth/authService.js';
 import { parseCookies, readJsonBody, routeError, sendJsonResponse, sessionCookie } from './httpUtils.js';
 
-const USERNAME_RE = /^.{1,50}$/;
 const loginWindows = new Map();
 
 function limitLogin(req) {
@@ -17,9 +16,9 @@ function validateCredentials(body, { registration = false } = {}) {
   const username = String(body.username || '').trim();
   const password = String(body.password || '');
   const email = String(body.email || '').trim();
-  if (!USERNAME_RE.test(username)) throw Object.assign(new Error('用户名需为 3-40 位中文、字母、数字或下划线'), { code: 'INVALID_USERNAME', status: 400 });
-  if (password.length < (registration ? 8 : 1) || password.length > 20) throw Object.assign(new Error(registration ? '密码长度需为 8-20 位' : '用户名或密码错误'), { code: registration ? 'INVALID_PASSWORD' : 'INVALID_CREDENTIALS', status: registration ? 400 : 401 });
-  if (email.length > 254) throw Object.assign(new Error('邮箱过长'), { code: 'INVALID_EMAIL', status: 400 });
+  if (registration && !username) throw Object.assign(new Error('用户名不能为空'), { code: 'INVALID_USERNAME', status: 400 });
+  if (registration && !password) throw Object.assign(new Error('密码不能为空'), { code: 'INVALID_PASSWORD', status: 400 });
+  if (!registration && (!username || !password)) throw Object.assign(new Error('用户名或密码不能为空'), { code: 'INVALID_CREDENTIALS', status: 401 });
   return { username, password, email };
 }
 
