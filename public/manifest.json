@@ -1,7 +1,7 @@
 {
-  "name": "Global Tech Radar",
-  "short_name": "TechRadar",
-  "description": "全球科技资讯聚合平台 - 实时追踪AI、芯片、开源、投资动态",
+  "name": "SiliconStream · 万般硅川",
+  "short_name": "硅川",
+  "description": "万般硅川 - 个人智能情报与创作 OS，聚合全球科技资讯、AI 早报、用户画像、社区广场与 A 股行情",
   "theme_color": "#0a0c10",
   "background_color": "#0a0c10",
   "display": "standalone",
@@ -20,6 +20,9 @@
       "type": "image/svg+xml"
     }
   ],
-  "categories": ["news", "productivity"],
+  "categories": [
+    "news",
+    "productivity"
+  ],
   "lang": "zh-CN"
 }

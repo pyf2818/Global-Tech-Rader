@@ -1,5 +1,5 @@
 {
-  "name": "global-tech-news-platform",
+  "name": "siliconstream",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -28,5 +28,6 @@
   "devDependencies": {
     "@vitest/coverage-v8": "^3.2.6",
     "vitest": "^3.2.6"
-  }
+  },
+  "description": "万般硅川 SiliconStream - 个人智能情报与创作 OS：聚合全球科技 RSS，叠加 AI 早报、用户画像、社区广场与 A 股行情终端"
 }

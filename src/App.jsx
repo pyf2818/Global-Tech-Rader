@@ -4586,7 +4586,7 @@ ${blueprintSummary}`,
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `tech-radar-materials-${new Date().toISOString().slice(0, 10)}.json`;
+    a.download = `siliconstream-materials-${new Date().toISOString().slice(0, 10)}.json`;
     a.click();
     URL.revokeObjectURL(url);
   }
@@ -8616,7 +8616,7 @@ ${signals}
                     const url = URL.createObjectURL(blob);
                     const a = document.createElement('a');
                     a.href = url;
-                    a.download = `tech-radar-bookmarks-${new Date().toISOString().slice(0, 10)}.md`;
+                    a.download = `siliconstream-bookmarks-${new Date().toISOString().slice(0, 10)}.md`;
                     a.click();
                     URL.revokeObjectURL(url);
                   }}>导出 Markdown</button>
@@ -8626,7 +8626,7 @@ ${signals}
                     const url = URL.createObjectURL(blob);
                     const a = document.createElement('a');
                     a.href = url;
-                    a.download = `tech-radar-bookmarks-${new Date().toISOString().slice(0, 10)}.json`;
+                    a.download = `siliconstream-bookmarks-${new Date().toISOString().slice(0, 10)}.json`;
                     a.click();
                     URL.revokeObjectURL(url);
                   }}>导出 JSON</button>
@@ -8647,7 +8647,7 @@ ${signals}
                     const url = URL.createObjectURL(blob);
                     const a = document.createElement('a');
                     a.href = url;
-                    a.download = `tech-radar-weekly-report-${new Date().toISOString().slice(0, 10)}.md`;
+                    a.download = `siliconstream-weekly-report-${new Date().toISOString().slice(0, 10)}.md`;
                     a.click();
                     URL.revokeObjectURL(url);
                   }}>导出周报 Markdown</button>

@@ -604,7 +604,7 @@ function GlobeContent({ items, isFullscreen, onClose }) {
     const source = followed.length ? followed : base;
     return source.slice(0, 6).map(item => ({
       title: item.title || 'Global technology signal',
-      source: item.source || 'Global Tech Radar',
+      source: item.source || '万般硅川',
       category: CATEGORY_LABELS[item.category] || item.category || '热门资讯',
       url: item.url || '',
     }));

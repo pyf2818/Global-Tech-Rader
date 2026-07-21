@@ -1,4 +1,4 @@
-const CACHE_NAME = 'tech-radar-v1';
+const CACHE_NAME = 'siliconstream-v1';
 const STATIC_ASSETS = [
   '/',
   '/index.html',

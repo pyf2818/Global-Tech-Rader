@@ -1,6 +1,6 @@
 # 部署指南 - Scrapling 集成
 
-本指南提供在本地、其他电脑或生产服务器上部署 Global Tech Radar + Scrapling 的完整步骤。
+本指南提供在本地、其他电脑或生产服务器上部署 SiliconStream · 万般硅川 + Scrapling 的完整步骤。
 
 ## 系统要求
 
@@ -138,7 +138,7 @@ pm2 startup
 
 #### 3. 使用 Nginx 反向代理
 
-**Nginx 配置** (`/etc/nginx/sites-available/tech-radar`)：
+**Nginx 配置** (`/etc/nginx/sites-available/siliconstream`)：
 ```nginx
 server {
     listen 80;
@@ -167,7 +167,7 @@ server {
 
 **启用配置**：
 ```bash
-sudo ln -s /etc/nginx/sites-available/tech-radar /etc/nginx/sites-enabled/
+sudo ln -s /etc/nginx/sites-available/siliconstream /etc/nginx/sites-enabled/
 sudo nginx -t
 sudo systemctl reload nginx
 ```
@@ -276,7 +276,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.frontend
-    container_name: tech-radar-frontend
+    container_name: siliconstream-frontend
     ports:
       - "80:80"
     depends_on:
@@ -288,7 +288,7 @@ services:
   # 可选：数据库（如果需要持久化）
   # postgres:
   #   image: postgres:15
-  #   container_name: tech-radar-db
+  #   container_name: siliconstream-db
   #   environment:
   #     POSTGRES_DB: tech_radar
   #     POSTGRES_USER: radar_user
@@ -302,7 +302,7 @@ volumes:
 
 networks:
   default:
-    name: tech-radar-network
+    name: siliconstream-network
 ```
 
 #### 3. 构建和启动

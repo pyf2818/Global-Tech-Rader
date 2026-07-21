@@ -1,9 +1,9 @@
 services:
-  tech-radar:
+  siliconstream:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: tech-radar-app
+    container_name: siliconstream-app
     ports:
       - "80:80"      # 前端访问
       - "5000:5000"  # Scrapling API
@@ -27,11 +27,11 @@ services:
       - ./logs:/var/log/nginx
       - ./scrapling-logs:/var/log/scrapling
     networks:
-      - tech-radar-network
+      - siliconstream-network
 
   postgres:
     image: postgres:15-alpine
-    container_name: silicon-meridian-db
+    container_name: siliconstream-db
     ports:
       - "${POSTGRES_PORT:-5433}:5432"
     environment:
@@ -47,23 +47,23 @@ services:
       - postgres_data:/var/lib/postgresql/data
     restart: unless-stopped
     networks:
-      - tech-radar-network
+      - siliconstream-network
 
   # 可选：Redis 缓存
   # redis:
   #   image: redis:7-alpine
-  #   container_name: tech-radar-redis
+  #   container_name: siliconstream-redis
   #   command: redis-server --appendonly yes
   #   volumes:
   #     - redis_data:/data
   #   restart: unless-stopped
   #   networks:
-  #     - tech-radar-network
+  #     - siliconstream-network
 
 volumes:
   postgres_data:
   redis_data:
 
 networks:
-  tech-radar-network:
+  siliconstream-network:
     driver: bridge
