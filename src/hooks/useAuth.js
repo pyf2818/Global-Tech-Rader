@@ -56,8 +56,8 @@ export function useAuth() {
 
   const handleRegister = async () => {
     if (!authForm.username || !authForm.password) { setAuthError('用户名和密码不能为空'); return; }
-    if (authForm.password.length < 10) { setAuthError('密码长度需为 10-128 位'); return; }
-    if (authForm.password !== authForm.confirmPassword) { setAuthError('两次输入的密码不一致'); return; }
+    if (authForm.password.length < 8 || authForm.password.length > 20) { setAuthError('密码长度需为 8-20 位'); return; }
+    if (authForm.confirmPassword && authForm.password !== authForm.confirmPassword) { setAuthError('两次输入的密码不一致'); return; }
     setAuthLoading(true); setAuthError('');
     try {
       const data = await requestJson('/api/auth/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: authForm.username, password: authForm.password, email: authForm.email }) });
