@@ -22,8 +22,9 @@ import { useCalendar } from './hooks/useCalendar.js';
 import { useUI } from './hooks/useUI.js';
 import { BlockGrid, BlockPanel, BlockStat, BlockToolbar } from './blocks/index.js';
 import CommandPalette from './shell/CommandPalette.jsx';
-import AiBriefingHome from './components/AiBriefingHome.jsx';
-import RecommendationTimeline from './components/RecommendationTimeline.jsx';
+import IntelligenceSidebar from './components/IntelligenceSidebar.jsx';
+import RecommendationFeed from './components/RecommendationFeed.jsx';
+import RecommendationDateRail from './components/RecommendationDateRail.jsx';
 import TodayNewspaper from './components/TodayNewspaper.jsx';
 import CommunityPage from './components/CommunityPage.jsx';
 import { useProfileSync } from './hooks/useProfileSync.js';
@@ -646,11 +647,11 @@ const VERTICAL_CHANNELS = [
 ];
 
 const LLM_PRESETS = [
-  { id: 'openai', name: 'OpenAI', baseUrl: 'https://api.openai.com', models: ['gpt-4o', 'gpt-4-turbo', 'gpt-4o-mini', 'gpt-3.5-turbo'], icon: '🟢', placeholder: 'sk-...' },
-  { id: 'deepseek', name: 'DeepSeek', baseUrl: 'https://api.deepseek.com', models: ['deepseek-chat', 'deepseek-coder'], icon: '🔵', placeholder: 'sk-...' },
-  { id: 'moonshot', name: 'Moonshot', baseUrl: 'https://api.moonshot.cn', models: ['moonshot-v1-8k', 'moonshot-v1-32k', 'moonshot-v1-128k'], icon: '🌙', placeholder: 'sk-...' },
-  { id: 'zhipu', name: '智谱 AI', baseUrl: 'https://open.bigmodel.cn/api/paas/v4', models: ['glm-4', 'glm-4-flash', 'glm-4-air'], icon: '🟣', placeholder: '请输入 API Key' },
-  { id: 'custom', name: '自定义', baseUrl: '', models: [], icon: '⚙️', placeholder: 'https://...' }
+  { id: 'openai', name: 'OpenAI', baseUrl: 'https://api.openai.com', models: ['gpt-4o', 'gpt-4-turbo', 'gpt-4o-mini', 'gpt-3.5-turbo'], abbrev: 'OA', placeholder: 'sk-...' },
+  { id: 'deepseek', name: 'DeepSeek', baseUrl: 'https://api.deepseek.com', models: ['deepseek-chat', 'deepseek-coder'], abbrev: 'DS', placeholder: 'sk-...' },
+  { id: 'moonshot', name: 'Moonshot', baseUrl: 'https://api.moonshot.cn', models: ['moonshot-v1-8k', 'moonshot-v1-32k', 'moonshot-v1-128k'], abbrev: 'MS', placeholder: 'sk-...' },
+  { id: 'zhipu', name: '智谱 AI', baseUrl: 'https://open.bigmodel.cn/api/paas/v4', models: ['glm-4', 'glm-4-flash', 'glm-4-air'], abbrev: 'ZP', placeholder: '请输入 API Key' },
+  { id: 'custom', name: '自定义', baseUrl: '', models: [], abbrev: 'CT', placeholder: 'https://...' }
 ];
 
 const DEFAULT_AGENTS = [
@@ -1164,12 +1165,13 @@ function App() {
     llmManualInput, setLlmManualInput,
     showLlmQuickConfig, setShowLlmQuickConfig,
     allLlmModels,
+    llmPresets, upsertPreset, removePreset, activatePreset, activePresetId,
   } = useLlmConfig();
 
   // ========== 用户系统 ==========
   // 认证与用户会话 — 从 App.jsx 提取为独立 hook（减少 ~140 行）
   const {
-    user, token, showAuthModal, authMode, authForm, authLoading, authError,
+    user, token, showAuthModal, authMode, authForm, authLoading, authError, setAuthError,
     showInterestModal, selectedInterests, isLoggedIn,
     setUser, setToken, setShowAuthModal, setAuthMode, setAuthForm,
     setSelectedInterests, setShowInterestModal,
@@ -1181,6 +1183,7 @@ function App() {
 
   const [profilePage, setProfilePage] = useState(1);
   const [copilotPendingMessage, setCopilotPendingMessage] = useState('');
+  const [llmPresetName, setLlmPresetName] = useState('');
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [profileForm, setProfileForm] = useState({ displayName: '', signature: '' });
@@ -2498,6 +2501,23 @@ function App() {
     });
     setRecommendationSnapshots(snapshotStoreRef.current.list());
   }, [loading, selectedNewsDate, recommendationCandidates.length, recommendationLanes, algorithmBriefing]);
+
+  // 今日速报页：实时 lanes 为空时（历史日期无缓存资讯）降级到当日快照，保证历史日报可读
+  const todaySnapshotFallback = useMemo(() => {
+    if (!selectedNewsDate) return null;
+    return snapshotStoreRef.current.get(selectedNewsDate);
+  }, [selectedNewsDate, recommendationSnapshots]);
+  const todayLanes = useMemo(() => {
+    const hasLive = (recommendationLanes.public?.length || 0) + (recommendationLanes.personal?.length || 0) > 0;
+    if (hasLive) return recommendationLanes;
+    const snapLanes = todaySnapshotFallback?.lanes;
+    return snapLanes || recommendationLanes;
+  }, [recommendationLanes, todaySnapshotFallback]);
+  const todayBriefing = useMemo(() => {
+    const hasLive = algorithmBriefing && (algorithmBriefing.oneLine || algorithmBriefing.opportunities?.length || algorithmBriefing.risks?.length);
+    if (hasLive) return algorithmBriefing;
+    return todaySnapshotFallback?.briefing || algorithmBriefing;
+  }, [algorithmBriefing, todaySnapshotFallback]);
 
   const workbenchItems = useMemo(() => {
     const seen = new Set();
@@ -5587,9 +5607,9 @@ ${signals}
     setMobileMenuOpen(false);
   };
   const wideWorkspaceNavs = ['home', 'today', 'recommendations', 'studio', 'agents', 'editor', 'materials', 'square', 'profile-center'];
-  // 右侧关注面板只在「全部动态」显示，其他页面不再带，避免拥挤
-  const showRightPanel = nav === 'all';
-  const showStatsBar = showRightPanel && nav !== 'today';
+  // 右侧面板：「全部动态」显示关注关键词；「AI 情报首页」显示情报时间线；「精准推荐」显示日期竖向时间线
+  const showRightPanel = nav === 'all' || nav === 'home' || nav === 'recommendations';
+  const showStatsBar = showRightPanel && nav !== 'today' && nav !== 'home' && nav !== 'recommendations';
 
   return (
     <div className={`app ${sidebarCollapsed ? 'sidebar-collapsed' : ''} ${panelCollapsed ? 'panel-collapsed' : ''} ${!showRightPanel ? 'no-right-panel' : ''} ${editorFullscreen ? 'editor-fullscreen' : ''}`}>
@@ -5825,7 +5845,7 @@ ${signals}
       <ThemePicker mode={themeMode} setMode={setThemeMode} palette={palette} setPalette={setPalette} show={showThemePicker} onClose={() => setShowThemePicker(false)} />
 
       {/* Main */}
-      <main className={`main ${(nav === 'home' || nav === 'today' || nav === 'recommendations') ? 'main-workbench' : ''}`}>
+      <main data-nav={nav} className={`main ${(nav === 'home' || nav === 'today' || nav === 'recommendations') ? 'main-workbench' : ''}`}>
         <header className={`topbar ${nav === 'all' ? 'topbar-all' : ''} ${(nav === 'trending' || nav === 'recommendations') ? 'topbar-trending' : ''}`}>
           {nav === 'all' && (
             <div className="topbar-brand">
@@ -6073,23 +6093,28 @@ ${signals}
 
         <div className={`feed custom-scrollbar ${(nav === 'home' || nav === 'today' || nav === 'recommendations') ? 'feed-workbench' : ''}`} ref={feedRef}>
           {nav === 'home' && (
-            <AiBriefingHome
-              briefing={algorithmBriefing}
-              lanes={recommendationLanes}
-              loading={loading}
-              onAsk={message => setCopilotPendingMessage(message)}
-              onNavigate={goNav}
-              onRefresh={() => loadNews()}
-              onOpenItem={item => {
-                recordReading(item);
-                if (item.url) window.open(item.url, '_blank', 'noopener,noreferrer');
+            <AiChatPanel
+              variant="main"
+              llmConfig={llmConfig}
+              intelligenceProfile={intelligenceProfile}
+              workbenchItems={workbenchItems}
+              selectedInterests={selectedInterests}
+              categories={categories}
+              allLlmModels={allLlmModels}
+              onOpenLlmConfig={() => setShowLlmQuickConfig(true)}
+              pendingMessage={copilotPendingMessage}
+              onMessageSent={() => setCopilotPendingMessage('')}
+              intelligenceContext={{
+                date: selectedNewsDate,
+                briefing: algorithmBriefing,
+                items: [...recommendationLanes.public, ...recommendationLanes.personal].slice(0, 12),
               }}
             />
           )}
           {nav === 'today' && (
             <TodayNewspaper
-              briefing={algorithmBriefing}
-              lanes={recommendationLanes}
+              briefing={todayBriefing}
+              lanes={todayLanes}
               loading={loading}
               onRefresh={() => loadNews()}
               onOpenRecommendations={() => goNav('recommendations')}
@@ -6098,6 +6123,15 @@ ${signals}
                 if (item.url) window.open(item.url, '_blank', 'noopener,noreferrer');
               }}
               onSaveItem={item => toggleMaterial(item, 'news', '今日速报')}
+              snapshots={recommendationSnapshots}
+              selectedDate={selectedNewsDate}
+              onSelectDate={date => setSelectedNewsDate(date)}
+              translations={translations}
+              translationOpen={translationOpen}
+              translatingItems={translatingItems}
+              onRequestTranslation={requestTranslation}
+              onToggleTranslation={itemId => setTranslationOpen(p => ({ ...p, [itemId]: !p[itemId] }))}
+              isEnglishText={isEnglishText}
             />
           )}
           {nav === 'today-legacy' && (
@@ -6941,13 +6975,27 @@ ${signals}
             </>
           )}
 
-          {/* SMART RECOMMENDATIONS - 基于兴趣的个性化推荐 */}
+          {/* SMART RECOMMENDATIONS - 当日满足用户关注/画像的资讯卡片流（右栏竖向时间线见 panel） */}
           {nav === 'recommendations' && (
-            <RecommendationTimeline
-              snapshots={recommendationSnapshots}
-              selectedDate={selectedNewsDate}
-              onSelectDate={setSelectedNewsDate}
-              onFeedback={handleRecommendationFeedback}
+            <RecommendationFeed
+              lanes={recommendationLanes}
+              loading={loading}
+              error={error}
+              isLoggedIn={isLoggedIn}
+              selectedInterests={selectedInterests}
+              categories={categories}
+              renderLimit={renderLimit}
+              viewMode={viewMode}
+              renderCard={(item, i) => {
+                const summaryEntry = getSummaryEntry(item);
+                return <NewsItem key={item.id} item={item} index={i} viewMode={viewMode} isFocused={focusedIndex === i} isBookmarked={isBookmarked(item.id)} isInMaterials={isInMaterials(item.id)} onBookmark={() => toggleBookmark(item)} onAddMaterial={() => toggleMaterial(item)} onSummary={() => handleSummaryToggle(item)} isSummaryOpen={expandedSummary[item.id]} summaryText={summaryEntry?.text || ''} summaryMode={summaryEntry?.mode || ''} summaryLoading={Boolean(summaryLoading[item.id])} isFollowed={followKeywords.some(kw => `${item.title} ${item.summary}`.toLowerCase().includes(kw.toLowerCase()))} onRead={() => recordReading(item)} showTranslation={translationOpen[item.id]} onToggleTranslation={() => setTranslationOpen(p => ({ ...p, [item.id]: !p[item.id] }))} onRequestTranslation={() => requestTranslation(item)} isTranslating={translatingItems[item.id]} translation={getTranslation(item)} onOpenLightbox={(src, title, images, index) => setLightbox({ open: true, src, title, images: images || [], index: index || 0 })} />;
+              }}
+              onLoadMore={loadMoreNews}
+              loadingMore={loadingMore}
+              hasMore={newsHasMore}
+              onRefresh={() => loadNews()}
+              onPickInterests={() => setShowInterestModal(true)}
+              onLogin={() => { setAuthMode('login'); setShowAuthModal(true); }}
             />
           )}
           {nav === 'recommendations-legacy' && (
@@ -8617,30 +8665,37 @@ ${signals}
         </div>
 
         {/* Copilot — AI 情报与每日速报共享同一段有界证据上下文 */}
-        {(nav === 'home' || nav === 'today') && (
-          <AiChatPanel
-            llmConfig={llmConfig}
-            intelligenceProfile={intelligenceProfile}
-            workbenchItems={workbenchItems}
-            selectedInterests={selectedInterests}
-            categories={categories}
-            allLlmModels={allLlmModels}
-            onOpenLlmConfig={() => setShowLlmQuickConfig(true)}
-            pendingMessage={copilotPendingMessage}
-            onMessageSent={() => setCopilotPendingMessage('')}
-            intelligenceContext={{
-              date: selectedNewsDate,
-              briefing: algorithmBriefing,
-              items: [...recommendationLanes.public, ...recommendationLanes.personal].slice(0, 12),
-            }}
-          />
-        )}
       </main>
 
       {/* Right Panel */}
-      {showRightPanel && <aside className={`panel ${panelCollapsed ? 'collapsed' : ''}`}>
+      {showRightPanel && <aside className={`panel ${panelCollapsed ? 'collapsed' : ''} ${nav === 'home' ? 'panel-intelligence' : nav === 'recommendations' ? 'panel-recommendations' : ''}`}>
         {!panelCollapsed && (
           <>
+          {nav === 'home' ? (
+            <IntelligenceSidebar
+              briefing={algorithmBriefing}
+              lanes={recommendationLanes}
+              snapshots={recommendationSnapshots}
+              selectedDate={selectedNewsDate}
+              onSelectDate={date => setSelectedNewsDate(date)}
+              onDissect={item => setCopilotPendingMessage(`请深度剖析这条情报：\n标题：${item.title}\n来源：${item.source || '未知'}\n摘要：${String(item.summary || '').slice(0, 400)}\n\n请从事实核查、关联脉络、对我的影响、下一步行动四个维度展开。`)}
+              onOpenItem={item => {
+                recordReading(item);
+                if (item.url) window.open(item.url, '_blank', 'noopener,noreferrer');
+              }}
+              onRefresh={() => loadNews()}
+              loading={loading}
+            />
+          ) : nav === 'recommendations' ? (
+            <RecommendationDateRail
+              snapshots={recommendationSnapshots}
+              selectedDate={selectedNewsDate}
+              onSelectDate={date => setSelectedNewsDate(date)}
+              loading={loading}
+              onRefresh={() => loadNews()}
+            />
+          ) : (
+            <>
             <section className="panel-section follow-panel-section">
               <div className="follow-panel-header">
                 <h3 className="panel-title">{ICONS.sparkle}<span>我的关注</span></h3>
@@ -8878,6 +8933,8 @@ ${signals}
                 </div>
               )}
             </section>
+            </>
+          )}
           </>
         )}
       </aside>}
@@ -9054,7 +9111,9 @@ ${signals}
           <div className="llm-config-modal" onClick={e => e.stopPropagation()}>
             <div className="llm-config-header">
               <div className="llm-config-title">
-                <span className="llm-config-emoji">✨</span>
+                <span className="llm-config-title-icon" aria-hidden="true">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                </span>
                 <div>
                   <h3>大模型配置</h3>
                   <p>选择服务商并填入凭证，开启 AI 智能助手</p>
@@ -9071,7 +9130,7 @@ ${signals}
                     className={`llm-provider-card ${llmConfig.provider === preset.id ? 'active' : ''}`}
                     onClick={() => handleSelectPreset(preset)}
                   >
-                    <span className="provider-card-icon">{preset.icon}</span>
+                    <span className="provider-card-badge" aria-hidden="true">{preset.abbrev}</span>
                     <span className="provider-card-name">{preset.name}</span>
                     <span className="provider-card-tag">{preset.id === 'custom' ? '自定义' : '云端'}</span>
                   </button>
@@ -9102,7 +9161,11 @@ ${signals}
                 </div>
 
                 <div className="llm-field">
-                  <label>选择模型</label>
+                  <div className="llm-field-head">
+                    <label>选择模型</label>
+                    <button type="button" className="llm-fetch-btn" onClick={fetchLlmModels} disabled={!llmConfig.baseUrl || llmFetching}>{llmFetching ? '拉取中...' : '拉取模型列表'}</button>
+                  </div>
+                  {llmFetchError ? <p className="llm-fetch-error">{llmFetchError}</p> : null}
                   <select
                     className="llm-model-select"
                     value={llmConfig.selectedModel}
@@ -9128,7 +9191,25 @@ ${signals}
             </div>
 
             <div className="llm-config-footer">
+              <select className="llm-preset-select" value={activePresetId || ''} onChange={e => { const p = llmPresets.find(x => x.id === e.target.value); if (p) activatePreset(p); }} title="切换已保存预设">
+                <option value="">切换预设...</option>
+                {llmPresets.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+              </select>
+              {activePresetId ? <button type="button" className="llm-btn-preset-del" onClick={() => { removePreset(activePresetId); }} title="删除当前激活的预设">删除预设</button> : null}
+              <input className="llm-preset-name-input" type="text" placeholder="预设名称（可选）" value={llmPresetName} onChange={e => setLlmPresetName(e.target.value)} />
               <button className="llm-btn-secondary" onClick={() => setShowLlmQuickConfig(false)}>取消</button>
+              <button
+                type="button"
+                className="llm-btn-preset-save"
+                disabled={!llmConfig.baseUrl}
+                onClick={() => {
+                  const fallback = (LLM_PRESETS.find(p => p.id === llmConfig.provider)?.name || '自定义') + '-' + (llmConfig.selectedModel || 'model').slice(0, 10);
+                  const name = llmPresetName.trim() || fallback;
+                  upsertPreset({ name, provider: llmConfig.provider || 'custom', baseUrl: llmConfig.baseUrl, apiKey: llmConfig.apiKey, selectedModel: llmConfig.selectedModel, manualModels: llmConfig.manualModels || [] });
+                  setLlmPresetName('');
+                }}
+                title="把当前配置保存为命名预设，方便下次一键切换"
+              >另存为预设</button>
               <button
                 className="llm-btn-test"
                 onClick={handleQuickTest}

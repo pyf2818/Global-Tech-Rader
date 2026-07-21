@@ -1,14 +1,16 @@
 /**
- * AiChatPanel — Enhanced AI copilot with session management,
- * dynamic welcome, artistic branding, and full markdown rendering
+ * AiChatPanel - 智能体对话主区（首页三栏布局的中间栏）
+ *
+ * 从原右侧 Copilot 浮窗重构为 Codex 桌面端式中间对话区：
+ * - 撑满父容器（flex 列布局），移除 resize handle 与固定宽度
+ * - 会话管理 / 模型选择 / 流式回复 / 引用校验 / 快捷指令 / 附件
+ * - 接收 pendingMessage（来自右栏情报「剖析」或其它入口）做深度分析
+ * - 顶部标题产品化，不再叫 Copilot
  */
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { renderMarkdown } from '../utils/markdown.jsx';
 
-function clamp(v, min, max) { return Math.max(min, Math.min(max, v)); }
-
-const EMOTICONS = ['(ノ°▽°)ノ', '(｡◕‿◕｡)', '(◕‿◕✿)', '(ノ≥∀≤)ノ', '(✿◠‿◠)', '(★‿★)', '(◕ᴗ◕✿)', '(〜￣▽￣)〜'];
-const WELCOME_MSGS = ['你好，我是你的智慧助手', '准备好了吗？', '今天有什么想了解的？', '随时为你效劳'];
+const WELCOME_MSGS = ['今天有什么情报需要我深入分析？', '准备好为你梳理今日要点了', '想从哪条资讯开始剖析？', '随时可以问我今日趋势与风险'];
 
 function loadSessions() {
   try {
@@ -33,6 +35,7 @@ export default function AiChatPanel({
   pendingMessage,
   onMessageSent,
   intelligenceContext,
+  variant = 'copilot',
 }) {
   const [sessions, setSessions] = useState(loadSessions);
   const [activeSessionId, setActiveSessionId] = useState(() => {
@@ -43,31 +46,7 @@ export default function AiChatPanel({
   const [input, setInput] = useState('');
   const [isStreaming, setIsStreaming] = useState(false);
   const [selectedModel, setSelectedModel] = useState(llmConfig?.selectedModel || '');
-  const [panelWidth, setPanelWidth] = useState(() => {
-    try { const s = localStorage.getItem('copilotPanelWidth'); return s ? Number(s) : 420; } catch { return 420; }
-  });
-  const [mobileOpen, setMobileOpen] = useState(false);
-  const resizeRef = useRef(null);
-  const resizeStartRef = useRef({ x: 0, w: 0 });
-
-  // Persist width
-  useEffect(() => { try { localStorage.setItem('copilotPanelWidth', String(Math.round(panelWidth))); } catch {} }, [panelWidth]);
-  useEffect(() => {
-    document.documentElement.style.setProperty('--copilot-panel-width', `${Math.round(panelWidth)}px`);
-    return () => document.documentElement.style.removeProperty('--copilot-panel-width');
-  }, [panelWidth]);
-
-  const handleResizeStart = useCallback((e) => {
-    e.preventDefault();
-    resizeStartRef.current = { x: e.clientX, w: panelWidth };
-    const onMove = (ev) => {
-      const dx = ev.clientX - resizeStartRef.current.x;
-      setPanelWidth(clamp(resizeStartRef.current.w - dx, 320, 700));
-    };
-    const onUp = () => { window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); };
-    window.addEventListener('mousemove', onMove);
-    window.addEventListener('mouseup', onUp);
-  }, [panelWidth]);
+  const [attachments, setAttachments] = useState([]);
 
   // Sync model selection when llmConfig changes externally (e.g. from LLM modal)
   useEffect(() => {
@@ -76,39 +55,22 @@ export default function AiChatPanel({
     }
   }, [llmConfig?.selectedModel]);
 
-  const [attachments, setAttachments] = useState([]);
-  const [welcomeEmoticon] = useState(() => EMOTICONS[Math.floor(Math.random() * EMOTICONS.length)]);
   const [welcomeMsg] = useState(() => WELCOME_MSGS[Math.floor(Math.random() * WELCOME_MSGS.length)]);
-  const [typingText, setTypingText] = useState('');
-  const [typingIdx, setTypingIdx] = useState(0);
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
   const fileInputRef = useRef(null);
 
   const currentSession = sessions.find(s => s.id === activeSessionId);
   const messages = currentSession?.messages || [];
-
   const userName = user?.username || '你';
-
-  // Typing animation for welcome
-  useEffect(() => {
-    const target = `${userName}，${welcomeMsg} ${welcomeEmoticon}`;
-    if (typingIdx < target.length) {
-      const timer = setTimeout(() => {
-        setTypingText(target.slice(0, typingIdx + 1));
-        setTypingIdx(typingIdx + 1);
-      }, 50 + Math.random() * 40);
-      return () => clearTimeout(timer);
-    }
-  }, [typingIdx, userName, welcomeMsg, welcomeEmoticon]);
-
-  // Sync sessions to localStorage
-  useEffect(() => { saveSessions(sessions); }, [sessions]);
 
   // Auto-scroll
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages.length]);
+
+  // Sync sessions to localStorage
+  useEffect(() => { saveSessions(sessions); }, [sessions]);
 
   // Build system prompt
   const systemPrompt = useMemo(() => {
@@ -246,7 +208,7 @@ export default function AiChatPanel({
     }
   }, [input, messages, isStreaming, llmConfig, selectedModel, systemPrompt, onOpenLlmConfig, activeSessionId, intelligenceContext]);
 
-  // Watch for pending messages from external triggers (e.g. "Ask AI" buttons)
+  // Watch for pending messages from external triggers (e.g. 右栏「剖析」按钮 / 快捷入口)
   useEffect(() => {
     if (pendingMessage && !isStreaming) {
       sendMessage(pendingMessage);
@@ -276,11 +238,8 @@ export default function AiChatPanel({
   const hasConfig = Boolean(llmConfig?.baseUrl && selectedModel);
 
   return (
-    <>
-      <button type="button" className="ai-chat-mobile-toggle" onClick={() => setMobileOpen(true)} aria-label="打开 Copilot" title="打开 Copilot">AI</button>
-    <div className={`ai-chat-panel ${mobileOpen ? 'mobile-open' : ''}`} style={{ width: panelWidth }} ref={resizeRef}>
-      <div className="ai-resize-handle" onMouseDown={handleResizeStart} />
-      {/* Header with artistic logo */}
+    <div className={`ai-chat-panel ${variant === 'main' ? 'ai-chat-panel-main' : ''}`}>
+      {/* Header */}
       <div className="chat-header">
         <div className="chat-header-left" onClick={() => setShowSessionList(!showSessionList)}>
           <div className="chat-logo">
@@ -294,7 +253,10 @@ export default function AiChatPanel({
               <path d="M22 27C22 27 23 28 24 28C25 28 26 27 26 27" stroke="var(--accent-cyan)" strokeWidth="1" strokeLinecap="round"/>
             </svg>
           </div>
-          <span className="chat-header-title">Copilot</span>
+          <div className="chat-header-titles">
+            <span className="chat-header-title">SiliconStream 智能体</span>
+            <span className="chat-header-sub">对话 · 剖析 · 研判</span>
+          </div>
         </div>
         <div className="chat-header-actions">
           <button className="chat-header-btn" onClick={createSession} title="新对话">
@@ -307,7 +269,6 @@ export default function AiChatPanel({
               <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
             </svg>
           </button>
-          <button className="chat-header-btn chat-mobile-close" onClick={() => setMobileOpen(false)} title="关闭 Copilot" aria-label="关闭 Copilot">×</button>
         </div>
       </div>
 
@@ -318,7 +279,7 @@ export default function AiChatPanel({
             <span>对话记录</span>
             <button onClick={() => { createSession(); setShowSessionList(false); }}>+ 新对话</button>
           </div>
-          <div className="chat-sessions-list">
+          <div className="chat-sessions-list custom-scrollbar">
             {sessions.length === 0 && <div className="chat-sessions-empty">暂无对话记录</div>}
             {sessions.map(s => (
               <div key={s.id}
@@ -350,16 +311,16 @@ export default function AiChatPanel({
       </div>
 
       {/* Messages area */}
-      <div className="chat-messages">
+      <div className="chat-messages custom-scrollbar">
         {messages.length === 0 && (
           <div className="chat-welcome">
             <div className="chat-welcome-greeting">
-              <span className="chat-welcome-typed">{typingText}</span>
-              <span className="chat-welcome-cursor">|</span>
+              <span className="chat-welcome-typed">{userName}，{welcomeMsg}</span>
             </div>
             <p className="chat-welcome-meta">
               已加载 {workbenchItems?.length || 0} 条资讯 · {selectedInterests?.length || 0} 个关注领域 · {intelligenceProfile?.confidence || 0}% 置信度
             </p>
+            <p className="chat-welcome-tip">点击右侧情报条目的「剖析」可在此深度展开，或试试下面的快捷指令：</p>
             <div className="chat-welcome-actions">
               {quickActions.map(action => (
                 <button key={action.label} className="chat-quick-btn" onClick={() => sendMessage(action.prompt)}>
@@ -425,7 +386,7 @@ export default function AiChatPanel({
             <path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
           </svg>
         </button>
-        <textarea ref={inputRef} className="chat-input" value={input} onChange={e => setInput(e.target.value)} onKeyDown={handleKeyDown} placeholder={hasConfig ? "输入消息... (Shift+Enter 换行)" : "请先配置大模型"} rows={1} disabled={!hasConfig} />
+        <textarea ref={inputRef} className="chat-input" value={input} onChange={e => setInput(e.target.value)} onKeyDown={handleKeyDown} placeholder={hasConfig ? "输入消息... (Shift+Enter 换行，点击右栏「剖析」可深度分析情报)" : "请先配置大模型"} rows={1} disabled={!hasConfig} />
         <button className="chat-send-btn" onClick={() => sendMessage()} disabled={!input.trim() || isStreaming || !hasConfig} title="发送">
           {isStreaming ? <div className="chat-send-spinner" /> : (
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -435,6 +396,5 @@ export default function AiChatPanel({
         </button>
       </div>
     </div>
-    </>
   );
 }

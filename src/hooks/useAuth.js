@@ -102,7 +102,7 @@ export function useAuth() {
   return {
     user, token: '', showAuthModal, authMode, authForm, authLoading, authError,
     showInterestModal, selectedInterests, isLoggedIn,
-    setUser, setToken: () => {}, setShowAuthModal, setAuthMode, setAuthForm, setSelectedInterests, setShowInterestModal,
+    setUser, setToken: () => {}, setShowAuthModal, setAuthMode, setAuthForm, setAuthError, setSelectedInterests, setShowInterestModal,
     handleRegister, handleLogin, handleLogout, updateUserInterests, updateUserProfile,
   };
 }
