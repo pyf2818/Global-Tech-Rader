@@ -3,6 +3,8 @@
 .gemini
 .opencode
 .omc/
+.agents/
+.monkeycode/
 
 # IDE and Editors
 **/.idea/
