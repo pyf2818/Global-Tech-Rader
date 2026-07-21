@@ -25,7 +25,8 @@ export function createProfileService(repository = createProfileRepository()) {
         return { type, target, note: String(follow.note || '').slice(0, 280) };
       }) : [];
       const confidence = Math.min(100, Math.max(0, Number(input.confidence) || 0));
-      return repository.saveState(userId, { domainTiers, sourceTiers, specialFollows, confidence, behaviorSignals: input.behaviorSignals || {} });
+      const expectedVersion = Number.isInteger(input.expectedVersion) && input.expectedVersion > 0 ? input.expectedVersion : null;
+      return repository.saveState(userId, { domainTiers, sourceTiers, specialFollows, confidence, behaviorSignals: input.behaviorSignals || {}, expectedVersion });
     },
   };
 }

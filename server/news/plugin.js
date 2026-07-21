@@ -4,6 +4,8 @@ import { sendJson, parseBody, isSafeUrl } from './utils/httpUtils.js';
 import { handleAuthRequest } from '../http/authHandlers.js';
 import { handleCommunityRequest } from '../http/communityHandlers.js';
 import { handleProfileRequest } from '../http/profileHandlers.js';
+import { handleAiGenerateRequest } from '../http/aiHandlers.js';
+import { handleFetchPageRequest } from '../http/fetchPageHandler.js';
 import { getNews } from './services/newsService.js';
 import { getTrending, getGithubTrending } from './services/trendingService.js';
 import { discoverSourceCandidates, validateFeedUrl } from './services/sourceDiscovery.js';
@@ -56,6 +58,12 @@ export function newsPlugin() {
         }
         if (requestUrl.pathname === '/api/profile/state') {
           return handleProfileRequest(req, res, { action: 'state' });
+        }
+        if (requestUrl.pathname === '/api/ai-generate') {
+          return handleAiGenerateRequest(req, res);
+        }
+        if (requestUrl.pathname === '/api/fetch-page') {
+          return handleFetchPageRequest(req, res);
         }
 
         if (requestUrl.pathname === '/api/news') {
@@ -312,108 +320,6 @@ ${items.map((i, idx) => {
             }
           }
 
-        // 获取网页内容
-        if (requestUrl.pathname === '/api/fetch-page') {
-          const url = requestUrl.searchParams.get('url');
-          if (!url) return sendJson(res, { error: 'url is required' }, 400);
-          if (!isSafeUrl(url)) return sendJson(res, { error: 'URL points to a blocked destination' }, 403);
-          try {
-            const controller = new AbortController();
-            const timeout = setTimeout(() => controller.abort(), 10000);
-            const response = await fetch(url, {
-              headers: { 'User-Agent': 'GlobalTechRadar/0.1' },
-              signal: controller.signal
-            });
-            clearTimeout(timeout);
-            if (!response.ok) {
-              return sendJson(res, { error: `Failed to fetch: ${response.status}` }, 500);
-            }
-            const html = await response.text();
-            // 提取正文内容
-            const textContent = html
-              .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
-              .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
-              .replace(/<[^>]+>/g, ' ')
-              .replace(/\s+/g, ' ')
-              .trim()
-              .slice(0, 15000);
-            return sendJson(res, { content: textContent });
-          } catch (e) {
-            return sendJson(res, { error: e.message }, 500);
-          }
-        }
-
-        // AI 辅助写作
-        if (requestUrl.pathname === '/api/ai-generate') {
-          const body = await parseBody(req);
-          const { baseUrl = '', apiKey = '', model = '', action = '', content = '', context = '', messages = [], systemPrompt = '' } = body;
-          if (!baseUrl || !model) return sendJson(res, { error: 'baseUrl and model are required' }, 400);
-          try {
-            const cleanBaseUrl = baseUrl.replace(/\/$/, '');
-            const apiUrl = cleanBaseUrl.endsWith('/v1') || cleanBaseUrl.endsWith('/v2') || cleanBaseUrl.endsWith('/v3') || cleanBaseUrl.endsWith('/v4')
-              ? cleanBaseUrl + '/chat/completions'
-              : cleanBaseUrl + '/v1/chat/completions';
-            const headers = { 'Content-Type': 'application/json' };
-            if (apiKey) headers['Authorization'] = `Bearer ${apiKey}`;
-
-            const prompts = {
-              continue: `请继续以下文章的内容，保持相同的风格和语气：\n\n${content}`,
-              rewrite: `请改写以下段落，使其更清晰、更专业，但保持原意不变：\n\n${content}`,
-              expand: `请扩展以下内容，添加更多细节和论据，使其更丰富：\n\n${content}`,
-              simplify: `请简化以下段落，使其更简洁易懂：\n\n${content}`,
-              translate_zh: `请将以下内容翻译成中文。只输出翻译结果，不要添加任何解释、说明、前缀或后缀：\n\n${content}`,
-              translate_en: `请将以下内容翻译成英文：\n\n${content}`,
-              title: `请为以下文章生成 5 个吸引人的标题，每个标题不超过 30 字：\n\n${content}`,
-              summary: `请为以下文章生成一段简洁的摘要（不超过 100 字）：\n\n${content}`
-            };
-
-            let apiMessages;
-
-            if (action === 'chat' && messages.length > 0) {
-              apiMessages = [];
-              if (systemPrompt) {
-                apiMessages.push({ role: 'system', content: systemPrompt });
-              }
-              const recentMessages = messages.slice(-20);
-              for (const msg of recentMessages) {
-                apiMessages.push({ role: msg.role, content: msg.content });
-              }
-              apiMessages.push({ role: 'user', content });
-            } else {
-              const prompt = prompts[action] || `请根据以下要求处理内容：\n要求：${action}\n内容：${content}`;
-              apiMessages = [];
-              if (systemPrompt) {
-                apiMessages.push({ role: 'system', content: systemPrompt });
-              }
-              apiMessages.push({ role: 'user', content: prompt });
-            }
-
-            const controller = new AbortController();
-            const timeout = setTimeout(() => controller.abort(), 30000);
-            const response = await fetch(apiUrl, {
-              method: 'POST',
-              headers,
-              body: JSON.stringify({
-                model,
-                messages: apiMessages,
-                max_tokens: 1500,
-                temperature: 0.7
-              }),
-              signal: controller.signal
-            });
-            clearTimeout(timeout);
-            if (!response.ok) {
-              const errText = await response.text().catch(() => '');
-              return sendJson(res, { error: `API responded ${response.status}: ${errText.slice(0, 200)}` });
-            }
-            const data = await response.json();
-            const generated = data.choices?.[0]?.message?.content || '';
-            return sendJson(res, { ok: true, content: generated });
-          } catch (e) {
-            return sendJson(res, { error: e.message });
-          }
-        }
-
         if (requestUrl.pathname.startsWith('/api/ai/') || requestUrl.pathname.startsWith('/api/translate') || requestUrl.pathname.startsWith('/api/subscriptions') || requestUrl.pathname.startsWith('/api/bookmarks')) {
           return sendJson(res, { ok: false, message: 'Reserved extension endpoint.' }, 501);
         }
@@ -438,4 +344,15 @@ ${items.map((i, idx) => {
       });
     }
   };
+}
+
+export function createNewsApiMiddleware() {
+  let middleware;
+  newsPlugin().configureServer({
+    middlewares: {
+      use(handler) { middleware = handler; },
+    },
+  });
+  if (!middleware) throw new Error('News API middleware was not initialized');
+  return middleware;
 }

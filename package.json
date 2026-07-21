@@ -7,12 +7,13 @@
     "dev": "vite --host 0.0.0.0",
     "build": "vite build",
     "db:migrate": "node server/db/migrate.js",
+    "start": "node server/productionServer.js",
     "preview": "vite preview --host 0.0.0.0",
     "test": "vitest run",
     "test:watch": "vitest"
   },
   "dependencies": {
-    "@vitejs/plugin-react": "^6.0.2",
+    "@vitejs/plugin-react": "5.1.4",
     "autoprefixer": "^10.5.0",
     "klinecharts": "^10.0.0-beta3",
     "postcss": "^8.5.15",
@@ -23,11 +24,11 @@
     "tailwindcss": "^3.4.17",
     "three": "^0.184.0",
     "typescript": "^6.0.3",
-    "vite": "^8.0.16"
+    "vite": "7.3.6"
   },
   "devDependencies": {
     "@vitest/coverage-v8": "^3.2.6",
     "vitest": "^3.2.6"
   },
-  "description": "万般硅川 SiliconStream - 个人智能情报与创作 OS：聚合全球科技 RSS，叠加 AI 早报、用户画像、社区广场与 A 股行情终端"
+  "description": "万般硅川 SiliconStream - 个人智能情报与创作平台"
 }

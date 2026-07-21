@@ -2,6 +2,12 @@ import pg from 'pg';
 
 let pool;
 
+function sslConfig() {
+  if (process.env.DATABASE_SSL === 'true') return { rejectUnauthorized: false };
+  if (process.env.DATABASE_SSL === 'false') return false;
+  return process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false;
+}
+
 export function getPool() {
   if (!process.env.DATABASE_URL) {
     throw Object.assign(new Error('DATABASE_URL is required'), { code: 'DATABASE_UNAVAILABLE' });
@@ -9,7 +15,7 @@ export function getPool() {
   if (!pool) {
     pool = new pg.Pool({
       connectionString: process.env.DATABASE_URL,
-      ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+      ssl: sslConfig(),
       max: 8,
       idleTimeoutMillis: 30000,
       connectionTimeoutMillis: 5000,

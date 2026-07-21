@@ -26,7 +26,8 @@ class ErrorBoundary extends React.Component {
             <summary>Component Stack</summary>
             <pre style={{ whiteSpace: 'pre-wrap', fontSize: 12 }}>{this.state.errorInfo?.componentStack}</pre>
           </details>
-          <button onClick={() => { localStorage.clear(); location.reload(); }} style={{ marginTop: 16, padding: '8px 16px', cursor: 'pointer' }}>Clear localStorage & Reload</button>
+          <p style={{ maxWidth: 720, color: '#cbd5e1', lineHeight: 1.6 }}>页面发生代码错误。重新加载不会删除素材、画像、推荐快照或智能体历史。</p>
+          <button onClick={() => location.reload()} style={{ marginTop: 16, padding: '8px 16px', cursor: 'pointer' }}>重新加载页面</button>
         </div>
       );
     }

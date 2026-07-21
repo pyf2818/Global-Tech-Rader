@@ -8,6 +8,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 npm install                              # Install dependencies
 npm run dev                              # Dev server on 0.0.0.0:5175 (with API middleware)
 npm run build                            # Production build -> dist/
+npm start                                # Production Node server (dist + full API, default port 3000)
 npm run preview                          # Preview production build (static only, no API)
 npm test                                 # Run unit tests (vitest) — 168 tests across src/utils, src/domain, src/hooks/__tests__/
 npm run test:watch                       # Watch mode
@@ -24,7 +25,7 @@ No lint, typecheck, or formatter commands exist.
 
 ## Architecture
 
-**Tech Stack**: React 19 + Vite 8 + Tailwind CSS 3 + Three.js (react-globe.gl) + klinecharts (stock charts)
+**Tech Stack**: React 19 + Vite 7 + Tailwind CSS 3 + Three.js (react-globe.gl) + klinecharts (stock charts)
 
 **Data Flow**: Vite middleware plugin (`server/news/plugin.js`) intercepts `/api/*` routes at dev-server level. Frontend uses native `fetch` to call these APIs. There is no Express/Koa — the plugin registers middleware directly on the Vite dev server.
 
@@ -198,12 +199,13 @@ PostgreSQL-backed platform layer (users, sessions, profiles, community, recommen
 
 ```
 server/db/
-  client.js                  pg Pool (reads DATABASE_URL); query() returns [] when DB unavailable
+  client.js                  pg Pool (reads DATABASE_URL and DATABASE_SSL)
   migrate.js                 Runs migrations (npm run db:migrate)
   migrations/001_platform.sql  Schema: users, sessions, user_profiles, profile_domains,
     profile_sources, special_follows, posts, comments, post_likes, post_bookmarks,
     user_follows, recommendation_snapshots, recommendation_items, briefing_snapshots,
     creation_assets, creation_documents, creation_versions
+  migrations/002_runtime_indexes.sql  Runtime indexes for feeds, sessions, social counts, and creation assets
 server/http/                 Shared HTTP handlers (used by BOTH dev plugin.js and api/ serverless)
   httpUtils.js               sendJsonResponse, readJsonBody, parseCookies, sessionCookie, routeError
   authHandlers.js            handleAuthRequest - register/login/logout/me/profile/interests
@@ -243,7 +245,7 @@ server/profile/              profileService + profileRepository
 
 ### Security
 
-`isSafeUrl()` blocks requests to localhost, private IPs (10.x, 172.16-31.x, 192.168.x, 127.x, 169.254.x). Applied to `/api/verify-source`, `/api/fetch-page`, and `/api/llm-models` routes.
+`server/security/urlSafety.js` resolves DNS and blocks localhost/private/link-local/reserved addresses, credential-bearing URLs, and upstream redirects. Shared AI/page gateways also enforce body limits, timeouts, rate limits, and optional `AI_ALLOWED_HOSTS`. Legacy feed discovery routes additionally use `isSafeUrl()`.
 
 ### Caching
 
@@ -256,9 +258,10 @@ server/profile/              profileService + profileRepository
 ## Deployment
 
 - **Vercel**: `vercel.json` maps `/api/*` to serverless functions in `api/`; static build served from `dist/`
-- **Docker**: Multi-stage `Dockerfile` — Node 20 builds frontend, Python 3.11 runs Scrapling + Gunicorn, Nginx serves static files (ports 80 + 5000)
-- **Docker Compose**: `docker-compose.yml` with optional PostgreSQL/Redis (commented out)
-- **Nginx**: `nginx.conf` — SPA routing, Scrapling proxy, static asset caching, security headers
+- **Node**: `server/productionServer.js` serves `dist/` and the complete shared API on `PORT` (default 3000)
+- **Docker**: Multi-stage Node 22 image; startup runs migrations and then the production server
+- **Docker Compose**: application + PostgreSQL 15; Scrapling is an optional external service configured by `SCRAPLING_URL`
+- **Vercel**: use Node/Docker for the complete long-lived platform; serverless-compatible routes remain in `api/`
 
 ## Critical Duplication (Must Update Both)
 

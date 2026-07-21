@@ -911,7 +911,6 @@ const ICONS = {
   alert: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>,
   trend: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>,
   target: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>,
-  grid: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>,
   link: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>,
   externalLink: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>,
   calendar: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>,
@@ -1200,11 +1199,6 @@ function App() {
   const [specialFollowForm, setSpecialFollowForm] = useState({ type: 'source', target: '', note: '' });
   const [editingSpecialFollowId, setEditingSpecialFollowId] = useState(null);
   useProfileSync({ user, domainTiers, sourceTiers, specialFollows, setDomainTiers, setSourceTiers, setSpecialFollows });
-  const [likedPosts, setLikedPosts] = useState(() => new Set(loadLS('likedPosts', [])));
-  const [savedPosts, setSavedPosts] = useState(() => new Set(loadLS('savedPosts', [])));
-  const [postComments, setPostComments] = useState(() => loadLS('postComments', {}));
-  const [commentTexts, setCommentTexts] = useState({});
-  const [showCommentPanel, setShowCommentPanel] = useState(null);
 
   // 打开资料弹窗时预填充表单
   useEffect(() => {
@@ -1222,10 +1216,7 @@ function App() {
     saveLS('sourceTiers:v1', sourceTiers);
     saveLS('dailyProfileSnapshots', dailyProfileSnapshots);
     saveLS('specialFollows:v2', specialFollows);
-    saveLS('likedPosts', [...likedPosts]);
-    saveLS('savedPosts', [...savedPosts]);
-    saveLS('postComments', postComments);
-  }, [domainTiers, sourceTiers, dailyProfileSnapshots, specialFollows, likedPosts, savedPosts, postComments]);
+  }, [domainTiers, sourceTiers, dailyProfileSnapshots, specialFollows]);
 
 
   // 认证函数已抽取至 useAuth — 这里不再定义
@@ -1239,15 +1230,6 @@ function App() {
     () => (serverCategories.length > 0 ? serverCategories : FALLBACK_CATEGORIES),
     [serverCategories]
   );
-
-  // 社区交互
-  const toggleLike = (id) => setLikedPosts(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
-  const toggleSave = (id) => setSavedPosts(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
-  const addComment = (postId, text) => {
-    if (!text.trim()) return;
-    setPostComments(prev => ({ ...prev, [postId]: [...(prev[postId] || []), { id: Date.now(), user: user?.displayName || '匿名', text, time: new Date().toISOString() }] }));
-    setCommentTexts(prev => ({ ...prev, [postId]: '' }));
-  };
 
   const resetSpecialFollowForm = () => {
     setSpecialFollowForm({ type: 'source', target: '', note: '' });
@@ -2746,9 +2728,6 @@ function App() {
     { type: '指定回复', desc: '沉淀可复用的固定输出结构' },
     { type: '输出', desc: '导出到素材库、文章或本地知识库' }
   ], []);
-
-  // Legacy square rendering below is unreachable; real posts come from CommunityPage.
-  const squareSeedItems = [];
 
   const profilePriorityItems = useMemo(() => {
     const base = selectedInterests.length ? selectedInterests : categories.slice(0, 6).map(c => c.id);
@@ -7038,89 +7017,6 @@ ${signals}
            )}
 
           {nav === 'square' && <CommunityPage user={user} onRequireAuth={() => { setAuthMode('login'); setShowAuthModal(true); }} />}
-
-          {false && nav === 'square' && (
-            <div className="product-page square-page">
-              <section className="product-hero square-hero">
-                <div>
-                  <div className="workbench-kicker">Community Intelligence</div>
-                  <h1>用户广场</h1>
-                  <p>分享文章、每日汇报和智能体工作流，让用户之间围绕高质量信息交流、收藏、关注和评论。</p>
-                </div>
-                <div className="product-hero-actions">
-                  <button className="ai-primary-action" onClick={() => goNav('editor')}>发布文章</button>
-                  <button className="secondary-action" onClick={() => goNav('agents')}>分享智能体</button>
-                </div>
-              </section>
-
-              <section className="square-layout">
-                <div className="square-feed">
-                  {squareSeedItems.map(item => {
-                    const liked = likedPosts.has(item.id);
-                    const saved = savedPosts.has(item.id);
-                    const likeCount = item.likes + (liked ? 1 : 0);
-                    const saveCount = item.saves + (saved ? 1 : 0);
-                    const comments = postComments[item.id] || [];
-                    const commentCount = item.comments + comments.length;
-                    const panelOpen = showCommentPanel === item.id;
-                    const draft = commentTexts[item.id] || '';
-                    return (
-                    <article key={item.id} className="square-post">
-                      <div className="square-post-head">
-                        <span className="square-post-type">{item.type}</span>
-                        <span className="square-post-tag">{item.tag}</span>
-                      </div>
-                      <h2>{item.title}</h2>
-                      <p>由 {item.author} 分享。后续会接入真实用户、评论线程、关注关系和公开/私密发布权限。</p>
-                      <div className="square-post-actions">
-                        <button className={liked ? 'active liked' : ''} onClick={() => toggleLike(item.id)}>{ICONS.heart}<span>{likeCount}</span></button>
-                        <button className={saved ? 'active saved' : ''} onClick={() => toggleSave(item.id)}>{ICONS.bookmark}<span>{saveCount}</span></button>
-                        <button className={panelOpen ? 'active' : ''} onClick={() => setShowCommentPanel(panelOpen ? null : item.id)}>{ICONS.document}<span>{commentCount}</span></button>
-                        <button onClick={() => showToast('关注能力将在社区阶段接入')}>{ICONS.follow}<span>关注</span></button>
-                      </div>
-                      {panelOpen && (
-                        <div className="square-post-comments">
-                          <div className="square-comments-list">
-                            {comments.length === 0 && <p className="square-comments-empty">还没有评论，成为第一个分享观点的人。</p>}
-                            {comments.map(c => (
-                              <div key={c.id} className="square-comment">
-                                <span className="square-comment-user">{c.user}</span>
-                                <span className="square-comment-time">{formatRelative(c.time)}</span>
-                                <p>{c.text}</p>
-                              </div>
-                            ))}
-                          </div>
-                          <div className="square-comment-input">
-                            <input
-                              type="text"
-                              placeholder="写下你的观点…"
-                              value={draft}
-                              onChange={(e) => setCommentTexts(prev => ({ ...prev, [item.id]: e.target.value }))}
-                              onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addComment(item.id, draft); } }}
-                            />
-                            <button onClick={() => addComment(item.id, draft)}>发送</button>
-                          </div>
-                        </div>
-                      )}
-                    </article>
-                    );
-                  })}
-                </div>
-                <aside className="square-side">
-                  <div>
-                    <span>社区方向</span>
-                    <strong>先沉淀价值，再扩展社交</strong>
-                    <p>广场不做泛信息流，优先分享文章、智能体、工作流和高质量每日汇报。</p>
-                  </div>
-                  <div>
-                    <span>基础互动</span>
-                    <strong>点赞 / 收藏 / 关注 / 评论</strong>
-                    <p>第一阶段先完成入口和对象模型，下一阶段再接入真实后端关系数据。</p>
-                  </div>
-                </aside>
-              </section>
-            </div>
-          )}
 
           {nav === 'profile-center' && (
             <div className="product-page profile-center-page">

@@ -32,6 +32,16 @@ scrapling-logs
 *~
 .DS_Store
 
+# Local AI tools and workspaces
+.agents
+.claude
+.gemini
+.monkeycode
+.omc
+.opencode
+.superpowers
+.worktrees
+
 # Git
 .git
 .gitignore
@@ -51,6 +61,7 @@ tests/
 *.test.js
 *.spec.js
 coverage/
+public/screenshots/
 
 # 临时文件
 tmp/

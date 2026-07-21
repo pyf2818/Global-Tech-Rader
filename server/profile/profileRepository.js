@@ -23,9 +23,10 @@ export function createProfileRepository(db = getPool()) {
         await client.query('insert into user_profiles(user_id) values ($1) on conflict do nothing', [userId]);
         const profile = await client.query(
           `update user_profiles set version = version + 1, confidence = $2, behavior_signals = $3, updated_at = now()
-           where user_id = $1 returning version`,
-          [userId, state.confidence || 0, JSON.stringify(state.behaviorSignals || {})],
+           where user_id = $1 and ($4::integer is null or version = $4) returning version`,
+          [userId, state.confidence || 0, JSON.stringify(state.behaviorSignals || {}), state.expectedVersion ?? null],
         );
+        if (!profile.rows[0]) throw Object.assign(new Error('画像已在其他设备更新，请重新加载后再保存'), { code: 'PROFILE_VERSION_CONFLICT', status: 409 });
         await client.query('delete from profile_domains where user_id = $1', [userId]);
         await client.query('delete from profile_sources where user_id = $1', [userId]);
         await client.query('delete from special_follows where user_id = $1', [userId]);

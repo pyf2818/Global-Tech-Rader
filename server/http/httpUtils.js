@@ -12,7 +12,14 @@ export function sendJsonResponse(res, status, payload, headers = {}) {
 }
 
 export async function readJsonBody(req) {
-  if (req.body && typeof req.body === 'object') return req.body;
+  if (req.body && typeof req.body === 'object') {
+    if (Buffer.byteLength(JSON.stringify(req.body), 'utf8') > MAX_BODY_BYTES) throw Object.assign(new Error('Request body too large'), { code: 'BODY_TOO_LARGE', status: 413 });
+    return req.body;
+  }
+  if (typeof req.body === 'string') {
+    if (Buffer.byteLength(req.body, 'utf8') > MAX_BODY_BYTES) throw Object.assign(new Error('Request body too large'), { code: 'BODY_TOO_LARGE', status: 413 });
+    try { return JSON.parse(req.body); } catch { throw Object.assign(new Error('Invalid JSON body'), { code: 'INVALID_JSON', status: 400 }); }
+  }
   let size = 0;
   const chunks = [];
   for await (const chunk of req) {

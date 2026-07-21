@@ -217,6 +217,7 @@ export default function AiChatPanel({
         }),
       });
       const data = await response.json();
+      if (!response.ok || data.ok === false) throw new Error(typeof data.error === 'string' ? data.error : data.error?.message || 'AI 请求失败');
       const rawContent = data.result || data.content || data.text || '未能获取回复内容。';
       const allowedCitationIds = new Set((intelligenceContext?.items || []).map(item => String(item.id)));
       const citedIds = [...rawContent.matchAll(/\[资讯:([^\]]+)\]/g)].map(match => match[1].trim());

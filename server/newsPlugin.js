@@ -15,4 +15,4 @@
 // (see server/auth, server/community, server/profile, server/db).
 // news/auth/userAuth.js is a dead legacy copy - do not use.
 
-export { newsPlugin } from './news/plugin.js';
+export { createNewsApiMiddleware, newsPlugin } from './news/plugin.js';

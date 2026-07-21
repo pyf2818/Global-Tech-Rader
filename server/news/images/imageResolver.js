@@ -511,7 +511,8 @@ export async function resolveImageWithScrapling(articleUrl) {
   }
 
   try {
-    const response = await fetch('http://localhost:5000/api/scrape', {
+    const scraplingBaseUrl = String(process.env.SCRAPLING_URL || 'http://localhost:5000').replace(/\/+$/, '');
+    const response = await fetch(`${scraplingBaseUrl}/api/scrape`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
