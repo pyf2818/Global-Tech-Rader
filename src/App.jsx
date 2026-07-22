@@ -84,7 +84,7 @@ const MOTIVATIONAL_QUOTES = [
 ];
 
 const NAV_ITEMS = [
-  { id: 'home', label: 'AI 情报', icon: 'sparkle' },
+  { id: 'home', label: 'AI 工作站', icon: 'sparkle' },
   { id: 'today', label: '今日速报', icon: 'sparkle' },
   { id: 'recommendations', label: '精准推荐', icon: 'calendar' },
   { id: 'all', label: '全部动态', icon: 'grid' },
@@ -100,7 +100,7 @@ const NAV_ITEMS = [
 ];
 
 const PRIMARY_NAV_ITEMS = [
-  { id: 'home', label: 'AI 情报', desc: '今日总判断', short: '情报', icon: 'sparkle', nav: 'home' },
+  { id: 'home', label: 'AI 工作站', desc: '今日总判断', short: '情报', icon: 'sparkle', nav: 'home' },
   { id: 'today', label: '今日速报', desc: '精准推荐', short: '速报', icon: 'sparkle', nav: 'today' },
   { id: 'recommendations', label: '精准推荐', desc: '日历时间线', short: '推荐', icon: 'calendar', nav: 'recommendations' },
   { id: 'all', label: '全部动态', desc: '扩展视野', short: '动态', icon: 'grid', nav: 'all' },
@@ -113,7 +113,7 @@ const PRIMARY_NAV_ITEMS = [
 
 const NAV_CONTEXT_SECTIONS = {
   home: {
-    label: 'AI 情报中枢',
+    label: 'AI 工作站',
     items: ['home']
   },
   today: {
@@ -1591,7 +1591,7 @@ function App() {
     let description = PRODUCT_DESCRIPTION;
     
     if (nav === 'home') {
-      title = `${PRODUCT_NAME} - AI 情报`;
+      title = `${PRODUCT_NAME} - AI 工作站`;
       description = '基于公共热点、用户画像和可验证来源生成每日情报总判断。';
     } else if (nav === 'today') {
       title = `${PRODUCT_NAME} - 每日汇报`;
@@ -1825,7 +1825,9 @@ function App() {
   useEffect(() => {
     if (!items.length || !availableNewsDates.length) return;
     if (!availableNewsDates.includes(selectedNewsDate)) {
-      setSelectedNewsDate(availableNewsDates[0]);
+      // 历史日期可能无实时资讯但有快照，用户主动选择时不覆盖
+      const hasSnapshot = snapshotStoreRef.current.get(selectedNewsDate);
+      if (!hasSnapshot) setSelectedNewsDate(availableNewsDates[0]);
     }
   }, [items.length, availableNewsDates, selectedNewsDate]);
 
