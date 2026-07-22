@@ -13,8 +13,8 @@
   --surface-workbench-inset: rgba(255, 255, 255, 0.035);
   --surface-workbench-control: var(--bg-primary);
   --surface-workbench-action: rgba(245, 247, 250, 0.04);
-  --sidebar-w: 220px;
-  --sidebar-collapsed-w: 56px;
+  --sidebar-w: 176px;
+  --sidebar-collapsed-w: 52px;
   --panel-w: 220px;
   --panel-collapsed-w: 40px;
   /* Default palette tokens (champagne) — overridden by [data-palette] */
@@ -219,7 +219,7 @@ body {
 .nav-item { display: flex; align-items: center; gap: var(--space-sm); width: 100%; padding: 7px 10px; margin-bottom: 1px; background: transparent; border: none; border-radius: 8px; color: var(--text-muted); font-size: 13px; font-weight: 500; cursor: pointer; transition: all 0.15s; text-align: left; white-space: nowrap; }
 .nav-item:hover { background: var(--bg-hover); color: var(--text-secondary); }
 .nav-item.active { background: rgba(56, 189, 248, 0.1); color: var(--accent-cyan); }
-.nav-primary-item { min-height: 52px; align-items: center; margin-bottom: 4px; border: 1px solid transparent; }
+.nav-primary-item { min-height: 42px; align-items: center; margin-bottom: 3px; border: 1px solid transparent; }
 .nav-primary-item.active { border-color: var(--accent-cyan-border); background: var(--surface-workbench-ai); }
 .nav-label-wrap { display: flex; min-width: 0; flex: 1; flex-direction: column; gap: 2px; }
 .nav-label-wrap small { overflow: hidden; color: var(--text-muted); font-size: 10px; font-weight: 600; text-overflow: ellipsis; }
@@ -17628,3 +17628,62 @@ body {
 .newspaper-body {
   padding: 0 8px;
 }
+
+/* ============================================================
+   侧边栏瘦身 + 细分模块横向标签条
+   ============================================================ */
+/* 细分模块改为横向标签（flex-wrap），节省纵向空间 */
+.nav-context-group {
+  margin-bottom: 8px;
+  padding: 0 8px;
+}
+.nav-context-group .nav-group-title-static {
+  padding: 4px 4px 6px;
+  font-size: 9px;
+  letter-spacing: 0.06em;
+}
+.nav-context-group .nav-item.nav-sub-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 28px;
+  padding: 0 10px;
+  margin: 0 4px 4px 0;
+  border: 1px solid var(--border-color);
+  border-radius: 14px;
+  font-size: 11px;
+  background: var(--bg-primary);
+  transition: all 0.15s;
+}
+.nav-context-group .nav-item.nav-sub-item:hover {
+  border-color: var(--border-active);
+  background: var(--accent-cyan-soft);
+}
+.nav-context-group .nav-item.nav-sub-item.active {
+  border-color: var(--accent-cyan);
+  background: var(--accent-cyan-soft);
+  color: var(--accent-cyan);
+}
+.nav-context-group .nav-item.nav-sub-item .nav-icon {
+  width: 14px;
+  height: 14px;
+  display: inline-flex;
+}
+.nav-context-group .nav-item.nav-sub-item .nav-icon svg {
+  width: 13px;
+  height: 13px;
+}
+.nav-context-group .nav-item.nav-sub-item .nav-count {
+  font-size: 9px;
+  padding: 0 5px;
+  min-width: auto;
+  height: 14px;
+  line-height: 14px;
+}
+/* 侧边栏整体更紧凑 */
+.sidebar { font-size: 12px; }
+.sidebar-header { padding: 10px 12px !important; }
+.sidebar-footer { padding: 8px 8px !important; }
+.sidebar-action { min-height: 34px !important; }
+.nav-item { padding: 0 10px; }
+.nav-label { font-size: 12px; }
