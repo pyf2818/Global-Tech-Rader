@@ -341,6 +341,9 @@ export default function StockPage({ llmConfig, onOpenLlmConfig }) {
 
   // 列表数据（热门或自选）
   const listItems = listTab === 'watchlist' ? watchlist : (dashboard?.stocks || []);
+  const quoteUpdatedLabel = realtime?.timestamp
+    ? new Date(realtime.timestamp).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+    : '--:--:--';
 
   const pickStock = (code, name) => {
     setSelectedCode(code);
@@ -375,6 +378,10 @@ export default function StockPage({ llmConfig, onOpenLlmConfig }) {
             </>
           )}
         </div>
+        <div className="stock3-data-status" title={`数据源：${realtime?.dataSource || '等待行情'}`}>
+          <span className={`stock3-data-dot ${realtime ? 'live' : ''}`} />
+          <span>行情 {quoteUpdatedLabel}</span>
+        </div>
         <button className={`stock-watch-btn ${isSelectedInWatchlist ? 'active' : ''}`} onClick={() => toggleStock(selectedStock)} title={isSelectedInWatchlist ? '移出自选' : '加入自选'}>
           {ICONS.star}<span>{isSelectedInWatchlist ? '已自选' : '加自选'}</span>
         </button>
@@ -403,6 +410,7 @@ export default function StockPage({ llmConfig, onOpenLlmConfig }) {
               const down = dashboard.stocks.filter(s => s.changePct < 0).length;
               const flat = dashboard.stocks.length - up - down;
               return <>
+                <span className="breadth-label">热门样本</span>
                 <span className="breadth-up">↑{up}</span>
                 <span className="breadth-flat">—{flat}</span>
                 <span className="breadth-down">↓{down}</span>

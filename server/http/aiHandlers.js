@@ -53,6 +53,90 @@ function buildMessages(body) {
   return result;
 }
 
+/* 流式聊天：向上游发 stream:true，解析 SSE delta 转发给前端。
+   前端断开（停止）时通过 req.on('close') 中止上游请求。 */
+async function handleAiStreamRequest(req, res, body) {
+  const baseUrl = cleanText(body.baseUrl, 2000).replace(/\/+$/, '');
+  const model = cleanText(body.model, 200);
+  if (!baseUrl || !model) {
+    return sendJsonResponse(res, 400, { ok: false, error: 'baseUrl 和 model 不能为空', errorCode: 'INVALID_AI_CONFIG' });
+  }
+  const apiUrl = /\/v[1-4]$/.test(baseUrl) ? `${baseUrl}/chat/completions` : `${baseUrl}/v1/chat/completions`;
+  const headers = { 'Content-Type': 'application/json' };
+  const apiKey = cleanText(body.apiKey, 4000);
+  if (apiKey) headers.Authorization = `Bearer ${apiKey}`;
+  const requestedMaxTokens = Number(body.max_tokens);
+  const maxTokens = Number.isFinite(requestedMaxTokens) && requestedMaxTokens > 0 && requestedMaxTokens <= 8000
+    ? Math.floor(requestedMaxTokens)
+    : 4000;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 90_000);
+  // 前端关闭连接时中止上游
+  const onClose = () => controller.abort();
+  req.on('close', onClose);
+
+  res.writeHead(200, {
+    'Content-Type': 'text/event-stream; charset=utf-8',
+    'Cache-Control': 'no-cache, no-transform',
+    'Connection': 'keep-alive',
+    'X-Accel-Buffering': 'no',
+  });
+
+  let upstream;
+  try {
+    upstream = await safeExternalFetch(apiUrl, {
+      allowPrivate: allowPrivateAiNetwork(), method: 'POST', headers, signal: controller.signal,
+      body: JSON.stringify({ model, messages: buildMessages(body), max_tokens: maxTokens, temperature: 0.7, stream: true }),
+    });
+    if (!upstream.ok) {
+      const errText = await upstream.text().catch(() => '');
+      res.write(`data: ${JSON.stringify({ ok: false, error: `模型服务返回 ${upstream.status}${errText ? ': ' + errText.slice(0, 200) : ''}`, errorCode: 'UPSTREAM_AI_ERROR' })}\n\n`);
+      return res.end();
+    }
+  } catch (err) {
+    const isAbort = err?.name === 'AbortError';
+    const msg = isAbort ? '模型服务请求超时或已停止' : (err?.message || 'AI 网关请求失败');
+    res.write(`data: ${JSON.stringify({ ok: false, error: msg, errorCode: isAbort ? 'UPSTREAM_TIMEOUT' : 'AI_GATEWAY_ERROR' })}\n\n`);
+    return res.end();
+  } finally {
+    clearTimeout(timeout);
+  }
+
+  const reader = upstream.body.getReader();
+  const decoder = new TextDecoder('utf-8');
+  let buffer = '';
+  try {
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed || !trimmed.startsWith('data:')) continue;
+        const payload = trimmed.slice(5).trim();
+        if (payload === '[DONE]') { res.write('data: [DONE]\n\n'); return res.end(); }
+        try {
+          const json = JSON.parse(payload);
+          const delta = json.choices?.[0]?.delta?.content;
+          if (delta) res.write(`data: ${JSON.stringify({ ok: true, delta })}\n\n`);
+        } catch { /* 跳过不完整的 JSON 行 */ }
+      }
+    }
+    res.write('data: [DONE]\n\n');
+    res.end();
+  } catch (err) {
+    if (err?.name !== 'AbortError') {
+      res.write(`data: ${JSON.stringify({ ok: false, error: err?.message || '流式读取失败', errorCode: 'AI_GATEWAY_ERROR' })}\n\n`);
+    }
+    res.end();
+  } finally {
+    clearTimeout(timeout);
+    req.off('close', onClose);
+  }
+}
+
 export async function handleAiGenerateRequest(req, res) {
   if (String(req.method).toUpperCase() !== 'POST') {
     return sendJsonResponse(res, 405, { ok: false, error: { code: 'METHOD_NOT_ALLOWED', message: '请求方法不支持' } });
@@ -61,6 +145,10 @@ export async function handleAiGenerateRequest(req, res) {
   try {
     enforceRateLimit(req);
     const body = await readJsonBody(req);
+    // 流式聊天走独立处理，返回 SSE
+    if (body.stream === true) {
+      return handleAiStreamRequest(req, res, body);
+    }
     const baseUrl = cleanText(body.baseUrl, 2000).replace(/\/+$/, '');
     const model = cleanText(body.model, 200);
     if (!baseUrl || !model) throw Object.assign(new Error('baseUrl 和 model 不能为空'), { code: 'INVALID_AI_CONFIG', status: 400 });
@@ -69,10 +157,14 @@ export async function handleAiGenerateRequest(req, res) {
     const apiKey = cleanText(body.apiKey, 4000);
     if (apiKey) headers.Authorization = `Bearer ${apiKey}`;
     const controller = new AbortController();
-    timeout = setTimeout(() => controller.abort(), 30_000);
+    timeout = setTimeout(() => controller.abort(), 90_000);
+    const requestedMaxTokens = Number(body.max_tokens);
+    const maxTokens = Number.isFinite(requestedMaxTokens) && requestedMaxTokens > 0 && requestedMaxTokens <= 8000
+      ? Math.floor(requestedMaxTokens)
+      : 4000;
     const response = await safeExternalFetch(apiUrl, {
       allowPrivate: allowPrivateAiNetwork(), method: 'POST', headers, signal: controller.signal,
-      body: JSON.stringify({ model, messages: buildMessages(body), max_tokens: 1500, temperature: 0.7 }),
+      body: JSON.stringify({ model, messages: buildMessages(body), max_tokens: maxTokens, temperature: 0.7 }),
     });
     if (!response.ok) {
       await response.body?.cancel().catch(() => {});

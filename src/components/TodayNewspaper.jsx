@@ -120,7 +120,7 @@ function Story({ item, rank, onOpenItem, onSaveItem, bilingual }) {
         <p>{item.summary || item.recommendation || '暂无摘要'}</p>
         <BilingualBody item={item} translation={translation} translationOpen={translationOpen} translating={translating} />
         <footer>
-          <span>{item.source || '未��来源'}</span>
+          <span>{item.source || '未知来源'}</span>
           <span>{item.publishedAt ? new Date(item.publishedAt).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }) : '--:--'}</span>
           <span>{Math.round(item.mustReadScore || 0)} 分</span>
           <button type="button" onClick={() => onSaveItem(item)}>沉淀素材</button>
@@ -142,6 +142,7 @@ function Story({ item, rank, onOpenItem, onSaveItem, bilingual }) {
 export default function TodayNewspaper({
   briefing,
   lanes,
+  items = [],
   loading,
   onRefresh,
   onOpenItem,
@@ -157,10 +158,28 @@ export default function TodayNewspaper({
   onToggleTranslation,
   isEnglishText,
 }) {
-  const allItems = [...(lanes?.public || []), ...(lanes?.personal || [])];
+  const allItems = useMemo(
+    () => [...(lanes?.public || []), ...(lanes?.personal || [])],
+    [lanes?.public, lanes?.personal]
+  );
   const lead = briefing?.sections?.lead || allItems[0];
   const domains = briefing?.sections?.domains || [];
-  const sources = [...new Map(allItems.map(item => [item.source, item])).values()].filter(item => item.source);
+  const reportItems = useMemo(() => {
+    const seen = new Set();
+    return [...allItems, ...(items || [])].filter(item => {
+      const key = item?.id || item?.url;
+      if (!key || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }, [allItems, items]);
+  const sources = [...new Map(reportItems.map(item => [item.source, item])).values()].filter(item => item.source);
+  const coveredDomains = [...new Set(reportItems.map(item => item.category).filter(Boolean))];
+  const featuredIds = new Set(allItems.map(item => item.id));
+  const quickBriefs = reportItems.filter(item => !featuredIds.has(item.id)).slice(0, 12);
+  const generatedTime = briefing?.generatedAt
+    ? new Date(briefing.generatedAt).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
+    : '--:--';
 
   const [bilingualAll, setBilingualAll] = useState(false);
   const englishItems = useMemo(
@@ -208,10 +227,18 @@ export default function TodayNewspaper({
                 {bilingualAll ? '收起译文' : `中英对照 ${englishCount}`}
               </button>
             )}
-            <button type="button" onClick={onOpenRecommendations}>历史推荐</button>
+            <button type="button" onClick={onOpenRecommendations}>精准推荐</button>
             <button type="button" onClick={onRefresh}>{loading ? '刷新中' : '刷新'}</button>
           </div>
         </header>
+
+        <dl className="newspaper-digest-strip" aria-label="今日速报概览">
+          <div><dt>入选资讯</dt><dd>{reportItems.length}</dd></div>
+          <div><dt>重点报道</dt><dd>{allItems.length}</dd></div>
+          <div><dt>覆盖领域</dt><dd>{coveredDomains.length}</dd></div>
+          <div><dt>独立信源</dt><dd>{sources.length}</dd></div>
+          <div><dt>编发时间</dt><dd>{generatedTime}</dd></div>
+        </dl>
 
         {!lead ? (
           <div className="newspaper-empty">当前日期没有足够资讯形成版面。</div>
@@ -229,6 +256,21 @@ export default function TodayNewspaper({
               <section><header><span>PUBLIC SIGNALS</span><h2>公共热点</h2></header>{(lanes.public || []).map((item, index) => <Story key={item.id} item={item} rank={index + 1} onOpenItem={onOpenItem} onSaveItem={onSaveItem} bilingual={bilingual} />)}</section>
               <section><header><span>PERSONAL PRIORITY</span><h2>个人必看</h2></header>{(lanes.personal || []).map((item, index) => <Story key={item.id} item={item} rank={index + 1} onOpenItem={onOpenItem} onSaveItem={onSaveItem} bilingual={bilingual} />)}</section>
             </div>
+
+            {quickBriefs.length > 0 && (
+              <section className="newspaper-briefs">
+                <header><span>NEWS IN BRIEF</span><h2>当日快讯</h2><small>重点版面之外的补充信号</small></header>
+                <ol>
+                  {quickBriefs.map((item, index) => (
+                    <li key={item.id || item.url}>
+                      <span>{String(index + 1).padStart(2, '0')}</span>
+                      <button type="button" onClick={() => onOpenItem(item)}>{item.title}</button>
+                      <small>{item.category || '综合'} · {item.source || '未知来源'} · {item.publishedAt ? new Date(item.publishedAt).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }) : '--:--'}</small>
+                    </li>
+                  ))}
+                </ol>
+              </section>
+            )}
 
             <section className="newspaper-domain-band">
               <header><span>SECTIONS</span><h2>领域版面</h2></header>

@@ -85,7 +85,6 @@ const MOTIVATIONAL_QUOTES = [
 
 const NAV_ITEMS = [
   { id: 'home', label: 'AI 工作站', icon: 'sparkle' },
-  { id: 'today', label: '今日速报', icon: 'sparkle' },
   { id: 'recommendations', label: '精准推荐', icon: 'calendar' },
   { id: 'all', label: '全部动态', icon: 'grid' },
   { id: 'stock', label: '股市动向', icon: 'trendingUp' },
@@ -101,8 +100,7 @@ const NAV_ITEMS = [
 
 const PRIMARY_NAV_ITEMS = [
   { id: 'home', label: 'AI 工作站', desc: '今日总判断', short: '情报', icon: 'cpu', nav: 'home', children: ['home'] },
-  { id: 'today', label: '今日速报', desc: '精准推荐', short: '速报', icon: 'sparkle', nav: 'today', children: ['today', 'recommendations'] },
-  { id: 'recommendations', label: '精准推荐', desc: '日历时间线', short: '推荐', icon: 'calendar', nav: 'recommendations', children: ['today', 'recommendations'] },
+  { id: 'recommendations', label: '精准推荐', desc: '日历时间线', short: '推荐', icon: 'calendar', nav: 'recommendations', children: ['recommendations'] },
   { id: 'all', label: '全部动态', desc: '扩展视野', short: '动态', icon: 'grid', nav: 'all', children: ['all'] },
   { id: 'stock', label: '股市动向', desc: '行情分析', short: '股市', icon: 'trendingUp', nav: 'stock', children: [] },
   { id: 'github', label: 'GitHub 热门', desc: '三榜项目', short: '开源', icon: 'github', nav: 'github', children: ['github'] },
@@ -116,13 +114,9 @@ const NAV_CONTEXT_SECTIONS = {
     label: 'AI 工作站',
     items: ['home']
   },
-  today: {
-    label: '智能推荐',
-    items: ['today', 'recommendations']
-  },
   recommendations: {
     label: '精准推荐',
-    items: ['today', 'recommendations']
+    items: ['recommendations']
   },
   all: {
     label: '多领域资讯',
@@ -1194,6 +1188,7 @@ function App() {
 
   const [profilePage, setProfilePage] = useState(1);
   const [copilotPendingMessage, setCopilotPendingMessage] = useState('');
+  const [showNewspaperOverlay, setShowNewspaperOverlay] = useState(false);
   const [llmPresetName, setLlmPresetName] = useState('');
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showProfileModal, setShowProfileModal] = useState(false);
@@ -1572,7 +1567,7 @@ function App() {
   }, []);
 
   useEffect(() => {
-    if (nav !== 'all' && nav !== 'recommendations' && nav !== 'today') return;
+    if (nav !== 'all' && nav !== 'recommendations') return;
     const el = feedRef.current;
     if (!el || loading) return;
     const observer = new IntersectionObserver(
@@ -1604,9 +1599,6 @@ function App() {
     if (nav === 'home') {
       title = `${PRODUCT_NAME} - AI 工作站`;
       description = '基于公共热点、用户画像和可验证来源生成每日情报总判断。';
-    } else if (nav === 'today') {
-      title = `${PRODUCT_NAME} - 每日汇报`;
-      description = '根据用户画像、阅读行为、信号源质量和大模型协作生成每日高质量情报汇报。';
     } else if (nav === 'trending') {
       title = `${PRODUCT_NAME} - ${TRENDING_TYPES.find(t => t.id === trendingType)?.label || '热门榜单'}`;
       description = '隐藏工具中的热点榜单，用于补充观察公共热度。';
@@ -1659,7 +1651,7 @@ function App() {
   }, [query]);
 
   useEffect(() => {
-    if (nav !== 'all' && nav !== 'today') return;
+    if (nav !== 'all') return;
     loadNews(blocked, false, debouncedQuery);
   }, [debouncedQuery, category, mode, sourceFilter]);
   useEffect(() => {
@@ -5583,7 +5575,6 @@ ${signals}
 
   const navToPrimary = {
     home: 'home',
-    today: 'today',
     recommendations: 'recommendations',
     all: 'all',
     stock: 'stock',
@@ -5619,10 +5610,10 @@ ${signals}
     setFocusedIndex(-1);
     setMobileMenuOpen(false);
   };
-  const wideWorkspaceNavs = ['home', 'today', 'recommendations', 'studio', 'agents', 'editor', 'materials', 'square', 'profile-center'];
+  const wideWorkspaceNavs = ['home', 'recommendations', 'studio', 'agents', 'editor', 'materials', 'square', 'profile-center'];
   // 右侧面板：「全部动态」显示关注关键词；「AI 情报首页」显示情报时间线；「精准推荐」显示日期竖向时间线
-  const showRightPanel = nav === 'all' || nav === 'home' || nav === 'recommendations';
-  const showStatsBar = showRightPanel && nav !== 'today' && nav !== 'home' && nav !== 'recommendations';
+  const showRightPanel = nav === 'all' || nav === 'recommendations';
+  const showStatsBar = showRightPanel && nav !== 'home' && nav !== 'recommendations';
 
   return (
     <div className={`app ${sidebarCollapsed ? 'sidebar-collapsed' : ''} ${panelCollapsed ? 'panel-collapsed' : ''} ${!showRightPanel ? 'no-right-panel' : ''} ${editorFullscreen ? 'editor-fullscreen' : ''}`}>
@@ -5722,47 +5713,58 @@ ${signals}
         <nav className="nav-menu">
           <div className="nav-primary-group">
             {!sidebarCollapsed && <div className="nav-group-title-static">主工作区</div>}
-            {PRIMARY_NAV_ITEMS.map(item => (
-              <button
-                key={item.id}
-                className={`nav-item nav-primary-item ${activePrimaryNav === item.id ? 'active' : ''}`}
-                onClick={() => { goNav(item.nav); addRecentVisit('nav', item.nav, item.label); }}
-                title={sidebarCollapsed ? item.label : undefined}
-              >
-                <span className="nav-icon">{ICONS[item.icon]}</span>
-                {sidebarCollapsed && item.short && (
-                  <span className="nav-short-label">{item.short}</span>
-                )}
-                {!sidebarCollapsed && (
-                  <span className="nav-label-wrap">
-                    <span className="nav-label">{item.label}</span>
-                    <small>{item.desc}</small>
-                  </span>
-                )}
-              </button>
-            ))}
-            </div>
+            {PRIMARY_NAV_ITEMS.map(item => {
+              const isActive = activePrimaryNav === item.id;
+              const showContext = isActive && !sidebarCollapsed && activeContextItems.length > 1;
 
-          {!sidebarCollapsed && activeContextItems.length > 0 && (
-            <div className={`nav-context-group ${contextGroupOpen ? 'open' : 'collapsed'}`}>
-              <button type="button" className="nav-context-toggle" onClick={() => setContextGroupOpen(v => !v)}>
-                <span className="nav-group-title-static">{activeContextSection.label}</span>
-                <span className={'nav-context-arrow' + (contextGroupOpen ? ' open' : '')} aria-hidden="true">▾</span>
-              </button>
-              {contextGroupOpen && activeContextItems.map(item => (
-                <button
-                  key={item.id}
-                  className={`nav-item nav-sub-item ${nav === item.id ? 'active' : ''}`}
-                  onClick={() => { goNav(item.id); addRecentVisit('nav', item.id, item.label); }}
-                >
-                  <span className="nav-icon">{ICONS[item.icon]}</span>
-                  <span className="nav-label">{item.label}</span>
-                  {item.id === 'reading-list' && <span className="nav-count">{bookmarks.length}</span>}
-                  {item.id === 'all' && <span className="nav-count">{filtered.length}</span>}
-                </button>
-              ))}
+              return (
+                <div key={item.id} className={`nav-primary-entry ${isActive ? 'active' : ''}`}>
+                  <button
+                    className={`nav-item nav-primary-item ${isActive ? 'active' : ''}`}
+                    onClick={() => {
+                      goNav(item.nav);
+                      addRecentVisit('nav', item.nav, item.label);
+                      setContextGroupOpen(current => isActive ? !current : true);
+                    }}
+                    title={sidebarCollapsed ? item.label : undefined}
+                    aria-expanded={showContext ? contextGroupOpen : undefined}
+                  >
+                    <span className="nav-icon">{ICONS[item.icon]}</span>
+                    {sidebarCollapsed && item.short && (
+                      <span className="nav-short-label">{item.short}</span>
+                    )}
+                    {!sidebarCollapsed && (
+                      <span className="nav-label-wrap">
+                        <span className="nav-label">{item.label}</span>
+                        <small>{item.desc}</small>
+                      </span>
+                    )}
+                    {showContext && (
+                      <span className={`nav-primary-chevron ${contextGroupOpen ? 'open' : ''}`} aria-hidden="true">
+                        {ICONS.chevronDown}
+                      </span>
+                    )}
+                  </button>
+                  {showContext && contextGroupOpen && (
+                    <div className="nav-context-group nav-context-inline">
+                      {activeContextItems.map(contextItem => (
+                        <button
+                          key={contextItem.id}
+                          className={`nav-item nav-sub-item ${nav === contextItem.id ? 'active' : ''}`}
+                          onClick={() => { goNav(contextItem.id); addRecentVisit('nav', contextItem.id, contextItem.label); }}
+                        >
+                          <span className="nav-icon">{ICONS[contextItem.icon]}</span>
+                          <span className="nav-label">{contextItem.label}</span>
+                          {contextItem.id === 'reading-list' && <span className="nav-count">{bookmarks.length}</span>}
+                          {contextItem.id === 'all' && <span className="nav-count">{filtered.length}</span>}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
             </div>
-          )}
 
           {!sidebarCollapsed && nav === 'agents' && (
             <div className="nav-context-group agent-nav-summary">
@@ -5861,8 +5863,8 @@ ${signals}
       <ThemePicker mode={themeMode} setMode={setThemeMode} palette={palette} setPalette={setPalette} show={showThemePicker} onClose={() => setShowThemePicker(false)} />
 
       {/* Main */}
-      <main data-nav={nav} className={`main ${(nav === 'home' || nav === 'today' || nav === 'recommendations') ? 'main-workbench' : ''}`}>
-        <header className={`topbar ${nav === 'all' ? 'topbar-all' : ''} ${(nav === 'trending' || nav === 'recommendations') ? 'topbar-trending' : ''}`}>
+      <main data-nav={nav} className={`main ${(nav === 'home' || nav === 'recommendations') ? 'main-workbench' : ''}`}>
+        <header className={`topbar ${nav === 'all' ? 'topbar-all' : ''} ${nav === 'stock' ? 'topbar-stock' : ''} ${(nav === 'trending' || nav === 'recommendations') ? 'topbar-trending' : ''}`}>
           {nav === 'all' && (
             <div className="topbar-brand">
               <span className="brand-title">{PRODUCT_NAME}</span>
@@ -5984,11 +5986,6 @@ ${signals}
                   )}
                 </div>
               )}
-              {nav === 'stock' && (
-                <Suspense fallback={<div className="page-loading-skeleton" />}>
-                  <StockPage llmConfig={llmConfig} categories={categories} onOpenLlmConfig={() => setShowLlmQuickConfig(true)} />
-                </Suspense>
-              )}
               {nav === 'github' && (
                 <div className="github-filter-bar">
                   <div className="lang-tabs">
@@ -6107,7 +6104,12 @@ ${signals}
           </div>
         )}
 
-        <div className={`feed custom-scrollbar ${(nav === 'home' || nav === 'today' || nav === 'recommendations') ? 'feed-workbench' : ''}`} ref={feedRef}>
+        <div className={`feed custom-scrollbar ${(nav === 'home' || nav === 'recommendations') ? 'feed-workbench' : ''} ${nav === 'stock' ? 'feed-stock' : ''}`} ref={feedRef}>
+          {nav === 'stock' && (
+            <Suspense fallback={<div className="page-loading-skeleton" />}>
+              <StockPage llmConfig={llmConfig} categories={categories} onOpenLlmConfig={() => setShowLlmQuickConfig(true)} />
+            </Suspense>
+          )}
           {nav === 'home' && (
             <AiChatPanel
               variant="main"
@@ -6125,29 +6127,10 @@ ${signals}
                 briefing: algorithmBriefing,
                 items: [...recommendationLanes.public, ...recommendationLanes.personal].slice(0, 12),
               }}
-            />
-          )}
-          {nav === 'today' && (
-            <TodayNewspaper
-              briefing={todayBriefing}
-              lanes={todayLanes}
-              loading={loading}
-              onRefresh={() => loadNews()}
-              onOpenRecommendations={() => goNav('recommendations')}
-              onOpenItem={item => {
-                recordReading(item);
-                if (item.url) window.open(item.url, '_blank', 'noopener,noreferrer');
-              }}
-              onSaveItem={item => toggleMaterial(item, 'news', '今日速报')}
-              snapshots={recommendationSnapshots}
-              selectedDate={selectedNewsDate}
-              onSelectDate={date => setSelectedNewsDate(date)}
-              translations={translations}
-              translationOpen={translationOpen}
-              translatingItems={translatingItems}
-              onRequestTranslation={requestTranslation}
-              onToggleTranslation={itemId => setTranslationOpen(p => ({ ...p, [itemId]: !p[itemId] }))}
-              isEnglishText={isEnglishText}
+              onOpenNewspaper={() => setShowNewspaperOverlay(true)}
+              todayBriefing={todayBriefing}
+              todayLanes={todayLanes}
+              materials={materials}
             />
           )}
           {nav === 'today-legacy' && (
@@ -8683,26 +8666,60 @@ ${signals}
         {/* Copilot — AI 情报与每日速报共享同一段有界证据上下文 */}
       </main>
 
+      {/* 今日速报抽屉：从右侧滑入，点遮罩或 ✕ 关闭 */}
+      {showNewspaperOverlay && (
+        <div
+          className="newspaper-drawer-mask"
+          role="dialog"
+          aria-modal="true"
+          aria-label="今日速报"
+          onClick={e => { if (e.target === e.currentTarget) setShowNewspaperOverlay(false); }}
+        >
+          <aside className="newspaper-drawer">
+            <div className="newspaper-drawer-bar">
+              <span>今日速报 · 完整日报</span>
+              <button
+                type="button"
+                className="newspaper-drawer-close"
+                onClick={() => setShowNewspaperOverlay(false)}
+                aria-label="关闭"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="newspaper-drawer-body custom-scrollbar">
+              <TodayNewspaper
+                briefing={todayBriefing}
+                lanes={todayLanes}
+                items={recommendationCandidates}
+                loading={loading}
+                onRefresh={() => loadNews()}
+                onOpenRecommendations={() => { setShowNewspaperOverlay(false); goNav('recommendations'); }}
+                onOpenItem={item => {
+                  recordReading(item);
+                  if (item.url) window.open(item.url, '_blank', 'noopener,noreferrer');
+                }}
+                onSaveItem={item => toggleMaterial(item, 'news', '今日速报')}
+                snapshots={recommendationSnapshots}
+                selectedDate={selectedNewsDate}
+                onSelectDate={date => setSelectedNewsDate(date)}
+                translations={translations}
+                translationOpen={translationOpen}
+                translatingItems={translatingItems}
+                onRequestTranslation={requestTranslation}
+                onToggleTranslation={itemId => setTranslationOpen(p => ({ ...p, [itemId]: !p[itemId] }))}
+                isEnglishText={isEnglishText}
+              />
+            </div>
+          </aside>
+        </div>
+      )}
+
       {/* Right Panel */}
-      {showRightPanel && <aside className={`panel ${panelCollapsed ? 'collapsed' : ''} ${nav === 'home' ? 'panel-intelligence' : nav === 'recommendations' ? 'panel-recommendations' : ''}`}>
+      {showRightPanel && <aside className={`panel ${panelCollapsed ? 'collapsed' : ''} ${nav === 'recommendations' ? 'panel-recommendations' : ''}`}>
         {!panelCollapsed && (
           <>
-          {nav === 'home' ? (
-            <IntelligenceSidebar
-              briefing={algorithmBriefing}
-              lanes={recommendationLanes}
-              snapshots={recommendationSnapshots}
-              selectedDate={selectedNewsDate}
-              onSelectDate={date => setSelectedNewsDate(date)}
-              onDissect={item => setCopilotPendingMessage(`请深度剖析这条情报：\n标题：${item.title}\n来源：${item.source || '未知'}\n摘要：${String(item.summary || '').slice(0, 400)}\n\n请从事实核查、关联脉络、对我的影响、下一步行动四个维度展开。`)}
-              onOpenItem={item => {
-                recordReading(item);
-                if (item.url) window.open(item.url, '_blank', 'noopener,noreferrer');
-              }}
-              onRefresh={() => loadNews()}
-              loading={loading}
-            />
-          ) : nav === 'recommendations' ? (
+          {nav === 'recommendations' ? (
             <RecommendationDateRail
               snapshots={recommendationSnapshots}
               selectedDate={selectedNewsDate}

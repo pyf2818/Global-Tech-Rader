@@ -30,10 +30,11 @@ const DEFAULT_HOT_STOCKS = [
   { secid: '1.688981', code: 'sh688981', name: '中芯国际' },
 ];
 
-// 缓存：实时 60s，K线 10min
+// 缓存：单标的实时 8s，批量看板 30s，K线 10min
 const realtimeCache = new Map();
 const klineCache = new Map();
-const REALTIME_TTL = 60 * 1000;
+const REALTIME_TTL = 8 * 1000;
+const BATCH_REALTIME_TTL = 30 * 1000;
 const KLINE_TTL = 10 * 60 * 1000;
 
 function nowMs() { return Date.now(); }
@@ -128,6 +129,7 @@ function parseTencentLine(line) {
     amount: 0,
     bids,
     asks,
+    dataSource: 'tencent',
     timestamp: nowMs(),
   };
 }
@@ -162,7 +164,19 @@ export async function getRealtime(secids) {
     const json = await res.json();
     const d = json?.data;
     if (d) {
-      const item = parseRealtimeItem(d, secids[0]);
+      let item = parseRealtimeItem(d, secids[0]);
+      // 东方财富主报价不含五档深度；腾讯作为盘口补充源，不影响主报价可用性。
+      try {
+        const [depth] = await fetchTencentBatch([secids[0]]);
+        if (depth) {
+          item = {
+            ...item,
+            bids: depth.bids || [],
+            asks: depth.asks || [],
+            dataSource: 'eastmoney+tencent',
+          };
+        }
+      } catch { /* 主报价仍然可用 */ }
       realtimeCache.set(key, { data: [item], t: nowMs() });
       return [item];
     }
@@ -181,7 +195,7 @@ export async function getRealtimeBatch(secids) {
   if (!secids || secids.length === 0) return [];
   const key = secids.join(',');
   const cached = realtimeCache.get(key);
-  if (cached && nowMs() - cached.t < REALTIME_TTL) return cached.data;
+  if (cached && nowMs() - cached.t < BATCH_REALTIME_TTL) return cached.data;
 
   const secidParam = secids.join(',');
   const url = `${LIST_URL}?secids=${secidParam}&fields=f1,f2,f3,f4,f12,f14,f15,f16,f17,f18&fltt=2`;
@@ -227,28 +241,32 @@ function parseRealtimeItem(d, secid) {
     changePct: Math.round(changePct * 100) / 100,
     volume: d.f47 || 0,
     amount: d.f48 || 0,
+    bids: [],
+    asks: [],
+    dataSource: 'eastmoney',
     timestamp: nowMs(),
   };
 }
 
-function parseListItem(d, secids) {
-  // ulist 返回 f2=最新价 f3=涨跌幅 f4=涨跌额 f15=最高 f16=最低 f17=今开 f18=昨收
+export function parseListItem(d, secids) {
+  // ulist 使用 fltt=2，价格和涨跌幅已经是实际数值，不能再次除以 100。
   const secid = secids.find(s => s.endsWith('.' + (d.f12 || ''))) || `${d.f1 || 1}.${d.f12}`;
-  const price = (d.f2 || 0) / 100;
-  const prevClose = (d.f18 || 0) / 100;
+  const price = Number(d.f2) || 0;
+  const prevClose = Number(d.f18) || 0;
   return {
     secid,
     code: d.f12 || '',
     name: d.f14 || '',
     price,
     prevClose,
-    open: (d.f17 || 0) / 100,
-    high: (d.f15 || 0) / 100,
-    low: (d.f16 || 0) / 100,
-    change: (d.f4 || 0) / 100,
-    changePct: (d.f3 || 0) / 100,
+    open: Number(d.f17) || 0,
+    high: Number(d.f15) || 0,
+    low: Number(d.f16) || 0,
+    change: Number(d.f4) || 0,
+    changePct: Number(d.f3) || 0,
     volume: 0,
     amount: 0,
+    dataSource: 'eastmoney',
     timestamp: nowMs(),
   };
 }

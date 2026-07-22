@@ -1,0 +1,273 @@
+/**
+ * WorkspacePanel - 本地工作空间面板（AI 工作站左栏"工作空间"tab）
+ *
+ * - 顶部：当前文件夹路径 + 切换/断开
+ * - 中部：文件树（展开/折叠），多选文件
+ * - 底部：操作区（加入 AI 上下文 / 在对话中分析）
+ * - 首次进入：引导选择文件夹
+ * - 不支持 File System Access API 时：降级提示
+ */
+import { useState, useEffect, useCallback } from 'react';
+import {
+  isFileSystemSupported, pickRootDirectory, restoreRootDirectory, clearRootDirectory,
+  listFiles, readFile, exportMaterials, exportBriefing, downloadMarkdown,
+  materialToMarkdown, briefingToMarkdown,
+} from '../utils/workspace.js';
+
+export default function WorkspacePanel({
+  onAddContextFiles,
+  materials = [],
+  todayBriefing,
+  todayLanes,
+}) {
+  const [rootHandle, setRootHandle] = useState(null);
+  const [rootName, setRootName] = useState('');
+  const [files, setFiles] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [toast, setToast] = useState('');
+  const [selected, setSelected] = useState(new Set()); // 选中的文件 path
+  const [expanded, setExpanded] = useState(new Set()); // 展开的目录 path
+  const supported = isFileSystemSupported();
+
+  const showToast = useCallback((msg) => {
+    setToast(msg);
+    setTimeout(() => setToast(''), 2500);
+  }, []);
+
+  // 启动时尝试恢复已授权的目录
+  useEffect(() => {
+    if (!supported) return;
+    restoreRootDirectory().then(handle => {
+      if (handle) { setRootHandle(handle); setRootName(handle.name); }
+    }).catch(() => {});
+  }, [supported]);
+
+  const refreshFiles = useCallback(async (handle) => {
+    setLoading(true);
+    setError('');
+    try {
+      const list = await listFiles(handle, 4);
+      setFiles(list);
+    } catch (e) {
+      setError(e.message || '读取文件失败');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const handlePick = useCallback(async () => {
+    setError('');
+    try {
+      const handle = await pickRootDirectory();
+      if (handle) {
+        setRootHandle(handle);
+        setRootName(handle.name);
+        await refreshFiles(handle);
+      }
+    } catch (e) {
+      if (e.name !== 'AbortError') setError(e.message || '选择文件夹失败');
+    }
+  }, [refreshFiles]);
+
+  const handleDisconnect = useCallback(async () => {
+    await clearRootDirectory();
+    setRootHandle(null);
+    setRootName('');
+    setFiles([]);
+    setSelected(new Set());
+  }, []);
+
+  const toggleSelect = useCallback((path) => {
+    setSelected(prev => {
+      const next = new Set(prev);
+      if (next.has(path)) next.delete(path); else next.add(path);
+      return next;
+    });
+  }, []);
+
+  const toggleExpand = useCallback((path) => {
+    setExpanded(prev => {
+      const next = new Set(prev);
+      if (next.has(path)) next.delete(path); else next.add(path);
+      return next;
+    });
+  }, []);
+
+  const selectAll = useCallback(() => {
+    setSelected(new Set(files.filter(f => !f.isDir).map(f => f.path)));
+  }, [files]);
+
+  const clearSelection = useCallback(() => setSelected(new Set()), []);
+
+  const handleAddContext = useCallback(async () => {
+    if (!rootHandle || selected.size === 0 || !onAddContextFiles) return;
+    const picked = files.filter(f => !f.isDir && selected.has(f.path));
+    const result = [];
+    for (const f of picked) {
+      try {
+        const segments = f.path.split('/');
+        const text = await readFile(rootHandle, segments);
+        result.push({ name: f.name, path: f.path, content: text });
+      } catch (e) {
+        result.push({ name: f.name, path: f.path, content: `读取失败: ${e.message}`, error: true });
+      }
+    }
+    onAddContextFiles(result);
+  }, [rootHandle, selected, files, onAddContextFiles]);
+
+  // 导出全部素材到工作空间（或降级下载）
+  const handleExportMaterials = useCallback(async () => {
+    if (!materials.length) { showToast('素材库为空'); return; }
+    if (rootHandle) {
+      showToast(`正在导出 ${materials.length} 条素材…`);
+      try {
+        const results = await exportMaterials(rootHandle, materials);
+        const ok = results.filter(r => r.ok).length;
+        showToast(`已导出 ${ok}/${materials.length} 条素材到 news/`);
+        await refreshFiles(rootHandle);
+      } catch (e) { showToast(`导出失败: ${e.message}`); }
+    } else {
+      // 降级：逐个下载
+      materials.forEach(m => downloadMarkdown(m.title || 'material', materialToMarkdown(m)));
+      showToast(`已下载 ${materials.length} 个文件`);
+    }
+  }, [materials, rootHandle, showToast, refreshFiles]);
+
+  // 导出今日速报
+  const handleExportBriefing = useCallback(async () => {
+    if (!todayBriefing) { showToast('暂无今日速报'); return; }
+    const date = todayBriefing.date || new Date().toISOString().slice(0, 10);
+    const content = briefingToMarkdown(todayBriefing, todayLanes);
+    if (rootHandle) {
+      try {
+        await exportBriefing(rootHandle, todayBriefing, todayLanes);
+        showToast(`已导出今日速报到 briefings/${date}.md`);
+        await refreshFiles(rootHandle);
+      } catch (e) { showToast(`导出失败: ${e.message}`); }
+    } else {
+      downloadMarkdown(`briefing-${date}`, content);
+      showToast('已下载今日速报');
+    }
+  }, [todayBriefing, todayLanes, rootHandle, showToast, refreshFiles]);
+
+  // 不支持 File System Access API
+  if (!supported) {
+    return (
+      <aside className="workspace-panel">
+        <div className="workspace-empty">
+          <div className="workspace-empty-icon"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg></div>
+          <p className="workspace-empty-title">当前浏览器不支持本地工作空间</p>
+          <p className="workspace-empty-desc">请使用 Chrome 或 Edge 浏览器以连接本地文件夹。你仍可通过各页面的「导出」按钮下载 Markdown 文件到本地。</p>
+        </div>
+      </aside>
+    );
+  }
+
+  // 未连接文件夹
+  if (!rootHandle) {
+    return (
+      <aside className="workspace-panel">
+        <div className="workspace-empty">
+          <div className="workspace-empty-icon"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg></div>
+          <p className="workspace-empty-title">连接本地工作空间</p>
+          <p className="workspace-empty-desc">授权一个文件夹作为你的数据资产库，可将资讯、日报沉淀为 Markdown，也可作为 AI 对话上下文。</p>
+          <button type="button" className="workspace-connect-btn" onClick={handlePick}>选择文件夹</button>
+        </div>
+      </aside>
+    );
+  }
+
+  // 构建文件树（按目录层级折叠）
+  const dirs = files.filter(f => f.isDir);
+  const fileItems = files.filter(f => !f.isDir);
+
+  return (
+    <aside className="workspace-panel">
+      <div className="workspace-top">
+        <div className="workspace-path" title={rootName}>
+          <span className="workspace-path-icon"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg></span>
+          <span className="workspace-path-name">{rootName}</span>
+        </div>
+        <div className="workspace-top-actions">
+          <button type="button" className="workspace-icon-btn" onClick={() => refreshFiles(rootHandle)} title="刷新">↻</button>
+          <button type="button" className="workspace-icon-btn" onClick={handlePick} title="切换文件夹">⇄</button>
+          <button type="button" className="workspace-icon-btn" onClick={handleDisconnect} title="断开连接">✕</button>
+        </div>
+      </div>
+
+      <div className="workspace-export-bar">
+        <button type="button" className="workspace-export-btn" onClick={handleExportMaterials} title="把素材库全部导出为 Markdown">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          导出素材 {materials.length > 0 && <span className="workspace-count">{materials.length}</span>}
+        </button>
+        <button type="button" className="workspace-export-btn" onClick={handleExportBriefing} title="导出今日速报为 Markdown">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-2 2zm0 0a2 2 0 0 1-2-2v-9c0-1.1.9-2 2-2h2"/><path d="M18 14h-8"/><path d="M15 18h-5"/><path d="M10 6h8v4h-8V6z"/></svg>
+          导出日报
+        </button>
+      </div>
+      {toast && <div className="workspace-toast">{toast}</div>}
+
+      <div className="workspace-file-list custom-scrollbar">
+        {loading && <div className="workspace-loading">读取中…</div>}
+        {error && <div className="workspace-error">{error}</div>}
+        {!loading && files.length === 0 && <div className="workspace-list-empty">文件夹为空</div>}
+        {!loading && files.length > 0 && (
+          <>
+            {dirs.map(d => (
+              <div key={d.path}>
+                <button
+                  type="button"
+                  className={`workspace-tree-dir ${expanded.has(d.path) ? 'expanded' : ''}`}
+                  style={{ paddingLeft: 8 + d.depth * 12 }}
+                  onClick={() => toggleExpand(d.path)}
+                >
+                  <span className="workspace-tree-arrow">{expanded.has(d.path) ? '▾' : '▸'}</span>
+                  <span className="workspace-tree-name">{d.name}</span>
+                </button>
+              </div>
+            ))}
+            {fileItems.map(f => {
+              // 仅当所有父目录展开时显示文件
+              const parents = f.path.split('/').slice(0, -1);
+              let prefix = '';
+              const allExpanded = parents.every((_, i) => {
+                const p = parents.slice(0, i + 1).join('/');
+                return expanded.has(p);
+              });
+              if (!allExpanded) return null;
+              return (
+                <button
+                  type="button"
+                  key={f.path}
+                  className={`workspace-tree-file ${selected.has(f.path) ? 'selected' : ''}`}
+                  style={{ paddingLeft: 8 + f.depth * 12 }}
+                  onClick={() => toggleSelect(f.path)}
+                  title={f.path}
+                >
+                  <span className="workspace-tree-file-icon"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></span>
+                  <span className="workspace-tree-name">{f.name}</span>
+                </button>
+              );
+            })}
+          </>
+        )}
+      </div>
+
+      {selected.size > 0 && (
+        <div className="workspace-bottom">
+          <div className="workspace-selected-bar">
+            <span>已选 {selected.size} 个文件</span>
+            <button type="button" className="workspace-link-btn" onClick={clearSelection}>清除</button>
+          </div>
+          <button type="button" className="workspace-action-btn primary" onClick={handleAddContext} disabled={!onAddContextFiles}>
+            加入 AI 上下文
+          </button>
+          {files.filter(f => !f.isDir).length > 0 && selected.size === 0 && (
+            <button type="button" className="workspace-link-btn" onClick={selectAll}>全选</button>
+          )}
+        </div>
+      )}
+    </aside>
+  );
+}
