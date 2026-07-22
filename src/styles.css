@@ -17687,3 +17687,31 @@ body {
 .sidebar-action { min-height: 34px !important; }
 .nav-item { padding: 0 10px; }
 .nav-label { font-size: 12px; }
+
+/* ============================================================
+   侧边栏细分模块下拉折叠
+   ============================================================ */
+.nav-context-group { margin-bottom: 8px; padding: 0 8px; }
+.nav-context-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 6px 6px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  border-radius: 6px;
+  transition: background 0.15s;
+}
+.nav-context-toggle:hover { background: var(--accent-cyan-soft); }
+.nav-context-toggle .nav-group-title-static { padding: 0; }
+.nav-context-arrow {
+  font-size: 10px;
+  color: var(--text-muted);
+  transition: transform 0.2s ease;
+  display: inline-block;
+}
+.nav-context-arrow.open { transform: rotate(0deg); }
+.nav-context-group.collapsed .nav-context-arrow { transform: rotate(-90deg); }
+.nav-context-group.collapsed .nav-item.nav-sub-item { display: none; }

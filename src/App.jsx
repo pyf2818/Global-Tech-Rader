@@ -100,7 +100,7 @@ const NAV_ITEMS = [
 ];
 
 const PRIMARY_NAV_ITEMS = [
-  { id: 'home', label: 'AI 工作站', desc: '今日总判断', short: '情报', icon: 'sparkle', nav: 'home', children: ['home'] },
+  { id: 'home', label: 'AI 工作站', desc: '今日总判断', short: '情报', icon: 'cpu', nav: 'home', children: ['home'] },
   { id: 'today', label: '今日速报', desc: '精准推荐', short: '速报', icon: 'sparkle', nav: 'today', children: ['today', 'recommendations'] },
   { id: 'recommendations', label: '精准推荐', desc: '日历时间线', short: '推荐', icon: 'calendar', nav: 'recommendations', children: ['today', 'recommendations'] },
   { id: 'all', label: '全部动态', desc: '扩展视野', short: '动态', icon: 'grid', nav: 'all', children: ['all'] },
@@ -1143,6 +1143,17 @@ function App() {
     return MOTIVATIONAL_QUOTES[idx];
   }, []);
   const [panelCollapsed, setPanelCollapsed] = useState(() => localStorage.getItem('panelCollapsed') === 'true');
+  // 导航分组下拉展开：记录哪些主模块展开了细分项
+  const [expandedNavGroups, setExpandedNavGroups] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('expandedNavGroups') || '[]'); } catch { return []; }
+  });
+  const toggleNavGroup = useCallback((id) => {
+    setExpandedNavGroups(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  }, []);
+  useEffect(() => { localStorage.setItem('expandedNavGroups', JSON.stringify(expandedNavGroups)); }, [expandedNavGroups]);
+  // 细分模块下拉折叠状态（默认展开）
+  const [contextGroupOpen, setContextGroupOpen] = useState(() => localStorage.getItem('contextGroupOpen') !== 'false');
+  useEffect(() => { localStorage.setItem('contextGroupOpen', String(contextGroupOpen)); }, [contextGroupOpen]);
   // source management states moved to useSourceManager hook (called after allSources)
   
   const [searchQuery, setSearchQuery] = useState('');
@@ -5730,12 +5741,15 @@ ${signals}
                 )}
               </button>
             ))}
-          </div>
+            </div>
 
           {!sidebarCollapsed && activeContextItems.length > 0 && (
-            <div className="nav-context-group">
-              <div className="nav-group-title-static">{activeContextSection.label}</div>
-              {activeContextItems.map(item => (
+            <div className={`nav-context-group ${contextGroupOpen ? 'open' : 'collapsed'}`}>
+              <button type="button" className="nav-context-toggle" onClick={() => setContextGroupOpen(v => !v)}>
+                <span className="nav-group-title-static">{activeContextSection.label}</span>
+                <span className={'nav-context-arrow' + (contextGroupOpen ? ' open' : '')} aria-hidden="true">▾</span>
+              </button>
+              {contextGroupOpen && activeContextItems.map(item => (
                 <button
                   key={item.id}
                   className={`nav-item nav-sub-item ${nav === item.id ? 'active' : ''}`}
