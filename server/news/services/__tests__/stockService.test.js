@@ -1,5 +1,9 @@
-import { describe, expect, it } from 'vitest';
-import { parseListItem, resolveSecid } from '../stockService.js';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { getKline, parseListItem, resolveSecid } from '../stockService.js';
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
 
 describe('stockService quote normalization', () => {
   it('keeps fltt=2 batch quote values at their real scale', () => {
@@ -32,5 +36,25 @@ describe('stockService quote normalization', () => {
     expect(resolveSecid('sh600519')).toBe('1.600519');
     expect(resolveSecid('00700')).toBe('116.00700');
     expect(resolveSecid('AAPL')).toBe('105.AAPL');
+  });
+
+  it('keeps different adjustment modes in separate K-line cache entries', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      json: async () => ({
+        data: {
+          code: '999999',
+          name: '测试标的',
+          klines: ['2026-07-22,10,11,12,9,1000,11000,3'],
+        },
+      }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    await getKline('1.999999', { period: '101', count: 20, adjust: '0' });
+    await getKline('1.999999', { period: '101', count: 20, adjust: '1' });
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock.mock.calls[0][0]).toContain('fqt=0');
+    expect(fetchMock.mock.calls[1][0]).toContain('fqt=1');
   });
 });

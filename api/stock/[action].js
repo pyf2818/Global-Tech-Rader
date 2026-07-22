@@ -51,9 +51,11 @@ export default async function handler(req, res) {
       }
       const period = String(queryValue(req, 'period') || '101');
       if (!PERIODS.has(period)) return send(res, 400, { ok: false, error: { code: 'INVALID_KLINE_PERIOD' } });
+      const adjust = String(queryValue(req, 'adjust') || '1');
+      if (!['0', '1', '2'].includes(adjust)) return send(res, 400, { ok: false, error: { code: 'INVALID_KLINE_ADJUST' } });
       const requestedCount = Number.parseInt(queryValue(req, 'count') || '60', 10);
       const count = Math.min(500, Math.max(20, Number.isFinite(requestedCount) ? requestedCount : 60));
-      const data = await getKline(secid, { period, count });
+      const data = await getKline(secid, { period, count, adjust });
       return data
         ? send(res, 200, data)
         : send(res, 503, { ok: false, error: { code: 'MARKET_DATA_UNAVAILABLE' } });

@@ -11,6 +11,7 @@ const ACTION_PROMPTS = {
   translate_en: content => `请将以下内容翻译成英文：\n\n${content}`,
   title: content => `请为以下文章生成 5 个标题，每个标题不超过 30 字：\n\n${content}`,
   summary: content => `请为以下文章生成一段不超过 100 字的摘要：\n\n${content}`,
+  'github-evaluator': content => `你是一位资深技术选型专家。请基于以下 GitHub 项目信息，实时分析并输出严格 JSON（不要 markdown 代码块，不要解释文字），字段如下：\n- scenario: 应用场景（1-2句，具体说明能解决什么问题）\n- audience: 适合谁（目标用户/团队）\n- difficulty: 落地难度（低/中/高 + 一句原因）\n- value: 价值判断（值得跟进的程度 + 一句理由）\n\n项目信息：\n${content}\n\n只输出 JSON，格式：{"scenario":"","audience":"","difficulty":"","value":""}`,
 };
 
 function clientKey(req) {

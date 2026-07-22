@@ -158,9 +158,16 @@ export async function getGithubTrending(lang, since) {
       tutorial: ''
     }));
 
-    const settled = await Promise.allSettled(rawRepos.slice(0, 5).map(async (item, i) => {
-      try {
-        const branches = ['main', 'master'];
+    // 分批获取 README（每批 5 个串行，避免 GitHub rate limit），全部 25 个都尝试
+    const BATCH = 5;
+    const targets = rawRepos.slice(0, 25);
+    const settled = [];
+    for (let start = 0; start < targets.length; start += BATCH) {
+      const batch = targets.slice(start, start + BATCH);
+      const results = await Promise.allSettled(batch.map(async (item, i) => {
+        const realIndex = start + i;
+        try {
+          const branches = ['main', 'master'];
         let content = '';
         const ghToken = process.env.GITHUB_TOKEN || process.env.VITE_GITHUB_TOKEN;
         const rawHeaders = ghToken ? { 'User-Agent': 'GlobalTechRadar/0.1', 'Authorization': `Bearer ${ghToken}` } : { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' };
@@ -216,10 +223,22 @@ const imageUrls = [...content.matchAll(/<img[^>]+src=["']([^"']+)["']/gi)].map(m
         const imageUrl = candidates.length > 0 ? candidates[0].src : (item.homepage ? '' : '');
 
         const tutorial = extractTutorial(content);
-        const intro = content.replace(/!\[[^\]]*\]\([^\)]+\)/g, '').replace(/<[^>]+>/g, '').replace(/#{1,4}\s/g, '').replace(/\s+/g, ' ').trim().slice(0, 200);
-        return { index: i, imageUrl, tutorial, readmeIntro: intro };
+        // 提取 README 第一段有意义的项目说明：去标签/图片/badge 后取第一个非标题段落
+        const cleanContent = content
+          .replace(/!\[[^\]]*\]\([^\)]+\)/g, '')
+          .replace(/<img[^>]*>/gi, '')
+          .replace(/<[^>]+>/g, '')
+          .replace(/```[\s\S]*?```/g, ' ')
+          .replace(/^\s*#{1,6}\s.*$/gm, '')
+          .replace(/\[([^\]]*)\]\([^)]+\)/g, '$1')
+          .split(/\n\s*\n/);
+        const intro = (cleanContent.find(p => p.replace(/[#*>`\-]/g, '').trim().length > 30) || cleanContent[0] || '')
+          .replace(/[#*>`]/g, '').replace(/\s+/g, ' ').trim().slice(0, 280);
+        return { index: realIndex, imageUrl, tutorial, readmeIntro: intro };
       } catch { return null; }
     }));
+      settled.push(...results);
+    }
 
     settled.forEach(result => {
       if (result.status === 'fulfilled' && result.value) {

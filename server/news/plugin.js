@@ -126,10 +126,12 @@ export function newsPlugin() {
         if (requestUrl.pathname === '/api/stock/kline') {
           const code = requestUrl.searchParams.get('code') || '';
           const period = requestUrl.searchParams.get('period') || '101';
+          const adjust = requestUrl.searchParams.get('adjust') || '1';
           const count = parseInt(requestUrl.searchParams.get('count') || '60', 10);
           const secid = resolveSecid(code);
           if (!secid) return sendJson(res, { ok: false, message: '无效的股票代码' }, 400);
-          const data = await getKline(secid, { period, count });
+          if (!['0', '1', '2'].includes(adjust)) return sendJson(res, { ok: false, message: '无效的复权参数' }, 400);
+          const data = await getKline(secid, { period, count, adjust });
           return sendJson(res, data || { ok: false, message: '未获取到K线数据' });
         }
 

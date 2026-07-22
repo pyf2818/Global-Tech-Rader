@@ -274,7 +274,7 @@ export function parseListItem(d, secids) {
 // K线：klt=101日 102周 103月 5/15/30/60 分钟；fqt=0不复权 1前复权 2后复权
 export async function getKline(secid, { period = '101', count = 60, adjust = '1' } = {}) {
   if (!secid) return null;
-  const key = `${secid}-${period}-${count}`;
+  const key = `${secid}-${period}-${count}-${adjust}`;
   const cached = klineCache.get(key);
   if (cached && nowMs() - cached.t < KLINE_TTL) return cached.data;
 

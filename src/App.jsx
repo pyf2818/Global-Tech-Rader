@@ -8,10 +8,6 @@ import { PALETTES } from './ThemePicker.jsx';
 import { getGradeColors, isEnglishText, isChineseText } from './utils/format.js';
 import {
   buildGithubMaterial,
-  inferGithubAudience,
-  inferGithubDifficulty,
-  inferGithubScenario,
-  inferGithubValue,
 } from './utils/githubMaterial.js';
 import { useAuth } from './hooks/useAuth.js';
 import { useLlmConfig } from './hooks/useLlmConfig.js';
@@ -1388,6 +1384,9 @@ function App() {
   const [elfQuotedContext, setElfQuotedContext] = useState(null);
   const [translationOpen, setTranslationOpen] = useState({});
   const [translatingItems, setTranslatingItems] = useState({});
+  // GitHub 项目 AI 情报实时分析（per-repo，localStorage 持久化）
+  const [githubInsights, setGithubInsights] = useState(() => loadLS('githubInsights', {}));
+  const [githubInsightLoading, setGithubInsightLoading] = useState({});
   // moreNavOpen moved to useUI
   const [currentArticleId, setCurrentArticleId] = useState(null);
   const [materialFilter, setMaterialFilter] = useState('all');
@@ -1426,11 +1425,24 @@ function App() {
   const [newArticleSpaceName, setNewArticleSpaceName] = useState('');
   const [articleSpaceForNewArticle, setArticleSpaceForNewArticle] = useState('all');
   
-  // 滚动资讯热点状态
-  const [scrollingNews, setScrollingNews] = useState(SCROLLING_NEWS_ITEMS);
+  // 滚动资讯热点状态：从实时 items 派生热门资讯，保证数据准确实时
   const [scrollingNewsPaused, setScrollingNewsPaused] = useState(false);
-  const [scrollingNewsIndex, setScrollingNewsIndex] = useState(0);
   const scrollingNewsRef = useRef(null);
+  const scrollingNews = useMemo(() => {
+    const sorted = [...items]
+      .filter(item => item.title)
+      .sort((a, b) => (b.mustReadScore || b.hot || 0) - (a.mustReadScore || a.hot || 0))
+      .slice(0, 12);
+    if (sorted.length > 0) return sorted.map(item => ({
+      id: item.id,
+      title: item.title,
+      category: item.category,
+      source: item.source || '',
+      time: item.publishedAt ? formatRelative(item.publishedAt) : '',
+      hot: (item.mustReadScore || 0) >= 60,
+    }));
+    return [];
+  }, [items]);
 
   const editorTextareaRef = useRef(null);
   const imageInputRef = useRef(null);
@@ -1540,16 +1552,21 @@ function App() {
     return () => clearTimeout(timer);
   }, [items, llmConfig.baseUrl, llmConfig.apiKey, llmConfig.selectedModel]);
 
-  // 滚动资讯自动滚动效果
+  // 滚动资讯自动滚动效果：rAF 连续平移 scrollLeft，无缝循环
   useEffect(() => {
-    if (scrollingNewsPaused) return;
-    
-    const interval = setInterval(() => {
-      setScrollingNewsIndex(prev => (prev + 1) % scrollingNews.length);
-    }, 4000); // 每4秒滚动一次
-    
-    return () => clearInterval(interval);
-  }, [scrollingNews.length, scrollingNewsPaused]);
+    const el = scrollingNewsRef.current;
+    if (!el || scrollingNewsPaused || scrollingNews.length === 0) return;
+    let raf;
+    const step = () => {
+      // 滚到第一份末尾（总宽度一半）时跳回开头，实现无缝循环
+      const half = el.scrollWidth / 2;
+      if (el.scrollLeft >= half) el.scrollLeft -= half;
+      el.scrollLeft += 0.4; // 滚动速度 px/帧
+      raf = requestAnimationFrame(step);
+    };
+    raf = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(raf);
+  }, [scrollingNewsPaused, scrollingNews.length]);
 
   useEffect(() => {
     if (!lightbox.open) return;
@@ -5536,6 +5553,77 @@ ${signals}
     return translations[item.id] || null;
   }
 
+  // GitHub 翻译：切换开关 + 打开时触发请求
+  function toggleGithubTranslation(repo) {
+    const id = repo.id;
+    setTranslationOpen(prev => {
+      const next = { ...prev, [id]: !prev[id] };
+      // 打开且无缓存时触发翻译
+      if (next[id] && !translations[id] && !translatingItems[id]) {
+        requestTranslation({ id, title: repo.fullName, summary: repo.description });
+      }
+      return next;
+    });
+  }
+
+  // GitHub 项目 AI 情报：实时调 LLM 生成应用场景/适合谁/落地难度/价值判断
+  async function requestGithubInsight(repo) {
+    const id = repo.id;
+    if (githubInsights[id] || githubInsightLoading[id]) return;
+    if (!llmConfig.baseUrl || !llmConfig.selectedModel) {
+      showToast('请先在设置中配置大模型 API');
+      return;
+    }
+    setGithubInsightLoading(prev => ({ ...prev, [id]: true }));
+    try {
+      const content = `项目：${repo.fullName}\n描述：${repo.description || '暂无'}\n语言：${repo.language || '未知'}\nStars：${repo.totalStars || 0}\nTopics：${(repo.topics || []).join(', ')}`;
+      const response = await fetch('/api/ai-generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          baseUrl: llmConfig.baseUrl,
+          apiKey: llmConfig.apiKey,
+          model: llmConfig.selectedModel,
+          action: 'github-evaluator',
+          content
+        })
+      });
+      const data = await response.json();
+      if (data.error) { showToast(`分析失败: ${data.error}`); return; }
+      // 解析返回的结构化 JSON（github-evaluator skill 输出）
+      let insight;
+      try {
+        const match = (data.content || '').match(/\{[\s\S]*\}/);
+        insight = match ? JSON.parse(match[0]) : null;
+      } catch { insight = null; }
+      if (!insight) {
+        // 降级：按行解析
+        const lines = (data.content || '').split('\n').filter(l => l.trim());
+        insight = {
+          scenario: lines[0] || '分析失败',
+          audience: lines[1] || '',
+          difficulty: lines[2] || '',
+          value: lines[3] || '',
+        };
+      }
+      const normalized = {
+        scenario: insight.scenario || insight.application || '暂无',
+        audience: insight.audience || insight.targetUsers || '暂无',
+        difficulty: insight.difficulty || insight.complexity || '暂无',
+        value: insight.value || insight.worth || '暂无',
+      };
+      setGithubInsights(prev => {
+        const next = { ...prev, [id]: normalized };
+        saveLS('githubInsights', next);
+        return next;
+      });
+    } catch (e) {
+      showToast(`分析失败: ${e.message}`);
+    } finally {
+      setGithubInsightLoading(prev => { const n = { ...prev }; delete n[id]; return n; });
+    }
+  }
+
   function executeSearch(q) {
     setNav('all');
     setCategory('all');
@@ -5612,11 +5700,11 @@ ${signals}
   };
   const wideWorkspaceNavs = ['home', 'recommendations', 'studio', 'agents', 'editor', 'materials', 'square', 'profile-center'];
   // 右侧面板：「全部动态」显示关注关键词；「AI 情报首页」显示情报时间线；「精准推荐」显示日期竖向时间线
-  const showRightPanel = nav === 'all' || nav === 'recommendations';
+  const showRightPanel = nav === 'recommendations';
   const showStatsBar = showRightPanel && nav !== 'home' && nav !== 'recommendations';
 
   return (
-    <div className={`app ${sidebarCollapsed ? 'sidebar-collapsed' : ''} ${panelCollapsed ? 'panel-collapsed' : ''} ${!showRightPanel ? 'no-right-panel' : ''} ${editorFullscreen ? 'editor-fullscreen' : ''}`}>
+    <div data-active-nav={nav} className={`app ${sidebarCollapsed ? 'sidebar-collapsed' : ''} ${panelCollapsed ? 'panel-collapsed' : ''} ${!showRightPanel ? 'no-right-panel' : ''} ${editorFullscreen ? 'editor-fullscreen' : ''}`}>
       <div className="particle-layer" aria-hidden="true">
         {Array.from({ length: 24 }).map((_, i) => <span key={i} className="particle" style={{ '--i': i }} />)}
       </div>
@@ -5865,31 +5953,20 @@ ${signals}
       {/* Main */}
       <main data-nav={nav} className={`main ${(nav === 'home' || nav === 'recommendations') ? 'main-workbench' : ''}`}>
         <header className={`topbar ${nav === 'all' ? 'topbar-all' : ''} ${nav === 'stock' ? 'topbar-stock' : ''} ${(nav === 'trending' || nav === 'recommendations') ? 'topbar-trending' : ''}`}>
-          {nav === 'all' && (
-            <div className="topbar-brand">
-              <span className="brand-title">{PRODUCT_NAME}</span>
-              <span className="brand-theme-icon" aria-hidden="true">{ICONS.palette}</span>
-            </div>
-          )}
-          
-          {/* 滚动资讯热点区域 */}
-          {nav === 'all' && (
+          {/* 滚动资讯热点区域 - 置于最顶部，连续滚动 + 可手动拖动 */}
+          {nav === 'all' && scrollingNews.length > 0 && (
             <div className="scrolling-news-container">
               <div className="scrolling-news-header">
                 <span className="scrolling-news-label">热门资讯</span>
                 <span className="scrolling-news-icon">{ICONS.fire}</span>
               </div>
-              <div 
+              <div
+                ref={scrollingNewsRef}
                 className="scrolling-news-content"
                 onMouseEnter={() => setScrollingNewsPaused(true)}
                 onMouseLeave={() => setScrollingNewsPaused(false)}
               >
-                <div 
-                  className="scrolling-news-track"
-                  style={{
-                    transform: `translateX(-${scrollingNewsIndex * (100 / Math.min(scrollingNews.length, 3))}%)`
-                  }}
-                >
+                <div className="scrolling-news-track">
                   {[...scrollingNews, ...scrollingNews].map((item, index) => (
                     <div key={`${item.id}-${index}`} className="scrolling-news-item">
                       {item.hot && <span className="scrolling-news-hot">HOT</span>}
@@ -5902,18 +5979,6 @@ ${signals}
                   ))}
                 </div>
               </div>
-              <button 
-                className="scrolling-news-nav scrolling-news-prev"
-                onClick={() => setScrollingNewsIndex(prev => (prev - 1 + scrollingNews.length) % scrollingNews.length)}
-              >
-                {ICONS.chevronLeft}
-              </button>
-              <button 
-                className="scrolling-news-nav scrolling-news-next"
-                onClick={() => setScrollingNewsIndex(prev => (prev + 1) % scrollingNews.length)}
-              >
-                {ICONS.chevronRight}
-              </button>
             </div>
           )}
           
@@ -5922,6 +5987,12 @@ ${signals}
           </button>
           <div className={`topbar-main ${nav === 'all' ? 'topbar-main-all' : ''}`}>
             <div className={`topbar-main-row ${nav === 'all' ? 'topbar-main-row-all' : ''}`}>
+              {nav === 'all' && (
+            <div className="topbar-brand">
+              <span className="brand-title">{PRODUCT_NAME}</span>
+              <span className="brand-theme-icon" aria-hidden="true" title={themeMode === 'dark' ? '深色模式' : '浅色模式'}>{themeMode === 'dark' ? ICONS.moon : ICONS.sun}</span>
+            </div>
+          )}
               {nav === 'all' && (
               <div className="search-wrap">
                 {ICONS.search}
@@ -6025,6 +6096,12 @@ ${signals}
               )}
               {(nav === 'all' || nav === 'trending' || nav === 'github') && (
                 <>
+                  {nav === 'all' && (
+                    <button className="globe-entry-btn" onClick={() => setGlobeFullscreenOpen(true)} title="全球科技大屏">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+                    全球大屏
+                    </button>
+                  )}
                   <button className={`btn-refresh ${nav === 'all' ? 'btn-refresh-all' : ''}`} onClick={() => { if (nav === 'all') loadNews(); else if (nav === 'trending') loadTrending(false, trendingPlatform, trendingType); else if (nav === 'github') loadGithub(); }}>
                     {ICONS.refresh}
                   </button>
@@ -7059,7 +7136,7 @@ ${signals}
             <>
               <div className="section-header"><h2 className="section-title">{ICONS.github} GitHub {GITHUB_PERIODS.find(p => p.id === githubSince)?.label || '周榜'}热门项目</h2><p className="section-desc">{githubSince === 'daily' ? '今日增星最多的开源项目' : githubSince === 'monthly' ? '本月增星最多的开源项目' : '本周增星最多的开源项目'}（实时同步）</p></div>
                {githubLoading && <div className="github-grid">{Array.from({ length: 6 }).map((_, i) => <article key={i} className="github-card skeleton"><div className="skeleton-gh-header" /><div className="skeleton-gh-desc" /><div className="skeleton-gh-stats" /></article>)}</div>}
-               <div className="github-grid">{githubRepos.map((repo, i) => <GithubRepoCard key={repo.id} repo={repo} index={i} since={githubSince} isBookmarked={isBookmarked(repo.url)} isInMaterials={isInMaterials(repo.id)} onBookmark={() => toggleBookmark({ id: repo.url, title: repo.fullName, url: repo.url, source: 'GitHub', summary: repo.description, tags: [repo.language].filter(Boolean), region: 'global', mode: 'deep', publishedAt: new Date().toISOString(), category: 'open-source' })} onAddMaterial={() => toggleMaterial(buildGithubMaterial(repo, githubSince), 'project', `GitHub ${GITHUB_PERIODS.find(p => p.id === githubSince)?.label || '周榜'}项目观察`)} showTranslation={translationOpen[repo.id]} onToggleTranslation={() => setTranslationOpen(p => ({ ...p, [repo.id]: !p[repo.id] }))} translation={getTranslation({ id: repo.id, title: repo.fullName, summary: repo.description })} onOpenLightbox={(src, title, images, index) => setLightbox({ open: true, src, title, images: images || [], index: index || 0 })} />)}</div>
+               <div className="github-grid">{githubRepos.map((repo, i) => <GithubRepoCard key={repo.id} repo={repo} index={i} since={githubSince} isBookmarked={isBookmarked(repo.url)} isInMaterials={isInMaterials(repo.id)} onBookmark={() => toggleBookmark({ id: repo.url, title: repo.fullName, url: repo.url, source: 'GitHub', summary: repo.description, tags: [repo.language].filter(Boolean), region: 'global', mode: 'deep', publishedAt: new Date().toISOString(), category: 'open-source' })} onAddMaterial={() => toggleMaterial(buildGithubMaterial(repo, githubSince), 'project', `GitHub ${GITHUB_PERIODS.find(p => p.id === githubSince)?.label || '周榜'}项目观察`)} showTranslation={translationOpen[repo.id]} onToggleTranslation={toggleGithubTranslation} translation={getTranslation({ id: repo.id, title: repo.fullName, summary: repo.description })} insight={githubInsights[repo.id]} onRequestInsight={requestGithubInsight} insightLoading={githubInsightLoading[repo.id]} onOpenLightbox={(src, title, images, index) => setLightbox({ open: true, src, title, images: images || [], index: index || 0 })} />)}</div>
             </>
            )}
 
@@ -9923,8 +10000,6 @@ function NewsItem({ item, index, viewMode = 'standard', isFocused = false, isBoo
   };
   const displayTitle = showTranslation && translation ? translation.title : item.title;
   const displaySummary = showTranslation && translation && translation.summary ? translation.summary : item.summary;
-  const cardInsight = buildNewsCardInsight(item, displaySummary);
-  const recommendationReason = trimBrief(cardInsight.why, 150);
   const summaryModeLabel = summaryMode === 'llm-scraped'
     ? 'AI 短摘要 · 已尝试抓取网页'
     : summaryMode === 'llm-card'
@@ -10066,12 +10141,6 @@ function NewsItem({ item, index, viewMode = 'standard', isFocused = false, isBoo
             </div>
           )}
         </div>
-        {!isCompact && recommendationReason && (
-          <div className="recommendation-reason">
-            <span className="recommendation-label">推荐理由：</span>
-            <span className="recommendation-text">{recommendationReason}</span>
-          </div>
-        )}
         {isSummaryOpen && (summaryLoading || summaryText) && (
           <div className="ai-summary">
             <div className="ai-summary-header">{ICONS.sparkle}<span>{summaryLoading ? '正在生成短摘要' : summaryModeLabel}</span></div>
@@ -10282,14 +10351,10 @@ function TrendLineChart({ labels = [], series = [] }) {
   );
 }
 
-function GithubRepoCard({ repo, index, since = 'weekly', isBookmarked = false, isInMaterials = false, onBookmark, onAddMaterial, showTranslation, onToggleTranslation, translation, onOpenLightbox }) {
+function GithubRepoCard({ repo, index, since = 'weekly', isBookmarked = false, isInMaterials = false, onBookmark, onAddMaterial, showTranslation, onToggleTranslation, translation, onOpenLightbox, insight, onRequestInsight, insightLoading }) {
   const [tutorialExpanded, setTutorialExpanded] = useState(false);
   const [insightExpanded, setInsightExpanded] = useState(false);
   const isEnglish = isEnglishText(repo.fullName) || isEnglishText(repo.description);
-  const scenarioText = inferGithubScenario(repo);
-  const audienceText = inferGithubAudience(repo);
-  const valueText = inferGithubValue(repo);
-  const difficultyText = inferGithubDifficulty(repo);
   const periodValue = repo.starsToday || repo.starsThisWeek || repo.starsThisMonth || 0;
   const periodLabel = GITHUB_PERIODS.find(p => p.id === since)?.label || '周榜';
 
@@ -10298,6 +10363,12 @@ function GithubRepoCard({ repo, index, since = 'weekly', isBookmarked = false, i
     const dragItem = buildGithubMaterial(repo, since);
     e.dataTransfer.setData('application/json', JSON.stringify(dragItem));
     e.dataTransfer.effectAllowed = 'copy';
+  };
+
+  const handleInsightToggle = () => {
+    const next = !insightExpanded;
+    setInsightExpanded(next);
+    if (next && !insight && onRequestInsight) onRequestInsight(repo);
   };
 
   return (
@@ -10330,16 +10401,22 @@ function GithubRepoCard({ repo, index, since = 'weekly', isBookmarked = false, i
 
       {/* AI 情报 —— 默认折叠，含场景/人群/难度/价值/教程 */}
       <div className="gh-insight">
-        <button className="gh-insight-toggle" onClick={() => setInsightExpanded(v => !v)}>
+        <button className="gh-insight-toggle" onClick={handleInsightToggle}>
           <span className="gh-insight-label">{ICONS.sparkle} AI 情报</span>
           <span className={`gh-insight-chevron ${insightExpanded ? 'open' : ''}`}>{ICONS.chevronDown}</span>
         </button>
         {insightExpanded && (
           <div className="gh-insight-body">
-            <div className="gh-insight-row"><span className="gh-insight-key">应用场景</span><p>{scenarioText}</p></div>
-            <div className="gh-insight-row"><span className="gh-insight-key">适合谁</span><p>{audienceText}</p></div>
-            <div className="gh-insight-row"><span className="gh-insight-key">落地难度</span><p>{difficultyText}</p></div>
-            <div className="gh-insight-row"><span className="gh-insight-key">价值判断</span><p>{valueText}</p></div>
+            {insightLoading && <div className="gh-insight-loading"><div className="spinner" /><span>正在实时分析项目…</span></div>}
+            {!insightLoading && insight && (
+              <>
+                <div className="gh-insight-row"><span className="gh-insight-key">应用场景</span><p>{insight.scenario}</p></div>
+                <div className="gh-insight-row"><span className="gh-insight-key">适合谁</span><p>{insight.audience}</p></div>
+                <div className="gh-insight-row"><span className="gh-insight-key">落地难度</span><p>{insight.difficulty}</p></div>
+                <div className="gh-insight-row"><span className="gh-insight-key">价值判断</span><p>{insight.value}</p></div>
+              </>
+            )}
+            {!insightLoading && !insight && <p className="gh-insight-empty">分析失败，请重试</p>}
             {repo.tutorial && (
               <div className="gh-insight-tutorial">
                 <button className="gh-tutorial-toggle" onClick={() => setTutorialExpanded(v => !v)}>
@@ -10355,7 +10432,7 @@ function GithubRepoCard({ repo, index, since = 'weekly', isBookmarked = false, i
       <div className="gh-card-actions">
         <button className={`gh-bookmark-btn ${isBookmarked ? 'active' : ''}`} onClick={onBookmark} title={isBookmarked ? '取消收藏' : '收藏'}>{isBookmarked ? ICONS.bookmarkFill : ICONS.bookmark}<span>收藏</span></button>
         {onAddMaterial && <button className={`gh-add-material-btn ${isInMaterials ? 'active' : ''}`} onClick={onAddMaterial} title={isInMaterials ? '已在素材库' : '收藏为素材'}>{ICONS.layers}<span>素材</span></button>}
-        {isEnglish && onToggleTranslation && <button className={`gh-translate-btn ${showTranslation ? 'active' : ''}`} onClick={onToggleTranslation} title="翻译">{ICONS.globe}<span>译</span></button>}
+        {isEnglish && onToggleTranslation && <button className={`gh-translate-btn ${showTranslation ? 'active' : ''}`} onClick={() => onToggleTranslation(repo)} title="翻译">{ICONS.globe}<span>译</span></button>}
       </div>
     </article>
   );

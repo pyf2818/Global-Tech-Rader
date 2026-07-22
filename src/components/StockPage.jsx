@@ -14,15 +14,27 @@ const DOWN_COLOR = '#22c55e';
 
 const PERIOD_OPTIONS = [
   { id: 'timeline', label: '分时' },
+  { id: '5', label: '5分' },
+  { id: '15', label: '15分' },
+  { id: '30', label: '30分' },
+  { id: '60', label: '60分' },
   { id: '101', label: '日K' },
   { id: '102', label: '周K' },
   { id: '103', label: '月K' },
 ];
 
-const KLINE_PERIOD_MAP = { '101': { type: 'day', span: 1 }, '102': { type: 'week', span: 1 }, '103': { type: 'month', span: 1 } };
+const KLINE_PERIOD_MAP = {
+  '5': { type: 'minute', span: 5 },
+  '15': { type: 'minute', span: 15 },
+  '30': { type: 'minute', span: 30 },
+  '60': { type: 'minute', span: 60 },
+  '101': { type: 'day', span: 1 },
+  '102': { type: 'week', span: 1 },
+  '103': { type: 'month', span: 1 },
+};
 
 // ===== klinecharts K线图 =====
-function KLineChart({ klineData, period, code }) {
+function KLineChart({ klineData, period, code, layoutKey }) {
   const containerRef = useRef(null);
   const chartRef = useRef(null);
 
@@ -70,14 +82,37 @@ function KLineChart({ klineData, period, code }) {
 
   useEffect(() => {
     const chart = chartRef.current;
-    if (!chart || !containerRef.current) return;
-    const ro = new ResizeObserver(() => chart.resize());
-    ro.observe(containerRef.current);
-    return () => ro.disconnect();
+    if (!chart) return;
+    let frameId = 0;
+    const resize = () => {
+      cancelAnimationFrame(frameId);
+      frameId = requestAnimationFrame(() => {
+        try { chart.resize(); } catch { /* 页面切换期间忽略失效实例 */ }
+      });
+    };
+    window.addEventListener('resize', resize);
+    return () => {
+      cancelAnimationFrame(frameId);
+      window.removeEventListener('resize', resize);
+    };
   }, []);
 
-  if (!klineData?.klines?.length) return <div className="stock-chart-empty">暂无K线数据</div>;
-  return <div className="stock-kline-container" ref={containerRef} />;
+  useEffect(() => {
+    const chart = chartRef.current;
+    if (!chart) return;
+    const timer = setTimeout(() => {
+      try { chart.resize(); } catch { /* 页面切换期间忽略失效实例 */ }
+    }, 50);
+    return () => clearTimeout(timer);
+  }, [layoutKey]);
+
+  const hasData = Boolean(klineData?.klines?.length);
+  return (
+    <div className="stock-kline-shell">
+      <div className="stock-kline-container" ref={containerRef} />
+      {!hasData && <div className="stock-chart-empty stock-kline-empty">暂无K线数据</div>}
+    </div>
+  );
 }
 
 // ===== 分时图（纯 SVG） =====
@@ -171,6 +206,13 @@ export default function StockPage({ llmConfig, onOpenLlmConfig }) {
   const [sectors, setSectors] = useState([]);
   const [sectorType, setSectorType] = useState('industry'); // industry | concept
   const [period, setPeriod] = useState('timeline');
+  const [adjust, setAdjust] = useState(() => localStorage.getItem('stockKlineAdjust') || '1');
+  const [leftPanelOpen, setLeftPanelOpen] = useState(() => localStorage.getItem('stockLeftPanelOpen') !== 'false');
+  const [rightPanelOpen, setRightPanelOpen] = useState(() => localStorage.getItem('stockRightPanelOpen') !== 'false');
+
+  useEffect(() => { localStorage.setItem('stockKlineAdjust', adjust); }, [adjust]);
+  useEffect(() => { localStorage.setItem('stockLeftPanelOpen', String(leftPanelOpen)); }, [leftPanelOpen]);
+  useEffect(() => { localStorage.setItem('stockRightPanelOpen', String(rightPanelOpen)); }, [rightPanelOpen]);
 
   // 搜索
   const [searchKeyword, setSearchKeyword] = useState('');
@@ -226,7 +268,7 @@ export default function StockPage({ llmConfig, onOpenLlmConfig }) {
     // 当前是分时图时，临时拉一份日K供诊断
     if (period === 'timeline' || !klineForDiag) {
       try {
-        const res = await fetch(`/api/stock/kline?code=${selectedCode}&period=101&count=30`);
+        const res = await fetch(`/api/stock/kline?code=${selectedCode}&period=101&count=30&adjust=${adjust}`);
         klineForDiag = await res.json();
       } catch { /* ignore */ }
     }
@@ -236,7 +278,7 @@ export default function StockPage({ llmConfig, onOpenLlmConfig }) {
       realtime,
       sectors,
     });
-  }, [ai, klineData, period, selectedCode, selectedName, realtime, sectors]);
+  }, [ai, adjust, klineData, period, selectedCode, selectedName, realtime, sectors]);
 
   // 触发 AI 早报
   const runBriefing = useCallback(() => {
@@ -295,13 +337,14 @@ export default function StockPage({ llmConfig, onOpenLlmConfig }) {
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch(`/api/stock/kline?code=${selectedCode}&period=${period}&count=120`);
+        const count = ['5', '15', '30', '60'].includes(period) ? 240 : 120;
+        const res = await fetch(`/api/stock/kline?code=${selectedCode}&period=${period}&count=${count}&adjust=${adjust}`);
         const data = await res.json();
         if (!cancelled) setKlineData(data);
       } catch { /* ignore */ }
     })();
     return () => { cancelled = true; };
-  }, [selectedCode, period]);
+  }, [selectedCode, period, adjust]);
 
   useEffect(() => { loadDashboard(); }, [loadDashboard]);
   useEffect(() => { if (selectedCode) loadStock(selectedCode); }, [selectedCode, loadStock]);
@@ -443,9 +486,9 @@ export default function StockPage({ llmConfig, onOpenLlmConfig }) {
       </section>
 
       {/* 三栏主体 */}
-      <div className="stock3-body">
+      <div className={`stock3-body ${leftPanelOpen ? '' : 'no-left'} ${rightPanelOpen ? '' : 'no-right'}`}>
         {/* 左栏：列表 */}
-        <aside className="stock3-left">
+        {leftPanelOpen && <aside className="stock3-left">
           <div className="stock3-left-tabs">
             <button className={`stock3-left-tab ${listTab === 'hot' ? 'active' : ''}`} onClick={() => setListTab('hot')}>热门</button>
             <button className={`stock3-left-tab ${listTab === 'watchlist' ? 'active' : ''}`} onClick={() => setListTab('watchlist')}>自选 {watchlist.length > 0 && `(${watchlist.length})`}</button>
@@ -484,7 +527,7 @@ export default function StockPage({ llmConfig, onOpenLlmConfig }) {
               </button>
             ))}
           </div>
-        </aside>
+        </aside>}
 
         {/* 中栏：主图 */}
         <main className="stock3-main">
@@ -499,21 +542,54 @@ export default function StockPage({ llmConfig, onOpenLlmConfig }) {
                 </span>
               )}
             </div>
-            <div className="stock3-period">
-              {PERIOD_OPTIONS.map(p => (
-                <button key={p.id} className={`stock3-period-btn ${period === p.id ? 'active' : ''}`} onClick={() => setPeriod(p.id)}>{p.label}</button>
-              ))}
+            <div className="stock3-chart-toolbar">
+              <div className="stock3-period">
+                {PERIOD_OPTIONS.map(p => (
+                  <button key={p.id} className={`stock3-period-btn ${period === p.id ? 'active' : ''}`} onClick={() => setPeriod(p.id)}>{p.label}</button>
+                ))}
+              </div>
+              {period !== 'timeline' && (
+                <label className="stock3-adjust">
+                  <span>复权</span>
+                  <select value={adjust} onChange={event => setAdjust(event.target.value)}>
+                    <option value="0">不复权</option>
+                    <option value="1">前复权</option>
+                    <option value="2">后复权</option>
+                  </select>
+                </label>
+              )}
+              <div className="stock3-layout-tools" aria-label="工作区布局">
+                <button type="button" className={leftPanelOpen ? '' : 'active'} onClick={() => setLeftPanelOpen(value => !value)} title={leftPanelOpen ? '隐藏股票列表' : '显示股票列表'} aria-pressed={!leftPanelOpen}>
+                  {leftPanelOpen ? ICONS.chevronLeft : ICONS.chevronRight}
+                </button>
+                <button type="button" className={rightPanelOpen ? '' : 'active'} onClick={() => setRightPanelOpen(value => !value)} title={rightPanelOpen ? '隐藏盘口指标' : '显示盘口指标'} aria-pressed={!rightPanelOpen}>
+                  {rightPanelOpen ? ICONS.chevronRight : ICONS.chevronLeft}
+                </button>
+                <button
+                  type="button"
+                  className={!leftPanelOpen && !rightPanelOpen ? 'active' : ''}
+                  onClick={() => {
+                    const focused = !leftPanelOpen && !rightPanelOpen;
+                    setLeftPanelOpen(focused);
+                    setRightPanelOpen(focused);
+                  }}
+                  title={!leftPanelOpen && !rightPanelOpen ? '恢复三栏' : '专注图表'}
+                  aria-pressed={!leftPanelOpen && !rightPanelOpen}
+                >
+                  {ICONS.grid}
+                </button>
+              </div>
             </div>
           </div>
           <div className="stock3-chart-wrap">
             {period === 'timeline'
               ? <TimelineChart points={timelineData?.points} preClose={timelineData?.preClose} />
-              : <KLineChart klineData={klineData} period={period} code={selectedCode} />}
+              : <KLineChart klineData={klineData} period={period} code={selectedCode} layoutKey={`${leftPanelOpen}-${rightPanelOpen}`} />}
           </div>
         </main>
 
         {/* 右栏：盘口 + 指标 */}
-        <aside className="stock3-right">
+        {rightPanelOpen && <aside className="stock3-right">
           <section className="stock3-panel">
             <div className="stock3-panel-label">五档盘口</div>
             <OrderBook realtime={realtime} />
@@ -526,7 +602,7 @@ export default function StockPage({ llmConfig, onOpenLlmConfig }) {
               ))}
             </div>
           </section>
-        </aside>
+        </aside>}
       </div>
 
       {/* 算法技术分析始终可用，LLM 仅增强自然语言表述 */}
