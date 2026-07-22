@@ -100,15 +100,15 @@ const NAV_ITEMS = [
 ];
 
 const PRIMARY_NAV_ITEMS = [
-  { id: 'home', label: 'AI 工作站', desc: '今日总判断', short: '情报', icon: 'sparkle', nav: 'home' },
-  { id: 'today', label: '今日速报', desc: '精准推荐', short: '速报', icon: 'sparkle', nav: 'today' },
-  { id: 'recommendations', label: '精准推荐', desc: '日历时间线', short: '推荐', icon: 'calendar', nav: 'recommendations' },
-  { id: 'all', label: '全部动态', desc: '扩展视野', short: '动态', icon: 'grid', nav: 'all' },
-  { id: 'stock', label: '股市动向', desc: '行情分析', short: '股市', icon: 'trendingUp', nav: 'stock' },
-  { id: 'github', label: 'GitHub 热门', desc: '三榜项目', short: '开源', icon: 'github', nav: 'github' },
-  { id: 'studio', label: '智创中心', desc: '素材智能体创作', short: '智创', icon: 'edit', nav: 'studio' },
-  { id: 'square', label: '用户广场', desc: '分享交流', short: '广场', icon: 'user', nav: 'square' },
-  { id: 'profile-center', label: '用户画像', desc: '越用越懂你', short: '画像', icon: 'target', nav: 'profile-center' }
+  { id: 'home', label: 'AI 工作站', desc: '今日总判断', short: '情报', icon: 'sparkle', nav: 'home', children: ['home'] },
+  { id: 'today', label: '今日速报', desc: '精准推荐', short: '速报', icon: 'sparkle', nav: 'today', children: ['today', 'recommendations'] },
+  { id: 'recommendations', label: '精准推荐', desc: '日历时间线', short: '推荐', icon: 'calendar', nav: 'recommendations', children: ['today', 'recommendations'] },
+  { id: 'all', label: '全部动态', desc: '扩展视野', short: '动态', icon: 'grid', nav: 'all', children: ['all'] },
+  { id: 'stock', label: '股市动向', desc: '行情分析', short: '股市', icon: 'trendingUp', nav: 'stock', children: [] },
+  { id: 'github', label: 'GitHub 热门', desc: '三榜项目', short: '开源', icon: 'github', nav: 'github', children: ['github'] },
+  { id: 'studio', label: '智创中心', desc: '素材智能体创作', short: '智创', icon: 'edit', nav: 'studio', children: ['materials', 'agents', 'editor'] },
+  { id: 'square', label: '用户广场', desc: '分享交流', short: '广场', icon: 'user', nav: 'square', children: ['square'] },
+  { id: 'profile-center', label: '用户画像', desc: '越用越懂你', short: '画像', icon: 'target', nav: 'profile-center', children: ['profile-center'] }
 ];
 
 const NAV_CONTEXT_SECTIONS = {
@@ -5710,7 +5710,7 @@ ${signals}
 
         <nav className="nav-menu">
           <div className="nav-primary-group">
-            {!sidebarCollapsed && <div className="nav-group-title-static">工作流</div>}
+            {!sidebarCollapsed && <div className="nav-group-title-static">主工作区</div>}
             {PRIMARY_NAV_ITEMS.map(item => (
               <button
                 key={item.id}

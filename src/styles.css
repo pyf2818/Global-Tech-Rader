@@ -195,7 +195,7 @@ body {
 .logo-icon svg { width: 32px; height: 32px; }
 .sidebar.collapsed .logo-icon { width: 28px; height: 28px; }
 .sidebar.collapsed .logo-icon svg { width: 24px; height: 24px; }
-.logo-text { font-size: 20px; font-weight: 700; background: linear-gradient(135deg, var(--accent-cyan) 0%, var(--accent-blue) 60%, var(--accent-violet) 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; white-space: nowrap; transition: opacity 0.2s; letter-spacing: 0.5px; text-shadow: 0 0 14px var(--border-glow); max-width: 140px; overflow: hidden; text-overflow: ellipsis; }
+.logo-text { font-size: 17px; font-weight: 700; background: linear-gradient(135deg, var(--accent-cyan) 0%, var(--accent-blue) 60%, var(--accent-violet) 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; white-space: nowrap; transition: opacity 0.2s; letter-spacing: 0.3px; text-shadow: 0 0 14px var(--border-glow); }
 .sidebar.collapsed .logo-text { opacity: 0; pointer-events: none; }
 .logo-copy { display: flex; min-width: 0; flex-direction: column; gap: 1px; }
 .logo-copy small { max-width: 142px; overflow: hidden; color: var(--text-muted); font-size: 10px; font-weight: 800; letter-spacing: 0; text-overflow: ellipsis; white-space: nowrap; }
