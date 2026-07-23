@@ -10092,14 +10092,13 @@ function NewsItem({ item, index, viewMode = 'standard', isFocused = false, isBoo
           <span className={`item-region region-${item.region}`}>{REGION_MAP[item.region]}</span>
         </div>}
         <div className="item-time">{formatRelative(item.publishedAt)}</div>
-        <div className="item-actions-left">
-          {onBookmark && <button className={`bookmark-btn ${isBookmarked ? 'active' : ''}`} onClick={onBookmark} title={isBookmarked ? '取消收藏' : '收藏'}>{isBookmarked ? ICONS.bookmarkFill : ICONS.bookmark}</button>}
-          {onAddMaterial && <button className={`add-material-btn ${isInMaterials ? 'active' : ''}`} onClick={() => onAddMaterial(item)} title={isInMaterials ? '已在素材库' : '收藏为素材'}>{ICONS.layers}</button>}
-          {onSummary && <button className={`summary-btn ${summaryLoading ? 'loading' : ''}`} onClick={onSummary} title="生成短摘要" disabled={summaryLoading}>{summaryLoading ? ICONS.spinner : ICONS.sparkle}</button>}
-          {isEnglish && onToggleTranslation && <button className={`translate-btn ${showTranslation ? 'active' : ''} ${isTranslating ? 'translating' : ''}`} onClick={() => { if (isTranslating) return; if (!translation && onRequestTranslation) { onRequestTranslation().then(result => { if (result) onToggleTranslation(); }); } else { onToggleTranslation(); } }} title="翻译" disabled={isTranslating}>{isTranslating ? ICONS.spinner : ICONS.globe}</button>}
-        </div>
       </div>
       <div className="item-main">
+        <div className="item-top-tags">
+          <span className={`item-mode mode-${item.mode}`}>{MODE_MAP[item.mode]}</span>
+          <span className={`item-region region-${item.region}`}>{REGION_MAP[item.region]}</span>
+          {item.tags?.slice(0, 3).map(t => <span key={t} className="item-tag">{t}</span>)}
+        </div>
         <div className="item-content-row">
           <div className="item-text">
             <h2 className="item-title"><span className="item-rank">{index + 1}.</span> {displayTitle}</h2>
@@ -10150,14 +10149,20 @@ function NewsItem({ item, index, viewMode = 'standard', isFocused = false, isBoo
           </div>
         )}
         {!isCompact && <div className="item-meta">
-          <div className="item-tags-row">{item.tags?.slice(0, 4).map(t => <span key={t} className="item-tag">{t}</span>)}</div>
+          <div className="item-tags-row card-grid-hide">{item.tags?.slice(0, 4).map(t => <span key={t} className="item-tag">{t}</span>)}</div>
           <div className="item-footer">
             <div className="item-source-container">
               <span className="item-source">{item.source}{item.platform ? ` · ${item.platform}` : ''}</span>
               {renderSourceGrade()}
               {renderChinaFocused()}
             </div>
-            <a href={item.url} target="_blank" rel="noreferrer" className="item-link" onClick={() => onRead?.(item)}>阅读原文 {ICONS.arrowRight}</a>
+            <div className="item-actions">
+              {onBookmark && <button className={`item-action-btn bookmark-btn ${isBookmarked ? 'active' : ''}`} onClick={onBookmark} title={isBookmarked ? '取消收藏' : '收藏'}>{isBookmarked ? ICONS.bookmarkFill : ICONS.bookmark}</button>}
+              {onAddMaterial && <button className={`item-action-btn add-material-btn ${isInMaterials ? 'active' : ''}`} onClick={() => onAddMaterial(item)} title={isInMaterials ? '已在素材库' : '收藏为素材'}>{ICONS.layers}</button>}
+              {onSummary && <button className={`item-action-btn summary-btn ${summaryLoading ? 'loading' : ''}`} onClick={onSummary} title="生成短摘要" disabled={summaryLoading}>{summaryLoading ? ICONS.spinner : ICONS.sparkle}</button>}
+              {isEnglish && onToggleTranslation && <button className={`item-action-btn translate-btn ${showTranslation ? 'active' : ''} ${isTranslating ? 'translating' : ''}`} onClick={() => { if (isTranslating) return; if (!translation && onRequestTranslation) { onRequestTranslation().then(result => { if (result) onToggleTranslation(); }); } else { onToggleTranslation(); } }} title="翻译" disabled={isTranslating}>{isTranslating ? ICONS.spinner : ICONS.globe}</button>}
+              <a href={item.url} target="_blank" rel="noreferrer" className="item-link" onClick={() => onRead?.(item)}>阅读原文 {ICONS.arrowRight}</a>
+            </div>
           </div>
         </div>}
         {isCompact && <div className="item-footer compact-footer">
@@ -10166,7 +10171,13 @@ function NewsItem({ item, index, viewMode = 'standard', isFocused = false, isBoo
             {renderSourceGrade()}
             {renderChinaFocused()}
           </div>
-          <a href={item.url} target="_blank" rel="noreferrer" className="item-link" onClick={() => onRead?.(item)}>{ICONS.arrowRight}</a>
+          <div className="item-actions">
+            {onBookmark && <button className={`item-action-btn bookmark-btn ${isBookmarked ? 'active' : ''}`} onClick={onBookmark} title={isBookmarked ? '取消收藏' : '收藏'}>{isBookmarked ? ICONS.bookmarkFill : ICONS.bookmark}</button>}
+            {onAddMaterial && <button className={`item-action-btn add-material-btn ${isInMaterials ? 'active' : ''}`} onClick={() => onAddMaterial(item)} title={isInMaterials ? '已在素材库' : '收藏为素材'}>{ICONS.layers}</button>}
+            {onSummary && <button className={`item-action-btn summary-btn ${summaryLoading ? 'loading' : ''}`} onClick={onSummary} title="生成短摘要" disabled={summaryLoading}>{summaryLoading ? ICONS.spinner : ICONS.sparkle}</button>}
+            {isEnglish && onToggleTranslation && <button className={`item-action-btn translate-btn ${showTranslation ? 'active' : ''} ${isTranslating ? 'translating' : ''}`} onClick={() => { if (isTranslating) return; if (!translation && onRequestTranslation) { onRequestTranslation().then(result => { if (result) onToggleTranslation(); }); } else { onToggleTranslation(); } }} title="翻译" disabled={isTranslating}>{isTranslating ? ICONS.spinner : ICONS.globe}</button>}
+            <a href={item.url} target="_blank" rel="noreferrer" className="item-link" onClick={() => onRead?.(item)}>{ICONS.arrowRight}</a>
+          </div>
         </div>}
       </div>
     </article>

@@ -8,6 +8,7 @@
  * - 不支持 File System Access API 时：降级提示
  */
 import { useState, useEffect, useCallback } from 'react';
+import { indexFile } from '../utils/workspaceIndex.js';
 import {
   isFileSystemSupported, pickRootDirectory, restoreRootDirectory, clearRootDirectory,
   listFiles, readFile, exportMaterials, exportBriefing, downloadMarkdown,
@@ -124,6 +125,11 @@ export default function WorkspacePanel({
       try {
         const results = await exportMaterials(rootHandle, materials);
         const ok = results.filter(r => r.ok).length;
+        // 建索引：让工作空间文件可被对话检索召回
+        materials.forEach((m, i) => {
+          const r = results[i];
+          if (r?.ok) indexFile(r.path, `${m.title || 'material'}.md`, materialToMarkdown(m));
+        });
         showToast(`已导出 ${ok}/${materials.length} 条素材到 news/`);
         await refreshFiles(rootHandle);
       } catch (e) { showToast(`导出失败: ${e.message}`); }
@@ -141,7 +147,8 @@ export default function WorkspacePanel({
     const content = briefingToMarkdown(todayBriefing, todayLanes);
     if (rootHandle) {
       try {
-        await exportBriefing(rootHandle, todayBriefing, todayLanes);
+        const path = await exportBriefing(rootHandle, todayBriefing, todayLanes);
+        indexFile(path, `${date}.md`, content);
         showToast(`已导出今日速报到 briefings/${date}.md`);
         await refreshFiles(rootHandle);
       } catch (e) { showToast(`导出失败: ${e.message}`); }
