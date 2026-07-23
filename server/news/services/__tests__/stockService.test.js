@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { getKline, parseListItem, resolveSecid } from '../stockService.js';
+import { getKline, parseListItem, parseMarketPoolItem, resolveSecid } from '../stockService.js';
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -36,6 +36,18 @@ describe('stockService quote normalization', () => {
     expect(resolveSecid('sh600519')).toBe('1.600519');
     expect(resolveSecid('00700')).toBe('116.00700');
     expect(resolveSecid('AAPL')).toBe('105.AAPL');
+  });
+
+  it('normalizes dynamic A-share market-pool rows', () => {
+    expect(parseMarketPoolItem({
+      f2: 38.91, f3: 0.52, f4: 0.2, f5: 1234, f6: 567890,
+      f12: '600036', f13: 1, f14: '招商银行', f15: 38.99,
+      f16: 38.45, f17: 38.68, f18: 38.71,
+    })).toMatchObject({
+      secid: '1.600036', code: 'sh600036', name: '招商银行',
+      price: 38.91, changePct: 0.52, amount: 567890,
+    });
+    expect(parseMarketPoolItem({ f12: 'invalid' })).toBeNull();
   });
 
   it('keeps different adjustment modes in separate K-line cache entries', async () => {

@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import { annualizedVolatility, simpleMovingAverage, supportResistance, volumeTrend } from '../indicators.js';
+import { annualizedVolatility, averageTrueRange, maxDrawdown, pricePosition, relativePerformance, simpleMovingAverage, supportResistance, volumeTrend } from '../indicators.js';
 
 const bars = [
   { close: 10, low: 9, high: 11, volume: 100 },
@@ -15,5 +15,21 @@ it('calculates finite deterministic indicators without mutating input', () => {
   expect(supportResistance(bars, 5)).toEqual({ support: 9, resistance: 15 });
   expect(volumeTrend(bars, 3)).toBe('expanding');
   expect(annualizedVolatility(bars)).toBeGreaterThan(0);
+  expect(averageTrueRange(bars, 3)).toBeGreaterThan(0);
+  expect(maxDrawdown(bars)).toBe(0);
+  expect(pricePosition(bars, 5)).toBe(100);
   expect(bars).toEqual(original);
+});
+
+it('measures drawdown from the prior peak', () => {
+  expect(maxDrawdown([{ close: 100 }, { close: 120 }, { close: 90 }, { close: 96 }])).toBe(25);
+});
+
+it('compares asset return with a benchmark over the same period', () => {
+  const asset = [{ close: 100 }, { close: 105 }, { close: 110 }];
+  const benchmark = [{ close: 100 }, { close: 102 }, { close: 104 }];
+  const result = relativePerformance(asset, benchmark, 2);
+  expect(result.assetReturn).toBeCloseTo(10);
+  expect(result.benchmarkReturn).toBeCloseTo(4);
+  expect(result.excessReturn).toBeCloseTo(6);
 });

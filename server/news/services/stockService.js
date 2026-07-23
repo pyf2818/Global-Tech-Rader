@@ -70,6 +70,8 @@ const TENCENT_URL = 'https://qt.gtimg.cn/q=';
 const TIMELINE_URL = 'https://push2his.eastmoney.com/api/qt/stock/trends2/get';
 // 东方财富板块涨跌接口（m:90 t:2=行业板块 t:3=概念板块）
 const SECTOR_LIST_URL = 'https://push2.eastmoney.com/api/qt/clist/get';
+const MARKET_POOL_SIZE = 30;
+const A_SHARE_FILTER = 'm:0+t:6,m:0+t:80,m:1+t:2,m:1+t:23';
 
 // 东方财富 secid（如 1.000001）→ 腾讯 code（如 sh000001）
 function secidToTencentCode(secid) {
@@ -271,6 +273,38 @@ export function parseListItem(d, secids) {
   };
 }
 
+export function parseMarketPoolItem(d) {
+  const code = String(d?.f12 || '');
+  if (!/^\d{6}$/.test(code)) return null;
+  const market = Number(d?.f13) === 1 || /^(6|68)/.test(code) ? 'sh' : 'sz';
+  const price = Number(d?.f2) || 0;
+  if (price <= 0 || !d?.f14) return null;
+  return {
+    secid: `${market === 'sh' ? 1 : 0}.${code}`,
+    code: `${market}${code}`,
+    name: d.f14,
+    price,
+    prevClose: Number(d.f18) || 0,
+    open: Number(d.f17) || 0,
+    high: Number(d.f15) || 0,
+    low: Number(d.f16) || 0,
+    change: Number(d.f4) || 0,
+    changePct: Number(d.f3) || 0,
+    volume: Number(d.f5) || 0,
+    amount: Number(d.f6) || 0,
+    dataSource: 'eastmoney',
+    timestamp: nowMs(),
+  };
+}
+
+async function getActiveMarketPool() {
+  const url = `${SECTOR_LIST_URL}?pn=1&pz=${MARKET_POOL_SIZE}&po=1&np=1&fltt=2&invt=2&fid=f6&fs=${A_SHARE_FILTER}&fields=f2,f3,f4,f5,f6,f12,f13,f14,f15,f16,f17,f18`;
+  const res = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } });
+  if (!res.ok) throw new Error(`market pool upstream returned ${res.status}`);
+  const json = await res.json();
+  return (json?.data?.diff || []).map(parseMarketPoolItem).filter(Boolean);
+}
+
 // K线：klt=101日 102周 103月 5/15/30/60 分钟；fqt=0不复权 1前复权 2后复权
 export async function getKline(secid, { period = '101', count = 60, adjust = '1' } = {}) {
   if (!secid) return null;
@@ -380,12 +414,26 @@ export async function getSectors(type = 'industry') {
 // 获取默认看板数据（指数 + 热门股）
 export async function getDashboard() {
   const indexSecids = DEFAULT_INDICES.map(i => i.secid);
-  const stockSecids = DEFAULT_HOT_STOCKS.map(s => s.secid);
-  const [indices, stocks] = await Promise.all([
+  const fallbackSecids = DEFAULT_HOT_STOCKS.map(s => s.secid);
+  const [indices, poolResult] = await Promise.all([
     getRealtimeBatch(indexSecids),
-    getRealtimeBatch(stockSecids),
+    getActiveMarketPool().catch(() => null),
   ]);
-  return { indices, stocks, updatedAt: new Date().toISOString() };
+  const dynamicStocks = Array.isArray(poolResult) && poolResult.length >= 10 ? poolResult : null;
+  const stocks = dynamicStocks || await getRealtimeBatch(fallbackSecids);
+  return {
+    indices,
+    stocks,
+    updatedAt: new Date().toISOString(),
+    coverage: {
+      kind: dynamicStocks ? 'active_turnover_sample' : 'fixed_fallback_sample',
+      label: dynamicStocks ? '沪深A股成交额活跃样本' : '固定热门样本（上游降级）',
+      stockCount: stocks.length,
+      targetCount: dynamicStocks ? MARKET_POOL_SIZE : DEFAULT_HOT_STOCKS.length,
+      realtimePollingSeconds: 30,
+      source: stocks[0]?.dataSource || 'unavailable',
+    },
+  };
 }
 
 // 搜索股票（东方财富搜索接口）
