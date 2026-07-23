@@ -46,38 +46,29 @@ function KLineChart({ klineData, period, code, layoutKey }) {
 
   useEffect(() => {
     if (!containerRef.current) return;
-    const chart = init(containerRef.current, {
-      styles: {
-        candle: {
-          type: 'candle_solid',
-          bar: {
-            upColor: UP_COLOR, downColor: DOWN_COLOR, noChangeColor: '#888',
-            upBorderColor: UP_COLOR, downBorderColor: DOWN_COLOR,
-            upWickColor: UP_COLOR, downWickColor: DOWN_COLOR,
-          },
-          priceMark: { last: { upColor: UP_COLOR, downColor: DOWN_COLOR } },
-        },
-        yAxis: { position: 'right' },
-        crosshair: {
-          horizontal: { line: { style: 'dashed', dashedValue: [4, 2] }, text: { backgroundColor: '#1f2937' } },
-          vertical: { line: { style: 'dashed', dashedValue: [4, 2] }, text: { backgroundColor: '#1f2937' } },
-        },
-      },
-    });
+    const chart = init(containerRef.current);
     if (!chart) return;
     chartRef.current = chart;
-    chart.createIndicator({ name: 'MA', calcParams: [5, 10, 20], shortName: 'MA' }, { id: 'ma_pane', isStack: true });
-    chart.createIndicator({ name: 'VOL', shortName: 'VOL' }, { id: 'vol_pane' });
-    return () => { if (containerRef.current) dispose(containerRef.current); chartRef.current = null; };
+    chart.createIndicator({ name: 'MA', calcParams: [5, 10, 20], shortName: 'MA', paneId: 'candle_pane' }, true);
+    chart.createIndicator({ name: 'VOL', shortName: 'VOL', paneId: 'volume_pane' });
+    return () => {
+      if (containerRef.current) dispose(containerRef.current);
+      chartRef.current = null;
+    };
   }, []);
 
   useEffect(() => {
     const chart = chartRef.current;
     if (!chart) return;
     const list = toKLineData(klineData?.klines);
+    chart.setDataLoader({ getBars: ({ callback }) => callback(list, { backward: false, forward: false }) });
+    // Symbol and period changes both request data, so the loader must be registered first.
     chart.setSymbol({ ticker: code || 'INDEX', pricePrecision: 2, volumePrecision: 0 });
     chart.setPeriod(KLINE_PERIOD_MAP[period] || KLINE_PERIOD_MAP['101']);
-    chart.setDataLoader({ getBars: ({ callback }) => callback(list, { backward: false, forward: false }) });
+    if (list.length > 0) {
+      chart.resetData();
+      chart.resize();
+    }
   }, [klineData, period, code, toKLineData]);
 
   useEffect(() => {
@@ -209,10 +200,12 @@ export default function StockPage({ llmConfig, onOpenLlmConfig }) {
   const [adjust, setAdjust] = useState(() => localStorage.getItem('stockKlineAdjust') || '1');
   const [leftPanelOpen, setLeftPanelOpen] = useState(() => localStorage.getItem('stockLeftPanelOpen') !== 'false');
   const [rightPanelOpen, setRightPanelOpen] = useState(() => localStorage.getItem('stockRightPanelOpen') !== 'false');
+  const [experienceMode, setExperienceMode] = useState(() => localStorage.getItem('stockExperienceMode') || 'beginner');
 
   useEffect(() => { localStorage.setItem('stockKlineAdjust', adjust); }, [adjust]);
   useEffect(() => { localStorage.setItem('stockLeftPanelOpen', String(leftPanelOpen)); }, [leftPanelOpen]);
   useEffect(() => { localStorage.setItem('stockRightPanelOpen', String(rightPanelOpen)); }, [rightPanelOpen]);
+  useEffect(() => { localStorage.setItem('stockExperienceMode', experienceMode); }, [experienceMode]);
 
   // 搜索
   const [searchKeyword, setSearchKeyword] = useState('');
@@ -387,6 +380,24 @@ export default function StockPage({ llmConfig, onOpenLlmConfig }) {
   const quoteUpdatedLabel = realtime?.timestamp
     ? new Date(realtime.timestamp).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
     : '--:--:--';
+  const breadth = useMemo(() => {
+    const stocks = dashboard?.stocks || [];
+    const up = stocks.filter(s => s.changePct > 0).length;
+    const down = stocks.filter(s => s.changePct < 0).length;
+    return { up, down, flat: Math.max(stocks.length - up - down, 0), total: stocks.length };
+  }, [dashboard]);
+  const marketRead = useMemo(() => {
+    const index = dashboard?.indices?.[0];
+    const change = index?.changePct ?? realtime?.changePct;
+    const positive = (change ?? 0) >= 0;
+    const crowded = breadth.total > 0 && breadth.down / breadth.total > 0.55;
+    return {
+      tone: crowded ? '谨慎' : positive ? '偏强' : '偏弱',
+      toneClass: crowded ? 'caution' : positive ? 'positive' : 'negative',
+      reason: crowded ? '下跌样本较多，先观察风险扩散' : positive ? '主要指数和热门样本维持上行' : '主要指数走弱，先观察支撑是否有效',
+      action: crowded ? '观察量能与止跌信号' : positive ? '关注强势板块能否延续' : '关注是否出现企稳信号',
+    };
+  }, [breadth, dashboard, realtime]);
 
   const pickStock = (code, name) => {
     setSelectedCode(code);
@@ -425,6 +436,10 @@ export default function StockPage({ llmConfig, onOpenLlmConfig }) {
           <span className={`stock3-data-dot ${realtime ? 'live' : ''}`} />
           <span>行情 {quoteUpdatedLabel}</span>
         </div>
+        <div className="stock3-experience-switch" role="tablist" aria-label="使用模式">
+          <button type="button" className={experienceMode === 'beginner' ? 'active' : ''} onClick={() => setExperienceMode('beginner')} role="tab" aria-selected={experienceMode === 'beginner'}>新手</button>
+          <button type="button" className={experienceMode === 'pro' ? 'active' : ''} onClick={() => setExperienceMode('pro')} role="tab" aria-selected={experienceMode === 'pro'}>专业</button>
+        </div>
         <button className={`stock-watch-btn ${isSelectedInWatchlist ? 'active' : ''}`} onClick={() => toggleStock(selectedStock)} title={isSelectedInWatchlist ? '移出自选' : '加入自选'}>
           {ICONS.star}<span>{isSelectedInWatchlist ? '已自选' : '加自选'}</span>
         </button>
@@ -462,6 +477,25 @@ export default function StockPage({ llmConfig, onOpenLlmConfig }) {
           </div>
         )}
       </section>
+
+      {experienceMode === 'beginner' && (
+        <section className="stock3-coach" aria-label="市场摘要">
+          <div className="stock3-coach-lead">
+            <span className="stock3-coach-kicker">市场状态</span>
+            <strong className={marketRead.toneClass}>{marketRead.tone}</strong>
+            <span>{marketRead.reason}</span>
+          </div>
+          <div className="stock3-coach-item">
+            <span>今天先看</span>
+            <strong>{marketRead.action}</strong>
+          </div>
+          <div className="stock3-coach-item">
+            <span>涨跌家数</span>
+            <strong><em className="up">{breadth.up} 涨</em><em className="down">{breadth.down} 跌</em></strong>
+          </div>
+          <div className="stock3-coach-note" title="市场状态是基于当前行情样本的辅助判断，不代表买卖建议">仅作观察参考</div>
+        </section>
+      )}
 
       {/* 板块涨幅榜（行业/概念切换） */}
       <section className="stock3-sectors">
@@ -591,11 +625,11 @@ export default function StockPage({ llmConfig, onOpenLlmConfig }) {
         {/* 右栏：盘口 + 指标 */}
         {rightPanelOpen && <aside className="stock3-right">
           <section className="stock3-panel">
-            <div className="stock3-panel-label">五档盘口</div>
+            <div className="stock3-panel-label" title="买卖双方当前挂单价格和数量">五档盘口 <span className="stock-help-dot">?</span></div>
             <OrderBook realtime={realtime} />
           </section>
           <section className="stock3-panel">
-            <div className="stock3-panel-label">关键指标</div>
+            <div className="stock3-panel-label" title="当日开盘、最高、最低、昨收和成交数据">关键指标 <span className="stock-help-dot">?</span></div>
             <div className="stock3-metrics">
               {metrics.map(m => (
                 <div key={m.label} className="stock3-metric"><span>{m.label}</span><strong>{m.value}</strong></div>

@@ -7,6 +7,7 @@
  * - 智能体状态：当前模型、连接状态、本次会话用量估算
  */
 import { useMemo, useState, useEffect } from 'react';
+import { setLearningEnabled } from '../utils/profileLearning.js';
 
 function todosKey(sessionId) { return `aiTodos_${sessionId || 'default'}`; }
 
@@ -28,19 +29,34 @@ export default function AgentPanel({
   relevantMemories = [],
   recalledFiles = [],
   onAddContextFiles,
+  learnedPrefs = {},
+  autoTodos = [],
 }) {
-  const [todos, setTodos] = useState(() => loadTodos(activeSessionId));
+  const [manualTodos, setManualTodos] = useState(() => loadTodos(activeSessionId));
   const [todoInput, setTodoInput] = useState('');
 
-  // 切换会话时重新加载待办
+  // 切换会话时重新加载手动待办
   useEffect(() => {
-    setTodos(loadTodos(activeSessionId));
+    setManualTodos(loadTodos(activeSessionId));
   }, [activeSessionId]);
 
   useEffect(() => {
     if (!activeSessionId) return;
-    try { localStorage.setItem(todosKey(activeSessionId), JSON.stringify(todos)); } catch {}
-  }, [todos, activeSessionId]);
+    try { localStorage.setItem(todosKey(activeSessionId), JSON.stringify(manualTodos)); } catch {}
+  }, [manualTodos, activeSessionId]);
+
+  // 合并待办：自动提取的 + 手动添加的（去重）
+  const todos = useMemo(() => {
+    const seen = new Set();
+    const merged = [];
+    for (const t of autoTodos) {
+      if (!seen.has(t.text)) { seen.add(t.text); merged.push({ ...t, id: `auto_${t.text.slice(0, 12)}` }); }
+    }
+    for (const t of manualTodos) {
+      if (!seen.has(t.text)) { seen.add(t.text); merged.push(t); }
+    }
+    return merged;
+  }, [autoTodos, manualTodos]);
 
   const stats = useMemo(() => {
     const userMsgs = messages.filter(m => m.role === 'user');
@@ -61,11 +77,24 @@ export default function AgentPanel({
   const addTodo = () => {
     const text = todoInput.trim();
     if (!text) return;
-    setTodos(prev => [...prev, { id: Date.now(), text, done: false }]);
+    setManualTodos(prev => [...prev, { id: Date.now(), text, done: false, source: 'manual' }]);
     setTodoInput('');
   };
-  const toggleTodo = id => setTodos(prev => prev.map(t => t.id === id ? { ...t, done: !t.done } : t));
-  const removeTodo = id => setTodos(prev => prev.filter(t => t.id !== id));
+  const toggleTodo = id => {
+    // auto 待办切换时自动转为手动持久化
+    setManualTodos(prev => {
+      const existing = prev.find(t => t.id === id);
+      if (existing) return prev.map(t => t.id === id ? { ...t, done: !t.done } : t);
+      const autoItem = todos.find(t => t.id === id);
+      if (autoItem) return [...prev, { ...autoItem, id: Date.now(), done: true, source: 'manual' }];
+      return prev;
+    });
+  };
+  const removeTodo = id => setManualTodos(prev => prev.filter(t => t.id !== id));
+  const adoptTodo = id => {
+    const autoItem = todos.find(t => t.id === id);
+    if (autoItem) setManualTodos(prev => [...prev, { ...autoItem, id: Date.now(), source: 'manual' }]);
+  };
 
   const pendingCount = todos.filter(t => !t.done).length;
 
@@ -104,13 +133,16 @@ export default function AgentPanel({
           <button type="button" className="agent-todo-add" onClick={addTodo}>+</button>
         </div>
         <ul className="agent-todo-list">
-          {todos.length === 0 && <li className="agent-todo-empty">暂无待办，可记录本次对话衍生的行动项</li>}
+          {todos.length === 0 && <li className="agent-todo-empty">对话中 AI 提出的行动项会自动出现在这里，也可手动添加</li>}
           {todos.map(t => (
-            <li key={t.id} className={`agent-todo-item ${t.done ? 'done' : ''}`}>
+            <li key={t.id} className={`agent-todo-item ${t.done ? 'done' : ''} ${t.source === 'auto' ? 'auto' : ''}`}>
               <button type="button" className="agent-todo-check" onClick={() => toggleTodo(t.id)} title={t.done ? '标记未完成' : '标记完成'}>
                 {t.done && <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>}
               </button>
               <span className="agent-todo-text">{t.text}</span>
+              {t.source === 'auto' && !t.done && (
+                <button type="button" className="agent-todo-adopt" onClick={() => adoptTodo(t.id)} title="采纳为我的待办">采纳</button>
+              )}
               <button type="button" className="agent-todo-del" onClick={() => removeTodo(t.id)} title="删除">×</button>
             </li>
           ))}
@@ -157,6 +189,45 @@ export default function AgentPanel({
                 >加入</button>
               </div>
             ))}
+          </div>
+        </section>
+      )}
+
+      {/* 学习偏好 - 从交互中自动学习，可关闭 */}
+      {learnedPrefs.hasData && (
+        <section className="agent-section">
+          <header className="agent-section-head">
+            <h3>学习偏好</h3>
+            <label className="agent-learn-toggle" title="自动学习开关">
+              <input
+                type="checkbox"
+                checked={learnedPrefs.learningEnabled !== false}
+                onChange={e => setLearningEnabled(e.target.checked)}
+              />
+              <span>自动学习</span>
+            </label>
+          </header>
+          <div className="agent-profile-card">
+            {learnedPrefs.frequentTopics?.length > 0 && (
+              <div className="agent-profile-row">
+                <span className="agent-profile-label">高频</span>
+                <div className="agent-profile-tags">
+                  {learnedPrefs.frequentTopics.map(t => <span key={t} className="agent-profile-tag learned">{t}</span>)}
+                </div>
+              </div>
+            )}
+            {learnedPrefs.preferredFormat && (
+              <div className="agent-profile-row">
+                <span className="agent-profile-label">格式</span>
+                <span className="agent-profile-value">{learnedPrefs.preferredFormat === 'table' ? '表格' : learnedPrefs.preferredFormat === 'list' ? '列表' : '段落'}</span>
+              </div>
+            )}
+            {learnedPrefs.preferredDepth && (
+              <div className="agent-profile-row">
+                <span className="agent-profile-label">深度</span>
+                <span className="agent-profile-value">{learnedPrefs.preferredDepth === 'deep' ? '深入详细' : learnedPrefs.preferredDepth === 'concise' ? '简洁' : '标准'}</span>
+              </div>
+            )}
           </div>
         </section>
       )}
