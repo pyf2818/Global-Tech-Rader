@@ -24,7 +24,7 @@ const STOP = new Set(['的', '了', '是', '在', '我', '你', '他', '这', '�
 function tokenize(text) {
   if (!text) return [];
   const lower = String(text).toLowerCase();
-  const words = lower.match(/[a-z]{2,}|[一-鿿]/g) || [];
+  const words = lower.match(/[a-z]{2,}|[一-鿿]{2,}/g) || [];
   return [...new Set(words.filter(w => !STOP.has(w)))];
 }
 

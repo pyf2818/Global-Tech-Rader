@@ -42,7 +42,7 @@ export function clearLearnedProfile() {
   save({ ...DEFAULT });
 }
 
-/* 从用户消息提取主题关键词 */
+/* 从用户消息提取主题关键词。中文 2 字以上词，避免单字噪声 */
 const STOP = new Set(['的', '了', '是', '在', '我', '你', '这', '那', '和', '与', '一', '个', '中', '不', '为', '有', '分析', '什么', '怎么', '如何', '可以', '请', '帮', 'the', 'a', 'an', 'is', 'are', 'to', 'of']);
 function extractTopics(text) {
   if (!text) return [];
@@ -98,12 +98,14 @@ export function observeReply(content) {
   save(p);
 }
 
-/* 获取偏好结论（供 systemPrompt 注入） */
+/* 获取偏好结论（供 systemPrompt 注入）。格式/深度需 ≥2 次观测，避免一次偶发定性 */
 export function getLearnedPreferences() {
   const p = loadLearnedProfile();
   const topTopics = p.frequentTopics.filter(f => f.count >= 2).slice(0, 5).map(f => f.topic);
-  const bestFormat = Object.entries(p.preferredFormat).sort((a, b) => b[1] - a[1])[0]?.[0];
-  const bestDepth = Object.entries(p.preferredDepth).sort((a, b) => b[1] - a[1])[0]?.[0];
+  const fmtEntries = Object.entries(p.preferredFormat).filter(([, c]) => c >= 2).sort((a, b) => b[1] - a[1]);
+  const depthEntries = Object.entries(p.preferredDepth).filter(([, c]) => c >= 2).sort((a, b) => b[1] - a[1]);
+  const bestFormat = fmtEntries[0]?.[0];
+  const bestDepth = depthEntries[0]?.[0];
   return {
     frequentTopics: topTopics,
     preferredFormat: bestFormat,        // table/list/paragraph

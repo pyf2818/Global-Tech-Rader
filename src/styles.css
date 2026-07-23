@@ -15094,6 +15094,14 @@ body {
   font-weight: 600;
   border: 1px solid var(--accent-cyan-border, var(--border-color));
 }
+.chat-context-pill-toggle { cursor: pointer; transition: background 0.15s, color 0.15s, border-color 0.15s; }
+.chat-context-pill-toggle:hover { background: var(--accent-cyan-soft); }
+.chat-context-pill-toggle.excluded {
+  background: transparent;
+  color: var(--text-muted);
+  border-color: var(--border-color);
+  text-decoration: line-through;
+}
 .chat-input-area {
   display: flex;
   align-items: flex-end;

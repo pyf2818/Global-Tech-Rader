@@ -38,12 +38,13 @@ export function clearAllMemories() {
   saveMemories([]);
 }
 
-/* 分词：中文按字/英文按词，去停用词 */
+/* 分词：中文按 2 字以上词、英文按词，去停用词。单字噪声大，不参与匹配 */
 const STOP = new Set(['的', '了', '是', '在', '我', '你', '他', '这', '那', '和', '与', '及', '或', '一', '个', '中', '上', '下', '不', '为', '有', 'the', 'a', 'an', 'is', 'are', 'to', 'of', 'in', 'on', 'for', 'and', 'or']);
 function tokenize(text) {
   if (!text) return [];
   const lower = String(text).toLowerCase();
-  const words = lower.match(/[a-z]{2,}|[一-鿿]/g) || [];
+  // 中文 2 字以上词 + 英文 2 字以上词，避免单字噪声
+  const words = lower.match(/[a-z]{2,}|[一-鿿]{2,}/g) || [];
   return words.filter(w => !STOP.has(w));
 }
 
@@ -70,9 +71,9 @@ export async function generateSessionSummary(session, llmConfig) {
       }),
     });
     const data = await resp.json();
-    if (data.error) return null;
+    if (data.error) { console.warn('[sessionMemory] 摘要生成失败:', data.error); return null; }
     const match = (data.content || '').match(/\{[\s\S]*\}/);
-    if (!match) return null;
+    if (!match) { console.warn('[sessionMemory] 摘要无 JSON'); return null; }
     const parsed = JSON.parse(match[0]);
     const memory = {
       sessionId: session.id,
@@ -86,10 +87,10 @@ export async function generateSessionSummary(session, llmConfig) {
     mems.push(memory);
     saveMemories(mems);
     return memory;
-  } catch { return null; }
+  } catch (e) { console.warn('[sessionMemory] 摘要生成异常:', e.message); return null; }
 }
 
-/* 按关键词检索相关历史记忆（排除当前会话） */
+/* 按关键词检索相关历史记忆（排除当前会话）。要求匹配率 ≥ 25% 或命中 ≥ 2 个词，避免噪声 */
 export function retrieveRelevantMemories(query, currentSessionId, limit = 3) {
   const queryTokens = new Set(tokenize(query));
   if (queryTokens.size === 0) return [];
@@ -98,7 +99,11 @@ export function retrieveRelevantMemories(query, currentSessionId, limit = 3) {
     const memTokens = new Set([...tokenize(m.topic), ...tokenize(m.conclusions.join(' ')), ...tokenize(m.title)]);
     let score = 0;
     queryTokens.forEach(t => { if (memTokens.has(t)) score += 1; });
-    return { memory: m, score };
-  }).filter(s => s.score > 0).sort((a, b) => b.score - a.score);
+    const matchRatio = score / queryTokens.size;
+    return { memory: m, score, matchRatio };
+  })
+  // 门槛：命中 ≥ 2 词，或匹配率 ≥ 25%（query 词少时用匹配率）
+  .filter(s => s.score >= 2 || (s.score >= 1 && s.matchRatio >= 0.25))
+  .sort((a, b) => b.score - a.score);
   return scored.slice(0, limit).map(s => s.memory);
 }

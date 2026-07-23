@@ -61,6 +61,7 @@ export default function AiChatPanel({
   const [memoriesVersion, setMemoriesVersion] = useState(0); // 会话记忆版本（摘要生成后刷新）
   const [learnedVersion, setLearnedVersion] = useState(0); // 学习画像版本（观测后刷新）
   const [autoTodos, setAutoTodos] = useState([]); // 对话自动提取的行动项
+  const [excludeAllEvidence, setExcludeAllEvidence] = useState(false); // 一键排除全部情报上下文
 
   const [activeSessionId, setActiveSessionId] = useState(() => {
     const saved = loadSessions();
@@ -125,7 +126,7 @@ export default function AiChatPanel({
     const interests = (selectedInterests || [])
       .map(id => categories?.find(c => c.id === id)?.label || id)
       .join('、');
-    const evidenceItems = (intelligenceContext?.items || []).slice(0, 12);
+    const evidenceItems = excludeAllEvidence ? [] : (intelligenceContext?.items || []).slice(0, 12);
     const evidence = evidenceItems.map(item => {
       const summary = String(item.summary || '').replace(/\s+/g, ' ').slice(0, 600);
       return `[资讯:${item.id}] 标题：${item.title}；来源：${item.source || '未知'}；摘要：${summary || '无摘要'}`;
@@ -172,7 +173,7 @@ export default function AiChatPanel({
         ? `用户从本地工作空间加入了以下文件作为分析上下文：\n${workspaceFiles.map(f => `[文件:${f.name}]\n${String(f.content || '').slice(0, 2000)}`).join('\n\n')}`
         : '',
     ].filter(Boolean).join('\n');
-  }, [selectedInterests, categories, intelligenceProfile, workbenchItems?.length, intelligenceContext, workspaceFiles, relevantMemories, recalledFiles, learnedPrefs]);
+  }, [selectedInterests, categories, intelligenceProfile, workbenchItems?.length, intelligenceContext, workspaceFiles, relevantMemories, recalledFiles, learnedPrefs, excludeAllEvidence]);
 
   // 情境化快捷建议：基于今日情报动态生成，空状态引导
   const quickActions = useMemo(() => {
@@ -701,9 +702,11 @@ export default function AiChatPanel({
         <div className="chat-composer-top">
           <div className="chat-context-group">
             {intelligenceContext?.items?.length > 0 && (
-              <div className="chat-context-pill" title={`已附加 ${intelligenceContext.items.length} 条今日情报作为上下文`}>
+              <div className="chat-context-wrap">
+                <button type="button" className={`chat-context-pill chat-context-pill-toggle ${excludeAllEvidence ? 'excluded' : ''}`} onClick={() => setExcludeAllEvidence(v => !v)} title={excludeAllEvidence ? '已排除情报上下文，点击恢复' : '已附加情报上下文，点击排除'}>
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-                已附加 {intelligenceContext.items.length} 条情报上下文
+                {excludeAllEvidence ? '已排除情报上下文' : `已附加 ${intelligenceContext.items.length} 条情报`}
+                </button>
               </div>
             )}
             {workspaceFiles.length > 0 && (
