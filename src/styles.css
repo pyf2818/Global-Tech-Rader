@@ -20011,6 +20011,77 @@ body {
   font-weight: 800;
 }
 
+.intelligence-alert-strip {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.intelligence-alert {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 32px;
+  gap: 3px 8px;
+  align-items: center;
+  min-height: 58px;
+  padding: 8px 9px;
+  border: 1px solid var(--border-color);
+  border-left: 3px solid var(--accent-cyan);
+  border-radius: 8px;
+  background: var(--surface-bg);
+}
+
+.intelligence-alert-risk { border-left-color: var(--accent-rose, #ef4444); }
+.intelligence-alert-opportunity { border-left-color: var(--accent-emerald, #10b981); }
+.intelligence-alert-sector { border-left-color: var(--accent-violet, #8b5cf6); }
+
+.intelligence-alert span {
+  grid-column: 1 / -1;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 750;
+}
+
+.intelligence-alert strong {
+  overflow: hidden;
+  color: var(--text-primary);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.intelligence-alert em {
+  display: grid;
+  place-items: center;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--accent-cyan) 14%, transparent);
+  color: var(--accent-cyan);
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 850;
+}
+
+.intelligence-alert-risk em {
+  background: color-mix(in srgb, var(--accent-rose, #ef4444) 14%, transparent);
+  color: var(--accent-rose, #ef4444);
+}
+
+.intelligence-alert-opportunity em {
+  background: color-mix(in srgb, var(--accent-emerald, #10b981) 14%, transparent);
+  color: var(--accent-emerald, #10b981);
+}
+
+.intelligence-alert-sector em {
+  background: color-mix(in srgb, var(--accent-violet, #8b5cf6) 14%, transparent);
+  color: var(--accent-violet, #8b5cf6);
+}
+
+@media (max-width: 860px) {
+  .intelligence-alert-strip { grid-template-columns: 1fr; }
+}
+
 .intelligence-weekly-sector {
   display: grid;
   gap: 8px;

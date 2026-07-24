@@ -7,6 +7,7 @@ import { buildDailyIntelligenceBriefing } from '../processors/dailyBriefing.js';
 import { buildEntityProfiles, findEntityProfile } from '../processors/entityExtract.js';
 import { buildOpportunitySignals } from '../processors/opportunityAnalysis.js';
 import { applyPersonalScores } from '../processors/personalScore.js';
+import { buildProactiveAlerts } from '../processors/proactiveAlerts.js';
 import { buildWeeklySectorAnalysis } from '../processors/weeklySectorAnalysis.js';
 import { createIntelligenceRepository } from '../repositories/intelligenceRepository.js';
 
@@ -127,6 +128,7 @@ export async function getAgentIntelligenceContext(params = {}) {
   const events = clusterIntelligenceEvents(topItems);
   const opportunities = buildOpportunitySignals(events).slice(0, 6);
   const weeklySectors = buildWeeklySectorAnalysis(events, { days: 7 });
+  const proactiveAlerts = buildProactiveAlerts({ events, weeklySectors, limit: 5 });
 
   return {
     ok: true,
@@ -141,6 +143,7 @@ export async function getAgentIntelligenceContext(params = {}) {
       watchEntities: topEntities(topItems),
       opportunities,
       weeklySectors: weeklySectors.sectors.slice(0, 5),
+      proactiveAlerts: proactiveAlerts.alerts,
       suggestedQuestions: [
         'Which AI events have the highest industry impact today?',
         'Which companies or models should I track next?',
@@ -348,6 +351,23 @@ export async function getWeeklySectorAnalysis(params = {}) {
 
   return {
     ...analysis,
+    source: eventsPayload.source,
+    mode: eventsPayload.mode,
+    updatedAt: eventsPayload.updatedAt || new Date().toISOString(),
+    fallback: eventsPayload.fallback,
+  };
+}
+
+export async function getProactiveIntelligenceAlerts(params = {}) {
+  const take = Math.min(100, Math.max(20, Number.parseInt(params.take || '80', 10) || 80));
+  const limit = Math.min(20, Math.max(1, Number.parseInt(params.limit || '6', 10) || 6));
+  const days = Math.min(30, Math.max(3, Number.parseInt(params.days || params.since || '7', 10) || 7));
+  const eventsPayload = await getIntelligenceEvents({ ...params, take, storage: params.storage || 'auto' });
+  const weeklySectors = buildWeeklySectorAnalysis(eventsPayload.events, { days });
+  const alerts = buildProactiveAlerts({ events: eventsPayload.events, weeklySectors, limit });
+
+  return {
+    ...alerts,
     source: eventsPayload.source,
     mode: eventsPayload.mode,
     updatedAt: eventsPayload.updatedAt || new Date().toISOString(),

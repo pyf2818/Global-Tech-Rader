@@ -1024,6 +1024,7 @@ function App() {
   const [externalIntelligenceItems, setExternalIntelligenceItems] = useState([]);
   const [externalIntelligenceOpportunities, setExternalIntelligenceOpportunities] = useState([]);
   const [externalIntelligenceWeeklySectors, setExternalIntelligenceWeeklySectors] = useState(null);
+  const [externalIntelligenceAlerts, setExternalIntelligenceAlerts] = useState([]);
   const [externalIntelligenceLoading, setExternalIntelligenceLoading] = useState(false);
   const [externalIntelligenceError, setExternalIntelligenceError] = useState('');
   const [externalIntelligenceUpdatedAt, setExternalIntelligenceUpdatedAt] = useState('');
@@ -4346,16 +4347,21 @@ ${blueprintSummary}`,
       if (selectedInterests.length) opportunityParams.set('interests', selectedInterests.join(','));
       const weeklyParams = new URLSearchParams({ take: '80', storage: 'auto', days: '7' });
       if (selectedInterests.length) weeklyParams.set('interests', selectedInterests.join(','));
-      const [eventsResponse, opportunitiesResponse, weeklyResponse] = await Promise.all([
+      const alertParams = new URLSearchParams({ take: '80', storage: 'auto', days: '7', limit: '5' });
+      if (selectedInterests.length) alertParams.set('interests', selectedInterests.join(','));
+      const [eventsResponse, opportunitiesResponse, weeklyResponse, alertsResponse] = await Promise.all([
         fetch(`/api/intelligence/events?${intelligenceParams}`),
         fetch(`/api/intelligence/opportunities?${opportunityParams}`).catch(() => null),
         fetch(`/api/intelligence/weekly-sectors?${weeklyParams}`).catch(() => null),
+        fetch(`/api/intelligence/alerts?${alertParams}`).catch(() => null),
       ]);
       const eventsPayload = await eventsResponse.json();
       const opportunitiesPayload = opportunitiesResponse ? await opportunitiesResponse.json().catch(() => ({ ok: false, opportunities: [] })) : { ok: false, opportunities: [] };
       const weeklyPayload = weeklyResponse ? await weeklyResponse.json().catch(() => ({ ok: false })) : { ok: false };
+      const alertsPayload = alertsResponse ? await alertsResponse.json().catch(() => ({ ok: false, alerts: [] })) : { ok: false, alerts: [] };
       setExternalIntelligenceOpportunities(opportunitiesPayload.ok && Array.isArray(opportunitiesPayload.opportunities) ? opportunitiesPayload.opportunities : []);
       setExternalIntelligenceWeeklySectors(weeklyPayload.ok ? weeklyPayload : null);
+      setExternalIntelligenceAlerts(alertsPayload.ok && Array.isArray(alertsPayload.alerts) ? alertsPayload.alerts : []);
       if (eventsPayload.ok && Array.isArray(eventsPayload.events) && eventsPayload.events.length > 0) {
         setExternalIntelligenceItems(eventsPayload.events);
         setExternalIntelligenceUpdatedAt(eventsPayload.updatedAt || new Date().toISOString());
@@ -7121,6 +7127,7 @@ ${signals}
               items={externalIntelligenceItems}
               opportunities={externalIntelligenceOpportunities}
               weeklySectors={externalIntelligenceWeeklySectors}
+              alerts={externalIntelligenceAlerts}
               loading={externalIntelligenceLoading}
               error={externalIntelligenceError}
               updatedAt={externalIntelligenceUpdatedAt}

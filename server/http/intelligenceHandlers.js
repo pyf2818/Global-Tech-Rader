@@ -6,6 +6,7 @@ import {
   getIntelligenceEvents,
   getIntelligenceOpportunities,
   getIntelligenceItems,
+  getProactiveIntelligenceAlerts,
   getStoredIntelligenceArticles,
   getStoredIntelligenceEvents,
   getWeeklySectorAnalysis,
@@ -44,6 +45,7 @@ function buildParams(req) {
     specialFollows: queryValue(req, 'specialFollows'),
     sourceTiers: queryValue(req, 'sourceTiers'),
     days: queryValue(req, 'days'),
+    limit: queryValue(req, 'limit'),
   };
 }
 
@@ -101,6 +103,9 @@ export async function handleIntelligenceRequest(req, res, { path = [] } = {}) {
     }
     if (action === 'weekly-sectors') {
       return sendJsonResponse(res, 200, await getWeeklySectorAnalysis(buildParams(req)));
+    }
+    if (action === 'alerts') {
+      return sendJsonResponse(res, 200, await getProactiveIntelligenceAlerts(buildParams(req)));
     }
     return sendJsonResponse(res, 404, { ok: false, error: { code: 'UNKNOWN_INTELLIGENCE_ENDPOINT' } });
   } catch (error) {

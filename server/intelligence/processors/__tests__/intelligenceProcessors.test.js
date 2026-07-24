@@ -6,6 +6,7 @@ import { buildDailyIntelligenceBriefing } from '../dailyBriefing.js';
 import { buildEntityProfiles, findEntityProfile } from '../entityExtract.js';
 import { buildOpportunitySignals } from '../opportunityAnalysis.js';
 import { applyPersonalScores } from '../personalScore.js';
+import { buildProactiveAlerts } from '../proactiveAlerts.js';
 import { buildWeeklySectorAnalysis } from '../weeklySectorAnalysis.js';
 
 describe('intelligence processors', () => {
@@ -315,5 +316,64 @@ describe('intelligence processors', () => {
     expect(analysis.sectors[0].keyEntities[0]).toEqual({ name: 'OpenAI', count: 2 });
     expect(analysis.opportunities.some(signal => signal.id === 'model-launch')).toBe(true);
     expect(analysis.risks.some(signal => signal.id === 'model-risk')).toBe(true);
+  });
+
+  it('builds proactive alerts from priority events and sector momentum', () => {
+    const now = Date.parse('2026-07-24T12:00:00.000Z');
+    const weeklySectors = {
+      sectors: [{
+        id: 'ai-models',
+        category: 'ai-models',
+        label: 'Models',
+        score: 84,
+        trend: 'surging',
+        eventCount: 5,
+        sourceCount: 4,
+        primarySignal: 'opportunity',
+        keyEntities: [{ name: 'OpenAI', count: 3 }],
+        topEvents: [{ id: 'event-1', citations: [{ id: 'a', url: 'https://example.com' }], lastSeenAt: '2026-07-24T02:00:00.000Z' }],
+      }],
+    };
+    const result = buildProactiveAlerts({
+      now,
+      weeklySectors,
+      events: [
+        {
+          id: 'risk-1',
+          title: 'AI model faces copyright lawsuit',
+          summary: 'Regulation and copyright risk increase.',
+          category: 'ai-models',
+          categoryLabel: 'Models',
+          entities: ['OpenAI'],
+          sources: ['Reuters'],
+          independentSourceCount: 2,
+          heatScore: 70,
+          impactScore: 86,
+          intelligenceScore: 79,
+          confidence: 78,
+          lastSeenAt: '2026-07-24T02:00:00.000Z',
+        },
+        {
+          id: 'opp-1',
+          title: 'Anthropic announces enterprise developer partnership',
+          summary: 'The partnership expands developer adoption.',
+          category: 'ai-products',
+          entities: ['Anthropic'],
+          sources: ['Anthropic News'],
+          independentSourceCount: 1,
+          impactScore: 82,
+          intelligenceScore: 81,
+          personalScore: 92,
+          confidence: 74,
+          lastSeenAt: '2026-07-24T03:00:00.000Z',
+        },
+      ],
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.alerts.some(alert => alert.kind === 'risk' && alert.id === 'event:risk-1')).toBe(true);
+    expect(result.alerts.some(alert => alert.kind === 'opportunity' && alert.id === 'event:opp-1')).toBe(true);
+    expect(result.alerts.some(alert => alert.kind === 'sector' && alert.id === 'sector:ai-models')).toBe(true);
+    expect(result.alerts[0].priority).toBeGreaterThanOrEqual(result.alerts.at(-1).priority);
   });
 });

@@ -22,6 +22,7 @@ export default function IntelligenceFeedPanel({
   items = [],
   opportunities = [],
   weeklySectors = null,
+  alerts = [],
   loading = false,
   error = '',
   updatedAt = '',
@@ -41,6 +42,7 @@ export default function IntelligenceFeedPanel({
   const lead = items[0];
   const topSectors = Array.isArray(weeklySectors?.sectors) ? weeklySectors.sectors.slice(0, 3) : [];
   const leadSector = weeklySectors?.leadSector || topSectors[0];
+  const topAlerts = Array.isArray(alerts) ? alerts.slice(0, 3) : [];
 
   return (
     <section className="intelligence-feed-panel" aria-label="AI 行业情报">
@@ -72,6 +74,18 @@ export default function IntelligenceFeedPanel({
 
       {!error && !loading && items.length === 0 && (
         <div className="intelligence-feed-empty">暂无可展示的行业情报</div>
+      )}
+
+      {topAlerts.length > 0 && (
+        <div className="intelligence-alert-strip" aria-label="主动情报提醒">
+          {topAlerts.map(alert => (
+            <div key={alert.id} className={`intelligence-alert intelligence-alert-${alert.kind || 'priority'}`}>
+              <span>{alert.kind === 'risk' ? '风险' : alert.kind === 'opportunity' ? '机会' : alert.kind === 'sector' ? '赛道' : '提醒'}</span>
+              <strong>{alert.title}</strong>
+              <em>{formatScore(alert.priority)}</em>
+            </div>
+          ))}
+        </div>
       )}
 
       {lead && (

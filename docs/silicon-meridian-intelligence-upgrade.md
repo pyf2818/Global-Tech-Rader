@@ -146,6 +146,7 @@ GET /api/intelligence/daily
 GET /api/intelligence/entities/:id
 GET /api/intelligence/opportunities
 GET /api/intelligence/weekly-sectors
+GET /api/intelligence/alerts
 GET /api/intelligence/agent/context
 ```
 
@@ -396,6 +397,7 @@ Current status:
 - The homepage Intelligence Feed passes current selected interests into event and opportunity requests.
 - Weekly sector analysis is available through `/api/intelligence/weekly-sectors` and appears in the homepage Intelligence Feed.
 - Agent context includes weekly sector signals so AI Elf and Workbench workflows can reason over current sector momentum.
+- Proactive intelligence alerts are available through `/api/intelligence/alerts`, appear in the homepage Intelligence Feed, and are included in Agent context for push-style follow-up.
 
 ## First Implementation Principle
 
