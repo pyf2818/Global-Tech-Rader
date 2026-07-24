@@ -341,7 +341,8 @@ Current status:
 - The handoff stores the analysis as material and opens AI Workbench with a follow-up research prompt.
 - Material cards now expose a direct "research" action that sends saved material back into AI Workbench.
 - AI Elf archive saves and Workbench handoffs share the same structured material payload.
-- The existing Workbench `AiChatPanel` already receives `materials`, so saved Elf records are available for continued research and export.
+- The Workbench `AiChatPanel` injects recent materials into the system prompt, prioritizes AI Elf handoff records, and exposes a "continue Elf research" quick action.
+- Workbench workflow context and Workbench-to-Elf handoffs include prioritized material summaries, so saved Elf records are available for continued research, export, and agent workflows.
 
 ## Rollout Plan
 

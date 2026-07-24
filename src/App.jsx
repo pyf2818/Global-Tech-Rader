@@ -3340,6 +3340,15 @@ ${agentWorkflowDraft.nodes.map((node, index) => `${index + 1}. [${workflowTypeMe
 摘要：${item.summary || '暂无摘要'}
 链接：${item.url || ''}`;
     }).join('\n\n');
+    const prioritizedMaterials = [...materials].sort((a, b) => {
+      const aElf = a.metadata?.origin === 'ai-elf' || String(a.source || '').includes('AI精灵') || String(a.source || '').includes('AI 精灵') ? 1 : 0;
+      const bElf = b.metadata?.origin === 'ai-elf' || String(b.source || '').includes('AI精灵') || String(b.source || '').includes('AI 精灵') ? 1 : 0;
+      if (aElf !== bElf) return bElf - aElf;
+      return (Date.parse(b.createdAt || '') || 0) - (Date.parse(a.createdAt || '') || 0);
+    }).slice(0, 6);
+    const materialLines = prioritizedMaterials.map((material, idx) => `${idx + 1}. ${material.title || '未命名素材'}
+来源：${material.source || '未知'}｜类型：${material.type || 'material'}｜标签：${Array.isArray(material.tags) ? material.tags.join('、') : ''}
+内容：${String(material.fullContent || material.content || '').replace(/\s+/g, ' ').slice(0, 900)}`).join('\n\n');
 
     return `${prompt}
 
@@ -3356,8 +3365,11 @@ ${agentWorkflowDraft.nodes.map((node, index) => `${index + 1}. [${workflowTypeMe
 推荐统计：当前范围 ${scopedAgentItems.length} 条，全部推荐 ${workbenchItems.length} 条，兴趣匹配 ${workbenchStats.focusMatches} 条，关键词命中 ${workbenchStats.keywordMatches} 条
 
 今日推荐资讯：
-${lines}`;
-  }, [scopedAgentItems, workbenchItems.length, selectedNewsDate, selectedInterests, followKeywords, intelligenceProfile, workbenchStats.focusMatches, workbenchStats.keywordMatches]);
+${lines}
+
+素材库上下文（优先包含 AI 精灵交接记录）：
+${materialLines || '暂无素材'}`;
+  }, [scopedAgentItems, workbenchItems.length, selectedNewsDate, selectedInterests, followKeywords, intelligenceProfile, workbenchStats.focusMatches, workbenchStats.keywordMatches, materials]);
 
   const sendWorkbenchToElf = useCallback((prompt, agentId = 'orchestrator') => {
     if (agentId) setCurrentAgent(agentId);

@@ -15121,6 +15121,16 @@ body {
   border-color: var(--border-color);
   text-decoration: line-through;
 }
+.chat-context-pill-material {
+  background: color-mix(in srgb, var(--accent-violet, #8b5cf6) 12%, transparent);
+  border-color: color-mix(in srgb, var(--accent-violet, #8b5cf6) 32%, var(--border-color));
+  color: var(--accent-violet, #8b5cf6);
+}
+.chat-context-pill-material.has-elf {
+  background: color-mix(in srgb, var(--accent-cyan) 14%, transparent);
+  border-color: color-mix(in srgb, var(--accent-cyan) 38%, var(--border-color));
+  color: var(--accent-cyan);
+}
 .chat-input-area {
   display: flex;
   align-items: flex-end;
