@@ -1,4 +1,4 @@
-create table intelligence_articles (
+create table if not exists intelligence_articles (
   id varchar(300) primary key,
   provider varchar(40) not null,
   upstream_id varchar(300) not null default '',
@@ -21,7 +21,7 @@ create table intelligence_articles (
   last_seen_at timestamptz not null default now()
 );
 
-create table intelligence_events (
+create table if not exists intelligence_events (
   id varchar(360) primary key,
   title varchar(500) not null,
   summary text not null default '',
@@ -44,10 +44,10 @@ create table intelligence_events (
   updated_at timestamptz not null default now()
 );
 
-create index intelligence_articles_published_idx on intelligence_articles(published_at desc);
-create index intelligence_articles_source_idx on intelligence_articles(source);
-create index intelligence_articles_category_idx on intelligence_articles(category);
-create unique index intelligence_articles_url_unique on intelligence_articles(lower(url));
-create index intelligence_events_score_idx on intelligence_events(intelligence_score desc, last_seen_at desc);
-create index intelligence_events_last_seen_idx on intelligence_events(last_seen_at desc);
-create index intelligence_events_category_idx on intelligence_events(category);
+create index if not exists intelligence_articles_published_idx on intelligence_articles(published_at desc);
+create index if not exists intelligence_articles_source_idx on intelligence_articles(source);
+create index if not exists intelligence_articles_category_idx on intelligence_articles(category);
+create unique index if not exists intelligence_articles_url_unique on intelligence_articles(lower(url));
+create index if not exists intelligence_events_score_idx on intelligence_events(intelligence_score desc, last_seen_at desc);
+create index if not exists intelligence_events_last_seen_idx on intelligence_events(last_seen_at desc);
+create index if not exists intelligence_events_category_idx on intelligence_events(category);

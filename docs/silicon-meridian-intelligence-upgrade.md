@@ -144,6 +144,7 @@ GET /api/intelligence/items
 GET /api/intelligence/events
 GET /api/intelligence/daily
 GET /api/intelligence/entities/:id
+GET /api/intelligence/opportunities
 GET /api/intelligence/agent/context
 ```
 
@@ -318,6 +319,28 @@ Return structured JSON for Agents:
 
 The Agent interface should avoid UI prose and keep citations traceable.
 
+## AI Elf and AI Workbench Linkage
+
+AI Elf should remain the always-available floating analysis surface: users can drag an article or event into it from any page, ask quick follow-up questions, and hand off between specialized agents.
+
+AI Workbench should be the durable research surface: conclusions, cited evidence, materials, workspace files, and next-step tasks should live there.
+
+The linkage contract is:
+
+- AI Elf can save a full conversation or a single assistant analysis as a structured material.
+- Saved Elf materials include the active agent, quoted context, session metadata, full conversation content, and suggested next steps.
+- "Save and continue in AI Workbench" sends the user to the Workbench with a prefilled research prompt.
+- The Workbench consumes the material library as persistent context, so Elf discoveries can be deepened, exported, or turned into articles.
+- The first implementation stores this linkage through the existing `materials` local persistence path; a later phase can mirror it into PostgreSQL creation assets.
+
+Current status:
+
+- AI Elf exposes a Workbench handoff action in the header and on assistant messages.
+- The handoff stores the analysis as material and opens AI Workbench with a follow-up research prompt.
+- Material cards now expose a direct "research" action that sends saved material back into AI Workbench.
+- AI Elf archive saves and Workbench handoffs share the same structured material payload.
+- The existing Workbench `AiChatPanel` already receives `materials`, so saved Elf records are available for continued research and export.
+
 ## Rollout Plan
 
 ### Phase 1: Vertical Slice
@@ -336,6 +359,14 @@ The Agent interface should avoid UI prose and keep citations traceable.
 - Build AI Daily Intelligence from event objects.
 - Add frontend Intelligence Feed mode.
 
+Current status:
+
+- Event clustering is implemented and exposed through `/api/intelligence/events`.
+- Articles and events can be persisted with `/api/intelligence/sync`.
+- Stored event reads are available through `/api/intelligence/stored`.
+- `/api/intelligence/daily` builds from event objects and supports `storage=live|stored|auto`.
+- The homepage Intelligence Feed uses `storage=auto` so stored events can backstop live source gaps.
+
 ### Phase 3: Company and Opportunity Layer
 
 - Extract entities.
@@ -343,11 +374,25 @@ The Agent interface should avoid UI prose and keep citations traceable.
 - Track models, products, papers, funding, and GitHub projects.
 - Add opportunity and risk analysis.
 
+Current status:
+
+- Minimal entity profiles are available through `/api/intelligence/entities` and `/api/intelligence/entities/:id`.
+- Profiles are derived from clustered events and include event count, source count, top scores, related events, and citations.
+- Company/model/product classification is deterministic and intentionally lightweight for the first slice.
+- Opportunity and risk signals are available through `/api/intelligence/opportunities`.
+- Agent context now includes the top opportunity/risk signals for follow-up workflows.
+
 ### Phase 4: Personal Intelligence
 
 - Combine profile tiers, source tiers, behavior, and special follows.
 - Add personalized daily report.
 - Add proactive push and weekly sector analysis.
+
+Current status:
+
+- Intelligence events accept lightweight personalization inputs through `interests`, `follows`, and `sourceTiers`.
+- Event ranking applies `personalScore` and `personalReasons` before feeding daily, entity, and opportunity outputs.
+- The homepage Intelligence Feed passes current selected interests into event and opportunity requests.
 
 ## First Implementation Principle
 

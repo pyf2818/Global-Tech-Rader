@@ -4,6 +4,9 @@ import { normalizeAiHotItems, normalizeRssItems } from '../processors/normalizeI
 import { scoreIntelligenceItems } from '../processors/impactScore.js';
 import { clusterIntelligenceEvents } from '../processors/eventCluster.js';
 import { buildDailyIntelligenceBriefing } from '../processors/dailyBriefing.js';
+import { buildEntityProfiles, findEntityProfile } from '../processors/entityExtract.js';
+import { buildOpportunitySignals } from '../processors/opportunityAnalysis.js';
+import { applyPersonalScores } from '../processors/personalScore.js';
 import { createIntelligenceRepository } from '../repositories/intelligenceRepository.js';
 
 const CACHE_TTL_MS = 5 * 60 * 1000;
@@ -46,6 +49,10 @@ function parseOptions(params = {}) {
     providers: String(params.providers || 'all').trim(),
     perSource: Math.min(20, Math.max(1, Number.parseInt(params.perSource || '6', 10) || 6)),
     sources: String(params.sources || '').trim(),
+    storage: ['live', 'stored', 'auto'].includes(params.storage) ? params.storage : 'live',
+    interests: String(params.interests || '').trim(),
+    follows: String(params.follows || params.specialFollows || '').trim(),
+    sourceTiers: String(params.sourceTiers || '').trim(),
   };
 }
 
@@ -116,6 +123,8 @@ export async function getAgentIntelligenceContext(params = {}) {
   const take = Math.min(30, Math.max(8, Number.parseInt(params.take || '16', 10) || 16));
   const payload = await getIntelligenceItems({ ...params, take });
   const topItems = payload.items.slice(0, take);
+  const events = clusterIntelligenceEvents(topItems);
+  const opportunities = buildOpportunitySignals(events).slice(0, 6);
 
   return {
     ok: true,
@@ -128,10 +137,12 @@ export async function getAgentIntelligenceContext(params = {}) {
       oneLine: buildOneLine(topItems),
       topEvents: topItems.slice(0, 8).map(toAgentEvent),
       watchEntities: topEntities(topItems),
+      opportunities,
       suggestedQuestions: [
         'Which AI events have the highest industry impact today?',
         'Which companies or models should I track next?',
         'What changed for developers, enterprises, or investors?',
+        'Which opportunities or risks need follow-up this week?',
       ],
     },
     citations: topItems.map(item => ({
@@ -146,9 +157,29 @@ export async function getAgentIntelligenceContext(params = {}) {
 }
 
 export async function getIntelligenceEvents(params = {}) {
+  const options = parseOptions(params);
+  if (options.storage === 'stored') {
+    const stored = await getStoredIntelligenceEvents(options);
+    return { ...stored, events: applyPersonalScores(stored.events, options) };
+  }
+
   const take = Math.min(100, Math.max(12, Number.parseInt(params.take || '50', 10) || 50));
-  const payload = await getIntelligenceItems({ ...params, take });
+  let payload;
+  try {
+    payload = await getIntelligenceItems({ ...params, take, storage: 'live' });
+  } catch (error) {
+    if (options.storage !== 'auto') throw error;
+    const stored = await getStoredIntelligenceEvents(options);
+    return { ...stored, events: applyPersonalScores(stored.events, options), fallback: { reason: 'live-error', message: error.message || 'Live intelligence unavailable' } };
+  }
+
   const events = clusterIntelligenceEvents(payload.items);
+  const personalizedEvents = applyPersonalScores(events, options);
+
+  if (options.storage === 'auto' && personalizedEvents.length === 0) {
+    const stored = await getStoredIntelligenceEvents(options);
+    return { ...stored, events: applyPersonalScores(stored.events, options), fallback: { reason: 'live-empty' } };
+  }
 
   return {
     ok: true,
@@ -156,8 +187,8 @@ export async function getIntelligenceEvents(params = {}) {
     source: payload.source,
     mode: payload.mode,
     updatedAt: payload.updatedAt,
-    count: events.length,
-    events,
+    count: personalizedEvents.length,
+    events: personalizedEvents,
     cache: payload.cache,
   };
 }
@@ -213,13 +244,97 @@ export async function getStoredIntelligenceArticles(params = {}) {
 }
 
 export async function getDailyIntelligenceBriefing(params = {}) {
+  const options = parseOptions(params);
   const take = Math.min(100, Math.max(12, Number.parseInt(params.take || '60', 10) || 60));
-  const liveEvents = await getIntelligenceEvents({ ...params, take });
+  let liveEvents;
+  try {
+    liveEvents = await getIntelligenceEvents({ ...params, take, storage: options.storage === 'stored' ? 'stored' : 'live' });
+  } catch (error) {
+    if (options.storage !== 'auto') throw error;
+    const stored = await getStoredIntelligenceEvents({ ...options, take });
+    return {
+      ...buildDailyIntelligenceBriefing({
+        events: stored.events,
+        date: params.date || new Date().toISOString().slice(0, 10),
+        source: 'stored',
+      }),
+      fallback: { reason: 'live-error', message: error.message || 'Live intelligence unavailable' },
+    };
+  }
+
+  if (options.storage === 'auto' && liveEvents.events.length === 0) {
+    const stored = await getStoredIntelligenceEvents({ ...options, take });
+    return {
+      ...buildDailyIntelligenceBriefing({
+        events: stored.events,
+        date: params.date || new Date().toISOString().slice(0, 10),
+        source: 'stored',
+      }),
+      fallback: { reason: 'live-empty' },
+    };
+  }
+
   return buildDailyIntelligenceBriefing({
     events: liveEvents.events,
     date: params.date || new Date().toISOString().slice(0, 10),
     source: liveEvents.source,
   });
+}
+
+export async function getIntelligenceEntities(params = {}) {
+  const take = Math.min(100, Math.max(12, Number.parseInt(params.take || '60', 10) || 60));
+  const eventsPayload = await getIntelligenceEvents({ ...params, take, storage: params.storage || 'auto' });
+  const entities = buildEntityProfiles(eventsPayload.events);
+
+  return {
+    ok: true,
+    version: 1,
+    source: eventsPayload.source,
+    mode: eventsPayload.mode,
+    updatedAt: eventsPayload.updatedAt || new Date().toISOString(),
+    count: entities.length,
+    entities,
+    fallback: eventsPayload.fallback,
+  };
+}
+
+export async function getIntelligenceEntity(entityId, params = {}) {
+  const take = Math.min(100, Math.max(12, Number.parseInt(params.take || '60', 10) || 60));
+  const eventsPayload = await getIntelligenceEvents({ ...params, take, storage: params.storage || 'auto' });
+  const entity = findEntityProfile(eventsPayload.events, entityId);
+
+  if (!entity) {
+    const error = new Error('Intelligence entity not found');
+    error.status = 404;
+    throw error;
+  }
+
+  return {
+    ok: true,
+    version: 1,
+    source: eventsPayload.source,
+    mode: eventsPayload.mode,
+    updatedAt: eventsPayload.updatedAt || new Date().toISOString(),
+    entity,
+    fallback: eventsPayload.fallback,
+  };
+}
+
+export async function getIntelligenceOpportunities(params = {}) {
+  const take = Math.min(100, Math.max(12, Number.parseInt(params.take || '40', 10) || 40));
+  const eventsPayload = await getIntelligenceEvents({ ...params, take, storage: params.storage || 'auto' });
+  const opportunities = buildOpportunitySignals(eventsPayload.events).slice(0, take);
+
+  return {
+    ok: true,
+    version: 1,
+    source: eventsPayload.source,
+    mode: eventsPayload.mode,
+    updatedAt: eventsPayload.updatedAt || new Date().toISOString(),
+    count: opportunities.length,
+    opportunities,
+    fallback: eventsPayload.fallback,
+  };
 }
 
 function buildOneLine(items) {

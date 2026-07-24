@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 
 // AI精灵助手组件 - Agent系统 + 历史记录 + 自适应窗口
-export default function AiElf({ llmConfig, avatarImage, elfName, onExportToMaterials, agents, currentAgent, onChangeAgent, externalQuotedContext, intelligenceProfile, intelligenceMissions }) {
+export default function AiElf({ llmConfig, avatarImage, elfName, onExportToMaterials, onContinueInWorkbench, agents, currentAgent, onChangeAgent, externalQuotedContext, intelligenceProfile, intelligenceMissions }) {
   const [isOpen, setIsOpen] = useState(false);
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
@@ -714,6 +714,61 @@ ${baseContent}
     URL.revokeObjectURL(url);
   };
 
+  const buildConversationMaterial = (mode = 'archive', sourceMessage = null) => {
+    const selectedMessages = sourceMessage ? [sourceMessage] : messages;
+    const firstUserMessage = messages.find(message => message.role === 'user');
+    const latestAssistant = sourceMessage || [...messages].reverse().find(message => message.role === 'assistant');
+    const titleBase = firstUserMessage?.content || latestAssistant?.content || `${elfName || 'AI精灵'}研究记录`;
+    const quotedTitle = quotedContext?.title || '';
+    const contextText = quotedContext?.fullContent || quotedContext?.content || '';
+    const conversationText = selectedMessages.map(message => {
+      const role = message.role === 'user' ? '用户' : (activeAgent?.name || elfName || 'AI精灵');
+      const time = new Date(message.timestamp || Date.now()).toLocaleString('zh-CN');
+      return `## ${role} / ${time}\n\n${message.content}`;
+    }).join('\n\n---\n\n');
+
+    const fullContent = [
+      `# ${String(titleBase).slice(0, 80)}`,
+      `- 来源：${elfName || 'AI精灵'} / ${activeAgent?.name || 'Agent'}`,
+      `- 保存模式：${mode === 'workbench' ? '工作站继续研究' : '素材归档'}`,
+      `- 保存时间：${new Date().toLocaleString('zh-CN')}`,
+      quotedTitle ? `- 引用上下文：${quotedTitle}` : '',
+      contextText ? `\n## 引用上下文\n\n${contextText}` : '',
+      `\n## 对话分析\n\n${conversationText || '暂无对话内容'}`,
+      `\n## 建议下一步\n\n- 在 AI 工作站中结合素材库继续追问\n- 补充原文、数据或反方证据\n- 将稳定结论沉淀为文章或研究清单`,
+    ].filter(Boolean).join('\n');
+
+    return {
+      title: `AI研究：${String(titleBase).replace(/\s+/g, ' ').slice(0, 60)}`,
+      content: latestAssistant?.content || conversationText || contextText || titleBase,
+      fullContent,
+      type: 'viewpoint',
+      source: `${elfName || 'AI精灵'} / ${activeAgent?.name || 'Agent'}`,
+      url: '',
+      tags: ['AI精灵', 'AI工作站', '研究记录', activeAgent?.name].filter(Boolean),
+      note: mode === 'workbench' ? '由 AI 精灵保存，可在 AI 工作站继续研究。' : '由 AI 精灵保存的分析素材。',
+      metadata: {
+        origin: 'ai-elf',
+        agentId: activeAgentId,
+        agentName: activeAgent?.name || '',
+        sessionId: currentSessionId,
+        quotedTitle,
+        messageCount: messages.length,
+        savedMode: mode,
+      },
+    };
+  };
+
+  const saveConversationToMaterials = (mode = 'archive', sourceMessage = null) => {
+    const payload = buildConversationMaterial(mode, sourceMessage);
+    if (mode === 'workbench') {
+      onContinueInWorkbench && onContinueInWorkbench(payload);
+      return;
+    }
+    if (!onExportToMaterials) return;
+    onExportToMaterials(payload);
+  };
+
   // 保存当前会话到历史
   // 加载历史会话
   const loadSession = (session) => {
@@ -1116,15 +1171,16 @@ ${baseContent}
                     <line x1="12" y1="15" x2="12" y2="3" />
                   </svg>
                 </button>
+                {onContinueInWorkbench && (
+                  <button className="ai-elf-btn" onClick={() => saveConversationToMaterials('workbench')} title="保存并在 AI 工作站继续研究">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="14" height="14">
+                      <path d="M4 4h16v16H4z" />
+                      <path d="M8 9h8M8 13h5M15 16l3 3" />
+                    </svg>
+                  </button>
+                )}
                 {onExportToMaterials && (
-                  <button className="ai-elf-btn" onClick={() => {
-                    const title = messages.length > 0 ? messages[0].content.slice(0, 50) : `${elfName || 'AI精灵'}对话`;
-                    const content = messages.map(m => {
-                      const role = m.role === 'user' ? '用户' : (elfName || 'AI精灵');
-                      return `[${role}]\n${m.content}`;
-                    }).join('\n\n---\n\n');
-                    onExportToMaterials({ title, content });
-                  }} title="保存到素材库">
+                  <button className="ai-elf-btn" onClick={() => saveConversationToMaterials('archive')} title="保存到素材库">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="14" height="14">
                       <path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/>
                     </svg>
@@ -1245,6 +1301,19 @@ ${baseContent}
                           </svg>
                           继续深入
                         </button>
+                        {onContinueInWorkbench && (
+                          <button
+                            className="ai-elf-action-btn"
+                            onClick={() => saveConversationToMaterials('workbench', msg)}
+                            title="存入工作站继续研究"
+                          >
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="12" height="12">
+                              <path d="M4 4h16v16H4z" />
+                              <path d="M8 9h8M8 13h5M15 16l3 3" />
+                            </svg>
+                            存入工作站
+                          </button>
+                        )}
                         {relayAgents.slice(0, 4).map(agent => (
                           <button
                             key={agent.id}

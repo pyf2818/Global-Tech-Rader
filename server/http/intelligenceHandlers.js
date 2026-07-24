@@ -1,7 +1,10 @@
 import {
   getAgentIntelligenceContext,
   getDailyIntelligenceBriefing,
+  getIntelligenceEntities,
+  getIntelligenceEntity,
   getIntelligenceEvents,
+  getIntelligenceOpportunities,
   getIntelligenceItems,
   getStoredIntelligenceArticles,
   getStoredIntelligenceEvents,
@@ -34,6 +37,11 @@ function buildParams(req) {
     providers: queryValue(req, 'providers'),
     perSource: queryValue(req, 'perSource'),
     sources: queryValue(req, 'sources'),
+    storage: queryValue(req, 'storage'),
+    interests: queryValue(req, 'interests'),
+    follows: queryValue(req, 'follows'),
+    specialFollows: queryValue(req, 'specialFollows'),
+    sourceTiers: queryValue(req, 'sourceTiers'),
   };
 }
 
@@ -45,7 +53,7 @@ function isDatabaseUnavailable(error) {
 }
 
 export async function handleIntelligenceRequest(req, res, { path = [] } = {}) {
-  const [action = 'items'] = path.filter(Boolean);
+  const [action = 'items', id = ''] = path.filter(Boolean);
   const method = req.method || 'GET';
 
   if (action === 'sync') {
@@ -82,19 +90,18 @@ export async function handleIntelligenceRequest(req, res, { path = [] } = {}) {
       return sendJsonResponse(res, 200, await getDailyIntelligenceBriefing(buildParams(req)));
     }
     if (action === 'entities') {
-      return sendJsonResponse(res, 501, {
-        ok: false,
-        error: {
-          code: 'INTELLIGENCE_ENDPOINT_NOT_READY',
-          message: 'This intelligence endpoint is reserved for the next rollout phase.',
-        },
-      });
+      return sendJsonResponse(res, 200, id
+        ? await getIntelligenceEntity(id, buildParams(req))
+        : await getIntelligenceEntities(buildParams(req)));
+    }
+    if (action === 'opportunities') {
+      return sendJsonResponse(res, 200, await getIntelligenceOpportunities(buildParams(req)));
     }
     return sendJsonResponse(res, 404, { ok: false, error: { code: 'UNKNOWN_INTELLIGENCE_ENDPOINT' } });
   } catch (error) {
     const dbUnavailable = isDatabaseUnavailable(error);
     const status = dbUnavailable ? 503 : (error?.status && error.status >= 400 && error.status < 600 ? error.status : 503);
-    const code = dbUnavailable ? 'DATABASE_UNAVAILABLE' : 'INTELLIGENCE_SOURCE_UNAVAILABLE';
+    const code = dbUnavailable ? 'DATABASE_UNAVAILABLE' : (status === 404 ? 'INTELLIGENCE_NOT_FOUND' : 'INTELLIGENCE_SOURCE_UNAVAILABLE');
     return sendJsonResponse(res, status, {
       ok: false,
       error: {

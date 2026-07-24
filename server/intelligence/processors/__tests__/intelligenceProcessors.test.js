@@ -3,6 +3,9 @@ import { normalizeAiHotItem, normalizeRssItem } from '../normalizeItem.js';
 import { scoreIntelligenceItem } from '../impactScore.js';
 import { clusterIntelligenceEvents } from '../eventCluster.js';
 import { buildDailyIntelligenceBriefing } from '../dailyBriefing.js';
+import { buildEntityProfiles, findEntityProfile } from '../entityExtract.js';
+import { buildOpportunitySignals } from '../opportunityAnalysis.js';
+import { applyPersonalScores } from '../personalScore.js';
 
 describe('intelligence processors', () => {
   it('normalizes AI HOT items into the Meridian intelligence item shape', () => {
@@ -133,5 +136,119 @@ describe('intelligence processors', () => {
     expect(briefing.lead.id).toBe('event-1');
     expect(briefing.sections[0].label).toBe('Model Releases');
     expect(briefing.watchEntities).toContain('OpenAI');
+  });
+
+  it('builds entity profiles from clustered intelligence events', () => {
+    const events = [
+      {
+        id: 'event-1',
+        title: 'OpenAI releases GPT-5 agent model',
+        summary: 'Major model release.',
+        category: 'ai-models',
+        categoryLabel: 'Models',
+        entities: ['OpenAI'],
+        sources: ['OpenAI Blog', 'The Verge'],
+        heatScore: 82,
+        impactScore: 92,
+        intelligenceScore: 88,
+        firstSeenAt: '2026-07-24T00:00:00.000Z',
+        lastSeenAt: '2026-07-24T02:00:00.000Z',
+        citations: [{ id: 'a', title: 'source', url: 'https://example.com' }],
+      },
+      {
+        id: 'event-2',
+        title: 'OpenAI expands enterprise deployment',
+        summary: 'Enterprise controls were updated.',
+        category: 'ai-products',
+        categoryLabel: 'Products',
+        entities: ['OpenAI'],
+        sources: ['OpenAI Blog'],
+        heatScore: 65,
+        impactScore: 72,
+        intelligenceScore: 74,
+        firstSeenAt: '2026-07-23T00:00:00.000Z',
+        lastSeenAt: '2026-07-23T01:00:00.000Z',
+      },
+    ];
+
+    const profiles = buildEntityProfiles(events);
+    const openai = findEntityProfile(events, 'openai');
+
+    expect(profiles).toHaveLength(1);
+    expect(openai.name).toBe('OpenAI');
+    expect(openai.type).toBe('company');
+    expect(openai.eventCount).toBe(2);
+    expect(openai.sourceCount).toBe(2);
+    expect(openai.impactScore).toBe(92);
+    expect(openai.relatedEvents[0].id).toBe('event-1');
+  });
+
+  it('builds opportunity and risk signals from intelligence events', () => {
+    const signals = buildOpportunitySignals([
+      {
+        id: 'event-market',
+        title: 'NVIDIA announces enterprise AI cloud partnership',
+        summary: 'The deployment expands enterprise customers and cloud revenue opportunities.',
+        entities: ['NVIDIA'],
+        sources: ['NVIDIA Blog', 'Reuters'],
+        independentSourceCount: 2,
+        heatScore: 80,
+        impactScore: 88,
+        intelligenceScore: 84,
+        confidence: 78,
+        lastSeenAt: '2026-07-24T02:00:00.000Z',
+        citations: [{ id: 'a', url: 'https://example.com' }],
+      },
+      {
+        id: 'event-risk',
+        title: 'AI model faces copyright lawsuit',
+        summary: 'A lawsuit raises copyright and policy risk for training data.',
+        entities: ['OpenAI'],
+        sources: ['Reuters'],
+        independentSourceCount: 1,
+        heatScore: 70,
+        impactScore: 82,
+        intelligenceScore: 77,
+        confidence: 70,
+        lastSeenAt: '2026-07-24T01:00:00.000Z',
+      },
+    ]);
+
+    expect(signals[0].type).toBe('market');
+    expect(signals[0].label).toBe('Market Opportunity');
+    expect(signals.some(signal => signal.type === 'risk')).toBe(true);
+    expect(signals[0].score).toBeGreaterThan(70);
+  });
+
+  it('applies personal scores to matching intelligence events', () => {
+    const events = applyPersonalScores([
+      {
+        id: 'robotics',
+        title: 'Robotics startup launches warehouse agent',
+        summary: 'A new robotics deployment reaches enterprise customers.',
+        category: 'robotics',
+        categoryLabel: 'Robotics',
+        intelligenceScore: 60,
+        confidence: 80,
+        independentSourceCount: 2,
+        entities: ['NVIDIA'],
+        sources: ['NVIDIA Blog'],
+      },
+      {
+        id: 'generic',
+        title: 'Generic AI roundup',
+        summary: 'Several updates happened.',
+        category: 'industry',
+        intelligenceScore: 65,
+        confidence: 30,
+        independentSourceCount: 1,
+        entities: [],
+        sources: ['Personal Blog'],
+      },
+    ], { interests: 'robotics,NVIDIA' });
+
+    expect(events[0].id).toBe('robotics');
+    expect(events[0].personalScore).toBeGreaterThan(events[1].personalScore);
+    expect(events[0].personalReasons).toContain('interest:robotics');
   });
 });

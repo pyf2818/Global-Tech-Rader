@@ -5140,6 +5140,19 @@ body {
 
 /* 素材头部操作按钮组 */
 .material-header-actions { display: flex; gap: var(--space-xs); align-items: center; }
+.material-research {
+  height: 22px;
+  padding: 0 7px;
+  border: 1px solid var(--accent-cyan);
+  border-radius: 5px;
+  background: var(--accent-cyan-soft);
+  color: var(--accent-cyan);
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.material-research:hover { background: var(--accent-cyan); color: var(--bg-primary); }
 .material-star { background: transparent; border: none; color: #f59e0b; cursor: pointer; font-size: 16px; padding: 2px 4px; border-radius: 4px; transition: all 0.2s; }
 .material-star:hover { background: rgba(245, 158, 11, 0.1); }
 
@@ -19942,6 +19955,60 @@ body {
 .intelligence-entity-strip b {
   color: var(--text-muted);
   font-weight: 700;
+}
+
+.intelligence-opportunity-list {
+  display: grid;
+  gap: 8px;
+}
+
+.intelligence-opportunity {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 34px;
+  gap: 4px 8px;
+  padding: 9px 10px;
+  border: 1px solid var(--border-color);
+  border-left: 3px solid var(--accent-color);
+  border-radius: 8px;
+  background: var(--surface-bg);
+}
+
+.intelligence-opportunity.risk {
+  border-left-color: var(--accent-rose, #ef4444);
+}
+
+.intelligence-opportunity.developer,
+.intelligence-opportunity.technology {
+  border-left-color: var(--accent-cyan, #22d3ee);
+}
+
+.intelligence-opportunity span {
+  grid-column: 1 / -1;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.intelligence-opportunity strong {
+  overflow: hidden;
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 650;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.intelligence-opportunity em {
+  display: grid;
+  place-items: center;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--accent-color) 14%, transparent);
+  color: var(--accent-color);
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 800;
 }
 
 .intelligence-mini-list {

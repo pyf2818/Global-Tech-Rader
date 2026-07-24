@@ -1022,6 +1022,7 @@ function App() {
   const [query, setQuery] = useState('');
   const [items, setItems] = useState([]);
   const [externalIntelligenceItems, setExternalIntelligenceItems] = useState([]);
+  const [externalIntelligenceOpportunities, setExternalIntelligenceOpportunities] = useState([]);
   const [externalIntelligenceLoading, setExternalIntelligenceLoading] = useState(false);
   const [externalIntelligenceError, setExternalIntelligenceError] = useState('');
   const [externalIntelligenceUpdatedAt, setExternalIntelligenceUpdatedAt] = useState('');
@@ -4338,8 +4339,17 @@ ${blueprintSummary}`,
     setExternalIntelligenceLoading(true);
     setExternalIntelligenceError('');
     try {
-      const eventsResponse = await fetch('/api/intelligence/events?take=24');
+      const intelligenceParams = new URLSearchParams({ take: '24', storage: 'auto' });
+      if (selectedInterests.length) intelligenceParams.set('interests', selectedInterests.join(','));
+      const opportunityParams = new URLSearchParams({ take: '8', storage: 'auto' });
+      if (selectedInterests.length) opportunityParams.set('interests', selectedInterests.join(','));
+      const [eventsResponse, opportunitiesResponse] = await Promise.all([
+        fetch(`/api/intelligence/events?${intelligenceParams}`),
+        fetch(`/api/intelligence/opportunities?${opportunityParams}`),
+      ]);
       const eventsPayload = await eventsResponse.json();
+      const opportunitiesPayload = await opportunitiesResponse.json().catch(() => ({ ok: false, opportunities: [] }));
+      setExternalIntelligenceOpportunities(opportunitiesPayload.ok && Array.isArray(opportunitiesPayload.opportunities) ? opportunitiesPayload.opportunities : []);
       if (eventsPayload.ok && Array.isArray(eventsPayload.events) && eventsPayload.events.length > 0) {
         setExternalIntelligenceItems(eventsPayload.events);
         setExternalIntelligenceUpdatedAt(eventsPayload.updatedAt || new Date().toISOString());
@@ -4360,7 +4370,7 @@ ${blueprintSummary}`,
 
   useEffect(() => {
     if (nav === 'recommendations') loadExternalIntelligence();
-  }, [nav]);
+  }, [nav, selectedInterests]);
 
   function loadMoreNews() {
     if (!newsHasMore || loadingMore || loading) return;
@@ -4580,6 +4590,21 @@ ${blueprintSummary}`,
     setMaterials(prev => [...prev, newMaterial]);
     setShowAddMaterial(false);
     return newMaterial;
+  }
+
+  function continueMaterialInWorkbench(material) {
+    if (!material) return;
+    setSelectedMaterials([material.id]);
+    setCopilotPendingMessage([
+      `请基于这条素材继续研究：${material.title || '未命名素材'}`,
+      '',
+      '【素材内容】',
+      String(material.fullContent || material.content || '').slice(0, 3500),
+      '',
+      '请输出：1）核心判断 2）证据缺口 3）下一步研究清单 4）可沉淀为文章的结构。'
+    ].join('\n'));
+    goNav('home');
+    showToast('已发送到 AI 工作站继续研究');
   }
 
   function removeMaterial(id) {
@@ -7088,6 +7113,7 @@ ${signals}
           {nav === 'recommendations' && (
             <IntelligenceFeedPanel
               items={externalIntelligenceItems}
+              opportunities={externalIntelligenceOpportunities}
               loading={externalIntelligenceLoading}
               error={externalIntelligenceError}
               updatedAt={externalIntelligenceUpdatedAt}
@@ -8427,6 +8453,9 @@ ${signals}
                         <div className="material-header">
                           <span className={`material-type-badge type-${m.type}`}>{MATERIAL_TYPES[m.type] || m.type}</span>
                           <div className="material-header-actions">
+                            <button className="material-research" onClick={() => continueMaterialInWorkbench(m)} title="发送到 AI 工作站继续研究">
+                              研究
+                            </button>
                             <button className="material-star" onClick={() => toggleMaterialStar(m.id)} title={m.starred ? '取消星标' : '添加星标'}>
                               {m.starred ? '★' : '☆'}
                             </button>
@@ -9443,17 +9472,51 @@ ${signals}
         externalQuotedContext={elfQuotedContext}
         intelligenceProfile={intelligenceProfile}
         intelligenceMissions={intelligenceMissions}
+        onContinueInWorkbench={(payload, savedMaterial) => {
+          const material = savedMaterial || addManualMaterial({
+            title: String(payload.title || 'AI 精灵研究记录').slice(0, 100),
+            content: String(payload.content || '').slice(0, 5000),
+            fullContent: payload.fullContent || payload.content || '',
+            type: payload.type || 'viewpoint',
+            source: payload.source || 'AI 精灵',
+            url: payload.url || '',
+            tags: payload.tags || ['AI精灵', 'AI工作站'],
+            note: payload.note || '由 AI 精灵保存，可在 AI 工作站继续研究。',
+            spaceId: payload.spaceId || null,
+            imageUrl: payload.imageUrl || '',
+            insight: payload.insight || null,
+            metadata: payload.metadata || null
+          });
+          setMaterialSearch(material.title || payload.title || '');
+          setMaterialFilter('all');
+          setMaterialSourceFilter('all');
+          setMaterialSpaceFilter('all');
+          if (material.id) setSelectedMaterials([material.id]);
+          setCopilotPendingMessage([
+            `请基于刚从 AI 精灵保存的研究素材继续深化：${material.title || payload.title}`,
+            '',
+            '【素材内容】',
+            String(material.fullContent || material.content || payload.fullContent || payload.content || '').slice(0, 3500),
+            '',
+            '请输出：1）核心判断 2）仍需验证的证据 3）下一步研究清单 4）可沉淀为文章的结构。'
+          ].join('\n'));
+          goNav('home');
+          showToast('已转入 AI 工作站继续研究');
+        }}
         onExportToMaterials={(data) => {
-        const { title, content } = data;
-        addManualMaterial({
-          title: title.slice(0, 100),
-          content: content.slice(0, 5000),
-          type: 'analysis',
-          source: 'AI精灵',
-          url: '',
-          tags: 'AI分析,AI精灵',
-          note: '',
-          spaceId: null
+        return addManualMaterial({
+          title: String(data.title || 'AI 精灵分析素材').slice(0, 100),
+          content: String(data.content || '').slice(0, 5000),
+          fullContent: data.fullContent || data.content || '',
+          type: data.type || 'analysis',
+          source: data.source || 'AI精灵',
+          url: data.url || '',
+          tags: data.tags || ['AI分析', 'AI精灵'],
+          note: data.note || '',
+          spaceId: data.spaceId || null,
+          imageUrl: data.imageUrl || '',
+          insight: data.insight || null,
+          metadata: data.metadata || null
         });
       }} />
       </Suspense>

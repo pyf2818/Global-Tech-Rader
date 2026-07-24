@@ -20,6 +20,7 @@ function formatRelativeTime(value) {
 
 export default function IntelligenceFeedPanel({
   items = [],
+  opportunities = [],
   loading = false,
   error = '',
   updatedAt = '',
@@ -97,6 +98,17 @@ export default function IntelligenceFeedPanel({
                 <span key={entity.name}>{entity.name}<b>{entity.count}</b></span>
               )) : <span>等待实体信号</span>}
             </div>
+            {opportunities.length > 0 && (
+              <div className="intelligence-opportunity-list">
+                {opportunities.slice(0, 3).map(signal => (
+                  <div key={signal.id} className={`intelligence-opportunity ${signal.type || 'watch'}`}>
+                    <span>{signal.label || 'Opportunity'}</span>
+                    <strong>{signal.title}</strong>
+                    <em>{formatScore(signal.score)}</em>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       )}
