@@ -21,6 +21,7 @@ function formatRelativeTime(value) {
 export default function IntelligenceFeedPanel({
   items = [],
   opportunities = [],
+  weeklySectors = null,
   loading = false,
   error = '',
   updatedAt = '',
@@ -38,6 +39,8 @@ export default function IntelligenceFeedPanel({
   }, [items]);
 
   const lead = items[0];
+  const topSectors = Array.isArray(weeklySectors?.sectors) ? weeklySectors.sectors.slice(0, 3) : [];
+  const leadSector = weeklySectors?.leadSector || topSectors[0];
 
   return (
     <section className="intelligence-feed-panel" aria-label="AI 行业情报">
@@ -107,6 +110,30 @@ export default function IntelligenceFeedPanel({
                     <em>{formatScore(signal.score)}</em>
                   </div>
                 ))}
+              </div>
+            )}
+            {leadSector && (
+              <div className="intelligence-weekly-sector">
+                <div className="intelligence-weekly-sector-head">
+                  <span>周度赛道</span>
+                  <strong>{leadSector.label}</strong>
+                  <em>{formatScore(leadSector.score)}</em>
+                </div>
+                <div className="intelligence-weekly-sector-meta">
+                  <span>{leadSector.eventCount || 0} 事件</span>
+                  <span>{leadSector.sourceCount || 0} 来源</span>
+                  <span>{leadSector.trend === 'surging' ? '升温' : leadSector.trend === 'active' ? '活跃' : '观察'}</span>
+                </div>
+                {topSectors.length > 1 && (
+                  <div className="intelligence-weekly-sector-list">
+                    {topSectors.slice(1).map(sector => (
+                      <span key={sector.id}>
+                        <b>{sector.label}</b>
+                        <em>{formatScore(sector.score)}</em>
+                      </span>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
           </div>

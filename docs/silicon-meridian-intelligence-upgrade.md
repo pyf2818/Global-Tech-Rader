@@ -145,6 +145,7 @@ GET /api/intelligence/events
 GET /api/intelligence/daily
 GET /api/intelligence/entities/:id
 GET /api/intelligence/opportunities
+GET /api/intelligence/weekly-sectors
 GET /api/intelligence/agent/context
 ```
 
@@ -393,6 +394,8 @@ Current status:
 - Intelligence events accept lightweight personalization inputs through `interests`, `follows`, and `sourceTiers`.
 - Event ranking applies `personalScore` and `personalReasons` before feeding daily, entity, and opportunity outputs.
 - The homepage Intelligence Feed passes current selected interests into event and opportunity requests.
+- Weekly sector analysis is available through `/api/intelligence/weekly-sectors` and appears in the homepage Intelligence Feed.
+- Agent context includes weekly sector signals so AI Elf and Workbench workflows can reason over current sector momentum.
 
 ## First Implementation Principle
 

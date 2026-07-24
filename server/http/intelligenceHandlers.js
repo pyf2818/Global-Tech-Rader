@@ -8,6 +8,7 @@ import {
   getIntelligenceItems,
   getStoredIntelligenceArticles,
   getStoredIntelligenceEvents,
+  getWeeklySectorAnalysis,
   syncIntelligenceSnapshot,
 } from '../intelligence/services/intelligenceService.js';
 import { sendJsonResponse } from './httpUtils.js';
@@ -42,6 +43,7 @@ function buildParams(req) {
     follows: queryValue(req, 'follows'),
     specialFollows: queryValue(req, 'specialFollows'),
     sourceTiers: queryValue(req, 'sourceTiers'),
+    days: queryValue(req, 'days'),
   };
 }
 
@@ -96,6 +98,9 @@ export async function handleIntelligenceRequest(req, res, { path = [] } = {}) {
     }
     if (action === 'opportunities') {
       return sendJsonResponse(res, 200, await getIntelligenceOpportunities(buildParams(req)));
+    }
+    if (action === 'weekly-sectors') {
+      return sendJsonResponse(res, 200, await getWeeklySectorAnalysis(buildParams(req)));
     }
     return sendJsonResponse(res, 404, { ok: false, error: { code: 'UNKNOWN_INTELLIGENCE_ENDPOINT' } });
   } catch (error) {

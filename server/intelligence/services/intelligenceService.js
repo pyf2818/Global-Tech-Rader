@@ -7,6 +7,7 @@ import { buildDailyIntelligenceBriefing } from '../processors/dailyBriefing.js';
 import { buildEntityProfiles, findEntityProfile } from '../processors/entityExtract.js';
 import { buildOpportunitySignals } from '../processors/opportunityAnalysis.js';
 import { applyPersonalScores } from '../processors/personalScore.js';
+import { buildWeeklySectorAnalysis } from '../processors/weeklySectorAnalysis.js';
 import { createIntelligenceRepository } from '../repositories/intelligenceRepository.js';
 
 const CACHE_TTL_MS = 5 * 60 * 1000;
@@ -125,6 +126,7 @@ export async function getAgentIntelligenceContext(params = {}) {
   const topItems = payload.items.slice(0, take);
   const events = clusterIntelligenceEvents(topItems);
   const opportunities = buildOpportunitySignals(events).slice(0, 6);
+  const weeklySectors = buildWeeklySectorAnalysis(events, { days: 7 });
 
   return {
     ok: true,
@@ -138,6 +140,7 @@ export async function getAgentIntelligenceContext(params = {}) {
       topEvents: topItems.slice(0, 8).map(toAgentEvent),
       watchEntities: topEntities(topItems),
       opportunities,
+      weeklySectors: weeklySectors.sectors.slice(0, 5),
       suggestedQuestions: [
         'Which AI events have the highest industry impact today?',
         'Which companies or models should I track next?',
@@ -333,6 +336,21 @@ export async function getIntelligenceOpportunities(params = {}) {
     updatedAt: eventsPayload.updatedAt || new Date().toISOString(),
     count: opportunities.length,
     opportunities,
+    fallback: eventsPayload.fallback,
+  };
+}
+
+export async function getWeeklySectorAnalysis(params = {}) {
+  const take = Math.min(100, Math.max(20, Number.parseInt(params.take || '80', 10) || 80));
+  const days = Math.min(30, Math.max(3, Number.parseInt(params.days || params.since || '7', 10) || 7));
+  const eventsPayload = await getIntelligenceEvents({ ...params, take, storage: params.storage || 'auto' });
+  const analysis = buildWeeklySectorAnalysis(eventsPayload.events, { days });
+
+  return {
+    ...analysis,
+    source: eventsPayload.source,
+    mode: eventsPayload.mode,
+    updatedAt: eventsPayload.updatedAt || new Date().toISOString(),
     fallback: eventsPayload.fallback,
   };
 }

@@ -6,6 +6,7 @@ import { buildDailyIntelligenceBriefing } from '../dailyBriefing.js';
 import { buildEntityProfiles, findEntityProfile } from '../entityExtract.js';
 import { buildOpportunitySignals } from '../opportunityAnalysis.js';
 import { applyPersonalScores } from '../personalScore.js';
+import { buildWeeklySectorAnalysis } from '../weeklySectorAnalysis.js';
 
 describe('intelligence processors', () => {
   it('normalizes AI HOT items into the Meridian intelligence item shape', () => {
@@ -250,5 +251,69 @@ describe('intelligence processors', () => {
     expect(events[0].id).toBe('robotics');
     expect(events[0].personalScore).toBeGreaterThan(events[1].personalScore);
     expect(events[0].personalReasons).toContain('interest:robotics');
+  });
+
+  it('builds weekly sector analysis with opportunities and risks', () => {
+    const now = Date.parse('2026-07-24T12:00:00.000Z');
+    const analysis = buildWeeklySectorAnalysis([
+      {
+        id: 'model-launch',
+        title: 'OpenAI releases developer agent API',
+        summary: 'Developer launch expands enterprise adoption.',
+        category: 'ai-models',
+        categoryLabel: 'Models',
+        entities: ['OpenAI'],
+        sources: ['OpenAI Blog', 'The Verge'],
+        heatScore: 90,
+        impactScore: 92,
+        intelligenceScore: 88,
+        confidence: 82,
+        lastSeenAt: '2026-07-24T02:00:00.000Z',
+      },
+      {
+        id: 'model-risk',
+        title: 'AI model faces copyright lawsuit',
+        summary: 'Regulation and copyright risk increase.',
+        category: 'ai-models',
+        categoryLabel: 'Models',
+        entities: ['OpenAI'],
+        sources: ['Reuters'],
+        heatScore: 72,
+        impactScore: 84,
+        intelligenceScore: 78,
+        confidence: 76,
+        lastSeenAt: '2026-07-23T02:00:00.000Z',
+      },
+      {
+        id: 'robotics',
+        title: 'Robotics company announces warehouse deployment',
+        summary: 'Enterprise deployment reaches new customers.',
+        category: 'robotics',
+        categoryLabel: 'Robotics',
+        entities: ['NVIDIA'],
+        sources: ['NVIDIA Blog'],
+        heatScore: 64,
+        impactScore: 74,
+        intelligenceScore: 72,
+        lastSeenAt: '2026-07-22T02:00:00.000Z',
+      },
+      {
+        id: 'old',
+        title: 'Old AI update',
+        category: 'ai-models',
+        heatScore: 99,
+        impactScore: 99,
+        intelligenceScore: 99,
+        lastSeenAt: '2026-06-01T02:00:00.000Z',
+      },
+    ], { now, days: 7 });
+
+    expect(analysis.ok).toBe(true);
+    expect(analysis.eventCount).toBe(3);
+    expect(analysis.sectors[0].category).toBe('ai-models');
+    expect(analysis.sectors[0].eventCount).toBe(2);
+    expect(analysis.sectors[0].keyEntities[0]).toEqual({ name: 'OpenAI', count: 2 });
+    expect(analysis.opportunities.some(signal => signal.id === 'model-launch')).toBe(true);
+    expect(analysis.risks.some(signal => signal.id === 'model-risk')).toBe(true);
   });
 });
