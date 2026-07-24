@@ -5,8 +5,10 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host 0.0.0.0",
+    "dev:detached": "node scripts/start-dev-detached.mjs",
     "build": "vite build",
     "db:migrate": "node server/db/migrate.js",
+    "intelligence:sync": "node scripts/intelligence-sync.mjs",
     "start": "node server/productionServer.js",
     "preview": "vite preview --host 0.0.0.0",
     "test": "vitest run",

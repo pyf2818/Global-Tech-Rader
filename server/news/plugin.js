@@ -6,6 +6,7 @@ import { handleCommunityRequest } from '../http/communityHandlers.js';
 import { handleProfileRequest } from '../http/profileHandlers.js';
 import { handleAiGenerateRequest } from '../http/aiHandlers.js';
 import { handleFetchPageRequest } from '../http/fetchPageHandler.js';
+import { handleIntelligenceRequest } from '../http/intelligenceHandlers.js';
 import { getNews } from './services/newsService.js';
 import { getTrending, getGithubTrending } from './services/trendingService.js';
 import { discoverSourceCandidates, validateFeedUrl } from './services/sourceDiscovery.js';
@@ -64,6 +65,13 @@ export function newsPlugin() {
         }
         if (requestUrl.pathname === '/api/fetch-page') {
           return handleFetchPageRequest(req, res);
+        }
+
+        if (requestUrl.pathname === '/api/intelligence' || requestUrl.pathname.startsWith('/api/intelligence/')) {
+          const path = requestUrl.pathname === '/api/intelligence'
+            ? []
+            : requestUrl.pathname.slice('/api/intelligence/'.length).split('/');
+          return handleIntelligenceRequest(req, res, { path });
         }
 
         if (requestUrl.pathname === '/api/news') {

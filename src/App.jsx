@@ -19,6 +19,7 @@ import { useUI } from './hooks/useUI.js';
 import { BlockGrid, BlockPanel, BlockStat, BlockToolbar } from './blocks/index.js';
 import CommandPalette from './shell/CommandPalette.jsx';
 import IntelligenceSidebar from './components/IntelligenceSidebar.jsx';
+import IntelligenceFeedPanel from './components/IntelligenceFeedPanel.jsx';
 import RecommendationFeed from './components/RecommendationFeed.jsx';
 import RecommendationDateRail from './components/RecommendationDateRail.jsx';
 import TodayNewspaper from './components/TodayNewspaper.jsx';
@@ -1009,7 +1010,7 @@ function App() {
   const [editorFullscreen, setEditorFullscreen] = useState(false);
   const [nav, setNav] = useState(() => {
     const requested = new URLSearchParams(window.location.search).get('view');
-    return NAV_ITEMS.some(item => item.id === requested) ? requested : 'home';
+    return NAV_ITEMS.some(item => item.id === requested) ? requested : 'recommendations';
   });
   const [category, setCategory] = useState('all');
   const [categoryOpen, setCategoryOpen] = useState(false);
@@ -1020,6 +1021,10 @@ function App() {
   const [viewMode, setViewMode] = useState(() => loadLS('viewMode', 'standard'));
   const [query, setQuery] = useState('');
   const [items, setItems] = useState([]);
+  const [externalIntelligenceItems, setExternalIntelligenceItems] = useState([]);
+  const [externalIntelligenceLoading, setExternalIntelligenceLoading] = useState(false);
+  const [externalIntelligenceError, setExternalIntelligenceError] = useState('');
+  const [externalIntelligenceUpdatedAt, setExternalIntelligenceUpdatedAt] = useState('');
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [newsPage, setNewsPage] = useState(0);
@@ -1166,7 +1171,7 @@ function App() {
     llmManualInput, setLlmManualInput,
     showLlmQuickConfig, setShowLlmQuickConfig,
     allLlmModels,
-    llmPresets, upsertPreset, removePreset, activatePreset, activePresetId,
+    llmPresets, upsertPreset, removePreset, activatePreset, activePresetId, setActivePresetId,
   } = useLlmConfig();
 
   // ========== 用户系统 ==========
@@ -4329,6 +4334,34 @@ ${blueprintSummary}`,
       .finally(() => { setLoading(false); setLoadingMore(false); });
   }
 
+  async function loadExternalIntelligence() {
+    setExternalIntelligenceLoading(true);
+    setExternalIntelligenceError('');
+    try {
+      const eventsResponse = await fetch('/api/intelligence/events?take=24');
+      const eventsPayload = await eventsResponse.json();
+      if (eventsPayload.ok && Array.isArray(eventsPayload.events) && eventsPayload.events.length > 0) {
+        setExternalIntelligenceItems(eventsPayload.events);
+        setExternalIntelligenceUpdatedAt(eventsPayload.updatedAt || new Date().toISOString());
+        return;
+      }
+
+      const itemsResponse = await fetch('/api/intelligence/items?take=12');
+      const itemsPayload = await itemsResponse.json();
+      if (!itemsPayload.ok) throw new Error(itemsPayload.error?.message || '行业情报加载失败');
+      setExternalIntelligenceItems(Array.isArray(itemsPayload.items) ? itemsPayload.items : []);
+      setExternalIntelligenceUpdatedAt(itemsPayload.updatedAt || new Date().toISOString());
+    } catch (error) {
+      setExternalIntelligenceError(error.message || '行业情报加载失败');
+    } finally {
+      setExternalIntelligenceLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    if (nav === 'recommendations') loadExternalIntelligence();
+  }, [nav]);
+
   function loadMoreNews() {
     if (!newsHasMore || loadingMore || loading) return;
     setLoadingMore(true);
@@ -6202,7 +6235,7 @@ ${signals}
               intelligenceContext={{
                 date: selectedNewsDate,
                 briefing: algorithmBriefing,
-                items: [...recommendationLanes.public, ...recommendationLanes.personal].slice(0, 12),
+                items: [...externalIntelligenceItems, ...recommendationLanes.public, ...recommendationLanes.personal].slice(0, 16),
               }}
               onOpenNewspaper={() => setShowNewspaperOverlay(true)}
               todayBriefing={todayBriefing}
@@ -7052,6 +7085,15 @@ ${signals}
           )}
 
           {/* SMART RECOMMENDATIONS - 当日满足用户关注/画像的资讯卡片流（右栏竖向时间线见 panel） */}
+          {nav === 'recommendations' && (
+            <IntelligenceFeedPanel
+              items={externalIntelligenceItems}
+              loading={externalIntelligenceLoading}
+              error={externalIntelligenceError}
+              updatedAt={externalIntelligenceUpdatedAt}
+              onRefresh={loadExternalIntelligence}
+            />
+          )}
           {nav === 'recommendations' && (
             <RecommendationFeed
               lanes={recommendationLanes}
@@ -9221,9 +9263,6 @@ ${signals}
           <div className="llm-config-modal" onClick={e => e.stopPropagation()}>
             <div className="llm-config-header">
               <div className="llm-config-title">
-                <span className="llm-config-title-icon" aria-hidden="true">
-                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-                </span>
                 <div>
                   <h3>大模型配置</h3>
                   <p>选择服务商并填入凭证，开启 AI 智能助手</p>
@@ -9248,6 +9287,54 @@ ${signals}
               </div>
 
               <div className="llm-config-fields">
+                <div className="llm-field">
+                  <div className="llm-field-head">
+                    <label>已保存模型</label>
+                  </div>
+                  <div className="llm-saved-row">
+                    <select
+                      className="llm-model-select"
+                      value={activePresetId || ''}
+                      onChange={e => {
+                        const preset = llmPresets.find(item => item.id === e.target.value);
+                        if (preset) activatePreset(preset);
+                      }}
+                    >
+                      <option value="">选择已保存配置</option>
+                      {llmPresets.map(preset => (
+                        <option key={preset.id} value={preset.id}>{preset.name}</option>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      className="llm-fetch-btn"
+                      onClick={() => {
+                        const preset = llmPresets.find(item => item.id === activePresetId);
+                        if (preset) activatePreset(preset);
+                      }}
+                      disabled={!activePresetId}
+                    >
+                      套用
+                    </button>
+                  </div>
+                </div>
+
+                <div className="llm-field">
+                  <label>服务商</label>
+                  <select
+                    className="llm-model-select"
+                    value={llmConfig.provider}
+                    onChange={e => {
+                      const preset = LLM_PRESETS.find(item => item.id === e.target.value);
+                      if (preset) handleSelectPreset(preset);
+                    }}
+                  >
+                    {LLM_PRESETS.map(preset => (
+                      <option key={preset.id} value={preset.id}>{preset.name}</option>
+                    ))}
+                  </select>
+                </div>
+
                 <div className="llm-field">
                   <label>API Base URL</label>
                   <input
@@ -9315,7 +9402,7 @@ ${signals}
                 onClick={() => {
                   const fallback = (LLM_PRESETS.find(p => p.id === llmConfig.provider)?.name || '自定义') + '-' + (llmConfig.selectedModel || 'model').slice(0, 10);
                   const name = llmPresetName.trim() || fallback;
-                  upsertPreset({ name, provider: llmConfig.provider || 'custom', baseUrl: llmConfig.baseUrl, apiKey: llmConfig.apiKey, selectedModel: llmConfig.selectedModel, manualModels: llmConfig.manualModels || [] });
+                  upsertPreset({ id: llmPresetName.trim() ? undefined : activePresetId || undefined, name, provider: llmConfig.provider || 'custom', baseUrl: llmConfig.baseUrl, apiKey: llmConfig.apiKey, selectedModel: llmConfig.selectedModel, manualModels: llmConfig.manualModels || [] }, { activate: true });
                   setLlmPresetName('');
                 }}
                 title="把当前配置保存为命名预设，方便下次一键切换"
@@ -9920,6 +10007,7 @@ ${signals}
   }
 
   function handleSelectPreset(preset) {
+    setActivePresetId(null);
     setLlmConfig(prev => ({
       ...prev,
       provider: preset.id,
@@ -9931,6 +10019,19 @@ ${signals}
 
   function handleQuickSave() {
     if (!llmConfig.baseUrl || !llmConfig.selectedModel) return;
+    const providerName = LLM_PRESETS.find(p => p.id === llmConfig.provider)?.name || '自定义';
+    const fallbackName = `${providerName}-${llmConfig.selectedModel}`;
+    const name = llmPresetName.trim() || fallbackName;
+    upsertPreset({
+      id: llmPresetName.trim() ? undefined : activePresetId || undefined,
+      name,
+      provider: llmConfig.provider || 'custom',
+      baseUrl: llmConfig.baseUrl,
+      apiKey: llmConfig.apiKey,
+      selectedModel: llmConfig.selectedModel,
+      manualModels: llmConfig.manualModels || [],
+    }, { activate: true });
+    setLlmPresetName('');
     setShowLlmQuickConfig(false);
     setAiInsights({ loading: false, data: null, error: '' });
   }

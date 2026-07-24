@@ -1,25 +1,48 @@
-// useLlmConfig - LLM 配置与模型管理
-// 支持多套 provider 预设：保存/切换/删除，当前激活的一套同步到 llmConfig 供全局使用。
-
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import { loadLS, saveLS } from '../utils/localStorage.js';
 
-const DEFAULT_LLM_CONFIG = { baseUrl: '', apiKey: '', selectedModel: '', manualModels: [], provider: '' };
+const DEFAULT_LLM_CONFIG = {
+  baseUrl: '',
+  apiKey: '',
+  selectedModel: '',
+  manualModels: [],
+  provider: 'custom',
+};
 
+const CONFIG_KEY = 'llmConfig';
 const PRESETS_KEY = 'llmPresets:v1';
 const ACTIVE_KEY = 'llmActivePreset:v1';
 
-function loadPresets() {
-  return loadLS(PRESETS_KEY, []);
+function createPresetId() {
+  return `p_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`;
 }
-function loadActiveId() {
-  return loadLS(ACTIVE_KEY, null);
+
+function normalizePreset(preset = {}) {
+  return {
+    id: preset.id || createPresetId(),
+    name: String(preset.name || preset.selectedModel || '未命名模型').trim(),
+    provider: preset.provider || 'custom',
+    baseUrl: preset.baseUrl || '',
+    apiKey: preset.apiKey || '',
+    selectedModel: preset.selectedModel || '',
+    manualModels: Array.isArray(preset.manualModels) ? preset.manualModels : [],
+    updatedAt: Date.now(),
+  };
+}
+
+function loadConfig() {
+  return { ...DEFAULT_LLM_CONFIG, ...loadLS(CONFIG_KEY, DEFAULT_LLM_CONFIG) };
+}
+
+function loadPresets() {
+  const presets = loadLS(PRESETS_KEY, []);
+  return Array.isArray(presets) ? presets.map(normalizePreset) : [];
 }
 
 export function useLlmConfig() {
-  const [llmConfig, setLlmConfig] = useState(() => loadLS('llmConfig', DEFAULT_LLM_CONFIG));
+  const [llmConfig, setLlmConfig] = useState(loadConfig);
   const [llmPresets, setLlmPresets] = useState(loadPresets);
-  const [activePresetId, setActivePresetId] = useState(loadActiveId);
+  const [activePresetId, setActivePresetId] = useState(() => loadLS(ACTIVE_KEY, null));
   const [llmModels, setLlmModels] = useState([]);
   const [llmFetching, setLlmFetching] = useState(false);
   const [llmFetchError, setLlmFetchError] = useState('');
@@ -28,46 +51,56 @@ export function useLlmConfig() {
   const [llmManualInput, setLlmManualInput] = useState('');
   const [showLlmQuickConfig, setShowLlmQuickConfig] = useState(false);
 
-  const allLlmModels = useMemo(
-    () => [...llmModels, ...(llmConfig.manualModels || [])],
-    [llmModels, llmConfig.manualModels]
-  );
+  const allLlmModels = useMemo(() => {
+    const models = [...llmModels, ...(llmConfig.manualModels || [])];
+    if (llmConfig.selectedModel && !models.some(model => model.id === llmConfig.selectedModel)) {
+      models.push({ id: llmConfig.selectedModel, name: llmConfig.selectedModel });
+    }
+    return models;
+  }, [llmModels, llmConfig.manualModels, llmConfig.selectedModel]);
 
-  // 预设持久化
+  useEffect(() => { saveLS(CONFIG_KEY, llmConfig); }, [llmConfig]);
   useEffect(() => { saveLS(PRESETS_KEY, llmPresets); }, [llmPresets]);
   useEffect(() => { saveLS(ACTIVE_KEY, activePresetId); }, [activePresetId]);
 
-  // 新增/更新预设（同 name 视为更新）
-  const upsertPreset = useCallback((preset) => {
-    if (!preset?.name) return;
+  const upsertPreset = useCallback((preset, options = {}) => {
+    if (!preset?.name && !preset?.selectedModel) return null;
+    const draft = normalizePreset(preset);
+    let savedId = draft.id;
+
     setLlmPresets(prev => {
-      const idx = prev.findIndex(p => p.id === preset.id || p.name === preset.name);
-      const enriched = { id: preset.id || `p_${Date.now().toString(36)}`, ...preset };
+      const idx = prev.findIndex(item => item.id === draft.id);
       if (idx >= 0) {
         const next = [...prev];
-        next[idx] = { ...next[idx], ...enriched };
+        next[idx] = { ...next[idx], ...draft, id: next[idx].id };
+        savedId = next[idx].id;
+        if (options.activate) setActivePresetId(savedId);
         return next;
       }
-      return [...prev, enriched];
+
+      if (options.activate) setActivePresetId(savedId);
+      return [...prev, draft];
     });
+
+    return savedId;
   }, []);
 
   const removePreset = useCallback((id) => {
-    setLlmPresets(prev => prev.filter(p => p.id !== id));
+    setLlmPresets(prev => prev.filter(preset => preset.id !== id));
     setActivePresetId(prev => (prev === id ? null : prev));
   }, []);
 
-  // 切换激活预设：同步到 llmConfig
   const activatePreset = useCallback((preset) => {
     if (!preset) return;
-    setActivePresetId(preset.id);
+    const normalized = normalizePreset(preset);
+    setActivePresetId(normalized.id);
     setLlmConfig(prev => ({
       ...prev,
-      provider: preset.provider || 'custom',
-      baseUrl: preset.baseUrl || '',
-      apiKey: preset.apiKey || '',
-      selectedModel: preset.selectedModel || '',
-      manualModels: preset.manualModels || [],
+      provider: normalized.provider,
+      baseUrl: normalized.baseUrl,
+      apiKey: normalized.apiKey,
+      selectedModel: normalized.selectedModel,
+      manualModels: normalized.manualModels,
     }));
     setLlmModels([]);
     setLlmTestResult(null);

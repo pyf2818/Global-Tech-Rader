@@ -1,0 +1,135 @@
+Agent 接入 · AI HOT
+内容
+精选 全部 AI 动态 AI 日报 主题 收藏 接入
+Agent 接入 更多
+关于 更新日志 反馈
+京ICP备2026012723号-2
+精选 全部 日报 更多
+反馈
+Agent 与开发者接入
+让 Agent 直接使用 AI HOT
+Agent Skill 负责理解问题和整理答案；RSS 与 REST API 负责稳定传递公开精选、最近 7 天动态和日报。匿名只读，无需 API Key。
+匿名只读 无需 API Key API v 1.5.0 Skill v 0.3.7
+Agent Skill 让 Agent 自动理解问题、查询并整理结果 RSS 给阅读器和低代码工具订阅更新 REST API 给程序、工作流和自定义 Agent 使用
+推荐路径 · Agent-first
+把这一段发给你的 Agent
+这段提示会要求 Agent 先审阅来源和写入位置，再安装到当前平台目录；不会默认使用 sudo，也不会把 Codex 的更新写进 Claude 目录。
+请先检查并安装 AI HOT Skill：https://aihot.virxact.com/aihot-skill/
+要求：
+1. 先读取并检查 SKILL.md、README.md，确认只访问 AI HOT 的公开只读接口；
+2. 告诉我你准备写入的目录和文件，不要使用 sudo，不要覆盖其它 Skill；
+3. 安装到你当前 Agent 官方支持的用户级 skills 目录；
+4. 安装完成后告诉我是否需要重启或开启新会话，并给出一个验证问题。 复制 长内容可左右滑动
+先查看 SKILL.md 查看安装脚本 GitHub 来源
+Agent Skill · 自动理解意图
+安装、验证、再开始使用
+v 0.3.7
+1 审阅并安装 让 Agent 先说明来源、目标目录和写入文件，再执行安装。
+2 重启或开启新会话 大多数 Agent 只在会话开始时扫描 Skill；当前对话不一定立刻看到新文件。
+3 发送验证问题 看到明确时间窗、中文摘要和 AI HOT 站内链接，即表示接入成功。
+验证问题
+过去 24 小时 AI 圈最重要的 5 件事是什么？ 复制 长内容可左右滑动
+成功标志 回答注明“过去 24 小时”，给出 5 条以内中文摘要，并把标题链接到 AI HOT 阅读页。
+人类手动安装：选择当前平台 先打开并审阅 install.sh 。下面每条命令都显式声明目标平台，不再猜目录。
+Claude Code ~/.claude/skills/aihot
+bash <(curl -fsSL https://aihot.virxact.com/aihot-skill/install.sh) --target claude
+Codex $CODEX_HOME/skills/aihot（默认 ~/.codex）
+bash <(curl -fsSL https://aihot.virxact.com/aihot-skill/install.sh) --target codex
+Gemini CLI ~/.gemini/skills/aihot
+bash <(curl -fsSL https://aihot.virxact.com/aihot-skill/install.sh) --target gemini
+GitHub Copilot ~/.copilot/skills/aihot
+bash <(curl -fsSL https://aihot.virxact.com/aihot-skill/install.sh) --target copilot
+OpenCode ~/.config/opencode/skills/aihot
+bash <(curl -fsSL https://aihot.virxact.com/aihot-skill/install.sh) --target opencode
+通用 Agent Skills ~/.agents/skills/aihot
+bash <(curl -fsSL https://aihot.virxact.com/aihot-skill/install.sh) --target agents
+更新已有 Skill 让当前 Agent 覆盖它正在使用的同一目录。不要复制默认命令去猜另一个平台的目录。
+老版本可能仍沿用浏览器或无头浏览器 UA。看到 blocked / 567 不等于 IP 被封；先更新 Skill，再新开会话验证。
+请更新当前已安装的 AI HOT Skill：https://aihot.virxact.com/aihot-skill/
+先找到当前会话实际加载的 aihot/SKILL.md 路径，告诉我旧版本和目标路径；确认后覆盖同一目录。不要把更新写到其它 Agent 的目录。
+更新后用可识别的非浏览器 User-Agent 发起一次验证请求；如果此前出现 blocked / 567，不要继续沿用 Mozilla、Chrome 或 HeadlessChrome UA。 复制 长内容可左右滑动
+没有触发？按这个顺序排查 确认文件名严格为 SKILL.md ，且位于当前 Agent 支持的 skills 目录。
+关闭旧会话并新开一个会话，再问上面的验证问题。
+让 Agent 列出它发现的 skills，确认其中有 aihot 。
+仍失败时，把平台、版本和实际安装路径提交到反馈页；不要发送 token 或本地隐私文件。
+Agent Skills 是开放格式，但不同产品的目录、权限和启用方式不同。上面只承诺这些明确列出的路径；其它工具请以其官方文档为准。
+RSS · 阅读器与自动化工具
+复制地址即可订阅
+兼容主流 RSS 2.0 阅读器。第一次接入建议选“精选摘要”；只有确实需要阅读器内全文时才选“精选全文”， 需要自行筛选时再使用最近 7 天公开池。
+精选摘要 推荐
+最新 50 条精选，保留摘要、站内阅读和原文入口；体积更小，推荐大多数阅读器使用。
+https://aihot.virxact.com/feed.xml
+精选全文 按需
+同样保留 50 条；仅对明确允许再分发的来源内联正文，体积更大，需要阅读器内全文时选用。
+https://aihot.virxact.com/feed/full.xml
+最近 7 天公开池
+最新 50 条公开动态，不含公众号、未审内容和 arXiv 论文。适合自己筛选。
+https://aihot.virxact.com/feed/all.xml
+AI HOT 日报
+每天北京时间 08:00 发布一条精编日报，保留最近 30 期。
+https://aihot.virxact.com/feed/daily.xml
+给 RSS reader / Agent 的合同 支持 ETag 与 Last-Modified；未变化时返回 304。建议每 30 分钟或更慢轮询。
+条目 link 指向 AI HOT 站内阅读页，第三方原文在 description 中。
+默认精选与分类 feed 提供摘要，不输出 content:encoded。
+全文 feed 仅在来源明确允许时提供 content:encoded 正文。
+公众号、付费墙及默认网页/RSS 来源只提供摘要，不外发全文。
+分类订阅： /feed/category/ {ai-models|ai-products|industry|paper|tip} .xml
+分类全文： /feed/full/category/ {ai-models|ai-products|industry|paper|tip} .xml
+RSS 是公开阅读面，不代表第三方内容获得新的许可。镜像或对外发布时请保留 AI HOT 署名和原文入口。
+REST API · 程序与自定义 Agent
+一个请求开始，严格合同看 OpenAPI
+v 1.5.0
+无需 token，只允许匿名 GET。要长期维护全部精选，用一次快照加增量游标； 临时查询最近内容继续用 items。字段、错误码和 schema 以 OpenAPI 3.1 为准。
+打开 OpenAPI YAML 查看当前版本
+首次请求
+UA="your-app/1.0 (+mailto:you@example.com)"
+curl -H "User-Agent: $UA" 'https://aihot.virxact.com/api/public/items?mode=selected&take=20' 复制 长内容可左右滑动
+请把 your-app/1.0 和联系方式替换成你自己的标识；不要在生产中原样使用示例 UA，也不要伪装浏览器。
+看到 blocked / 567 ？这不等于 IP 被封 这表示请求先被边缘安全规则拦截。旧 Agent 请先更新 Skill；自建程序请移除 Mozilla、Chrome、HeadlessChrome 等浏览器 UA，改用上面的可识别非浏览器 UA 后只重试一次。仍失败时，请在反馈中附上 requestId 。
+默认精选 不传 mode 等同 selected；只有明确需要公开池时用 all。
+完整精选不限 7 天 snapshot 首次拿全，changes 后续只取变化；items 仍是最近 7 天查询。
+公开池不等于全库 不含公众号、未审内容、低相关和已合并重复条目。
+保留 attribution 默认完整响应包含 AI HOT 来源和 canonical；minimal 不含该字段。
+端点速览
+GET /api/public/selected/snapshot 当前全部精选；首次完整同步
+GET /api/public/selected/changes 精选新增、修改和撤选；后续只取变化
+GET /api/public/items 精选或最近 7 天公开池；支持分类、时间和关键词
+GET /api/public/hot-topics 当前热点，按多源热度排序
+GET /api/public/daily 最新日报
+GET /api/public/daily/{date} 指定日期日报
+GET /api/public/dailies 日报日期索引
+GET /api/public/fingerprint 低流量轮询指纹
+GET /api/public/version API 与 Skill 版本
+items 查询参数 参数 默认 用途与边界
+mode selected selected | all
+since now - 7d ISO 8601；早于 7 天会截断
+take 50 整数 1–100
+category 无 ai-models / ai-products / industry / paper / tip
+q 无 关键词，2–200 字
+cursor 无 原样回传 nextCursor，不要解析
+fields default minimal 仅保留索引和深链字段
+表格可左右滑动查看
+维护当前全部精选：一次快照，之后只拉变化 # 首次：拿到当前全部精选，并保存响应里的 cursor
+curl -H "User-Agent: $UA" 'https://aihot.virxact.com/api/public/selected/snapshot'
+# 以后：原样回传 cursor，只拿新增、修改和撤选
+curl -H "User-Agent: $UA" 'https://aihot.virxact.com/api/public/selected/changes?cursor=<上次响应的 cursor>' 复制 长内容可左右滑动
+每页成功应用后再保存新 cursor 。变化包含新增、标题／摘要等 原地修改和撤选；若返回 409 snapshot_required ，重新取一次快照即可，接口不会静默漏数。
+只关心最近头部：先 fingerprint，再拉 items # 每分钟先查轻量指纹；只有变化时才拉 items
+curl -H "User-Agent: $UA" 'https://aihot.virxact.com/api/public/fingerprint'
+# 只做通知或索引时使用轻量字段
+curl -H "User-Agent: $UA" 'https://aihot.virxact.com/api/public/items?mode=selected&take=50&fields=minimal' 复制 长内容可左右滑动
+fingerprint 只判断头部条目是否变化；标题、摘要或分类的原地编辑由 items 的 ETag / If-None-Match 感知。
+错误与恢复 400 ：参数不合法；按 OpenAPI 修正，不要自动改成宽查询。
+409 / snapshot_required ：增量游标无法继续安全续传；重新获取一次完整精选快照。
+403 ：检查是否使用了可识别的非浏览器 User-Agent。
+567 / blocked ：边缘安全规则在请求到达 AI HOT 前拦截；不等于 IP 被封。移除 Mozilla、Chrome、HeadlessChrome 等浏览器 UA，旧 Skill 先更新，再只重试一次；仍失败请提交 requestId 。
+429 ：退避 30–60 秒；不要增加并发重试。
+5xx / 超时 ：指数退避，并使用上次成功缓存；测试版不提供 SLA。
+使用边界
+公开可读，不等于可以忽略来源
+重要事实回原文核对 摘要和翻译由 AI 生成。引用数字、政策或原话前，请使用 API 返回的原文 URL 复核。
+保留来源和 canonical 对外发布 API 结果时请保留返回的 attribution/canonical；第三方原文版权归原作者。
+按频率合同调用 正常会话、RSS 阅读器和分钟级轮询均可使用；收到 429 后退避，不要并发抓取。
+测试版，不提供 SLA 兼容性变化和版本更新会写入 changelog；生产关键链路请自行设置缓存、重试和降级。
+接入失败、Skill 漏触发或需要新端点？走 反馈页 ，会同步到内部处理群。
+GitHub: khazix-skills/aihot · wzglyay@virxact.com
