@@ -346,6 +346,7 @@ Current status:
 - Creative asset normalization now preserves citations and AI Elf handoff provenance, and local workspace Markdown exports include source/provenance metadata.
 - Creative documents now have a local immutable version model; article creation and export create version records with linked material citations.
 - Creative export engine supports deterministic Markdown, JSON, and HTML exports with citation lists and escaped HTML output.
+- Creative workspace state now has a migration hook that normalizes legacy materials/articles into local creative assets and documents as the path toward centralized editor state.
 
 ## Rollout Plan
 

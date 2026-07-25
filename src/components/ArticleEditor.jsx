@@ -45,6 +45,7 @@ export default function ArticleEditor({
   batchAssignArticlesToSpace,
   insertAiResult, clearAiResult,
   exportArticleToFile, copyArticleAsRichText,
+  workspace,
   materials, llmConfig,
 }) {
   return (
@@ -97,7 +98,9 @@ export default function ArticleEditor({
                     const paragraphCount = article.content.split(/\n\s*\n/).filter(p => p.trim()).length;
                     const readMinutes = Math.max(1, Math.ceil(wordCount / 500));
                     const linkedMaterials = materials.filter(m => article.materials.includes(m.id));
-                    const versionCount = loadCreativeVersions(article.id).length;
+                    const versionCount = String(workspace?.activeDocumentId) === String(article.id)
+                      ? workspace.versions.length
+                      : loadCreativeVersions(article.id).length;
 
                     return (
                       <>
