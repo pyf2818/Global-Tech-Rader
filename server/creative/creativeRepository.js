@@ -1,4 +1,4 @@
-import { getPool, withTransaction } from '../db/client.js';
+import { getPool } from '../db/client.js';
 
 function mapAsset(row = {}) {
   return {
@@ -45,6 +45,21 @@ function mapVersion(row = {}) {
 async function queryDocument(db, documentId) {
   const { rows } = await db.query('select * from creation_documents where id = $1', [documentId]);
   return rows[0] ? mapDocument(rows[0]) : null;
+}
+
+async function inTransaction(db, work) {
+  const client = await db.connect();
+  try {
+    await client.query('BEGIN');
+    const result = await work(client);
+    await client.query('COMMIT');
+    return result;
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
 }
 
 export function createCreativeRepository(db = getPool()) {
@@ -128,7 +143,7 @@ export function createCreativeRepository(db = getPool()) {
     },
 
     async appendVersion(userId, version) {
-      return withTransaction(async client => {
+      return inTransaction(db, async client => {
         const document = await queryDocument(client, version.documentId);
         if (!document || String(document.ownerId) !== String(userId)) return null;
 

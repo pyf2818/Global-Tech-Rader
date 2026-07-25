@@ -181,3 +181,8 @@
 # Codex/Superpowers temporary workspaces
 .worktrees/
 .superpowers/
+
+# Test artifacts
+playwright-report/
+test-results/
+.data/

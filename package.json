@@ -12,14 +12,17 @@
     "start": "node server/productionServer.js",
     "preview": "vite preview --host 0.0.0.0",
     "test": "vitest run",
+    "test:integration": "vitest run --config vitest.integration.config.js",
+    "test:e2e": "playwright test",
+    "verify:platform": "node scripts/verify-platform.mjs",
     "test:watch": "vitest"
   },
   "dependencies": {
     "@vitejs/plugin-react": "5.1.4",
     "autoprefixer": "^10.5.0",
     "klinecharts": "^10.0.0-beta3",
-    "postcss": "^8.5.15",
     "pg": "^8.16.3",
+    "postcss": "^8.5.15",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "react-globe.gl": "^2.38.0",
@@ -29,6 +32,7 @@
     "vite": "7.3.6"
   },
   "devDependencies": {
+    "@playwright/test": "^1.62.0",
     "@vitest/coverage-v8": "^3.2.6",
     "vitest": "^3.2.6"
   },

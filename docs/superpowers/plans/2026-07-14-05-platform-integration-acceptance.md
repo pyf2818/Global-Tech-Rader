@@ -34,7 +34,7 @@ Run: `npx playwright install chromium`
 
 Expected: Chromium browser installation succeeds.
 
-- [ ] **Step 2: Add non-overlapping scripts**
+- [x] **Step 2: Add non-overlapping scripts**
 
 ```json
 {
@@ -47,7 +47,7 @@ Expected: Chromium browser installation succeeds.
 }
 ```
 
-- [ ] **Step 3: Configure Playwright**
+- [x] **Step 3: Configure Playwright**
 
 ```js
 import { defineConfig } from '@playwright/test';
@@ -59,11 +59,11 @@ export default defineConfig({
 });
 ```
 
-- [ ] **Step 4: Isolate integration tests**
+- [x] **Step 4: Isolate integration tests**
 
 Create `vitest.integration.config.js` with `include: ['tests/integration/**/*.test.js']`, `environment: 'node'`, `fileParallelism: false`, and a 30-second timeout. Keep normal unit tests independent from PostgreSQL.
 
-- [ ] **Step 5: Ignore generated artifacts and commit**
+- [x] **Step 5: Ignore generated artifacts and commit**
 
 Ignore `playwright-report/`, `test-results/`, `.superpowers/`, and `.data/` without changing existing user ignore rules.
 
@@ -78,11 +78,11 @@ git commit -m "test: add integration and browser acceptance harnesses"
 - Create: `tests/integration/dbTestUtils.js`
 - Create: `tests/integration/platform.integration.test.js`
 
-- [ ] **Step 1: Create isolated database test helpers**
+- [x] **Step 1: Create isolated database test helpers**
 
 `withTestDatabase` requires `TEST_DATABASE_URL`, creates a unique schema `test_<random>`, sets `search_path`, applies all migrations, and drops the schema in `finally`. Refuse to run when the database name does not contain `test` or the URL is missing `TEST_DATABASE_URL`.
 
-- [ ] **Step 2: Write the two-account community scenario**
+- [x] **Step 2: Write the two-account community scenario**
 
 ```js
 it('persists a cross-user post and idempotent interactions', async () => {
@@ -97,11 +97,11 @@ it('persists a cross-user post and idempotent interactions', async () => {
 });
 ```
 
-- [ ] **Step 3: Write profile/snapshot immutability tests**
+- [x] **Step 3: Write profile/snapshot immutability tests**
 
 Save profile version 1, create a dated snapshot, change tiers to create profile version 2, and assert the stored snapshot still references version 1 with unchanged item positions and score parts.
 
-- [ ] **Step 4: Write creative ownership/version tests**
+- [x] **Step 4: Write creative ownership/version tests**
 
 Save a document and two versions as Alice, assert Bob cannot read it, restore version 1, and assert a third version is inserted rather than version 2 being overwritten.
 
@@ -129,15 +129,15 @@ git commit -m "test: prove platform persistence invariants"
 **Files:**
 - Create: `tests/e2e/fixtures.js`
 
-- [ ] **Step 1: Define fixed news and profile fixtures**
+- [x] **Step 1: Define fixed news and profile fixtures**
 
 Use 12 items across AI, chips, cloud and robotics, with at least six sources, fixed 2026-07-14 timestamps, two duplicate canonical event IDs, one special-follow source, and public/personal score inputs.
 
-- [ ] **Step 2: Intercept unstable external reads only**
+- [x] **Step 2: Intercept unstable external reads only**
 
 Export `installExternalFixtures(page)` that fulfills `/api/news`, `/api/meta`, `/api/trending`, `/api/github-trending`, and market upstream-facing browser routes. Do not intercept auth/community/profile/creative APIs in persistence tests.
 
-- [ ] **Step 3: Add fixture contract assertions**
+- [x] **Step 3: Add fixture contract assertions**
 
 Assert IDs are unique, duplicate canonical IDs are intentional, dates are fixed, and every item has title/source/category/publishedAt.
 
@@ -154,7 +154,7 @@ git commit -m "test: add deterministic intelligence browser fixtures"
 - Create: `tests/e2e/ai-home.spec.js`
 - Create: `tests/e2e/recommendations.spec.js`
 
-- [ ] **Step 1: Test model-free default home**
+- [x] **Step 1: Test model-free default home**
 
 ```js
 import { test, expect } from '@playwright/test';
@@ -285,23 +285,23 @@ git commit -m "test: cover community persistence and profile tiers"
 - Create: `src/domain/intelligence/__tests__/adversarial.test.js`
 - Create: `server/http/__tests__/security.test.js`
 
-- [ ] **Step 1: Add recommendation attacks**
+- [x] **Step 1: Add recommendation attacks**
 
 Test one source submitting 50 articles, copied content with changed titles, future timestamps, malformed dates, 100 special-follow rules and extreme behavior signals. Assert source/category caps, canonical dedupe, finite scores and behavior/special-follow limits.
 
-- [ ] **Step 2: Add prompt-injection and citation attacks**
+- [x] **Step 2: Add prompt-injection and citation attacks**
 
 Use a community post containing “ignore previous instructions” and nonexistent citation IDs. Assert the content remains delimited as evidence, invalid citations are rejected, and algorithm briefing remains visible.
 
-- [ ] **Step 3: Add HTTP attacks**
+- [x] **Step 3: Add HTTP attacks**
 
 Test oversized JSON, invalid UUIDs, stored script tags, duplicate relationships, unauthorized ownership, expired sessions and missing database configuration. Assert 400/401/403/409/413/503 responses and no secrets in payloads.
 
-- [ ] **Step 4: Implement the verification orchestrator**
+- [x] **Step 4: Implement the verification orchestrator**
 
 `verify-platform.mjs` runs, in order, unit tests, build, integration tests when `TEST_DATABASE_URL` exists, and E2E tests when `RUN_E2E=1`. It prints a JSON summary and exits nonzero on any required failure; skipped external suites are explicitly `skipped`, never `passed`.
 
-- [ ] **Step 5: Run and commit**
+- [x] **Step 5: Run and commit**
 
 Run: `npm run verify:platform`
 
@@ -328,7 +328,7 @@ $env:RUN_E2E='1'; npm run test:e2e
 
 Expected: every command exits 0. Record exact test counts, durations and build output.
 
-- [ ] **Step 2: Audit each approved requirement**
+- [x] **Step 2: Audit each approved requirement**
 
 Create a table with columns `Requirement`, `Authoritative evidence`, `Result`, `Known limitation`. Include separate rows for all seven modules, AI fallback, dev/prod parity, history immutability, security, failure states and local export citations.
 
@@ -340,7 +340,7 @@ Run: `git status --short`, `git diff --check`, and inspect `.env.example`, `verc
 
 Do not mark a requirement complete until its named unit, integration and/or E2E evidence covers the full behavior. Add a focused regression test with the fix, rerun the smallest suite, then rerun the final verification set.
 
-- [ ] **Step 5: Commit the acceptance record**
+- [x] **Step 5: Commit the acceptance record**
 
 ```bash
 git add docs/acceptance/2026-07-14-platform-acceptance.md
