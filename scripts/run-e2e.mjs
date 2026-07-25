@@ -2,7 +2,7 @@ import { spawn } from 'node:child_process';
 import { createServer } from 'vite';
 
 process.env.SILICON_E2E = '1';
-process.env.DATABASE_URL = '';
+process.env.DATABASE_URL = process.env.TEST_DATABASE_URL || '';
 process.env.SCRAPLING_URL = '';
 
 const server = await createServer({
@@ -23,7 +23,7 @@ const child = spawn(process.execPath, args, {
   env: {
     ...process.env,
     SILICON_E2E: '1',
-    DATABASE_URL: '',
+    DATABASE_URL: process.env.TEST_DATABASE_URL || '',
     SCRAPLING_URL: '',
   },
 });

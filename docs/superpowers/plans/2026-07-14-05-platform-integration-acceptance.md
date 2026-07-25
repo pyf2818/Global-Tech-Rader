@@ -20,7 +20,7 @@ $env:RUN_E2E='1'
 node scripts\verify-platform.mjs
 ```
 
-Observed result: unit passed (24 files, 221 tests), build passed, integration passed (1 file, 3 tests), E2E passed (5 Edge tests). Later E2E runs passed 8 Edge tests after adding stock failure-mode coverage, 11 Edge tests after adding creative lineage/version/export coverage, and 14 Edge tests after adding recommendation newspaper, duplicate-cluster and historical-snapshot coverage. This proves the configured suites, with remaining detailed browser scenarios tracked below.
+Observed result: unit passed (24 files, 221 tests), build passed, integration passed (1 file, 3 tests), and E2E passed. Later E2E runs passed 8 Edge tests after adding stock failure-mode coverage, 11 Edge tests after adding creative lineage/version/export coverage, 14 Edge tests after adding recommendation newspaper, duplicate-cluster and historical-snapshot coverage, and 17 Edge tests after adding DB-backed community persistence, rollback, profile tier persistence, score attribution and snapshot immutability coverage. This proves the configured suites and the detailed browser scenarios tracked below.
 
 ## File map
 
@@ -38,13 +38,15 @@ Observed result: unit passed (24 files, 221 tests), build passed, integration pa
 - Create: `playwright.config.js`
 - Modify: `.gitignore`
 
-- [ ] **Step 1: Install Playwright test runtime**
+- [x] **Step 1: Install Playwright test runtime**
 
 Run: `npm install --save-dev @playwright/test@^1.55.0`
 
 Run: `npx playwright install chromium`
 
 Expected: Chromium browser installation succeeds.
+
+Actual result: Playwright runtime is installed. Chromium download timed out in this environment, so the configured browser project uses the installed Microsoft Edge channel; the full Edge E2E suite passes.
 
 - [x] **Step 2: Add non-overlapping scripts**
 
@@ -157,12 +159,14 @@ Export `installExternalFixtures(page)` that fulfills `/api/news`, `/api/meta`, `
 
 Assert IDs are unique, duplicate canonical IDs are intentional, dates are fixed, and every item has title/source/category/publishedAt.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add tests/e2e/fixtures.js
 git commit -m "test: add deterministic intelligence browser fixtures"
 ```
+
+Actual result: deterministic fixtures were committed with the browser acceptance harness and later extended so DB-backed tests can avoid intercepting community APIs.
 
 ### Task 4: Verify AI home, newspaper and recommendation timeline
 
@@ -277,19 +281,19 @@ git commit -m "test: cover creative provenance versions and exports"
 - Create: `tests/e2e/community.spec.js`
 - Create: `tests/e2e/profile.spec.js`
 
-- [ ] **Step 1: Test two browser contexts against PostgreSQL**
+- [x] **Step 1: Test two browser contexts against PostgreSQL**
 
 Use two isolated contexts. Alice registers and publishes; Bob registers, opens the same post, comments, likes, bookmarks and follows. Reload both contexts and assert persisted counts and comment content.
 
-- [ ] **Step 2: Test unauthorized and rollback behavior**
+- [x] **Step 2: Test unauthorized and rollback behavior**
 
 Signed-out interaction opens auth. Simulate a 503 write response and assert optimistic count returns to its previous value with an error message.
 
-- [ ] **Step 3: Test three-tier profile effects**
+- [x] **Step 3: Test three-tier profile effects**
 
 Set AI domain/source to 一级, chips to 三级, add one special follow, generate the next date's snapshot, and assert score explanations contain the correct tier components. Change tiers and assert the prior date is unchanged.
 
-- [ ] **Step 4: Run and commit**
+- [x] **Step 4: Run and commit**
 
 Run: `npx playwright test tests/e2e/community.spec.js tests/e2e/profile.spec.js`
 
@@ -299,6 +303,8 @@ Expected: PASS with `TEST_DATABASE_URL` and `DATABASE_URL` pointing to the dispo
 git add tests/e2e/community.spec.js tests/e2e/profile.spec.js
 git commit -m "test: cover community persistence and profile tiers"
 ```
+
+Actual result: `$env:TEST_DATABASE_URL='postgresql://meridian:meridian-local-dev-2026-strong@localhost:5433/silicon_meridian_test'; npm run test:e2e -- tests/e2e/community.spec.js tests/e2e/profile.spec.js` passed 3 Edge tests in 30.2s. The DB-backed full `$env:TEST_DATABASE_URL='postgresql://meridian:meridian-local-dev-2026-strong@localhost:5433/silicon_meridian_test'; npm run test:e2e` run passed 17 Edge tests in 1.3m.
 
 ### Task 8: Add adversarial platform verification
 
@@ -356,13 +362,17 @@ Actual result: configured full verifier passed with `TEST_DATABASE_URL` and `RUN
 
 Create a table with columns `Requirement`, `Authoritative evidence`, `Result`, `Known limitation`. Include separate rows for all seven modules, AI fallback, dev/prod parity, history immutability, security, failure states and local export citations.
 
-- [ ] **Step 3: Inspect the final worktree and deployment configuration**
+- [x] **Step 3: Inspect the final worktree and deployment configuration**
 
 Run: `git status --short`, `git diff --check`, and inspect `.env.example`, `vercel.json`, Docker PostgreSQL health check and every new API function path. Unrelated pre-existing user changes remain untouched and are listed separately.
 
-- [ ] **Step 4: Fix any failed or weak evidence**
+Actual result: `git status --short` showed only this acceptance work plus unrelated local `server/news/config/constants.js`, `.openanlan/`, and `dev-server.pid`. `git diff --check` exited 0 with CRLF warnings only. `.env.example`, `vercel.json`, `docker-compose.yml` health checks, Docker container health for `siliconstream-db`, and API function paths under `api/auth`, `api/community`, `api/profile`, `api/creative`, `api/intelligence`, and `api/stock` were inspected.
+
+- [x] **Step 4: Fix any failed or weak evidence**
 
 Do not mark a requirement complete until its named unit, integration and/or E2E evidence covers the full behavior. Add a focused regression test with the fix, rerun the smallest suite, then rerun the final verification set.
+
+Actual result: weak evidence for community/profile browser persistence and profile-tier effects was fixed with DB-backed Playwright coverage. The final verifier with `TEST_DATABASE_URL` and `RUN_E2E=1` passed unit, build, integration and all 17 Edge E2E tests.
 
 - [x] **Step 5: Commit the acceptance record**
 

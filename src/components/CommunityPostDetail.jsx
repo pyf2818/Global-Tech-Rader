@@ -22,7 +22,7 @@ export default function CommunityPostDetail({ post, comments, loading, user, onC
   };
 
   return (
-    <aside className="community-detail" aria-label="社区内容详情">
+    <aside className="community-detail" data-testid="community-detail" aria-label="社区内容详情">
       <div className="community-detail-toolbar">
         <span>{post.type}</span>
         <button type="button" onClick={onClose} aria-label="关闭详情">×</button>
@@ -30,7 +30,7 @@ export default function CommunityPostDetail({ post, comments, loading, user, onC
       <div className="community-author-row">
         <div className="community-avatar">{(post.displayName || post.username || '用').slice(0, 1)}</div>
         <div><strong>{post.displayName || post.username}</strong><span>{formatDate(post.createdAt)}</span></div>
-        {user?.id !== post.authorId && <button type="button" className={post.following ? 'active' : ''} onClick={() => runProtected(() => onFollow(!post.following))}>{post.following ? '已关注' : '关注'}</button>}
+        {user?.id !== post.authorId && <button type="button" data-testid="community-detail-follow" className={post.following ? 'active' : ''} onClick={() => runProtected(() => onFollow(!post.following))}>{post.following ? '已关注' : '关注'}</button>}
       </div>
       <h2>{post.title}</h2>
       <div className="community-post-body">{post.body}</div>
@@ -38,8 +38,8 @@ export default function CommunityPostDetail({ post, comments, loading, user, onC
         <div className="community-sources"><strong>引用来源</strong>{post.sourceRefs.map((source, index) => <a key={`${source.url || source.title}-${index}`} href={source.url} target="_blank" rel="noreferrer">{source.title || source.url}</a>)}</div>
       )}
       <div className="community-detail-actions">
-        <button className={post.liked ? 'active liked' : ''} onClick={() => runProtected(() => onLike(!post.liked))}>赞同 {post.likeCount || 0}</button>
-        <button className={post.bookmarked ? 'active' : ''} onClick={() => runProtected(() => onBookmark(!post.bookmarked))}>收藏 {post.bookmarkCount || 0}</button>
+        <button data-testid="community-detail-like" className={post.liked ? 'active liked' : ''} onClick={() => runProtected(() => onLike(!post.liked))}>赞同 {post.likeCount || 0}</button>
+        <button data-testid="community-detail-bookmark" className={post.bookmarked ? 'active' : ''} onClick={() => runProtected(() => onBookmark(!post.bookmarked))}>收藏 {post.bookmarkCount || 0}</button>
         <span>评论 {post.commentCount || 0}</span>
       </div>
       <section className="community-comments">
@@ -52,8 +52,8 @@ export default function CommunityPostDetail({ post, comments, loading, user, onC
           </article>
         ))}
         <div className="community-comment-compose">
-          <textarea value={draft} onChange={event => setDraft(event.target.value)} maxLength={2000} placeholder={user ? '写下经过思考的观点' : '登录后参与讨论'} />
-          <button type="button" onClick={() => submitComment().catch(() => {})}>发送</button>
+          <textarea data-testid="community-comment-input" value={draft} onChange={event => setDraft(event.target.value)} maxLength={2000} placeholder={user ? '写下经过思考的观点' : '登录后参与讨论'} />
+          <button type="button" data-testid="community-submit-comment" onClick={() => submitComment().catch(() => {})}>发送</button>
         </div>
       </section>
     </aside>

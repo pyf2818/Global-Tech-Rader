@@ -26,7 +26,8 @@ export function assertFixtureContract(items = NEWS_FIXTURES) {
   }
 }
 
-export async function installExternalFixtures(page) {
+export async function installExternalFixtures(page, options = {}) {
+  const { community = true } = options;
   assertFixtureContract();
   await page.route('**/api/intelligence/events**', route => route.fulfill({
     status: 200,
@@ -131,9 +132,11 @@ export async function installExternalFixtures(page) {
       })),
     }),
   }));
-  await page.route('**/api/community/posts**', route => route.fulfill({
-    status: 200,
-    contentType: 'application/json',
-    body: JSON.stringify({ ok: true, data: { items: [], nextCursor: null } }),
-  }));
+  if (community) {
+    await page.route('**/api/community/posts**', route => route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ ok: true, data: { items: [], nextCursor: null } }),
+    }));
+  }
 }

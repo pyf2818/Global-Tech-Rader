@@ -7367,13 +7367,15 @@ ${signals}
                   </div>
                   <div className="priority-list">
                     {profilePriorityItems.map(item => (
-                      <div key={item.id} className="priority-row">
+                      <div key={item.id} className="priority-row" data-testid="profile-domain-row" data-domain-id={item.id}>
                         <span>{ICONS[item.icon]} {item.label}</span>
                         <div className="profile-tier-control" role="group" aria-label={`${item.label}关注等级`}>
                           {PROFILE_TIER_OPTIONS.map(option => (
                             <button
                               key={option.id}
                               type="button"
+                              data-testid="profile-domain-tier"
+                              data-tier={option.id}
                               aria-pressed={item.tier === option.id}
                               className={item.tier === option.id ? 'active' : ''}
                               onClick={() => setDomainTiers(prev => ({ ...prev, [item.id]: option.id }))}
@@ -7395,13 +7397,15 @@ ${signals}
                   </div>
                   <div className="priority-list">
                     {sourcePriorityItems.map(item => (
-                      <div key={item.name} className="priority-row">
+                      <div key={item.name} className="priority-row" data-testid="profile-source-row" data-source-id={item.name}>
                         <span>{item.name}</span>
                         <div className="profile-tier-control" role="group" aria-label={`${item.name}信源等级`}>
                           {PROFILE_TIER_OPTIONS.map(option => (
                             <button
                               key={option.id}
                               type="button"
+                              data-testid="profile-source-tier"
+                              data-tier={option.id}
                               aria-pressed={item.tier === option.id}
                               className={item.tier === option.id ? 'active' : ''}
                               onClick={() => setSourceTiers(prev => ({ ...prev, [item.name]: option.id }))}
@@ -7417,7 +7421,7 @@ ${signals}
                 </div>
               </section>
 
-              <section className="profile-special-follows">
+              <section className="profile-special-follows" data-testid="profile-special-follows">
                 <div className="section-header"><h2 className="section-title">{ICONS.star} 特别关注</h2><p className="section-desc">手动添加小众信息源、博主或特定URL，始终优先推荐。</p></div>
                 {specialFollows.length === 0 ? (
                   <div className="empty-state"><p>暂无特别关注</p><p className="empty-state-hint">添加后这些目标的新内容会优先进入个人必看通道</p></div>
@@ -7438,12 +7442,12 @@ ${signals}
                   </div>
                 )}
                 <div className="special-follow-form">
-                  <select value={specialFollowForm.type} onChange={event => setSpecialFollowForm(prev => ({ ...prev, type: event.target.value }))} aria-label="特别关注类型">
+                  <select data-testid="profile-special-type" value={specialFollowForm.type} onChange={event => setSpecialFollowForm(prev => ({ ...prev, type: event.target.value }))} aria-label="特别关注类型">
                     {SPECIAL_FOLLOW_TYPES.map(type => <option key={type.id} value={type.id}>{type.label}</option>)}
                   </select>
-                  <input value={specialFollowForm.target} onChange={event => setSpecialFollowForm(prev => ({ ...prev, target: event.target.value }))} placeholder="信源、博主、关键词或 URL" />
-                  <input value={specialFollowForm.note} onChange={event => setSpecialFollowForm(prev => ({ ...prev, note: event.target.value }))} placeholder="备注（可选）" />
-                  <button type="button" onClick={submitSpecialFollow}>{editingSpecialFollowId ? '保存' : '添加'}</button>
+                  <input data-testid="profile-special-target" value={specialFollowForm.target} onChange={event => setSpecialFollowForm(prev => ({ ...prev, target: event.target.value }))} placeholder="信源、博主、关键词或 URL" />
+                  <input data-testid="profile-special-note" value={specialFollowForm.note} onChange={event => setSpecialFollowForm(prev => ({ ...prev, note: event.target.value }))} placeholder="备注（可选）" />
+                  <button type="button" data-testid="profile-special-submit" onClick={submitSpecialFollow}>{editingSpecialFollowId ? '保存' : '添加'}</button>
                   {editingSpecialFollowId && <button type="button" className="secondary-action" onClick={resetSpecialFollowForm}>取消</button>}
                 </div>
               </section>
@@ -9614,7 +9618,7 @@ ${signals}
 
       {/* 登录/注册弹窗 */}
       {showAuthModal && (
-        <div className="modal-overlay" onClick={() => setShowAuthModal(false)}>
+        <div className="modal-overlay" data-testid="auth-modal" onClick={() => setShowAuthModal(false)}>
           <div className="modal modal-sm" onClick={e => e.stopPropagation()}>
             <div className="modal-header">
               <h3>{authMode === 'login' ? '登录' : '注册'}</h3>
@@ -9622,14 +9626,15 @@ ${signals}
             </div>
             <div className="modal-body auth-modal-body">
               <div className="auth-tabs">
-                <button className={`auth-tab ${authMode === 'login' ? 'active' : ''}`} onClick={() => { setAuthMode('login'); setAuthError(''); }}>登录</button>
-                <button className={`auth-tab ${authMode === 'register' ? 'active' : ''}`} onClick={() => { setAuthMode('register'); setAuthError(''); }}>注册</button>
+                <button className={`auth-tab ${authMode === 'login' ? 'active' : ''}`} data-testid="auth-login-tab" onClick={() => { setAuthMode('login'); setAuthError(''); }}>登录</button>
+                <button className={`auth-tab ${authMode === 'register' ? 'active' : ''}`} data-testid="auth-register-tab" onClick={() => { setAuthMode('register'); setAuthError(''); }}>注册</button>
               </div>
               {authError && <div className="auth-error">{authError}</div>}
               <div className="auth-form">
                 <div className="auth-field">
                   <label>用户名</label>
                   <input
+                    data-testid="auth-username"
                     type="text"
                     value={authForm.username}
                     onChange={e => setAuthForm(prev => ({ ...prev, username: e.target.value }))}
@@ -9640,6 +9645,7 @@ ${signals}
                   <div className="auth-field">
                     <label>邮箱</label>
                     <input
+                      data-testid="auth-email"
                       type="email"
                       value={authForm.email}
                       onChange={e => setAuthForm(prev => ({ ...prev, email: e.target.value }))}
@@ -9650,6 +9656,7 @@ ${signals}
                 <div className="auth-field">
                   <label>密码</label>
                   <input
+                    data-testid="auth-password"
                     type="password"
                     value={authForm.password}
                     onChange={e => setAuthForm(prev => ({ ...prev, password: e.target.value }))}
@@ -9660,6 +9667,7 @@ ${signals}
                   <div className="auth-field">
                     <label>确认密码</label>
                     <input
+                      data-testid="auth-confirm-password"
                       type="password"
                       value={authForm.confirmPassword}
                       onChange={e => setAuthForm(prev => ({ ...prev, confirmPassword: e.target.value }))}
@@ -9669,6 +9677,7 @@ ${signals}
                 )}
                 <button
                   className="auth-submit-btn"
+                  data-testid="auth-submit"
                   onClick={authMode === 'login' ? handleLogin : handleRegister}
                   disabled={authLoading}
                 >
@@ -10337,6 +10346,13 @@ function NewsItem({ item, index, viewMode = 'standard', isFocused = false, isBoo
       className={`news-item view-${viewMode} ${isFocused ? 'focused' : ''} ${isFollowed ? 'followed' : ''}`}
       style={{ animationDelay: `${index * 40}ms` }}
       data-index={index}
+      data-testid="news-item"
+      data-item-id={item.id || ''}
+      data-title={item.title || ''}
+      data-source={item.source || ''}
+      data-category={item.category || ''}
+      data-must-read-score={Number.isFinite(item.mustReadScore) ? item.mustReadScore : ''}
+      data-score-parts={JSON.stringify(item.recommendationScoreParts || item.scoreParts?.personal || {})}
       draggable
       onDragStart={handleDragStart}
     >
