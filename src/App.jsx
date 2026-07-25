@@ -38,6 +38,7 @@ import { buildRecommendation, clusterEvents, selectBriefingLanes } from './domai
 import { buildAlgorithmBriefing } from './domain/intelligence/briefingEngine.js';
 import { createSnapshotStore } from './domain/intelligence/snapshotStore.js';
 import { isAiElfAsset, normalizeAsset } from './domain/creative/assetModel.js';
+import { exportDocument } from './domain/creative/exportEngine.js';
 import { saveDocumentVersion } from './domain/creative/versionStore.js';
 
 // 代码分割：三个重组件按需加载，避免首屏全量打包 Three.js / klinecharts
@@ -5163,13 +5164,20 @@ ${signals}
       });
     }
     
-    const content = `# ${article.title || '未命名'}\n\n> 创建时间: ${new Date(article.createdAt).toLocaleString('zh-CN')}\n> 更新时间: ${new Date(article.updatedAt).toLocaleString('zh-CN')}\n> 模板: ${ARTICLE_TEMPLATES[article.template] || article.template}\n> 状态: ${ARTICLE_STATUS[article.status] || article.status}\n${article.tags.length > 0 ? `> 标签: ${article.tags.join(', ')}\n` : ''}\n---\n\n${exportContent}`;
+    const exportPayload = exportDocument({
+      id: article.id,
+      title: article.title || '未命名',
+      content: `# ${article.title || '未命名'}\n\n> 创建时间: ${new Date(article.createdAt).toLocaleString('zh-CN')}\n> 更新时间: ${new Date(article.updatedAt).toLocaleString('zh-CN')}\n> 模板: ${ARTICLE_TEMPLATES[article.template] || article.template}\n> 状态: ${ARTICLE_STATUS[article.status] || article.status}\n${article.tags.length > 0 ? `> 标签: ${article.tags.join(', ')}\n` : ''}\n---\n\n${exportContent}`,
+      status: article.status,
+      updatedAt: article.updatedAt,
+      citations: articleCitations(article),
+    }, 'md');
     saveArticleVersion(article, 'export', exportContent);
-    const blob = new Blob([content], { type: 'text/markdown;charset=utf-8' });
+    const blob = new Blob([exportPayload.content], { type: exportPayload.mime });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `${title}.md`;
+    a.download = exportPayload.filename || `${title}.md`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
