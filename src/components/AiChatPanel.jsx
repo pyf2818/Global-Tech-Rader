@@ -14,6 +14,7 @@ import { generateSessionSummary, retrieveRelevantMemories } from '../utils/sessi
 import { searchFiles } from '../utils/workspaceIndex.js';
 import { observeQuestion, observeReply, getLearnedPreferences } from '../utils/profileLearning.js';
 import { extractTodos } from '../utils/todoExtractor.js';
+import { isAiElfAsset, normalizeAsset } from '../domain/creative/assetModel.js';
 
 const WELCOME_MSGS = ['今天有什么情报需要我深入分析？', '准备好为你梳理今日要点了', '想从哪条资讯开始剖析？', '随时可以问我今日趋势与风险'];
 
@@ -101,20 +102,16 @@ export default function AiChatPanel({
 
   const materialContext = useMemo(() => {
     const materialList = Array.isArray(materials) ? materials : [];
-    const isElfMaterial = (material) => {
-      const tags = Array.isArray(material.tags) ? material.tags : [];
-      return material.metadata?.origin === 'ai-elf'
-        || String(material.source || '').includes('AI精灵')
-        || String(material.source || '').includes('AI 精灵')
-        || tags.some(tag => String(tag).includes('AI精灵') || String(tag).includes('AI工作站'));
-    };
-    const scored = materialList.map((material, index) => ({
+    const normalized = materialList.flatMap((material) => {
+      try { return [normalizeAsset(material)]; } catch { return []; }
+    });
+    const scored = normalized.map((material, index) => ({
       material,
       index,
-      score: (isElfMaterial(material) ? 100 : 0)
+      score: (isAiElfAsset(material) ? 100 : 0)
         + (material.starred ? 20 : 0)
         + (Date.parse(material.createdAt || '') || 0) / 1_000_000_000_000,
-      isElf: isElfMaterial(material),
+      isElf: isAiElfAsset(material),
     }));
     scored.sort((a, b) => b.score - a.score || b.index - a.index);
     const selected = scored.slice(0, 6).map(entry => entry.material);

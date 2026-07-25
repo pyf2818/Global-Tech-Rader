@@ -37,6 +37,7 @@ import {
 import { buildRecommendation, clusterEvents, selectBriefingLanes } from './domain/intelligence/recommendationEngine.js';
 import { buildAlgorithmBriefing } from './domain/intelligence/briefingEngine.js';
 import { createSnapshotStore } from './domain/intelligence/snapshotStore.js';
+import { isAiElfAsset, normalizeAsset } from './domain/creative/assetModel.js';
 
 // 代码分割：三个重组件按需加载，避免首屏全量打包 Three.js / klinecharts
 const GlobeView = lazy(() => import('./GlobeView.jsx'));
@@ -3340,9 +3341,12 @@ ${agentWorkflowDraft.nodes.map((node, index) => `${index + 1}. [${workflowTypeMe
 摘要：${item.summary || '暂无摘要'}
 链接：${item.url || ''}`;
     }).join('\n\n');
-    const prioritizedMaterials = [...materials].sort((a, b) => {
-      const aElf = a.metadata?.origin === 'ai-elf' || String(a.source || '').includes('AI精灵') || String(a.source || '').includes('AI 精灵') ? 1 : 0;
-      const bElf = b.metadata?.origin === 'ai-elf' || String(b.source || '').includes('AI精灵') || String(b.source || '').includes('AI 精灵') ? 1 : 0;
+    const normalizedMaterials = materials.flatMap(material => {
+      try { return [normalizeAsset(material)]; } catch { return []; }
+    });
+    const prioritizedMaterials = normalizedMaterials.sort((a, b) => {
+      const aElf = isAiElfAsset(a) ? 1 : 0;
+      const bElf = isAiElfAsset(b) ? 1 : 0;
       if (aElf !== bElf) return bElf - aElf;
       return (Date.parse(b.createdAt || '') || 0) - (Date.parse(a.createdAt || '') || 0);
     }).slice(0, 6);

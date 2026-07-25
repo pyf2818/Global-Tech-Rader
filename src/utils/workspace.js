@@ -12,6 +12,8 @@
  *   conversations/会话标题.md
  */
 
+import { buildCitation, isAiElfAsset, normalizeAsset } from '../domain/creative/assetModel.js';
+
 const DB_NAME = 'meridian-workspace';
 const STORE = 'handles';
 const HANDLE_KEY = 'root';
@@ -135,17 +137,27 @@ export async function listFiles(root, maxDepth = 4) {
 /* ===== Markdown 导出构造 ===== */
 
 export function materialToMarkdown(m) {
-  const lines = [`# ${m.title || '无标题'}`, ''];
+  let asset = null;
+  try { asset = normalizeAsset(m); } catch {}
+  const material = asset || m;
+  const lines = [`# ${material.title || '无标题'}`, ''];
   const meta = [];
-  if (m.source) meta.push(`**来源**: ${m.source}`);
-  if (m.url) meta.push(`**链接**: ${m.url}`);
-  if (m.createdAt) meta.push(`**时间**: ${new Date(m.createdAt).toLocaleString('zh-CN')}`);
-  if (m.tags?.length) meta.push(`**标签**: ${m.tags.join(', ')}`);
+  if (material.source) meta.push(`**来源**: ${material.source}`);
+  if (material.url) meta.push(`**链接**: ${material.url}`);
+  if (material.createdAt) meta.push(`**时间**: ${new Date(material.createdAt).toLocaleString('zh-CN')}`);
+  if (material.tags?.length) meta.push(`**标签**: ${material.tags.join(', ')}`);
+  if (asset?.citation?.origin || isAiElfAsset(asset || material)) meta.push(`**交接来源**: ${asset?.citation?.origin === 'ai-elf' || isAiElfAsset(asset || material) ? 'AI 精灵 -> AI 工作站' : asset.citation.origin}`);
   if (meta.length) { lines.push(meta.join('  \n'), ''); }
-  if (m.content) { lines.push('## 摘要', '', m.content, ''); }
-  if (m.fullContent && m.fullContent !== m.content) { lines.push('## 正文', '', m.fullContent, ''); }
-  if (m.note) { lines.push('## 笔记', '', m.note, ''); }
-  if (m.insight) { lines.push('## 洞察', '', typeof m.insight === 'string' ? m.insight : JSON.stringify(m.insight, null, 2), ''); }
+  if (material.content) { lines.push('## 摘要', '', material.content, ''); }
+  if (material.fullContent && material.fullContent !== material.content) { lines.push('## 正文', '', material.fullContent, ''); }
+  if (material.note) { lines.push('## 笔记', '', material.note, ''); }
+  if (material.insight) { lines.push('## 洞察', '', typeof material.insight === 'string' ? material.insight : JSON.stringify(material.insight, null, 2), ''); }
+  if (asset?.citation) {
+    lines.push('## 来源引用', '', buildCitation(asset, 1), '');
+  }
+  if (asset?.metadata && Object.keys(asset.metadata).length > 0) {
+    lines.push('## 元数据', '', '```json', JSON.stringify(asset.metadata, null, 2), '```', '');
+  }
   return lines.join('\n');
 }
 
