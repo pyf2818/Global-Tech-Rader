@@ -28,6 +28,31 @@ export function assertFixtureContract(items = NEWS_FIXTURES) {
 
 export async function installExternalFixtures(page) {
   assertFixtureContract();
+  await page.route('**/api/intelligence/events**', route => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify({ ok: true, events: NEWS_FIXTURES, updatedAt: '2026-07-14T12:30:00Z' }),
+  }));
+  await page.route('**/api/intelligence/items**', route => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify({ ok: true, items: NEWS_FIXTURES, updatedAt: '2026-07-14T12:30:00Z' }),
+  }));
+  await page.route('**/api/intelligence/opportunities**', route => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify({ ok: true, opportunities: [] }),
+  }));
+  await page.route('**/api/intelligence/weekly-sectors**', route => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify({ ok: true, sectors: [] }),
+  }));
+  await page.route('**/api/intelligence/alerts**', route => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify({ ok: true, alerts: [] }),
+  }));
   await page.route('**/api/news**', route => route.fulfill({
     status: 200,
     contentType: 'application/json',
