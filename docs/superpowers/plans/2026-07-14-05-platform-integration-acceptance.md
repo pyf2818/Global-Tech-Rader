@@ -20,7 +20,7 @@ $env:RUN_E2E='1'
 node scripts\verify-platform.mjs
 ```
 
-Observed result: unit passed (24 files, 221 tests), build passed, integration passed (1 file, 3 tests), E2E passed (5 Edge tests). Later E2E runs passed 8 Edge tests after adding stock failure-mode coverage and 11 Edge tests after adding creative lineage/version/export coverage. This proves the configured suites, but the detailed unchecked browser scenarios below remain open until covered directly.
+Observed result: unit passed (24 files, 221 tests), build passed, integration passed (1 file, 3 tests), E2E passed (5 Edge tests). Later E2E runs passed 8 Edge tests after adding stock failure-mode coverage, 11 Edge tests after adding creative lineage/version/export coverage, and 14 Edge tests after adding recommendation newspaper, duplicate-cluster and historical-snapshot coverage. This proves the configured suites, with remaining detailed browser scenarios tracked below.
 
 ## File map
 
@@ -186,23 +186,25 @@ test('opens on a model-free AI daily briefing', async ({ page }) => {
 });
 ```
 
-- [ ] **Step 2: Test newspaper structure**
+- [x] **Step 2: Test newspaper structure**
 
 Navigate to 今日速报 and assert headline, both lanes, domain sections, risk section, source citations and updated time exist. Assert no more than two visible items share one source.
 
-- [ ] **Step 3: Test duplicate grouping in 全部动态**
+- [x] **Step 3: Test duplicate grouping in 全部动态**
 
 Navigate to 全部动态 and assert the two paraphrased OpenAI fixture items render as one event card labeled “2 个独立来源”. Expand it and assert both original links and source names remain accessible.
 
-- [ ] **Step 4: Test immutable historical timeline**
+- [x] **Step 4: Test immutable historical timeline**
 
 Create the 2026-07-14 local snapshot, change profile tiers, navigate away/back, and assert the 2026-07-14 item order is unchanged. A 2026-07-13 date without a snapshot shows an empty state rather than current items.
 
-- [ ] **Step 5: Run and commit**
+- [x] **Step 5: Run and commit**
 
 Run: `npx playwright test tests/e2e/ai-home.spec.js tests/e2e/recommendations.spec.js`
 
 Expected: PASS.
+
+Actual result: `npm run test:e2e -- tests/e2e/recommendations.spec.js` passed 3 Edge tests covering newspaper structure, duplicate OpenAI event clusters and immutable historical snapshot replay. The full `npm run test:e2e` suite passed 14 Edge tests.
 
 ```bash
 git add tests/e2e/ai-home.spec.js tests/e2e/recommendations.spec.js

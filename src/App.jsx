@@ -2521,6 +2521,17 @@ function App() {
     maxCategoryRatio: 0.4,
   }), [recommendationCandidates]);
 
+  const selectedRecommendationSnapshot = useMemo(() => {
+    if (!selectedNewsDate) return null;
+    return snapshotStoreRef.current.get(selectedNewsDate);
+  }, [selectedNewsDate, recommendationSnapshots]);
+
+  const displayRecommendationLanes = useMemo(() => {
+    const liveCount = (recommendationLanes.public?.length || 0) + (recommendationLanes.personal?.length || 0);
+    if (liveCount > 0) return recommendationLanes;
+    return selectedRecommendationSnapshot?.lanes || recommendationLanes;
+  }, [recommendationLanes, selectedRecommendationSnapshot]);
+
   const algorithmBriefing = useMemo(() => buildAlgorithmBriefing({
     date: selectedNewsDate,
     lanes: recommendationLanes,
@@ -2539,21 +2550,17 @@ function App() {
   }, [loading, selectedNewsDate, recommendationCandidates.length, recommendationLanes, algorithmBriefing]);
 
   // 今日速报页：实时 lanes 为空时（历史日期无缓存资讯）降级到当日快照，保证历史日报可读
-  const todaySnapshotFallback = useMemo(() => {
-    if (!selectedNewsDate) return null;
-    return snapshotStoreRef.current.get(selectedNewsDate);
-  }, [selectedNewsDate, recommendationSnapshots]);
   const todayLanes = useMemo(() => {
     const hasLive = (recommendationLanes.public?.length || 0) + (recommendationLanes.personal?.length || 0) > 0;
     if (hasLive) return recommendationLanes;
-    const snapLanes = todaySnapshotFallback?.lanes;
+    const snapLanes = selectedRecommendationSnapshot?.lanes;
     return snapLanes || recommendationLanes;
-  }, [recommendationLanes, todaySnapshotFallback]);
+  }, [recommendationLanes, selectedRecommendationSnapshot]);
   const todayBriefing = useMemo(() => {
     const hasLive = algorithmBriefing && (algorithmBriefing.oneLine || algorithmBriefing.opportunities?.length || algorithmBriefing.risks?.length);
     if (hasLive) return algorithmBriefing;
-    return todaySnapshotFallback?.briefing || algorithmBriefing;
-  }, [algorithmBriefing, todaySnapshotFallback]);
+    return selectedRecommendationSnapshot?.briefing || algorithmBriefing;
+  }, [algorithmBriefing, selectedRecommendationSnapshot]);
 
   const workbenchItems = useMemo(() => {
     const seen = new Set();
@@ -7205,7 +7212,7 @@ ${signals}
           )}
           {nav === 'recommendations' && (
             <RecommendationFeed
-              lanes={recommendationLanes}
+              lanes={displayRecommendationLanes}
               loading={loading}
               error={error}
               isLoggedIn={isLoggedIn}
@@ -7217,6 +7224,7 @@ ${signals}
                 const summaryEntry = getSummaryEntry(item);
                 return <NewsItem key={item.id} item={item} index={i} viewMode={viewMode} isFocused={focusedIndex === i} isBookmarked={isBookmarked(item.id)} isInMaterials={isInMaterials(item.id)} onBookmark={() => toggleBookmark(item)} onAddMaterial={() => toggleMaterial(item)} onSummary={() => handleSummaryToggle(item)} isSummaryOpen={expandedSummary[item.id]} summaryText={summaryEntry?.text || ''} summaryMode={summaryEntry?.mode || ''} summaryLoading={Boolean(summaryLoading[item.id])} isFollowed={followKeywords.some(kw => `${item.title} ${item.summary}`.toLowerCase().includes(kw.toLowerCase()))} onRead={() => recordReading(item)} showTranslation={translationOpen[item.id]} onToggleTranslation={() => setTranslationOpen(p => ({ ...p, [item.id]: !p[item.id] }))} onRequestTranslation={() => requestTranslation(item)} isTranslating={translatingItems[item.id]} translation={getTranslation(item)} onOpenLightbox={(src, title, images, index) => setLightbox({ open: true, src, title, images: images || [], index: index || 0 })} />;
               }}
+              snapshotMeta={recommendationCandidates.length === 0 ? selectedRecommendationSnapshot : null}
               onLoadMore={loadMoreNews}
               loadingMore={loadingMore}
               hasMore={newsHasMore}

@@ -16,6 +16,7 @@ export default function RecommendationFeed({
   renderLimit,
   viewMode,
   renderCard, // (item, index) => ReactNode  由 App.jsx 提供，复用 NewsItem + 全部 handler
+  snapshotMeta,
   onLoadMore,
   loadingMore,
   hasMore,
@@ -41,7 +42,7 @@ export default function RecommendationFeed({
   const canLoadMore = hasMore || total > renderLimit;
 
   // 未登录
-  if (!isLoggedIn) {
+  if (!snapshotMeta && !isLoggedIn) {
     return (
       <div className="empty-state">
         <p>请先登录并选择感兴趣的领域，以获得个性化推荐</p>
@@ -51,7 +52,7 @@ export default function RecommendationFeed({
   }
 
   // 未选兴趣领域
-  if (selectedInterests.length === 0) {
+  if (!snapshotMeta && selectedInterests.length === 0) {
     return (
       <div className="empty-state">
         <p>你还没有选择感兴趣的领域</p>
@@ -72,9 +73,18 @@ export default function RecommendationFeed({
     </div>
   );
 
+  const snapshotBanner = snapshotMeta ? (
+    <div className="recommendation-snapshot-meta">
+      <span>Snapshot {snapshotMeta.date}</span>
+      <strong>Algorithm {snapshotMeta.algorithmVersion || '1.0'}</strong>
+      <span>Profile v{snapshotMeta.profileVersion || 1}</span>
+    </div>
+  ) : null;
+
   if (loading) {
     return (
       <>
+        {snapshotBanner}
         {interestBar}
         <div className={`feed-list view-${viewMode} ${viewMode === 'card' ? 'card-grid' : ''}`}>
           {Array.from({ length: 6 }).map((_, i) => (
@@ -92,6 +102,7 @@ export default function RecommendationFeed({
   if (error) {
     return (
       <>
+        {snapshotBanner}
         {interestBar}
         <div className="error-state">
           <p>加载失败: {error}</p>
@@ -104,6 +115,7 @@ export default function RecommendationFeed({
   if (total === 0) {
     return (
       <>
+        {snapshotBanner}
         {interestBar}
         <div className="empty-state">
           <p>当日暂无满足你关注领域的推荐资讯</p>
@@ -115,6 +127,7 @@ export default function RecommendationFeed({
 
   return (
     <>
+      {snapshotBanner}
       {interestBar}
       <div className={`feed-list view-${viewMode} ${viewMode === 'card' ? 'card-grid' : ''}`}>
         {visible.map((item, i) => renderCard(item, i))}

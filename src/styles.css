@@ -764,6 +764,20 @@ body {
 
 .error-state button, .empty-state button { padding: 8px 20px; background: var(--accent-cyan); border: none; border-radius: 6px; color: var(--bg-primary); font-weight: 600; cursor: pointer; }
 .feed-list { display: flex; flex-direction: column; gap: 10px; }
+.recommendation-snapshot-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 10px;
+  padding: 8px 10px;
+  border: var(--panel-border);
+  border-radius: 8px;
+  background: var(--surface-workbench-control, var(--surface-card));
+  color: var(--text-muted);
+  font-size: 12px;
+}
+.recommendation-snapshot-meta strong { color: var(--text-primary); }
 
 /* Load More Sentinel */
 .load-more-area { display: flex; align-items: center; justify-content: center; gap: var(--space-sm); padding: 20px 0; color: var(--text-muted); font-size: 13px; }

@@ -62,7 +62,7 @@ export default function RecommendationDateRail({
               ?? ((snap?.lanes?.public?.length || 0) + (snap?.lanes?.personal?.length || 0));
             return (
               <li key={date} className={`intel-timeline-node ${active ? 'active' : ''}`}>
-                <button type="button" onClick={() => onSelectDate?.(date)}>
+                <button type="button" data-date={date} onClick={() => onSelectDate?.(date)}>
                   <span className="newspaper-timeline-diamond" aria-hidden="true">
                     <span className="newspaper-timeline-diamond-glow" />
                     <span className="newspaper-timeline-diamond-core" />
