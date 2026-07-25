@@ -7,7 +7,7 @@ const projectRoot = fileURLToPath(new URL('.', import.meta.url));
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, projectRoot, '');
-  if (!process.env.DATABASE_URL && env.DATABASE_URL) process.env.DATABASE_URL = env.DATABASE_URL;
+  if (process.env.SILICON_E2E !== '1' && !process.env.DATABASE_URL && env.DATABASE_URL) process.env.DATABASE_URL = env.DATABASE_URL;
   return {
     root: projectRoot,
     plugins: [newsPlugin(), react()],

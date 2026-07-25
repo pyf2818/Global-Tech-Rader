@@ -13,7 +13,7 @@
     "preview": "vite preview --host 0.0.0.0",
     "test": "vitest run",
     "test:integration": "vitest run --config vitest.integration.config.js",
-    "test:e2e": "playwright test",
+    "test:e2e": "node scripts/run-e2e.mjs",
     "verify:platform": "node scripts/verify-platform.mjs",
     "test:watch": "vitest"
   },

@@ -13,12 +13,48 @@ import { getTrending, getGithubTrending } from './services/trendingService.js';
 import { discoverSourceCandidates, validateFeedUrl } from './services/sourceDiscovery.js';
 import { getDashboard, getRealtime, getKline, getTimeline, getSectors, searchStock, resolveSecid } from './services/stockService.js';
 
+const E2E_INTELLIGENCE_ITEMS = [
+  { id: 'openai-agent-1', canonicalId: 'event-openai-agent', title: 'OpenAI releases a new agent platform today', source: 'OpenAI Blog', category: 'ai', publishedAt: '2026-07-14T01:00:00Z', summary: 'Official agent platform release.', url: 'https://openai.com/index/agents' },
+  { id: 'openai-agent-2', canonicalId: 'event-openai-agent', title: 'OpenAI releases new Agent platform', source: 'TechCrunch', category: 'ai', publishedAt: '2026-07-14T02:00:00Z', summary: 'Media coverage of the same agent platform.', url: 'https://techcrunch.com/openai-agent' },
+  { id: 'nvidia-chip', canonicalId: 'event-nvidia-chip', title: 'NVIDIA expands AI accelerator supply', source: 'NVIDIA Blog', category: 'chips', publishedAt: '2026-07-14T04:00:00Z', summary: 'Accelerator supply update.', url: 'https://nvidia.com/blog/ai-chip' },
+];
+
+function sendE2eFixture(res, requestUrl) {
+  if (process.env.SILICON_E2E !== '1') return false;
+  if (requestUrl.pathname === '/api/intelligence/events') {
+    sendJson(res, { ok: true, events: E2E_INTELLIGENCE_ITEMS, updatedAt: '2026-07-14T12:30:00Z' });
+    return true;
+  }
+  if (requestUrl.pathname === '/api/intelligence/items') {
+    sendJson(res, { ok: true, items: E2E_INTELLIGENCE_ITEMS, updatedAt: '2026-07-14T12:30:00Z' });
+    return true;
+  }
+  if (requestUrl.pathname === '/api/intelligence/opportunities') {
+    sendJson(res, { ok: true, opportunities: [] });
+    return true;
+  }
+  if (requestUrl.pathname === '/api/intelligence/weekly-sectors') {
+    sendJson(res, { ok: true, sectors: [] });
+    return true;
+  }
+  if (requestUrl.pathname === '/api/intelligence/alerts') {
+    sendJson(res, { ok: true, alerts: [] });
+    return true;
+  }
+  if (requestUrl.pathname === '/api/news') {
+    sendJson(res, { ok: true, items: E2E_INTELLIGENCE_ITEMS, total: E2E_INTELLIGENCE_ITEMS.length, hasMore: false });
+    return true;
+  }
+  return false;
+}
+
 export function newsPlugin() {
   return {
     name: 'global-tech-news-api',
     configureServer(server) {
       const handleApiRequest = async (req, res, next) => {
         const requestUrl = new URL(req.url, 'http://localhost');
+        if (sendE2eFixture(res, requestUrl)) return;
 
         if (requestUrl.pathname === '/api/meta') {
           return sendJson(res, {

@@ -10,6 +10,18 @@
 
 ---
 
+## Current verification update
+
+2026-07-25: the platform verifier passed with local Docker PostgreSQL and Edge E2E:
+
+```powershell
+$env:TEST_DATABASE_URL='postgresql://meridian:meridian-local-dev-2026-strong@localhost:5433/silicon_meridian_test'
+$env:RUN_E2E='1'
+node scripts\verify-platform.mjs
+```
+
+Observed result: unit passed (24 files, 221 tests), build passed, integration passed (1 file, 3 tests), E2E passed (5 Edge tests). This proves the configured suites, but the detailed unchecked browser scenarios below remain open until covered directly.
+
 ## File map
 
 - Create `tests/integration/platform.integration.test.js` and database test helpers.
@@ -105,11 +117,13 @@ Save profile version 1, create a dated snapshot, change tiers to create profile 
 
 Save a document and two versions as Alice, assert Bob cannot read it, restore version 1, and assert a third version is inserted rather than version 2 being overwritten.
 
-- [ ] **Step 5: Run against local PostgreSQL and commit**
+- [x] **Step 5: Run against local PostgreSQL and commit**
 
 Run: `$env:DB_PASSWORD='meridian_test'; docker compose up -d postgres`
 
 Expected: `tech-radar-db` is healthy and was initialized with the dedicated local test password.
+
+Actual local evidence used `siliconstream-db` on port 5433 with password `meridian-local-dev-2026-strong`.
 
 Run: `docker exec tech-radar-db createdb -U meridian silicon_meridian_test`
 
@@ -118,6 +132,8 @@ Expected: the disposable test database is created; if it already exists, verify 
 Run: `$env:TEST_DATABASE_URL='postgresql://meridian:meridian_test@localhost:5432/silicon_meridian_test'; npm run test:integration`
 
 Expected: all integration tests pass and temporary schemas are removed.
+
+Actual result: `$env:TEST_DATABASE_URL='postgresql://meridian:meridian-local-dev-2026-strong@localhost:5433/silicon_meridian_test'; npm run test:integration` passed 1 file and 3 tests.
 
 ```bash
 git add tests/integration
@@ -317,7 +333,7 @@ git commit -m "test: add adversarial platform verification"
 **Files:**
 - Create: `docs/acceptance/2026-07-14-platform-acceptance.md`
 
-- [ ] **Step 1: Run all authoritative commands**
+- [x] **Step 1: Run all authoritative commands**
 
 ```powershell
 npm run test
@@ -327,6 +343,8 @@ $env:RUN_E2E='1'; npm run test:e2e
 ```
 
 Expected: every command exits 0. Record exact test counts, durations and build output.
+
+Actual result: configured full verifier passed with `TEST_DATABASE_URL` and `RUN_E2E=1`; exact counts are recorded in `docs/acceptance/2026-07-14-platform-acceptance.md`.
 
 - [x] **Step 2: Audit each approved requirement**
 

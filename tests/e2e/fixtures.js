@@ -73,4 +73,67 @@ export async function installExternalFixtures(page) {
     contentType: 'application/json',
     body: JSON.stringify({ ok: true, repos: [{ id: 'repo-1', name: 'agent-framework', fullName: 'example/agent-framework', stars: 12000 }] }),
   }));
+  await page.route('**/api/stock/dashboard**', route => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify({
+      indices: [{ code: '000001', name: '上证指数', price: 3120.12, changePct: 0.8 }],
+      stocks: [{ code: '600519', name: '贵州茅台', price: 1688.8, changePct: 1.2 }],
+      hotStocks: [{ code: '600519', name: '贵州茅台', price: 1688.8, changePct: 1.2 }],
+      coverage: { realtimePollingSeconds: 30 },
+    }),
+  }));
+  await page.route('**/api/stock/sectors**', route => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify({ sectors: [{ name: 'AI Infra', changePct: 2.1, lead: '600519' }] }),
+  }));
+  await page.route('**/api/stock/realtime**', route => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify({
+      code: '600519',
+      secid: '1.600519',
+      name: '贵州茅台',
+      price: 1688.8,
+      change: 20.1,
+      changePct: 1.2,
+      open: 1660,
+      high: 1699,
+      low: 1655,
+      prevClose: 1668.7,
+      volume: 120000,
+      amount: 202656000,
+      bids: [{ price: 1688.7, volume: 100 }],
+      asks: [{ price: 1688.9, volume: 120 }],
+      timestamp: '2026-07-14T12:30:00Z',
+      dataSource: 'fixture',
+    }),
+  }));
+  await page.route('**/api/stock/timeline**', route => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify({ code: '600519', name: '贵州茅台', preClose: 1668.7, points: [{ time: '09:30', price: 1670, volume: 1000 }, { time: '10:00', price: 1688.8, volume: 2000 }] }),
+  }));
+  await page.route('**/api/stock/kline**', route => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify({
+      code: '600519',
+      name: '贵州茅台',
+      klines: Array.from({ length: 60 }, (_, index) => ({
+        date: `2026-07-${String(1 + (index % 28)).padStart(2, '0')}`,
+        open: 1600 + index,
+        close: 1601 + index,
+        high: 1605 + index,
+        low: 1595 + index,
+        volume: 100000 + index * 1000,
+      })),
+    }),
+  }));
+  await page.route('**/api/community/posts**', route => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify({ ok: true, data: { items: [], nextCursor: null } }),
+  }));
 }

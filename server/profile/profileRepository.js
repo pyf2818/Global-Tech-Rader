@@ -1,4 +1,19 @@
-import { getPool, withTransaction } from '../db/client.js';
+import { getPool } from '../db/client.js';
+
+async function inTransaction(db, work) {
+  const client = await db.connect();
+  try {
+    await client.query('BEGIN');
+    const result = await work(client);
+    await client.query('COMMIT');
+    return result;
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
+}
 
 export function createProfileRepository(db = getPool()) {
   return {
@@ -19,7 +34,7 @@ export function createProfileRepository(db = getPool()) {
       };
     },
     async saveState(userId, state) {
-      return withTransaction(async client => {
+      return inTransaction(db, async client => {
         await client.query('insert into user_profiles(user_id) values ($1) on conflict do nothing', [userId]);
         const profile = await client.query(
           `update user_profiles set version = version + 1, confidence = $2, behavior_signals = $3, updated_at = now()

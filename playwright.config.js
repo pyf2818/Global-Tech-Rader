@@ -7,7 +7,7 @@ export default defineConfig({
   workers: 1,
   reporter: [['list']],
   use: {
-    baseURL: 'http://127.0.0.1:5175',
+    baseURL: 'http://127.0.0.1:5176',
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
   },
@@ -17,10 +17,4 @@ export default defineConfig({
       use: { ...devices['Desktop Edge'], channel: 'msedge' },
     },
   ],
-  webServer: {
-    command: 'npm run dev',
-    url: 'http://127.0.0.1:5175',
-    reuseExistingServer: true,
-    timeout: 120_000,
-  },
 });
