@@ -266,7 +266,7 @@ export function useCreativeWorkspace({ syncEnabled = false } = {}) {
 
   const removeAsset = useCallback((assetId) => {
     setAssets(prev => {
-      const next = prev.filter(asset => String(asset.id) !== String(assetId));
+      const next = prev.filter(asset => String(asset.id) !== String(assetId) && String(asset.originalItemId || '') !== String(assetId));
       persistAssets(next);
       return next;
     });

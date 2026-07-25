@@ -20,7 +20,7 @@ $env:RUN_E2E='1'
 node scripts\verify-platform.mjs
 ```
 
-Observed result: unit passed (24 files, 221 tests), build passed, integration passed (1 file, 3 tests), E2E passed (5 Edge tests). A later focused E2E run passed 8 Edge tests after adding stock failure-mode coverage. This proves the configured suites, but the detailed unchecked browser scenarios below remain open until covered directly.
+Observed result: unit passed (24 files, 221 tests), build passed, integration passed (1 file, 3 tests), E2E passed (5 Edge tests). Later E2E runs passed 8 Edge tests after adding stock failure-mode coverage and 11 Edge tests after adding creative lineage/version/export coverage. This proves the configured suites, but the detailed unchecked browser scenarios below remain open until covered directly.
 
 ## File map
 
@@ -244,23 +244,25 @@ git commit -m "test: cover stock fallback and stale data states"
 **Files:**
 - Create: `tests/e2e/creative.spec.js`
 
-- [ ] **Step 1: Test news-to-asset-to-document flow**
+- [x] **Step 1: Test news-to-asset-to-document flow**
 
 Open a fixture news item, add it to materials, enter 智创空间, create a document from it, and assert the source title, publisher and URL remain visible.
 
-- [ ] **Step 2: Test version restore semantics**
+- [x] **Step 2: Test version restore semantics**
 
 Save content A, save content B, restore A, and assert version count becomes three and content A is active.
 
-- [ ] **Step 3: Test downloaded formats**
+- [x] **Step 3: Test downloaded formats**
 
 Use Playwright download events for Markdown, JSON and HTML. Read each file and assert the source citation exists; assert HTML contains no executable `<script>` from hostile editor text.
 
-- [ ] **Step 4: Run and commit**
+- [x] **Step 4: Run and commit**
 
 Run: `npx playwright test tests/e2e/creative.spec.js`
 
 Expected: PASS.
+
+Actual result: `npm run test:e2e -- tests/e2e/creative.spec.js` passed 3 Edge tests. The full `npm run test:e2e` suite passed 11 Edge tests.
 
 ```bash
 git add tests/e2e/creative.spec.js

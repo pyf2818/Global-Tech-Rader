@@ -149,7 +149,12 @@ export default function CreativeWorkspace({ workspace, onOpenEditor, onOpenMater
           </div>
           {selectedAsset && (
             <p className="creative-asset-provenance">
-              {selectedAsset.citation?.title || selectedAsset.title} / {selectedAsset.citation?.source || selectedAsset.source || 'Unknown source'}
+              <span>{selectedAsset.citation?.title || selectedAsset.title} / {selectedAsset.citation?.source || selectedAsset.source || 'Unknown source'}</span>
+              {(selectedAsset.citation?.url || selectedAsset.url) && (
+                <a href={selectedAsset.citation?.url || selectedAsset.url} target="_blank" rel="noreferrer">
+                  {selectedAsset.citation?.url || selectedAsset.url}
+                </a>
+              )}
             </p>
           )}
           <button type="button" className="creative-primary" onClick={createFromAsset} disabled={!selectedAsset}>
@@ -179,6 +184,21 @@ export default function CreativeWorkspace({ workspace, onOpenEditor, onOpenMater
                 </select>
                 <button type="button" onClick={exportActiveDocument}>Export local</button>
               </div>
+              {activeVersions.length > 0 && (
+                <div className="creative-version-list" aria-label="Version history">
+                  {activeVersions.slice(0, 5).map(version => (
+                    <button
+                      type="button"
+                      key={version.id}
+                      onClick={() => workspace?.restoreVersion?.(activeDocument.id, version)}
+                      aria-label={`Restore v${version.number}`}
+                    >
+                      <strong>v{version.number}</strong>
+                      <span>{version.reason || 'manual'}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
             </>
           ) : (
             <p className="creative-empty">No document yet. Create the first draft from an asset.</p>

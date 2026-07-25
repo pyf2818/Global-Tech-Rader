@@ -20519,9 +20519,21 @@ body {
 }
 
 .creative-asset-provenance {
+  display: grid;
+  gap: 4px;
   margin: auto 0 0;
   padding-top: 8px;
   border-top: var(--panel-border);
+}
+
+.creative-asset-provenance a {
+  overflow-wrap: anywhere;
+  color: var(--accent-cyan, #22d3ee);
+  text-decoration: none;
+}
+
+.creative-asset-provenance a:hover {
+  text-decoration: underline;
 }
 
 .creative-primary {
@@ -20583,6 +20595,47 @@ body {
   color: var(--text-primary);
   font: inherit;
   font-size: 13px;
+}
+
+.creative-version-list {
+  display: grid;
+  gap: 8px;
+}
+
+.creative-version-list button {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  min-height: 38px;
+  padding: 8px 10px;
+  border: var(--panel-border);
+  border-radius: 7px;
+  background: var(--surface-workbench-control, var(--surface-card));
+  color: var(--text-secondary);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.creative-version-list button:hover {
+  border-color: var(--accent-cyan-border, var(--border-active));
+  color: var(--text-primary);
+}
+
+.creative-version-list strong {
+  color: var(--text-primary);
+  font-size: 13px;
+  line-height: 1;
+}
+
+.creative-version-list span {
+  overflow: hidden;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .creative-proposal-panel textarea {

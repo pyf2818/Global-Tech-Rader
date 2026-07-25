@@ -10,7 +10,8 @@ Generated: 2026-07-25
 | `npm run test:integration` without `TEST_DATABASE_URL` | Skipped | 1 file, 3 tests skipped by design |
 | `node scripts/verify-platform.mjs` | Pass with skips | Unit and build passed; integration skipped because `TEST_DATABASE_URL` is unset; E2E skipped when `RUN_E2E` is not `1` |
 | `$env:TEST_DATABASE_URL='postgresql://meridian:meridian-local-dev-2026-strong@localhost:5433/silicon_meridian_test'; $env:RUN_E2E='1'; node scripts\verify-platform.mjs` | Pass | Unit passed: 24 files, 221 tests, 7.3s. Build passed, 6.9s. Integration passed: 1 file, 3 tests, 3.2s. E2E passed: 5 Edge tests, 15.4s |
-| `$env:TEST_DATABASE_URL='postgresql://meridian:meridian-local-dev-2026-strong@localhost:5433/silicon_meridian_test'; npm run test:e2e` | Pass | E2E passed: 8 Edge tests, 24.5s, including stock algorithm, stale cache, and unavailable market data states |
+| `npm run test:e2e -- tests/e2e/creative.spec.js` | Pass | E2E passed: 3 Edge tests, 15.2s, covering news-to-asset document creation, restore-as-new-version semantics, and Markdown/JSON/HTML download contents |
+| `$env:TEST_DATABASE_URL='postgresql://meridian:meridian-local-dev-2026-strong@localhost:5433/silicon_meridian_test'; npm run test:e2e` | Pass | E2E passed: 11 Edge tests, 46.0s, including stock algorithm/failure modes and creative asset lineage/export downloads |
 
 ## Requirement Audit
 
@@ -19,12 +20,12 @@ Generated: 2026-07-25
 | Unit-level platform logic | `npm run test` through `verify-platform` | Passed: 24 files, 221 tests | Browser journeys are covered separately |
 | Production build | `npm run build` through `verify-platform` | Passed | Existing Vite large chunk warning remains |
 | PostgreSQL cross-user persistence | `tests/integration/platform.integration.test.js`; configured `TEST_DATABASE_URL` run through `verify-platform` | Passed: community cross-user post/comment/like, immutable recommendation snapshot, creative ownership/version restore | The disposable database is local Docker PostgreSQL on port 5433 |
-| Creative ownership and append-only versions | `server/creative/__tests__/creativeService.test.js`; `tests/integration/platform.integration.test.js`; `tests/e2e/platform-pages.spec.js` | Passed at service, integration, and browser smoke levels | Browser smoke does not yet read downloaded Markdown/JSON/HTML files |
+| Creative ownership, lineage, append-only versions, and local exports | `server/creative/__tests__/creativeService.test.js`; `tests/integration/platform.integration.test.js`; `tests/e2e/creative.spec.js`; `tests/e2e/platform-pages.spec.js` | Passed at service, integration, and browser levels: browser covers news-to-asset document creation, restore to a third version, and downloaded Markdown/JSON/HTML citation contents with escaped hostile HTML | Uses deterministic browser fixtures rather than live upstream news |
 | Security and adversarial behavior | `src/domain/intelligence/__tests__/adversarial.test.js`; `server/http/__tests__/security.test.js` | Passed | Does not replace full browser security testing |
 | Browser AI home fixture flow | `tests/e2e/fixtures.js`; `tests/e2e/ai-home.spec.js`; configured `verify-platform` E2E run | Passed with system Edge | Uses deterministic fixtures, not live upstream services |
 | Browser platform page smoke | `tests/e2e/platform-pages.spec.js`; configured `verify-platform` E2E run | Passed: recommendation/all dynamics, stock algorithm fixture, creative provenance/export controls, community/profile page open | Not a full substitute for every detailed Plan 5 browser case |
 | Stock analysis and failure modes | `tests/e2e/stock.spec.js`; `$env:TEST_DATABASE_URL=...; npm run test:e2e` | Passed: algorithm mode without LLM configuration, stale cache state with timestamp, unavailable market data disables analysis | Uses deterministic market fixtures rather than live upstream services |
-| Final acceptance completeness | `scripts/verify-platform.mjs` JSON summary and current E2E run | Improved but still partial against the full Plan 5 checklist | Remaining unchecked items include creative download-file assertions, detailed newspaper/dedupe/history browser checks, and two-context community/profile browser persistence |
+| Final acceptance completeness | `scripts/verify-platform.mjs` JSON summary and current E2E run | Improved but still partial against the full Plan 5 checklist | Remaining unchecked items include detailed newspaper/dedupe/history browser checks, two-context community/profile browser persistence, and final worktree/deployment audit |
 
 ## Current Notes
 

@@ -4565,6 +4565,7 @@ ${blueprintSummary}`,
   function toggleMaterial(item, type = null, note = '') {
     if (isInMaterials(item.id)) {
       setMaterials(prev => prev.filter(m => m.originalItemId !== item.id));
+      creativeWorkspace.removeAsset?.(item.id);
       const toast = document.createElement('div');
       toast.className = 'material-toast';
       toast.textContent = '已从素材库移除';
@@ -4595,6 +4596,7 @@ ${blueprintSummary}`,
         createdAt: new Date().toISOString()
       };
       setMaterials(prev => [...prev, newMaterial]);
+      creativeWorkspace.addAsset?.(newMaterial);
       const toast = document.createElement('div');
       toast.className = 'material-toast';
       toast.textContent = '✓ 已添加到素材库';
