@@ -1,4 +1,4 @@
-const MAX_BODY_BYTES = 64 * 1024;
+const MAX_BODY_BYTES = 2 * 1024 * 1024;
 
 export function sendJsonResponse(res, status, payload, headers = {}) {
   if (typeof res.status === 'function' && typeof res.json === 'function') {

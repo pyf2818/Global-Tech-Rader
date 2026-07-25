@@ -106,8 +106,26 @@ export default function CreativeWorkspace({ workspace, onOpenEditor, onOpenMater
           <strong>{assets.length}<span>assets</span></strong>
           <strong>{documents.length}<span>docs</span></strong>
           <strong>{activeVersions.length}<span>versions</span></strong>
+          <button
+            type="button"
+            className="creative-sync-button"
+            onClick={() => workspace?.syncNow?.()}
+            disabled={!workspace?.syncNow || ['syncing', 'local'].includes(workspace?.syncState?.status)}
+          >
+            {workspace?.syncState?.status === 'local' ? 'Local' : workspace?.syncState?.status === 'syncing' ? 'Syncing' : 'Sync'}
+          </button>
         </div>
       </div>
+      {workspace?.syncState?.status === 'conflict' && (
+        <div className="creative-sync-alert">
+          <span>Remote changes detected for {workspace.syncState.conflicts?.length || 0} document(s).</span>
+          <button type="button" onClick={() => workspace.syncNow?.({ resolve: 'local' })}>Keep local</button>
+          <button type="button" onClick={() => workspace.syncNow?.({ resolve: 'remote' })}>Use remote</button>
+        </div>
+      )}
+      {workspace?.syncState?.status === 'error' && (
+        <div className="creative-sync-alert error">{workspace.syncState.error?.message || 'Creative sync failed'}</div>
+      )}
 
       <div className="creative-workspace-grid">
         <div className="creative-panel">

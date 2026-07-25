@@ -3,6 +3,7 @@ import { getSourceGrade, getSourceGradeInfo } from './config/sourceGrades.js';
 import { sendJson, parseBody, isSafeUrl } from './utils/httpUtils.js';
 import { handleAuthRequest } from '../http/authHandlers.js';
 import { handleCommunityRequest } from '../http/communityHandlers.js';
+import { handleCreativeRequest } from '../http/creativeHandlers.js';
 import { handleProfileRequest } from '../http/profileHandlers.js';
 import { handleAiGenerateRequest } from '../http/aiHandlers.js';
 import { handleFetchPageRequest } from '../http/fetchPageHandler.js';
@@ -56,6 +57,10 @@ export function newsPlugin() {
         if (requestUrl.pathname.startsWith('/api/community/')) {
           const path = requestUrl.pathname.slice('/api/community/'.length).split('/');
           return handleCommunityRequest(req, res, { path });
+        }
+        if (requestUrl.pathname.startsWith('/api/creative/')) {
+          const path = requestUrl.pathname.slice('/api/creative/'.length).split('/');
+          return handleCreativeRequest(req, res, { path });
         }
         if (requestUrl.pathname === '/api/profile/state') {
           return handleProfileRequest(req, res, { action: 'state' });

@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { normalizeAsset } from '../domain/creative/assetModel.js';
 import { exportDocument as exportCreativeDocument } from '../domain/creative/exportEngine.js';
 import {
@@ -41,6 +41,56 @@ function uniqueById(items = []) {
     seen.add(id);
     return true;
   });
+}
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function isUuid(value) {
+  return UUID_RE.test(String(value || ''));
+}
+
+function versionMapToList(map = {}) {
+  return Object.values(map).flat().filter(Boolean);
+}
+
+function listToVersionMap(versions = []) {
+  return versions.reduce((groups, version) => {
+    const documentId = String(version.documentId || version.document_id || '');
+    if (!documentId) return groups;
+    groups[documentId] = [...(groups[documentId] || []), version];
+    return groups;
+  }, {});
+}
+
+function findDocumentConflicts(localDocuments = [], remoteDocuments = []) {
+  return remoteDocuments.filter(remote => {
+    const local = localDocuments.find(document => String(document.id) === String(remote.id));
+    if (!local) return false;
+    const localTime = Date.parse(local.updatedAt || local.createdAt || 0);
+    const remoteTime = Date.parse(remote.updatedAt || remote.createdAt || 0);
+    if (remoteTime <= localTime) return false;
+    return String(local.title || '') !== String(remote.title || '')
+      || String(local.draftContent || '') !== String(remote.draftContent || '');
+  }).map(document => ({ id: document.id, title: document.title, remoteUpdatedAt: document.updatedAt }));
+}
+
+async function requestCreativeJson(url, options = {}) {
+  const response = await fetch(url, {
+    ...options,
+    credentials: 'include',
+    headers: {
+      ...(options.body ? { 'Content-Type': 'application/json' } : {}),
+      ...(options.headers || {}),
+    },
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok || data.ok === false) {
+    const error = new Error(data?.error?.message || 'Creative sync failed');
+    error.status = response.status;
+    error.code = data?.error?.code;
+    throw error;
+  }
+  return data.data || data;
 }
 
 export function migrateLegacyCreativeState({
@@ -103,12 +153,14 @@ export function initializeCreativeWorkspace(now = new Date().toISOString()) {
   return { ...next, migration };
 }
 
-export function useCreativeWorkspace() {
+export function useCreativeWorkspace({ syncEnabled = false } = {}) {
   const initial = useMemo(() => initializeCreativeWorkspace(), []);
   const [assets, setAssets] = useState(initial.assets);
   const [documents, setDocuments] = useState(initial.documents);
   const [activeDocumentId, setActiveDocumentId] = useState(documents[0]?.id || null);
   const [lastError, setLastError] = useState(null);
+  const [syncState, setSyncState] = useState({ status: syncEnabled ? 'idle' : 'local', error: null, syncedAt: null, conflicts: [] });
+  const [syncRevision, setSyncRevision] = useState(0);
 
   const persistAssets = useCallback((nextAssets) => {
     const result = writeJson(CREATIVE_ASSETS_KEY, nextAssets);
@@ -127,7 +179,80 @@ export function useCreativeWorkspace() {
     [documents, activeDocumentId],
   );
 
-  const versions = useMemo(() => activeDocument ? loadCreativeVersions(activeDocument.id) : [], [activeDocument]);
+  const versions = useMemo(() => activeDocument ? loadCreativeVersions(activeDocument.id) : [], [activeDocument, syncRevision]);
+
+  const mergeRemoteState = useCallback((state = {}) => {
+    if (Array.isArray(state.assets)) {
+      setAssets(prev => {
+        const next = uniqueById([...state.assets, ...prev]);
+        persistAssets(next);
+        return next;
+      });
+    }
+    if (Array.isArray(state.documents)) {
+      setDocuments(prev => {
+        const next = uniqueById([...state.documents, ...prev]);
+        persistDocuments(next);
+        return next;
+      });
+    }
+    if (Array.isArray(state.versions)) {
+      const localMap = loadCreativeVersions();
+      const remoteMap = listToVersionMap(state.versions);
+      const nextMap = { ...localMap };
+      Object.entries(remoteMap).forEach(([documentId, remoteVersions]) => {
+        nextMap[documentId] = uniqueById([...remoteVersions, ...(nextMap[documentId] || [])]);
+      });
+      writeJson(CREATIVE_VERSIONS_KEY, nextMap);
+      setSyncRevision(revision => revision + 1);
+    }
+  }, [persistAssets, persistDocuments]);
+
+  const syncNow = useCallback(async ({ resolve = 'detect' } = {}) => {
+    if (!syncEnabled) return { ok: false, code: 'SYNC_DISABLED' };
+    setSyncState({ status: 'syncing', error: null, syncedAt: null, conflicts: [] });
+    try {
+      const remote = await requestCreativeJson('/api/creative/state');
+      const conflicts = findDocumentConflicts(documents, remote.documents || []);
+      if (conflicts.length && resolve === 'remote') {
+        mergeRemoteState(remote);
+        const syncedAt = new Date().toISOString();
+        setSyncState({ status: 'synced', error: null, syncedAt, conflicts: [] });
+        return { ok: true, data: remote, syncedAt };
+      }
+      if (conflicts.length) {
+        if (resolve !== 'local') {
+          setSyncState({ status: 'conflict', error: null, syncedAt: null, conflicts });
+          return { ok: false, code: 'CREATIVE_SYNC_CONFLICT', conflicts };
+        }
+      }
+
+      const allVersions = versionMapToList(loadCreativeVersions());
+      const payload = {
+        assets: assets.filter(asset => isUuid(asset.id)),
+        documents: documents.filter(document => isUuid(document.id)),
+        versions: allVersions.filter(version => isUuid(version.documentId) && isUuid(version.clientOperationId)),
+      };
+      const result = await requestCreativeJson('/api/creative/sync', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      });
+      mergeRemoteState(result.state || result);
+      const syncedAt = new Date().toISOString();
+      setSyncState({ status: 'synced', error: null, syncedAt, conflicts: [] });
+      return { ok: true, data: result, syncedAt };
+    } catch (error) {
+      const next = { code: error.code || 'CREATIVE_SYNC_FAILED', message: error.message };
+      setSyncState({ status: 'error', error: next, syncedAt: null, conflicts: [] });
+      setLastError(next);
+      return { ok: false, ...next };
+    }
+  }, [assets, documents, mergeRemoteState, syncEnabled]);
+
+  useEffect(() => {
+    if (syncEnabled) return;
+    setSyncState(state => state.status === 'local' ? state : { status: 'local', error: null, syncedAt: null, conflicts: [] });
+  }, [syncEnabled]);
 
   const addAsset = useCallback((input) => {
     const asset = normalizeAsset(input);
@@ -244,6 +369,7 @@ export function useCreativeWorkspace() {
     activeDocumentId,
     setActiveDocumentId,
     lastError,
+    syncState,
     addAsset,
     removeAsset,
     createDocument,
@@ -253,5 +379,6 @@ export function useCreativeWorkspace() {
     linkAsset,
     unlinkAsset,
     exportDocument,
+    syncNow,
   };
 }

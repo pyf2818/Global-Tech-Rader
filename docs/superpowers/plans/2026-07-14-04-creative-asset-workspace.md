@@ -24,7 +24,7 @@
 - Create: `src/domain/creative/assetModel.js`
 - Create: `src/domain/creative/__tests__/assetModel.test.js`
 
-- [ ] **Step 1: Write failing normalization tests**
+- [x] **Step 1: Write failing normalization tests**
 
 ```js
 import { expect, it } from 'vitest';
@@ -42,13 +42,13 @@ it('rejects assets without a stable title', () => {
 });
 ```
 
-- [ ] **Step 2: Verify failure**
+- [x] **Step 2: Verify failure**
 
 Run: `npx vitest run src/domain/creative/__tests__/assetModel.test.js`
 
 Expected: FAIL with missing module.
 
-- [ ] **Step 3: Implement the immutable asset contract**
+- [x] **Step 3: Implement the immutable asset contract**
 
 ```js
 export function normalizeAsset(input, now = new Date().toISOString()) {
@@ -73,7 +73,7 @@ export function buildCitation(asset, index) {
 }
 ```
 
-- [ ] **Step 4: Run tests and commit**
+- [x] **Step 4: Run tests and commit**
 
 Run: `npx vitest run src/domain/creative/__tests__/assetModel.test.js`
 
@@ -90,7 +90,7 @@ git commit -m "feat: preserve citations in creative assets"
 - Create: `src/domain/creative/versionStore.js`
 - Create: `src/domain/creative/__tests__/versionStore.test.js`
 
-- [ ] **Step 1: Write failing version tests**
+- [x] **Step 1: Write failing version tests**
 
 ```js
 import { expect, it } from 'vitest';
@@ -107,17 +107,17 @@ it('creates immutable versions and restores by creating a new version', () => {
 });
 ```
 
-- [ ] **Step 2: Verify failure and implement**
+- [x] **Step 2: Verify failure and implement**
 
 Run: `npx vitest run src/domain/creative/__tests__/versionStore.test.js`
 
 Expected before implementation: FAIL. Implement `{ document, version }` results; versions contain `id`, `documentId`, sequential `number`, `title`, `content`, deduplicated `assetIds`, `citations`, `createdAt`, and `reason`. Never mutate previous inputs.
 
-- [ ] **Step 3: Add a bounded local persistence adapter**
+- [x] **Step 3: Add a bounded local persistence adapter**
 
 Store documents under `creativeDocuments:v1` and versions under `creativeVersions:v1`. Keep the newest 50 versions per document and never delete the newest version. Quota errors surface as `{ ok: false, code: 'LOCAL_STORAGE_QUOTA' }` without clearing editor content.
 
-- [ ] **Step 4: Run tests and commit**
+- [x] **Step 4: Run tests and commit**
 
 Run: `npx vitest run src/domain/creative/__tests__/versionStore.test.js`
 
@@ -135,7 +135,7 @@ git commit -m "feat: add immutable creative document versions"
 - Create: `src/domain/creative/__tests__/exportEngine.test.js`
 - Modify: `src/utils/markdown.jsx`
 
-- [ ] **Step 1: Write failing export tests**
+- [x] **Step 1: Write failing export tests**
 
 ```js
 import { expect, it } from 'vitest';
@@ -156,21 +156,21 @@ it('escapes hostile HTML content', () => {
 });
 ```
 
-- [ ] **Step 2: Verify failure**
+- [x] **Step 2: Verify failure**
 
 Run: `npx vitest run src/domain/creative/__tests__/exportEngine.test.js`
 
 Expected: FAIL with missing module.
 
-- [ ] **Step 3: Implement all three exporters**
+- [x] **Step 3: Implement all three exporters**
 
 Markdown appends `## 来源` and numbered citations. JSON exports schema version, document metadata, content and citations. HTML uses escaped metadata and sanitized rendered Markdown, includes UTF-8 meta tags, and appends a source list with safe `rel="noopener noreferrer"` links.
 
-- [ ] **Step 4: Remove duplicate Markdown renderer from `App.jsx`**
+- [x] **Step 4: Remove duplicate Markdown renderer from `App.jsx`**
 
 Use only `src/utils/markdown.jsx`; keep placeholder image resolution `![alt](#{id})` in the shared renderer.
 
-- [ ] **Step 5: Run tests and commit**
+- [x] **Step 5: Run tests and commit**
 
 Run: `npx vitest run src/domain/creative/__tests__/exportEngine.test.js`
 
@@ -188,23 +188,23 @@ git commit -m "feat: export creative work with source citations"
 - Modify: `src/App.jsx:1268-1269,4468-4615,4887-5110`
 - Modify: `src/components/ArticleEditor.jsx`
 
-- [ ] **Step 1: Move material/document operations behind the hook**
+- [x] **Step 1: Move material/document operations behind the hook**
 
 Expose `{ assets, documents, versions, activeDocument, addAsset, removeAsset, createDocument, updateDraft, saveVersion, restoreVersion, linkAsset, unlinkAsset, exportDocument }`. Maintain existing localStorage migration for `materials` and `articles` once, then save only the new keys.
 
-- [ ] **Step 2: Preserve editor behavior**
+- [x] **Step 2: Preserve editor behavior**
 
 Autosave updates the mutable draft; explicit save, AI insertion, restore and export create immutable versions with reasons `manual`, `ai_insert`, `restore`, or `export`.
 
-- [ ] **Step 3: Reduce ArticleEditor prop surface**
+- [x] **Step 3: Reduce ArticleEditor prop surface**
 
 Pass one `workspace` object plus UI-only state instead of dozens of material/article mutation functions. Keep image upload, preview and cursor insertion behavior.
 
-- [ ] **Step 4: Verify migration and quota failure**
+- [x] **Step 4: Verify migration and quota failure**
 
 Use a copied browser profile containing old `materials` and `articles`; confirm they appear once after migration. Simulate `QuotaExceededError`; confirm draft text remains in memory and an error banner appears.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/hooks/useCreativeWorkspace.js src/App.jsx src/components/ArticleEditor.jsx
@@ -218,25 +218,25 @@ git commit -m "refactor: centralize creative workspace state"
 - Modify: `src/App.jsx:6100-6235,8047-8400`
 - Modify: `src/styles.css`
 
-- [ ] **Step 1: Define one navigation entry**
+- [x] **Step 1: Define one navigation entry**
 
 Keep `studio` as the public label “智创空间”. Materials and editor remain internal subviews reachable from tabs, not three competing primary navigation items.
 
-- [ ] **Step 2: Implement the asset-to-document workflow**
+- [x] **Step 2: Implement the asset-to-document workflow**
 
 The page shows recent assets, active documents, version count, unresolved citations, and actions “从素材创作”“继续编辑”“导出本地”. Opening an asset reveals full provenance.
 
-- [ ] **Step 3: Add AI proposal behavior**
+- [x] **Step 3: Add AI proposal behavior**
 
 AI output appears in a review panel with cited asset IDs. The user must click insert/replace; AI never overwrites a document automatically. Invalid citation IDs disable insertion and show the validation error.
 
-- [ ] **Step 4: Verify responsive UI and exports**
+- [x] **Step 4: Verify responsive UI and exports**
 
 Run: `npm run test && npm run build`
 
 Expected: tests and build pass. Manually export one document in all three formats and open the files.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/components/CreativeWorkspace.jsx src/App.jsx src/styles.css
@@ -254,19 +254,19 @@ git commit -m "feat: unify assets AI creation and local export"
 - Modify: `server/news/plugin.js`
 - Modify: `src/hooks/useCreativeWorkspace.js`
 
-- [ ] **Step 1: Test ownership and append-only versions**
+- [x] **Step 1: Test ownership and append-only versions**
 
 Assert users cannot read/update another user's private document; saving a version inserts a new row; restoring inserts another row; duplicate client operation IDs are idempotent.
 
-- [ ] **Step 2: Implement service and routes**
+- [x] **Step 2: Implement service and routes**
 
 Support `GET/POST /api/creative/assets`, `GET/POST/PATCH /api/creative/documents`, `GET/POST /api/creative/documents/:id/versions`. Require authentication and validate citation arrays against assets owned by the same user.
 
-- [ ] **Step 3: Implement explicit sync semantics**
+- [x] **Step 3: Implement explicit sync semantics**
 
 Local anonymous state stays local until the user chooses “同步到账号”. Server versions win only after the user selects a conflict; never silently delete local work. Track `syncState: local|synced|conflict`.
 
-- [ ] **Step 4: Run tests and commit**
+- [x] **Step 4: Run tests and commit**
 
 Run: `npm run test && npm run build`
 

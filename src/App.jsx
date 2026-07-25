@@ -1357,7 +1357,7 @@ function App() {
   const [bookmarks, setBookmarks] = useState(() => loadLS('bookmarks', []));
   const [materials, setMaterials] = useState(() => loadLS('materials', []));
   const [articles, setArticles] = useState(() => loadLS('articles', []));
-  const creativeWorkspace = useCreativeWorkspace();
+  const creativeWorkspace = useCreativeWorkspace({ syncEnabled: isLoggedIn });
   const [expandedSummary, setExpandedSummary] = useState({});
   const [summaryCache, setSummaryCache] = useState(() => loadLS('summaryCache', {}));
   const [summaryLoading, setSummaryLoading] = useState({});
