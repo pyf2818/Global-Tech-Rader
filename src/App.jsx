@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, useRef, useCallback, lazy, Suspense } from 'react';
 import SettingsModal from './components/SettingsModal.jsx';
 import ArticleEditor from './components/ArticleEditor.jsx';
+import CreativeWorkspace from './components/CreativeWorkspace.jsx';
 import ColorfulBubbles from './components/ColorfulBubbles.jsx';
 import AiChatPanel from './components/AiChatPanel.jsx';
 import ThemePicker from './ThemePicker.jsx';
@@ -6540,6 +6541,12 @@ ${signals}
                   <span className="quick-create-text"><strong>添加素材</strong><em>从资讯或本地上传</em></span>
                 </button>
               </section>
+
+              <CreativeWorkspace
+                workspace={creativeWorkspace}
+                onOpenEditor={() => goNav('editor')}
+                onOpenMaterials={() => goNav('materials')}
+              />
 
               <BlockGrid columns={3}>
                 {studioModules.map(module => (

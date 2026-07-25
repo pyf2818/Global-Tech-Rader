@@ -32,6 +32,8 @@ The repository already has the right foundation:
 - `server/profile/` and `src/utils/profileModel.js` already model user interests, source tiers, and special follows.
 - `src/utils/workflowEngine.js` can consume structured intelligence context for Agent workflows.
 
+Status update: the Studio page now includes the first unified Creative Workspace slice for recent assets, active drafts, version counts, local export, and reviewed AI proposal insertion.
+
 The upgrade should extend these layers instead of creating a separate product silo.
 
 ## Target Architecture
