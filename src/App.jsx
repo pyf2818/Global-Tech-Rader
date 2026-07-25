@@ -38,6 +38,7 @@ import { buildRecommendation, clusterEvents, selectBriefingLanes } from './domai
 import { buildAlgorithmBriefing } from './domain/intelligence/briefingEngine.js';
 import { createSnapshotStore } from './domain/intelligence/snapshotStore.js';
 import { isAiElfAsset, normalizeAsset } from './domain/creative/assetModel.js';
+import { saveDocumentVersion } from './domain/creative/versionStore.js';
 
 // 代码分割：三个重组件按需加载，避免首屏全量打包 Three.js / klinecharts
 const GlobeView = lazy(() => import('./GlobeView.jsx'));
@@ -4738,11 +4739,43 @@ ${blueprintSummary}`,
       images: []
     };
     setArticles(prev => [...prev, newArticle]);
+    saveArticleVersion(newArticle, 'create');
     return newArticle;
   }
 
   function updateArticle(id, updates) {
     setArticles(prev => prev.map(a => a.id === id ? { ...a, ...updates, updatedAt: new Date().toISOString() } : a));
+  }
+
+  function articleCitations(article) {
+    const linkedIds = new Set((article.materials || []).map(id => String(id)));
+    return materials
+      .filter(material => linkedIds.has(String(material.id)))
+      .flatMap(material => {
+        try { return [normalizeAsset(material).citation]; } catch { return []; }
+      });
+  }
+
+  function saveArticleVersion(article, reason = 'manual', content = article.content) {
+    const result = saveDocumentVersion({
+      id: article.id,
+      title: article.title,
+      content,
+      status: article.status,
+      assetIds: article.materials || [],
+      citations: articleCitations(article),
+      createdAt: article.createdAt,
+      updatedAt: article.updatedAt,
+      versionNumber: article.versionNumber || 0,
+    }, {
+      title: article.title,
+      content,
+      assetIds: article.materials || [],
+      citations: articleCitations(article),
+      reason,
+    });
+    if (!result.ok) showToast(result.code === 'LOCAL_STORAGE_QUOTA' ? '版本保存失败：本地空间不足' : '版本保存失败');
+    return result;
   }
 
   function deleteArticle(id) {
@@ -5131,6 +5164,7 @@ ${signals}
     }
     
     const content = `# ${article.title || '未命名'}\n\n> 创建时间: ${new Date(article.createdAt).toLocaleString('zh-CN')}\n> 更新时间: ${new Date(article.updatedAt).toLocaleString('zh-CN')}\n> 模板: ${ARTICLE_TEMPLATES[article.template] || article.template}\n> 状态: ${ARTICLE_STATUS[article.status] || article.status}\n${article.tags.length > 0 ? `> 标签: ${article.tags.join(', ')}\n` : ''}\n---\n\n${exportContent}`;
+    saveArticleVersion(article, 'export', exportContent);
     const blob = new Blob([content], { type: 'text/markdown;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');

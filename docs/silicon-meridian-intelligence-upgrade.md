@@ -344,6 +344,7 @@ Current status:
 - The Workbench `AiChatPanel` injects recent materials into the system prompt, prioritizes AI Elf handoff records, and exposes a "continue Elf research" quick action.
 - Workbench workflow context and Workbench-to-Elf handoffs include prioritized material summaries, so saved Elf records are available for continued research, export, and agent workflows.
 - Creative asset normalization now preserves citations and AI Elf handoff provenance, and local workspace Markdown exports include source/provenance metadata.
+- Creative documents now have a local immutable version model; article creation and export create version records with linked material citations.
 
 ## Rollout Plan
 

@@ -3,6 +3,7 @@ import { ICONS } from '../constants/index.jsx';
 import { ARTICLE_STATUS, ARTICLE_TEMPLATES, ARTICLE_TEMPLATE_CONTENT, MATERIAL_TYPES } from '../constants/index.jsx';
 import { formatRelative } from '../utils/format.js';
 import { renderMarkdownWithImages } from '../utils/markdown.jsx';
+import { loadCreativeVersions } from '../domain/creative/versionStore.js';
 
 export default function ArticleEditor({
   editorFullscreen, setEditorFullscreen,
@@ -96,6 +97,7 @@ export default function ArticleEditor({
                     const paragraphCount = article.content.split(/\n\s*\n/).filter(p => p.trim()).length;
                     const readMinutes = Math.max(1, Math.ceil(wordCount / 500));
                     const linkedMaterials = materials.filter(m => article.materials.includes(m.id));
+                    const versionCount = loadCreativeVersions(article.id).length;
 
                     return (
                       <>
@@ -147,7 +149,7 @@ export default function ArticleEditor({
                               onChange={e => setArticleTagInput(e.target.value)}
                             />
                           </div>
-                          <span className="article-updated">{wordCount} 字 · {readMinutes} 分钟阅读</span>
+                          <span className="article-updated">{wordCount} 字 · {readMinutes} 分钟阅读 · {versionCount} 个版本</span>
                         </div>
 
                         <div className="editor-toolbar">
