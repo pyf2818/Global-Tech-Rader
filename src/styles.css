@@ -15642,6 +15642,28 @@ body {
   background: var(--accent-emerald);
   box-shadow: 0 0 6px color-mix(in srgb, var(--accent-emerald) 70%, transparent);
 }
+.stock-market-state {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 12px;
+  border: var(--panel-border);
+  border-radius: 8px;
+  background: var(--surface-workbench-inset);
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+.stock-market-state strong {
+  color: var(--accent-amber);
+}
+.stock-market-state.error strong {
+  color: var(--accent-red);
+}
+.stock-market-state span {
+  color: var(--text-muted);
+  font: 600 11px/1 var(--font-mono);
+}
 .stock3-experience-switch {
   display: inline-grid;
   grid-template-columns: 1fr 1fr;

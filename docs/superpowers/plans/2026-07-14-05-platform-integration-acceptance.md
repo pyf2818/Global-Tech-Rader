@@ -20,7 +20,7 @@ $env:RUN_E2E='1'
 node scripts\verify-platform.mjs
 ```
 
-Observed result: unit passed (24 files, 221 tests), build passed, integration passed (1 file, 3 tests), E2E passed (5 Edge tests). This proves the configured suites, but the detailed unchecked browser scenarios below remain open until covered directly.
+Observed result: unit passed (24 files, 221 tests), build passed, integration passed (1 file, 3 tests), E2E passed (5 Edge tests). A later focused E2E run passed 8 Edge tests after adding stock failure-mode coverage. This proves the configured suites, but the detailed unchecked browser scenarios below remain open until covered directly.
 
 ## File map
 
@@ -214,23 +214,25 @@ git commit -m "test: cover AI briefing and recommendation history"
 **Files:**
 - Create: `tests/e2e/stock.spec.js`
 
-- [ ] **Step 1: Test algorithm mode without configuration**
+- [x] **Step 1: Test algorithm mode without configuration**
 
 Fulfill fixed quotes and 120 rising K-line bars, navigate to 股市动向, select the stock, run analysis, and assert `算法分析`, `强势`, MA values, support, resistance, risk and disclaimer are visible.
 
-- [ ] **Step 2: Test stale cache state**
+- [x] **Step 2: Test stale cache state**
 
 Fulfill a normalized `{ ok: true, stale: true, source: 'cache' }` response and assert the UI displays “缓存行情” and the timestamp.
 
-- [ ] **Step 3: Test unavailable data**
+- [x] **Step 3: Test unavailable data**
 
 Fulfill `{ ok: false, error: { code: 'MARKET_DATA_UNAVAILABLE' } }`; assert analysis is disabled and no rating is shown.
 
-- [ ] **Step 4: Run and commit**
+- [x] **Step 4: Run and commit**
 
 Run: `npx playwright test tests/e2e/stock.spec.js`
 
 Expected: PASS.
+
+Actual result: `npm run test:e2e -- tests/e2e/stock.spec.js` passed 3 Edge tests, and the full `npm run test:e2e` suite passed 8 Edge tests.
 
 ```bash
 git add tests/e2e/stock.spec.js

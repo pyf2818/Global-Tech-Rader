@@ -758,6 +758,7 @@ export default function StockPage({ llmConfig, onOpenLlmConfig }) {
   const [klineReloadKey, setKlineReloadKey] = useState(0);
   const [timelineData, setTimelineData] = useState(null);
   const [realtime, setRealtime] = useState(null);
+  const [marketDataState, setMarketDataState] = useState({ stale: false, unavailable: false, message: '', timestamp: '' });
   const [sectors, setSectors] = useState([]);
   const [sectorType, setSectorType] = useState('industry'); // industry | concept
   const [period, setPeriod] = useState('timeline');
@@ -880,25 +881,56 @@ export default function StockPage({ llmConfig, onOpenLlmConfig }) {
     ai.checkAlerts(watchlist, alertConditions);
   }, [ai, watchlist, alertConditions]);
 
+  const normalizeRealtimePayload = payload => {
+    if (payload?.ok === false) {
+      return {
+        realtime: null,
+        state: {
+          stale: false,
+          unavailable: true,
+          message: payload?.error?.code === 'MARKET_DATA_UNAVAILABLE' ? '行情数据暂不可用' : (payload?.error?.message || '行情数据暂不可用'),
+          timestamp: payload?.timestamp || '',
+        },
+      };
+    }
+    const quote = payload?.data || payload?.quote || payload;
+    return {
+      realtime: quote,
+      state: {
+        stale: Boolean(payload?.stale),
+        unavailable: false,
+        message: payload?.stale ? '缓存行情' : '',
+        timestamp: payload?.timestamp || quote?.timestamp || '',
+      },
+    };
+  };
+
   const loadStock = useCallback(async (code) => {
     setKlineData(null); setTimelineData(null); setRealtime(null);
+    setMarketDataState({ stale: false, unavailable: false, message: '', timestamp: '' });
     try {
       const rRes = await fetch(`/api/stock/realtime?code=${code}`);
-      const r = await rRes.json();
-      setRealtime(r);
-      setSelectedName(r?.name || code);
+      const payload = await rRes.json();
+      const normalized = normalizeRealtimePayload(payload);
+      setRealtime(normalized.realtime);
+      setMarketDataState(normalized.state);
+      setSelectedName(normalized.realtime?.name || code);
       // 分时图（指数和个股都支持）
       const tRes = await fetch(`/api/stock/timeline?code=${code}`);
       setTimelineData(await tRes.json());
-    } catch { /* ignore */ }
+    } catch {
+      setMarketDataState({ stale: false, unavailable: true, message: '行情数据暂不可用', timestamp: '' });
+    }
   }, []);
 
   // 轻量刷新：只拉实时行情，不清空 K线/分时（定时轮询用）
   const refreshRealtime = useCallback(async (code) => {
     try {
       const rRes = await fetch(`/api/stock/realtime?code=${code}`);
-      const r = await rRes.json();
-      if (r) setRealtime(r);
+      const payload = await rRes.json();
+      const normalized = normalizeRealtimePayload(payload);
+      setRealtime(normalized.realtime);
+      setMarketDataState(normalized.state);
     } catch { /* ignore */ }
   }, []);
 
@@ -1042,7 +1074,7 @@ export default function StockPage({ llmConfig, onOpenLlmConfig }) {
         </div>
         <div className="stock3-data-status" title={`数据源：${realtime?.dataSource || '等待行情'}；最近拉取：${quoteUpdatedLabel}；个股每 10 秒轮询，不是逐笔行情`}>
           <span className={`stock3-data-dot ${realtime ? 'live' : ''}`} />
-          <span>轮询行情 {marketClockLabel}</span>
+          <span>{marketDataState.stale ? '缓存行情' : marketDataState.unavailable ? '行情不可用' : '轮询行情'} {marketDataState.timestamp ? new Date(marketDataState.timestamp).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : marketClockLabel}</span>
         </div>
         <div className="stock3-experience-switch" role="tablist" aria-label="使用模式">
           <button type="button" className={experienceMode === 'beginner' ? 'active' : ''} onClick={() => setExperienceMode('beginner')} role="tab" aria-selected={experienceMode === 'beginner'}>新手</button>
@@ -1061,6 +1093,13 @@ export default function StockPage({ llmConfig, onOpenLlmConfig }) {
         </button>
         <button className="btn-refresh" onClick={loadDashboard}>{ICONS.refresh}<span>刷新</span></button>
       </header>
+
+      {(marketDataState.stale || marketDataState.unavailable) && (
+        <div className={`stock-market-state ${marketDataState.unavailable ? 'error' : 'stale'}`}>
+          <strong>{marketDataState.message}</strong>
+          {marketDataState.timestamp && <span>{new Date(marketDataState.timestamp).toLocaleString('zh-CN')}</span>}
+        </div>
+      )}
 
       {/* 大盘指数横条 */}
       {/* 大盘指数横条 + 涨跌家数 */}
@@ -1312,7 +1351,7 @@ export default function StockPage({ llmConfig, onOpenLlmConfig }) {
           )}
         </div>
         {!ai.diagnosis && !ai.diagnosing && !ai.diagnoseError && (
-          <button className="stock-ai-run" onClick={runDiagnosis} disabled={!realtime}>
+          <button className="stock-ai-run" onClick={runDiagnosis} disabled={!realtime || marketDataState.unavailable}>
             {ICONS.sparkle}<span>{ai.llmReady ? '生成 AI 增强分析' : '生成算法分析'}</span>
           </button>
         )}
