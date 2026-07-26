@@ -1240,7 +1240,7 @@ function App() {
   } = useSourceManager({ allSources });  // githubLang/githubSince 已移入 useTrending
   // calendar states moved to useCalendar hook
 
-  const [articles, setArticles] = useState(() => loadLS('articles', []));
+  // articles/articlespaces moved to useArticleEditor hook
   const creativeWorkspace = useCreativeWorkspace({ syncEnabled: isLoggedIn });
   const {
     expandedSummary, setExpandedSummary,
@@ -1288,43 +1288,18 @@ function App() {
   const [githubInsights, setGithubInsights] = useState(() => loadLS('githubInsights', {}));
   const [githubInsightLoading, setGithubInsightLoading] = useState({});
   // moreNavOpen moved to useUI
-  const [currentArticleId, setCurrentArticleId] = useState(null);
   const [materialFilter, setMaterialFilter] = useState('all');
   const [materialSearch, setMaterialSearch] = useState('');
   const [materialTags, setMaterialTags] = useState([]);
   const [materialTimeRange, setMaterialTimeRange] = useState('all');
   const [materialSourceFilter, setMaterialSourceFilter] = useState('all');
   const [materialSpaceFilter, setMaterialSpaceFilter] = useState('all');
-  const [materialSpaces, setMaterialSpaces] = useState(() => loadLS('materialSpaces', []));
   const [showSpaceForm, setShowSpaceForm] = useState(false);
-  const [newSpaceName, setNewSpaceName] = useState('');
-  const [selectedMaterials, setSelectedMaterials] = useState([]);
   const [showAddMaterial, setShowAddMaterial] = useState(false);
-  const [aiResult, setAiResult] = useState({ loading: false, content: '', error: '', action: '' });
   const [aiBrief, setAiBrief] = useState({ loading: false, content: '', error: '', generatedAt: null });
   const [signalFilter, setSignalFilter] = useState('all');
-  const [articleExportFilter, setArticleExportFilter] = useState('all');
-  const [articleSearch, setArticleSearch] = useState('');
-  const [articleStatusFilter, setArticleStatusFilter] = useState('all');
-  const [articleTemplateFilter, setArticleTemplateFilter] = useState('all');
-  const [articleSort, setArticleSort] = useState('updated');
-  const [articleTagInput, setArticleTagInput] = useState('');
-  const [editingArticleTag, setEditingArticleTag] = useState(null);
-  const [autoSaveTimer, setAutoSaveTimer] = useState(null);
-  const [lastSavedAt, setLastSavedAt] = useState(null);
-  const [editorTab, setEditorTab] = useState('edit');
-  const [editorCursorPos, setEditorCursorPos] = useState({ start: 0, end: 0 });
-  const [showTemplateMenu, setShowTemplateMenu] = useState(false);
-  const [showAiPanel, setShowAiPanel] = useState(false);
-  const [showImagePanel, setShowImagePanel] = useState(false);
-  const [aiCustomPrompt, setAiCustomPrompt] = useState('');
-  const [articleSpaces, setArticleSpaces] = useState(() => loadLS('articleSpaces', []));
-  const [articleSpaceFilter, setArticleSpaceFilter] = useState('all');
-  const [articleMaterialSpaceFilter, setArticleMaterialSpaceFilter] = useState('all');
-  const [articleSpaceFormOpen, setArticleSpaceFormOpen] = useState(false);
-  const [newArticleSpaceName, setNewArticleSpaceName] = useState('');
-  const [articleSpaceForNewArticle, setArticleSpaceForNewArticle] = useState('all');
-  
+  // article editor state moved to useArticleEditor hook
+
   // 滚动资讯热点状态：从实时 items 派生热门资讯，保证数据准确实时
   const [scrollingNewsPaused, setScrollingNewsPaused] = useState(false);
   const scrollingNewsRef = useRef(null);
@@ -1333,6 +1308,45 @@ function App() {
   const editorTextareaRef = useRef(null);
   const imageInputRef = useRef(null);
   const workflowImportInputRef = useRef(null);
+
+  const {
+    articles, setArticles,
+    articleSpaces, setArticleSpaces,
+    currentArticleId, setCurrentArticleId,
+    editorTab, setEditorTab,
+    editorCursorPos, setEditorCursorPos,
+    showTemplateMenu, setShowTemplateMenu,
+    showAiPanel, setShowAiPanel,
+    showImagePanel, setShowImagePanel,
+    aiResult, setAiResult,
+    aiCustomPrompt, setAiCustomPrompt,
+    autoSaveTimer, setAutoSaveTimer,
+    lastSavedAt, setLastSavedAt,
+    articleTagInput, setArticleTagInput,
+    editingArticleTag, setEditingArticleTag,
+    articleSpaceFilter, setArticleSpaceFilter,
+    articleMaterialSpaceFilter, setArticleMaterialSpaceFilter,
+    articleSpaceFormOpen, setArticleSpaceFormOpen,
+    newArticleSpaceName, setNewArticleSpaceName,
+    articleSpaceForNewArticle, setArticleSpaceForNewArticle,
+    articleSearch, setArticleSearch,
+    articleStatusFilter, setArticleStatusFilter,
+    articleTemplateFilter, setArticleTemplateFilter,
+    articleSort, setArticleSort,
+    articleExportFilter, setArticleExportFilter,
+    createArticle, updateArticle, deleteArticle, duplicateArticle,
+    addArticleTag, removeArticleTag,
+    triggerAutoSave,
+    handleContentChange, handleTitleChange,
+    insertAtCursor, insertMaterialAtCursor,
+    removeLinkedMaterial,
+    handleImageUpload, handlePaste,
+    createArticleSpace, deleteArticleSpace,
+    assignArticleToSpace, batchAssignArticlesToSpace,
+    insertAiResult, clearAiResult, aiAction,
+    exportArticleToFile, copyArticleAsRichText, exportArticle,
+    articleCitations, saveArticleVersion,
+  } = useArticleEditor({ llmConfig, materials, editorTextareaRef });
 
   const feedRef = useRef(null);
   const searchInputRef = useRef(null);
@@ -3315,202 +3329,7 @@ ${blueprintSummary}`,
 
   // loadTrending / loadGithub 已提取至 useTrending hook
 
-  function toggleBookmark(item) {
-    setBookmarks(prev => {
-      const exists = prev.find(b => b.itemId === item.id);
-      if (exists) return prev.filter(b => b.itemId !== item.id);
-      return [...prev, { id: Date.now(), itemId: item.id, title: item.title, url: item.url, source: item.source, savedAt: new Date().toISOString(), isRead: false, readAt: null, summary: item.summary, tags: item.tags, region: item.region, mode: item.mode, publishedAt: item.publishedAt, category: item.category }];
-    });
-  }
-
-  function isBookmarked(itemId) { return bookmarks.some(b => b.itemId === itemId); }
-  function isInMaterials(itemId) { return materials.some(m => m.originalItemId === itemId); }
-
-  function toggleRead(bookmarkId) {
-    setBookmarks(prev => prev.map(b => b.id === bookmarkId ? { ...b, isRead: !b.isRead, readAt: !b.isRead ? new Date().toISOString() : null } : b));
-  }
-
-  // 根据内容智能判断素材类型
-  function detectMaterialType(item) {
-    if (item.materialType) return item.materialType;
-    if (item.source === 'GitHub' || item.category === 'open-source' || item.fullName) return 'project';
-    if (item.category) {
-      const catMap = {
-        'ai-models': 'data', 'ai-apps': 'data', 'ai-tools': 'data',
-        'open-source': 'case', 'developer': 'case',
-        'funding': 'data', 'ipo': 'data', 'mergers-acquisitions': 'data',
-        'policy': 'viewpoint', 'regulation': 'viewpoint',
-        'industry-trends': 'viewpoint', 'emerging-tech': 'viewpoint',
-        'product-launch': 'case', 'partnership': 'case',
-      };
-      return catMap[item.category] || 'quote';
-    }
-    return 'quote';
-  }
-
-  // 素材库操作
-  function toggleMaterial(item, type = null, note = '') {
-    if (isInMaterials(item.id)) {
-      setMaterials(prev => prev.filter(m => m.originalItemId !== item.id));
-      creativeWorkspace.removeAsset?.(item.id);
-      const toast = document.createElement('div');
-      toast.className = 'material-toast';
-      toast.textContent = '已从素材库移除';
-      document.body.appendChild(toast);
-      setTimeout(() => toast.remove(), 2000);
-    } else {
-      const detectedType = type || detectMaterialType(item);
-      const tags = Array.from(new Set([
-        ...(item.tags || []),
-        ...(item.topics || []),
-        item.language,
-        item.category
-      ].filter(Boolean)));
-      const newMaterial = {
-        id: Date.now(),
-        type: detectedType,
-        title: item.title,
-        content: item.summary || item.title,
-        fullContent: item.fullContent || item.content || item.summary || item.title,
-        source: item.source,
-        url: item.url,
-        tags,
-        imageUrl: item.imageUrl || '',
-        insight: item.insight || buildNewsCardInsight(item),
-        metadata: item.metadata || null,
-        originalItemId: item.id,
-        note,
-        createdAt: new Date().toISOString()
-      };
-      setMaterials(prev => [...prev, newMaterial]);
-      creativeWorkspace.addAsset?.(newMaterial);
-      const toast = document.createElement('div');
-      toast.className = 'material-toast';
-      toast.textContent = '✓ 已添加到素材库';
-      document.body.appendChild(toast);
-      setTimeout(() => toast.remove(), 2000);
-    }
-  }
-
-  function addManualMaterial({ title, content, type, source, url, tags, note, spaceId, imageUrl, fullContent, insight, metadata }) {
-    const newMaterial = {
-      id: Date.now(),
-      type,
-      title,
-      content,
-      fullContent: fullContent || content,
-      source: source || '手动添加',
-      url: url || '',
-      tags: Array.isArray(tags) ? tags : (tags ? tags.split(',').map(t => t.trim()).filter(Boolean) : []),
-      note,
-      spaceId: spaceId ? Number(spaceId) : null,
-      imageUrl: imageUrl || '',
-      insight: insight || null,
-      metadata: metadata || null,
-      createdAt: new Date().toISOString()
-    };
-    setMaterials(prev => [...prev, newMaterial]);
-    setShowAddMaterial(false);
-    return newMaterial;
-  }
-
-  function continueMaterialInWorkbench(material) {
-    if (!material) return;
-    setSelectedMaterials([material.id]);
-    setCopilotPendingMessage([
-      `请基于这条素材继续研究：${material.title || '未命名素材'}`,
-      '',
-      '【素材内容】',
-      String(material.fullContent || material.content || '').slice(0, 3500),
-      '',
-      '请输出：1）核心判断 2）证据缺口 3）下一步研究清单 4）可沉淀为文章的结构。'
-    ].join('\n'));
-    goNav('home');
-    showToast('已发送到 AI 工作站继续研究');
-  }
-
-  function removeMaterial(id) {
-    setMaterials(prev => prev.filter(m => m.id !== id));
-  }
-
-  function batchRemoveMaterials(ids) {
-    setMaterials(prev => prev.filter(m => !ids.includes(m.id)));
-    setSelectedMaterials([]);
-  }
-
-  function updateMaterialTags(id, tags) {
-    setMaterials(prev => prev.map(m => m.id === id ? { ...m, tags } : m));
-  }
-
-  function toggleMaterialSelection(id) {
-    setSelectedMaterials(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
-  }
-
-  function selectAllMaterials() {
-    setSelectedMaterials(filteredMaterials.map(m => m.id));
-  }
-
-  function clearMaterialSelection() {
-    setSelectedMaterials([]);
-  }
-
-  function updateMaterialNote(id, note) {
-    setMaterials(prev => prev.map(m => m.id === id ? { ...m, note } : m));
-  }
-
-  function assignMaterialsToSpace(ids, spaceId) {
-    setMaterials(prev => prev.map(m => ids.includes(m.id) ? { ...m, spaceId } : m));
-    setSelectedMaterials([]);
-  }
-
-  function createMaterialSpace() {
-    if (!newSpaceName.trim()) return;
-    const newSpace = { id: Date.now(), name: newSpaceName.trim(), createdAt: new Date().toISOString() };
-    setMaterialSpaces(prev => [...prev, newSpace]);
-    setNewSpaceName('');
-    setShowSpaceForm(false);
-  }
-
-  function deleteMaterialSpace(id) {
-    setMaterialSpaces(prev => prev.filter(s => s.id !== id));
-    setMaterials(prev => prev.map(m => m.spaceId === id ? { ...m, spaceId: null } : m));
-    if (materialSpaceFilter === String(id)) setMaterialSpaceFilter('all');
-  }
-
-  function toggleMaterialStar(id) {
-    setMaterials(prev => prev.map(m => m.id === id ? { ...m, starred: !m.starred } : m));
-  }
-
-  function exportMaterials() {
-    const data = JSON.stringify(materials, null, 2);
-    const blob = new Blob([data], { type: 'application/json;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `siliconstream-materials-${new Date().toISOString().slice(0, 10)}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-  }
-
-  function importMaterials(file) {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      try {
-        const imported = JSON.parse(e.target.result);
-        if (Array.isArray(imported)) {
-          setMaterials(prev => [...prev, ...imported.map(m => ({ ...m, id: Date.now() + Math.random() }))]);
-          const toast = document.createElement('div');
-          toast.className = 'material-toast';
-          toast.textContent = `✓ 成功导入 ${imported.length} 条素材`;
-          document.body.appendChild(toast);
-          setTimeout(() => toast.remove(), 2000);
-        }
-      } catch (err) {
-        alert('导入失败：文件格式错误');
-      }
-    };
-    reader.readAsText(file);
-  }
+  // 书签与素材操作已提取至 useBookmarkMaterial hook
 
   // 文章操作
   function createArticle(template = 'blank', spaceId = null) {
@@ -4237,6 +4056,29 @@ ${signals}
     setFocusedIndex(-1);
     setMobileMenuOpen(false);
   };
+  const {
+    bookmarks, setBookmarks,
+    materials, setMaterials,
+    selectedMaterials, setSelectedMaterials,
+    materialSpaces, setMaterialSpaces,
+    newSpaceName, setNewSpaceName,
+    toggleBookmark, isBookmarked, isInMaterials, toggleRead,
+    detectMaterialType, toggleMaterial, addManualMaterial,
+    continueMaterialInWorkbench, removeMaterial, batchRemoveMaterials,
+    updateMaterialTags, toggleMaterialSelection, selectAllMaterials,
+    clearMaterialSelection, updateMaterialNote, assignMaterialsToSpace,
+    createMaterialSpace, deleteMaterialSpace, toggleMaterialStar,
+    exportMaterials, importMaterials,
+  } = useBookmarkMaterial({
+    creativeWorkspace,
+    goNav,
+    setCopilotPendingMessage,
+    setShowAddMaterial,
+    setShowSpaceForm,
+    materialSpaceFilter,
+    setMaterialSpaceFilter,
+    filteredMaterials,
+  });
   const wideWorkspaceNavs = ['home', 'recommendations', 'studio', 'agents', 'editor', 'materials', 'square', 'profile-center'];
   // 右侧面板：「全部动态」显示关注关键词；「AI 情报首页」显示情报时间线；「精准推荐」显示日期竖向时间线
   const showRightPanel = nav === 'recommendations';
