@@ -5,16 +5,9 @@ import { renderMarkdown } from '../utils/markdown.jsx';
 import { normalizeAsset } from '../domain/creative/assetModel.js';
 import { exportDocument } from '../domain/creative/exportEngine.js';
 import { saveDocumentVersion } from '../domain/creative/versionStore.js';
+import { ARTICLE_STATUS, ARTICLE_TEMPLATES, ARTICLE_TEMPLATE_CONTENT } from '../constants/index.jsx';
 
-// 文章状态/模板常量（与 src/constants/index.jsx 保持一致，避免循环依赖）
-export const ARTICLE_STATUS = { draft: '草稿', published: '已发布', archived: '已归档' };
-export const ARTICLE_TEMPLATES = { blank: '空白', briefing: '每日简报', analysis: '深度分析', tech: '技术解读' };
-export const ARTICLE_TEMPLATE_CONTENT = {
-  blank: '',
-  briefing: `# 每日科技简报\n\n> 日期：{DATE}\n\n## 今日要闻\n\n1. \n2. \n3. \n\n## 重点分析\n\n### 事件背景\n\n\n### 影响解读\n\n\n## 趋势观察\n\n\n## 明日关注\n\n`,
-  analysis: `# 深度分析：标题\n\n## 摘要\n\n用 2-3 句话概括本文核心观点。\n\n## 背景\n\n介绍事件的来龙去脉，提供必要的上下文信息。\n\n## 核心观点\n\n### 观点一\n\n- 论据支撑\n- 数据引用\n- 案例说明\n\n### 观点二\n\n- 论据支撑\n- 数据引用\n- 案例说明\n\n## 影响分析\n\n- 对行业的影响\n- 对用户的影响\n- 对技术生态的影响\n\n## 趋势预判\n\n基于以上分析，对未来趋势做出预判。\n\n## 参考资料\n\n1. \n2. \n`,
-  tech: `# 技术解读：标题\n\n## 概述\n\n简要介绍要解读的技术/产品/工具。\n\n## 技术原理\n\n### 核心概念\n\n解释关键技术概念。\n\n### 架构设计\n\n描述技术的架构或设计思路。\n\n## 使用场景\n\n- 场景一：\n- 场景二：\n- 场景三：\n\n## 代码示例\n\n\`\`\`javascript\n// 示例代码\n\`\`\`\n\n## 优缺点分析\n\n### 优势\n\n- \n- \n\n### 局限\n\n- \n- \n\n## 总结\n\n总结技术的价值和适用场景。\n\n## 参考资料\n\n- \n`
-};
+// 文章状态/模板常量从 ../constants/index.jsx 导入（单一来源）
 
 /**
  * 文章编辑器 hook：管理文章/创作空间/编辑器状态与全部操作函数。
@@ -49,7 +42,7 @@ export const ARTICLE_TEMPLATE_CONTENT = {
  *   articleCitations, saveArticleVersion,
  * }}
  */
-export function useArticleEditor({ llmConfig, materials, editorTextareaRef }) {
+export function useArticleEditor({ llmConfig, materials = [], editorTextareaRef }) {
   // 文章与空间数据
   const [articles, setArticles] = useState(() => loadLS('articles', []));
   const [articleSpaces, setArticleSpaces] = useState(() => loadLS('articleSpaces', []));
