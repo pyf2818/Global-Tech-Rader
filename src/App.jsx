@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useRef, useCallback, lazy, Suspense } from 'react';
+﻿import { useEffect, useMemo, useState, useRef, useCallback, lazy, Suspense } from 'react';
 import SettingsModal from './components/SettingsModal.jsx';
 import ArticleEditor from './components/ArticleEditor.jsx';
 import CreativeWorkspace from './components/CreativeWorkspace.jsx';
@@ -14,10 +14,6 @@ import SkeletonCard from './components/SkeletonCard.jsx';
 import NewsItem from './components/NewsItem.jsx';
 import HexRadarChart from './components/HexRadarChart.jsx';
 import TrendLineChart from './components/TrendLineChart.jsx';
-import GithubRepoCard from './components/GithubRepoCard.jsx';
-import {
-  buildGithubMaterial,
-} from './utils/githubMaterial.js';
 import { useAuth } from './hooks/useAuth.js';
 import { useLlmConfig } from './hooks/useLlmConfig.js';
 import { useTrending } from './hooks/useTrending.js';
@@ -34,7 +30,14 @@ import RecommendationFeed from './components/RecommendationFeed.jsx';
 import RecommendationDateRail from './components/RecommendationDateRail.jsx';
 import TodayNewspaper from './components/TodayNewspaper.jsx';
 import CommunityPage from './components/CommunityPage.jsx';
+import RecommendationsPage from './components/RecommendationsPage.jsx';
+import ProfilePage from './components/ProfilePage.jsx';
 import StudioPage from './components/StudioPage.jsx';
+import NewsPage from './components/NewsPage.jsx';
+import GithubPage from './components/GithubPage.jsx';
+import TrendingPage from './components/TrendingPage.jsx';
+import HomePage from './components/HomePage.jsx';
+import AgentsPage from './components/AgentsPage.jsx';
 import { useProfileSync } from './hooks/useProfileSync.js';
 import {
   PROFILE_TIER_OPTIONS,
@@ -6105,8 +6108,8 @@ ${signals}
             </Suspense>
           )}
           {nav === 'home' && (
-            <AiChatPanel
-              variant="main"
+            <HomePage
+              key="home"
               llmConfig={llmConfig}
               intelligenceProfile={intelligenceProfile}
               workbenchItems={workbenchItems}
@@ -6116,11 +6119,10 @@ ${signals}
               onOpenLlmConfig={() => setShowLlmQuickConfig(true)}
               pendingMessage={copilotPendingMessage}
               onMessageSent={() => setCopilotPendingMessage('')}
-              intelligenceContext={{
-                date: selectedNewsDate,
-                briefing: algorithmBriefing,
-                items: [...externalIntelligenceItems, ...recommendationLanes.public, ...recommendationLanes.personal].slice(0, 16),
-              }}
+              selectedNewsDate={selectedNewsDate}
+              algorithmBriefing={algorithmBriefing}
+              externalIntelligenceItems={externalIntelligenceItems}
+              recommendationLanes={recommendationLanes}
               onOpenNewspaper={() => setShowNewspaperOverlay(true)}
               todayBriefing={todayBriefing}
               todayLanes={todayLanes}
@@ -6316,603 +6318,114 @@ ${signals}
           )}
 
           {nav === 'agents' && (
-            <div className="agent-home">
-              <section className="agent-home-hero">
-                <div>
-                  <div className="workbench-kicker">Agentic Intelligence</div>
-                  <h1>智能体工作流</h1>
-                  <p>这是主力大模型工作区，用来完成深度分析、追踪记忆、风险扫描和创作转化。AI 精灵保留为页面小助手，这里负责真正的宽屏任务处理。</p>
-                </div>
-                <button
-                  className="ai-primary-action"
-                  onClick={() => runAgentWorkflow(intelligenceMissions[0])}
-                >
-                  运行今日简报
-                </button>
-              </section>
-
-              <section className="agent-workflow-layout">
-                <div className="agent-workflow-panel mission-panel">
-                  <div className="section-header">
-                    <h2 className="section-title">{ICONS.sparkles} 工作流任务</h2>
-                    <p className="section-desc">任务会自动携带今日资讯、用户画像、追踪关键词和来源偏好。</p>
-                  </div>
-                  <div className="agent-scope-selector">
-                    {agentWorkflowScopes.map(scope => (
-                      <button
-                        key={scope.id}
-                        type="button"
-                        className={agentWorkflowScope === scope.id ? 'active' : ''}
-                        onClick={() => setAgentWorkflowScope(scope.id)}
-                      >
-                        <span>{scope.label}</span>
-                        <small>{scope.desc}</small>
-                      </button>
-                    ))}
-                  </div>
-                  <div className="agent-workflow-missions">
-                    {intelligenceMissions.map(mission => {
-                      const agent = agents.find(a => a.id === mission.agentId);
-                      return (
-                        <button
-                          key={mission.id}
-                          className={`agent-workflow-mission ${agentWorkflowResult.missionId === mission.id ? 'active' : ''}`}
-                          onClick={() => runAgentWorkflow(mission)}
-                        >
-                          <span>{mission.label}</span>
-                          <small>{agent?.name || '智能体'}</small>
-                        </button>
-                      );
-                    })}
-                  </div>
-                  <div className="agent-custom-run">
-                    <label>自定义任务</label>
-                    <textarea
-                      id="agent-workflow-custom-prompt"
-                      name="agentWorkflowPrompt"
-                      value={agentWorkflowPrompt}
-                      onChange={e => setAgentWorkflowPrompt(e.target.value)}
-                      placeholder="例如：只分析我关注领域里的机会，并给出三个可执行创作选题"
-                      rows={4}
-                    />
-                    <button onClick={() => runAgentWorkflow(intelligenceMissions[0], agentWorkflowPrompt)}>
-                      运行自定义工作流
-                    </button>
-                  </div>
-                </div>
-
-                <div className="agent-workflow-panel context-panel">
-                  <div className="section-header">
-                    <h2 className="section-title">{ICONS.follow} 个性化上下文</h2>
-                    <p className="section-desc">产品不只聚焦 AI，会从你的选择由小及大扩展到科技、商业、政策和产业赛道。</p>
-                  </div>
-                  <div className="agent-context-grid">
-                    <div><span>关注领域</span><strong>{intelligenceProfile.focusLabels.join('、') || '未设置'}</strong></div>
-                    <div><span>追踪记忆</span><strong>{intelligenceProfile.tracked.join('、') || '暂无'}</strong></div>
-                    <div><span>推荐深度</span><strong>{intelligenceProfile.depth}</strong></div>
-                    <div><span>输出目标</span><strong>{intelligenceProfile.outputGoal}</strong></div>
-                  </div>
-                  <div className="agent-source-strategy">
-                    <strong>信息源增强方向</strong>
-                    <p>参考 RSSHub、feedfinder、Readability/Mercury Parser 的思路：用源发现扩大覆盖，用健康评分控制质量，用正文抽取提高图片和摘要准确性。</p>
-                    <button onClick={() => { setSettingsTab('sources'); setShowSettings(true); }}>管理信息源</button>
-                  </div>
-                  <div className="agent-source-strategy">
-                    <strong>AI 精灵定位</strong>
-                    <p>小精灵继续负责随手问、引用卡片、轻量接力；复杂任务在此页面运行，避免窗口太小影响操作。</p>
-                  </div>
-                </div>
-
-                <div className="agent-workflow-panel builder-panel">
-                  <div className="section-header">
-                    <h2 className="section-title">{ICONS.bot} 可视化工作流蓝图</h2>
-                    <p className="section-desc">先用可编辑节点定义智能体协作语言，后续再升级为拖拽式画布和真实节点执行。</p>
-                  </div>
-
-                  <div className="workflow-template-bar">
-                    <label>
-                      <span>工作流模板</span>
-                      <select value={activeWorkflowId} onChange={e => switchWorkflowTemplate(e.target.value)}>
-                        {workflowTemplates.map(template => (
-                          <option key={template.id} value={template.id}>{template.name || '未命名工作流'}</option>
-                        ))}
-                      </select>
-                    </label>
-                    <button onClick={saveWorkflowAsTemplate}>{ICONS.plus} 保存副本</button>
-                    <button onClick={() => deleteWorkflowTemplate(activeWorkflowId)}>删除模板</button>
-                  </div>
-
-                  <div className="workflow-template-gallery">
-                    <div className="workflow-gallery-head">
-                      <div>
-                        <span>成熟模板库</span>
-                        <strong>从真实工作流产品提炼的三条起步链路</strong>
-                      </div>
-                      <div className="workflow-import-actions">
-                        <input
-                          ref={workflowImportInputRef}
-                          type="file"
-                          accept="application/json,.json"
-                          onChange={e => importWorkflowJson(e.target.files?.[0])}
-                          hidden
-                        />
-                        <button type="button" onClick={() => workflowImportInputRef.current?.click()}>
-                          导入 JSON
-                        </button>
-                      </div>
-                    </div>
-                    <div className="workflow-template-cards">
-                      {WORKFLOW_TEMPLATE_LIBRARY.map(template => (
-                        <button
-                          key={template.id}
-                          type="button"
-                          className="workflow-template-card"
-                          onClick={() => installWorkflowTemplate(template)}
-                        >
-                          <strong>{template.name}</strong>
-                          <p>{template.description}</p>
-                          <small>{template.source}</small>
-                          <span>{template.nodes.length} 节点 · {template.tags.join(' / ')}</span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className={`workflow-validation-panel ${workflowValidation.ready ? 'ready' : 'blocked'}`}>
-                    <div className="workflow-validation-head">
-                      <div>
-                        <span>运行前检查</span>
-                        <strong>{workflowValidation.ready ? '工作流已就绪' : `${workflowValidation.blockingIssues.length} 个阻塞项`}</strong>
-                      </div>
-                      <em>{workflowValidation.score}%</em>
-                    </div>
-                    <div className="workflow-validation-list">
-                      {workflowValidation.checks.slice(0, 8).map(check => (
-                        <div key={check.id} className={`workflow-validation-item ${check.ok ? 'ok' : check.blocking ? 'bad' : 'warn'}`}>
-                          <span>{check.ok ? 'OK' : check.blocking ? 'Fix' : 'Warn'}</span>
-                          <p>{check.label}<small>{check.detail}</small></p>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="workflow-draft-form">
-                    <label>
-                      <span>工作流名称</span>
-                      <input
-                        value={agentWorkflowDraft.name}
-                        onChange={e => updateWorkflowDraft({ name: e.target.value })}
-                      />
-                    </label>
-                    <label>
-                      <span>目标说明</span>
-                      <textarea
-                        value={agentWorkflowDraft.description}
-                        onChange={e => updateWorkflowDraft({ description: e.target.value })}
-                        rows={2}
-                      />
-                    </label>
-                  </div>
-
-                  <div className="workflow-canvas">
-                    {agentWorkflowDraft.nodes.map((node, index) => (
-                      <div
-                        key={node.id}
-                        className={`workflow-node-frame ${draggingWorkflowNodeId === node.id ? 'dragging' : ''}`}
-                        draggable
-                        onDragStart={() => setDraggingWorkflowNodeId(node.id)}
-                        onDragOver={e => e.preventDefault()}
-                        onDrop={() => {
-                          reorderWorkflowNode(draggingWorkflowNodeId, node.id);
-                          setDraggingWorkflowNodeId('');
-                        }}
-                        onDragEnd={() => setDraggingWorkflowNodeId('')}
-                      >
-                        <button
-                          type="button"
-                          className={`workflow-builder-node tone-${workflowTypeMeta[node.type]?.tone || 'slate'} ${selectedWorkflowNodeId === node.id ? 'active' : ''} ${node.enabled === false ? 'disabled' : ''}`}
-                          onClick={() => setSelectedWorkflowNodeId(node.id)}
-                        >
-                          <span className="workflow-node-index">{String(index + 1).padStart(2, '0')}</span>
-                          <span className="workflow-node-type">{workflowTypeMeta[node.type]?.label || node.type}</span>
-                          <strong>{node.title}</strong>
-                          <p>{node.role}</p>
-                          {formatWorkflowNodeConfig(node) && <small>{formatWorkflowNodeConfig(node)}</small>}
-                        </button>
-                        {index < agentWorkflowDraft.nodes.length - 1 && <span className="workflow-connector">→</span>}
-                      </div>
-                    ))}
-                  </div>
-
-                  <div className="workflow-add-row">
-                    <select value={newWorkflowNodeType} onChange={e => setNewWorkflowNodeType(e.target.value)}>
-                      {Object.entries(workflowTypeMeta).map(([type, meta]) => (
-                        <option key={type} value={type}>{meta.label}</option>
-                      ))}
-                    </select>
-                    <button onClick={addWorkflowNode}>{ICONS.plus} 添加节点</button>
-                    <button className="workflow-save-blueprint" onClick={exportWorkflowToMaterials}>{ICONS.layers} 保存蓝图</button>
-                    <button className="workflow-download-json" onClick={downloadWorkflowJson}>{ICONS.download} 导出 JSON</button>
-                    <button onClick={resetWorkflowDraft}>恢复模板</button>
-                  </div>
-
-                  {selectedWorkflowNode && (
-                    <div className="workflow-node-editor">
-                      <div className="workflow-node-editor-head">
-                        <div>
-                          <span>节点配置</span>
-                          <strong>{selectedWorkflowNode.title}</strong>
-                        </div>
-                        <div className="workflow-node-tools">
-                          <button onClick={() => moveWorkflowNode(selectedWorkflowNode.id, 'up')}>上移</button>
-                          <button onClick={() => moveWorkflowNode(selectedWorkflowNode.id, 'down')}>下移</button>
-                          <label className="workflow-toggle">
-                            <input
-                              type="checkbox"
-                              checked={selectedWorkflowNode.enabled !== false}
-                              onChange={e => updateWorkflowNode(selectedWorkflowNode.id, { enabled: e.target.checked })}
-                            />
-                            启用
-                          </label>
-                        </div>
-                      </div>
-                      <div className="workflow-node-editor-grid">
-                        <label>
-                          <span>节点标题</span>
-                          <input
-                            className="workflow-node-title-input"
-                            value={selectedWorkflowNode.title}
-                            onChange={e => updateWorkflowNode(selectedWorkflowNode.id, { title: e.target.value })}
-                          />
-                        </label>
-                        <label>
-                          <span>节点类型</span>
-                          <select
-                            value={selectedWorkflowNode.type}
-                            onChange={e => updateWorkflowNode(selectedWorkflowNode.id, { type: e.target.value })}
-                          >
-                            {Object.entries(workflowTypeMeta).map(([type, meta]) => (
-                              <option key={type} value={type}>{meta.label}</option>
-                            ))}
-                          </select>
-                        </label>
-                      </div>
-                      <label>
-                        <span>职责说明</span>
-                        <textarea
-                          value={selectedWorkflowNode.role}
-                          onChange={e => updateWorkflowNode(selectedWorkflowNode.id, { role: e.target.value })}
-                          rows={2}
-                        />
-                      </label>
-                      <label>
-                        <span>执行指令 / Prompt</span>
-                        <textarea
-                          value={selectedWorkflowNode.prompt}
-                          onChange={e => updateWorkflowNode(selectedWorkflowNode.id, { prompt: e.target.value })}
-                          rows={4}
-                        />
-                      </label>
-                      {selectedWorkflowNode.type === 'skill' && (
-                        <label>
-                          <span>内置 Skill 能力</span>
-                          <select
-                            value={selectedWorkflowNode.skillId || 'evidence-pack'}
-                            onChange={e => updateWorkflowNode(selectedWorkflowNode.id, { skillId: e.target.value })}
-                          >
-                            {WORKFLOW_SKILL_CATALOG.map(skill => (
-                              <option key={skill.id} value={skill.id}>{skill.label}</option>
-                            ))}
-                          </select>
-                        </label>
-                      )}
-                      {selectedWorkflowNode.type === 'condition' && (
-                        <div className="workflow-node-editor-grid condition-grid">
-                          <label>
-                            <span>判断指标</span>
-                            <select
-                              value={selectedWorkflowNode.conditionMetric || 'itemCount'}
-                              onChange={e => updateWorkflowNode(selectedWorkflowNode.id, { conditionMetric: e.target.value })}
-                            >
-                              {WORKFLOW_CONDITION_METRICS.map(metric => (
-                                <option key={metric.id} value={metric.id}>{metric.label}</option>
-                              ))}
-                            </select>
-                          </label>
-                          <label>
-                            <span>条件</span>
-                            <select
-                              value={selectedWorkflowNode.conditionOperator || '>='}
-                              onChange={e => updateWorkflowNode(selectedWorkflowNode.id, { conditionOperator: e.target.value })}
-                            >
-                              {WORKFLOW_CONDITION_OPERATORS.map(operator => (
-                                <option key={operator.id} value={operator.id}>{operator.label}</option>
-                              ))}
-                            </select>
-                          </label>
-                          <label>
-                            <span>阈值</span>
-                            <input
-                              type="number"
-                              value={selectedWorkflowNode.conditionValue ?? 1}
-                              onChange={e => updateWorkflowNode(selectedWorkflowNode.id, { conditionValue: Number(e.target.value) })}
-                            />
-                          </label>
-                        </div>
-                      )}
-                      {selectedWorkflowNode.type === 'classifier' && (
-                        <label>
-                          <span>分类桶</span>
-                          <input
-                            value={selectedWorkflowNode.classifierLabels || '必读,追踪,素材,创作,降噪'}
-                            onChange={e => updateWorkflowNode(selectedWorkflowNode.id, { classifierLabels: e.target.value })}
-                            placeholder="例如 必读,追踪,素材,创作,降噪"
-                          />
-                        </label>
-                      )}
-                      <div className="workflow-node-editor-grid">
-                        <label>
-                          <span>输入变量</span>
-                          <input
-                            value={selectedWorkflowNode.inputKey || ''}
-                            onChange={e => updateWorkflowNode(selectedWorkflowNode.id, { inputKey: e.target.value })}
-                            placeholder="例如 briefing_context"
-                          />
-                        </label>
-                        <label>
-                          <span>输出变量</span>
-                          <input
-                            value={selectedWorkflowNode.outputKey || ''}
-                            onChange={e => updateWorkflowNode(selectedWorkflowNode.id, { outputKey: e.target.value })}
-                            placeholder="例如 ranked_signals"
-                          />
-                        </label>
-                      </div>
-                      <button className="workflow-delete-node" onClick={() => removeWorkflowNode(selectedWorkflowNode.id)}>删除节点</button>
-                      <div className="workflow-node-relations">
-                        <div>
-                          <span>上游</span>
-                          <strong>{selectedWorkflowConnections.previous?.title || '起点'}</strong>
-                        </div>
-                        <div>
-                          <span>下游</span>
-                          <strong>{selectedWorkflowConnections.next?.title || '终点'}</strong>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="workflow-blueprint-preview">
-                    <span>当前启用链路</span>
-                    <p>{enabledWorkflowNodes.map(node => node.title).join(' → ') || '暂无启用节点'}</p>
-                  </div>
-                </div>
-
-                <div className="agent-workflow-panel result-panel">
-                  <div className="section-header">
-                    <h2 className="section-title">{ICONS.document} 工作流输出</h2>
-                    <p className="section-desc">结果可继续交给小助手追问，或沉淀到素材库。</p>
-                  </div>
-                  <div className={`workflow-run-panel status-${agentWorkflowRun.status || 'idle'}`}>
-                    <div className="workflow-run-head">
-                      <div>
-                        <span>最近运行</span>
-                        <strong>{agentWorkflowRun.missionLabel || '尚未运行工作流'}</strong>
-                      </div>
-                      <em>{workflowRunStatusMeta[agentWorkflowRun.status]?.label || '待运行'}</em>
-                    </div>
-                    {agentWorkflowRun.startedAt && (
-                      <p className="workflow-run-time">
-                        开始：{new Date(agentWorkflowRun.startedAt).toLocaleTimeString('zh-CN')}
-                        {agentWorkflowRun.finishedAt ? ` · 结束：${new Date(agentWorkflowRun.finishedAt).toLocaleTimeString('zh-CN')}` : ''}
-                      </p>
-                    )}
-                    <div className="workflow-run-trace">
-                      {(agentWorkflowRun.trace?.length ? agentWorkflowRun.trace : enabledWorkflowNodes.map((node, index) => ({
-                        id: node.id,
-                        title: node.title,
-                        type: node.type,
-                        order: index + 1,
-                        status: 'idle',
-                        detail: node.role
-                      }))).map(step => (
-                        <div key={step.id} className={`workflow-trace-step status-${step.status}`}>
-                          <span>{String(step.order).padStart(2, '0')}</span>
-                          <div>
-                            <strong>{step.title}</strong>
-                            <p>{step.detail}</p>
-                            {(step.inputKey || step.outputKey) && (
-                              <small className="workflow-trace-io">
-                                {(step.inputKey || 'context')} → {(step.outputKey || 'output')}
-                              </small>
-                            )}
-                            {step.variablePreview && <small className="workflow-trace-io">{step.variablePreview}</small>}
-                            {step.output && <pre>{step.output.slice(0, 420)}</pre>}
-                          </div>
-                          <em>{step.status}</em>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                  {agentWorkflowHistory.length > 0 && (
-                    <div className="workflow-memory-panel">
-                      <div className="workflow-memory-head">
-                        <div>
-                          <span>任务记忆</span>
-                          <strong>{agentWorkflowHistory.length} 次运行</strong>
-                        </div>
-                        <button onClick={clearAgentWorkflowHistory}>清空</button>
-                      </div>
-                      <div className="workflow-memory-list">
-                        {agentWorkflowHistory.slice(0, 4).map(record => (
-                          <button
-                            type="button"
-                            key={record.id}
-                            className={`workflow-memory-item status-${record.status || 'completed'}`}
-                            onClick={() => restoreAgentWorkflowHistory(record)}
-                          >
-                            <span>{record.missionLabel || '历史任务'}</span>
-                            <strong>{record.workflowName || agentWorkflowDraft.name}</strong>
-                            <em>{record.finishedAt ? new Date(record.finishedAt).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }) : '未完成'}</em>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                  {agentWorkflowResult.loading && <div className="agent-result-loading"><div className="spinner" /><span>智能体正在处理今日情报...</span></div>}
-                  {!agentWorkflowResult.loading && agentWorkflowResult.error && (
-                    <div className="agent-result-error">
-                      <p>{agentWorkflowResult.error}</p>
-                      <button onClick={() => setShowLlmQuickConfig(true)}>配置大模型</button>
-                    </div>
-                  )}
-                  {!agentWorkflowResult.loading && !agentWorkflowResult.error && !agentWorkflowResult.content && (
-                    <div className="agent-result-empty">
-                      <p>选择左侧任务后，结果会在这里生成。</p>
-                    </div>
-                  )}
-                  {!agentWorkflowResult.loading && agentWorkflowResult.content && (
-                    <>
-                      <pre className="agent-result-content">{agentWorkflowResult.content}</pre>
-                      {agentWorkflowActions.length > 0 && (
-                        <div className="workflow-action-panel">
-                          <div className="workflow-action-head">
-                            <div>
-                              <span>可执行动作</span>
-                              <strong>{agentWorkflowActions.filter(action => action.status !== 'done').length} 个待处理</strong>
-                            </div>
-                          </div>
-                          <div className="workflow-action-list">
-                            {agentWorkflowActions.map(action => (
-                              <div key={action.id} className={`workflow-action-item status-${action.status || 'pending'}`}>
-                                <div className="workflow-action-main">
-                                  <span>{action.label}</span>
-                                  <strong>{action.title}</strong>
-                                  <p>{action.desc}</p>
-                                </div>
-                                <button onClick={() => executeWorkflowAction(action)}>
-                                  {action.status === 'done' ? '已完成' : '执行'}
-                                </button>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                      <div className="agent-result-actions">
-                        <button onClick={() => addManualMaterial({
-                          title: `${agentWorkflowDraft.name || '智能体工作流'} ${new Date().toLocaleDateString('zh-CN')}`,
-                          content: `${agentWorkflowResult.content}\n\n---\n\n工作流蓝图\n${workflowBlueprintText}`,
-                          type: 'analysis',
-                          source: '智能体工作流',
-                          url: '',
-                          tags: '智能体,情报分析',
-                          note: '',
-                          spaceId: null
-                        })}>存入素材库</button>
-                        <button onClick={exportWorkflowResultToEditor}>导出到内容创作</button>
-                        <button onClick={() => sendWorkbenchToElf(`请基于以下智能体工作流结果继续追问：\n${agentWorkflowResult.content}`, currentAgent)}>
-                          交给小助手追问
-                        </button>
-                      </div>
-                    </>
-                  )}
-                </div>
-              </section>
-            </div>
+            <AgentsPage
+              runAgentWorkflow={runAgentWorkflow}
+              intelligenceMissions={intelligenceMissions}
+              agentWorkflowScopes={agentWorkflowScopes}
+              agentWorkflowScope={agentWorkflowScope}
+              setAgentWorkflowScope={setAgentWorkflowScope}
+              agentWorkflowRunning={agentWorkflowRunning}
+              agentWorkflowResult={agentWorkflowResult}
+              agentWorkflowHistory={agentWorkflowHistory}
+              agentWorkflowRun={agentWorkflowRun}
+              agentWorkflowActions={agentWorkflowActions}
+              agentWorkflowDraft={agentWorkflowDraft}
+              selectedWorkflowNodeId={selectedWorkflowNodeId}
+              setSelectedWorkflowNodeId={setSelectedWorkflowNodeId}
+              currentAgent={currentAgent}
+              setCurrentAgent={setCurrentAgent}
+              llmConfig={llmConfig}
+              workflowTypeMeta={workflowTypeMeta}
+              workflowRunStatusMeta={workflowRunStatusMeta}
+              enabledWorkflowNodes={enabledWorkflowNodes}
+              workflowBlueprintText={workflowBlueprintText}
+              selectedWorkflowNode={selectedWorkflowNode}
+              selectedWorkflowConnections={selectedWorkflowConnections}
+              newWorkflowNodeType={newWorkflowNodeType}
+              setNewWorkflowNodeType={setNewWorkflowNodeType}
+              formatWorkflowNodeConfig={formatWorkflowNodeConfig}
+              updateWorkflowNode={updateWorkflowNode}
+              removeWorkflowNode={removeWorkflowNode}
+              moveWorkflowNode={moveWorkflowNode}
+              addWorkflowNode={addWorkflowNode}
+              exportWorkflowToMaterials={exportWorkflowToMaterials}
+              downloadWorkflowJson={downloadWorkflowJson}
+              resetWorkflowDraft={resetWorkflowDraft}
+              runAgentWorkflow={runAgentWorkflow}
+              executeWorkflowAction={executeWorkflowAction}
+              clearAgentWorkflowHistory={clearAgentWorkflowHistory}
+              restoreAgentWorkflowHistory={restoreAgentWorkflowHistory}
+              sendWorkbenchToElf={sendWorkbenchToElf}
+              exportWorkflowResultToEditor={exportWorkflowResultToEditor}
+              addManualMaterial={addManualMaterial}
+              setShowLlmQuickConfig={setShowLlmQuickConfig}
+              setSettingsTab={setSettingsTab}
+              setShowSettings={setShowSettings}
+              WORKFLOW_SKILL_CATALOG={WORKFLOW_SKILL_CATALOG}
+              WORKFLOW_CONDITION_METRICS={WORKFLOW_CONDITION_METRICS}
+              WORKFLOW_CONDITION_OPERATORS={WORKFLOW_CONDITION_OPERATORS}
+            />
           )}
 
           {/* ALL NEWS */}
           {nav === 'all' && (
-            <>
-              {/* Event Clusters */}
-              {eventClusters.length > 0 && category === 'all' && mode === 'all' && !query && (
-                <div className="event-clusters">
-                  {eventClusters.slice(0, 3).map(cluster => (
-                    <div key={cluster.id} className="event-cluster-card">
-                      <div className="cluster-header" onClick={() => setExpandedEvents(p => ({ ...p, [cluster.id]: !p[cluster.id] }))}>
-                        <span className="cluster-icon">{ICONS.eventCard}</span>
-                        <span className="cluster-keyword">{cluster.keyword}</span>
-                        <span className="cluster-count">{cluster.independentSourceCount} 个独立来源</span>
-                        <span className={`cluster-chevron ${expandedEvents[cluster.id] ? 'open' : ''}`}>{ICONS.chevronDown}</span>
-                      </div>
-                      {expandedEvents[cluster.id] && (
-                        <div className="cluster-items">
-                          {cluster.items.map((item, ci) => {
-                            const summaryEntry = getSummaryEntry(item);
-                            return <NewsItem key={item.id} item={item} index={ci} viewMode={viewMode} isFocused={focusedIndex === filtered.indexOf(item)} isBookmarked={isBookmarked(item.id)} isInMaterials={isInMaterials(item.id)} onBookmark={() => toggleBookmark(item)} onAddMaterial={() => toggleMaterial(item)} onSummary={() => handleSummaryToggle(item)} isSummaryOpen={expandedSummary[item.id]} summaryText={summaryEntry?.text || ''} summaryMode={summaryEntry?.mode || ''} summaryLoading={Boolean(summaryLoading[item.id])} isFollowed={followKeywords.some(kw => `${item.title} ${item.summary}`.toLowerCase().includes(kw.toLowerCase()))} onOpenLightbox={(src, title, images, index) => setLightbox({ open: true, src, title, images: images || [], index: index || 0 })} showTranslation={translationOpen[item.id]} onToggleTranslation={() => setTranslationOpen(p => ({ ...p, [item.id]: !p[item.id] }))} onRequestTranslation={() => requestTranslation(item)} isTranslating={translatingItems[item.id]} translation={getTranslation(item)} />;
-                          })}
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {loading && <div className={`feed-list view-${viewMode} ${viewMode === 'card' ? 'card-grid' : ''}`}>{Array.from({ length: 6 }).map((_, i) => <SkeletonCard key={i} viewMode={viewMode} />)}</div>}
-              {error && <div className="error-state"><p>加载失败: {error}</p><button onClick={() => loadNews()}>重试</button></div>}
-              {!loading && !error && allFeedItems.length === 0 && <div className="empty-state"><p>{allActiveFilters.length > 0 ? `共 ${items.length} 条资讯，当前 ${allActiveFilters.length} 个筛选条件均不匹配` : '没有匹配的资讯'}</p><button onClick={clearAllFilters}>清空全部筛选</button></div>}
-              <div className={`feed-list view-${viewMode} ${viewMode === 'card' ? 'card-grid' : ''}`}>
-                {allFeedItems.slice(0, renderLimit).map((item, i) => {
-                  const summaryEntry = getSummaryEntry(item);
-                  return <NewsItem key={item.id} item={item} index={i} viewMode={viewMode} isFocused={focusedIndex === i} isBookmarked={isBookmarked(item.id)} isInMaterials={isInMaterials(item.id)} onBookmark={() => toggleBookmark(item)} onAddMaterial={() => toggleMaterial(item)} onSummary={() => handleSummaryToggle(item)} isSummaryOpen={expandedSummary[item.id]} summaryText={summaryEntry?.text || ''} summaryMode={summaryEntry?.mode || ''} summaryLoading={Boolean(summaryLoading[item.id])} isFollowed={followKeywords.some(kw => `${item.title} ${item.summary}`.toLowerCase().includes(kw.toLowerCase()))} onRead={() => recordReading(item)} showTranslation={translationOpen[item.id]} onToggleTranslation={() => setTranslationOpen(p => ({ ...p, [item.id]: !p[item.id] }))} onRequestTranslation={() => requestTranslation(item)} isTranslating={translatingItems[item.id]} translation={getTranslation(item)} onOpenLightbox={(src, title, images, index) => setLightbox({ open: true, src, title, images: images || [], index: index || 0 })} />;
-                })}
-              </div>
-              {nav === 'all' && loadingMore && (
-                <div className={`feed-list view-${viewMode} ${viewMode === 'card' ? 'card-grid' : ''}`}>
-                  {Array.from({ length: 3 }).map((_, i) => <SkeletonCard key={`more-${i}`} viewMode={viewMode} />)}
-                </div>
-              )}
-              {nav === 'all' && (newsHasMore || filtered.length > renderLimit) && (
-                <div id="load-more-sentinel" className="load-more-area">
-                  {loadingMore && <div className="load-more-spinner"><div className="spinner" /><span>加载中...</span></div>}
-                  {!loadingMore && <span className="load-more-hint">滚动加载更多</span>}
-                </div>
-              )}
-              {nav === 'all' && !newsHasMore && filtered.length <= renderLimit && items.length > 0 && (
-                <div className="load-more-area load-more-done">已全部加载</div>
-              )}
-            </>
+            <NewsPage
+              key="all"
+              eventClusters={eventClusters}
+              category={category}
+              mode={mode}
+              query={query}
+              expandedEvents={expandedEvents}
+              setExpandedEvents={setExpandedEvents}
+              viewMode={viewMode}
+              focusedIndex={focusedIndex}
+              filtered={filtered}
+              loading={loading}
+              error={error}
+              allFeedItems={allFeedItems}
+              allActiveFilters={allActiveFilters}
+              items={items}
+              renderLimit={renderLimit}
+              expandedSummary={expandedSummary}
+              summaryLoading={summaryLoading}
+              followKeywords={followKeywords}
+              translationOpen={translationOpen}
+              translatingItems={translatingItems}
+              newsHasMore={newsHasMore}
+              loadingMore={loadingMore}
+              getSummaryEntry={getSummaryEntry}
+              isBookmarked={isBookmarked}
+              isInMaterials={isInMaterials}
+              toggleBookmark={toggleBookmark}
+              toggleMaterial={toggleMaterial}
+              handleSummaryToggle={handleSummaryToggle}
+              clearAllFilters={clearAllFilters}
+              loadNews={loadNews}
+              recordReading={recordReading}
+              requestTranslation={requestTranslation}
+              getTranslation={getTranslation}
+              setLightbox={setLightbox}
+              setTranslationOpen={setTranslationOpen}
+            />
           )}
 
           {/* TRENDING */}
           {nav === 'trending' && (
-            <>
-              <div className="section-header">
-                <h2 className="section-title">{ICONS.fire} 热门榜单</h2>
-                <p className="section-desc">聚合 36氪、少数派、爱范儿、品玩、IT之家、Hacker News、TechCrunch、The Verge、Ars Technica、Wired 等 20+ 高质量平台热门内容</p>
-              </div>
-
-              {trendingLoading && <div className={`feed-list view-${viewMode} ${viewMode === 'card' ? 'card-grid' : ''}`}>{Array.from({ length: 4 }).map((_, i) => <SkeletonCard key={i} viewMode={viewMode} />)}</div>}
-              {!trendingLoading && <div className={`feed-list view-${viewMode} ${viewMode === 'card' ? 'card-grid' : ''}`}>{trendingItems.map((item, i) => <NewsItem key={item.id} item={item} index={i} viewMode={viewMode} isBookmarked={isBookmarked(item.id)} isInMaterials={isInMaterials(item.id)} onBookmark={() => toggleBookmark(item)} onAddMaterial={() => toggleMaterial(item)} isFollowed={false} onOpenLightbox={(src, title, images, index) => setLightbox({ open: true, src, title, images: images || [], index: index || 0 })} showTranslation={translationOpen[item.id]} onToggleTranslation={() => setTranslationOpen(p => ({ ...p, [item.id]: !p[item.id] }))} onRequestTranslation={() => requestTranslation(item)} isTranslating={translatingItems[item.id]} translation={getTranslation(item)} />)}</div>}
-
-              {!trendingLoading && trendingItems.length > 0 && (
-                <div className="load-more-area">
-                  {trendingLoadingMore && <div className="load-more-spinner"><div className="spinner" /><span>加载中...</span></div>}
-                  {!trendingLoadingMore && trendingHasMore && (
-                    <button className="btn-load-more" onClick={() => loadTrending(true, trendingPlatform, trendingType)}>加载更多</button>
-                  )}
-                  {!trendingHasMore && <span className="load-more-done">已全部加载</span>}
-                </div>
-              )}
-            </>
+            <TrendingPage key="trending" viewMode={viewMode} trendingLoading={trendingLoading} trendingItems={trendingItems} isBookmarked={isBookmarked} isInMaterials={isInMaterials} toggleBookmark={toggleBookmark} toggleMaterial={toggleMaterial} setLightbox={setLightbox} translationOpen={translationOpen} setTranslationOpen={setTranslationOpen} requestTranslation={requestTranslation} translatingItems={translatingItems} getTranslation={getTranslation} trendingLoadingMore={trendingLoadingMore} trendingHasMore={trendingHasMore} loadTrending={loadTrending} trendingPlatform={trendingPlatform} trendingType={trendingType} />
           )}
 
           {/* SMART RECOMMENDATIONS - 当日满足用户关注/画像的资讯卡片流（右栏竖向时间线见 panel） */}
           {nav === 'recommendations' && (
-            <IntelligenceFeedPanel
-              items={externalIntelligenceItems}
-              opportunities={externalIntelligenceOpportunities}
-              weeklySectors={externalIntelligenceWeeklySectors}
-              alerts={externalIntelligenceAlerts}
-              loading={externalIntelligenceLoading}
-              error={externalIntelligenceError}
-              updatedAt={externalIntelligenceUpdatedAt}
-              onRefresh={loadExternalIntelligence}
-            />
-          )}
-          {nav === 'recommendations' && (
-            <RecommendationFeed
-              lanes={displayRecommendationLanes}
+            <RecommendationsPage
+              externalIntelligenceItems={externalIntelligenceItems}
+              externalIntelligenceOpportunities={externalIntelligenceOpportunities}
+              externalIntelligenceWeeklySectors={externalIntelligenceWeeklySectors}
+              externalIntelligenceAlerts={externalIntelligenceAlerts}
+              externalIntelligenceLoading={externalIntelligenceLoading}
+              externalIntelligenceError={externalIntelligenceError}
+              externalIntelligenceUpdatedAt={externalIntelligenceUpdatedAt}
+              loadExternalIntelligence={loadExternalIntelligence}
+              displayRecommendationLanes={displayRecommendationLanes}
               loading={loading}
               error={error}
               isLoggedIn={isLoggedIn}
@@ -6920,17 +6433,32 @@ ${signals}
               categories={categories}
               renderLimit={renderLimit}
               viewMode={viewMode}
-              renderCard={(item, i) => {
-                const summaryEntry = getSummaryEntry(item);
-                return <NewsItem key={item.id} item={item} index={i} viewMode={viewMode} isFocused={focusedIndex === i} isBookmarked={isBookmarked(item.id)} isInMaterials={isInMaterials(item.id)} onBookmark={() => toggleBookmark(item)} onAddMaterial={() => toggleMaterial(item)} onSummary={() => handleSummaryToggle(item)} isSummaryOpen={expandedSummary[item.id]} summaryText={summaryEntry?.text || ''} summaryMode={summaryEntry?.mode || ''} summaryLoading={Boolean(summaryLoading[item.id])} isFollowed={followKeywords.some(kw => `${item.title} ${item.summary}`.toLowerCase().includes(kw.toLowerCase()))} onRead={() => recordReading(item)} showTranslation={translationOpen[item.id]} onToggleTranslation={() => setTranslationOpen(p => ({ ...p, [item.id]: !p[item.id] }))} onRequestTranslation={() => requestTranslation(item)} isTranslating={translatingItems[item.id]} translation={getTranslation(item)} onOpenLightbox={(src, title, images, index) => setLightbox({ open: true, src, title, images: images || [], index: index || 0 })} />;
-              }}
-              snapshotMeta={recommendationCandidates.length === 0 ? selectedRecommendationSnapshot : null}
-              onLoadMore={loadMoreNews}
+              recommendationCandidates={recommendationCandidates}
+              selectedRecommendationSnapshot={selectedRecommendationSnapshot}
+              loadMoreNews={loadMoreNews}
               loadingMore={loadingMore}
-              hasMore={newsHasMore}
-              onRefresh={() => loadNews()}
-              onPickInterests={() => setShowInterestModal(true)}
-              onLogin={() => { setAuthMode('login'); setShowAuthModal(true); }}
+              newsHasMore={newsHasMore}
+              loadNews={loadNews}
+              setShowInterestModal={setShowInterestModal}
+              setAuthMode={setAuthMode}
+              setShowAuthModal={setShowAuthModal}
+              focusedIndex={focusedIndex}
+              expandedSummary={expandedSummary}
+              summaryLoading={summaryLoading}
+              translationOpen={translationOpen}
+              translatingItems={translatingItems}
+              followKeywords={followKeywords}
+              getSummaryEntry={getSummaryEntry}
+              isBookmarked={isBookmarked}
+              isInMaterials={isInMaterials}
+              toggleBookmark={toggleBookmark}
+              toggleMaterial={toggleMaterial}
+              handleSummaryToggle={handleSummaryToggle}
+              recordReading={recordReading}
+              getTranslation={getTranslation}
+              requestTranslation={requestTranslation}
+              setTranslationOpen={setTranslationOpen}
+              setLightbox={setLightbox}
             />
           )}
           {nav === 'recommendations-legacy' && (
@@ -6992,202 +6520,47 @@ ${signals}
 
           {/* GITHUB */}
           {nav === 'github' && (
-            <>
-              <div className="section-header"><h2 className="section-title">{ICONS.github} GitHub {GITHUB_PERIODS.find(p => p.id === githubSince)?.label || '周榜'}热门项目</h2><p className="section-desc">{githubSince === 'daily' ? '今日增星最多的开源项目' : githubSince === 'monthly' ? '本月增星最多的开源项目' : '本周增星最多的开源项目'}（实时同步）</p></div>
-               {githubLoading && <div className="github-grid">{Array.from({ length: 6 }).map((_, i) => <article key={i} className="github-card skeleton"><div className="skeleton-gh-header" /><div className="skeleton-gh-desc" /><div className="skeleton-gh-stats" /></article>)}</div>}
-               <div className="github-grid">{githubRepos.map((repo, i) => <GithubRepoCard key={repo.id} repo={repo} index={i} since={githubSince} isBookmarked={isBookmarked(repo.url)} isInMaterials={isInMaterials(repo.id)} onBookmark={() => toggleBookmark({ id: repo.url, title: repo.fullName, url: repo.url, source: 'GitHub', summary: repo.description, tags: [repo.language].filter(Boolean), region: 'global', mode: 'deep', publishedAt: new Date().toISOString(), category: 'open-source' })} onAddMaterial={() => toggleMaterial(buildGithubMaterial(repo, githubSince), 'project', `GitHub ${GITHUB_PERIODS.find(p => p.id === githubSince)?.label || '周榜'}项目观察`)} showTranslation={translationOpen[repo.id]} onToggleTranslation={toggleGithubTranslation} translation={getTranslation({ id: repo.id, title: repo.fullName, summary: repo.description })} insight={githubInsights[repo.id]} onRequestInsight={requestGithubInsight} insightLoading={githubInsightLoading[repo.id]} onOpenLightbox={(src, title, images, index) => setLightbox({ open: true, src, title, images: images || [], index: index || 0 })} />)}</div>
-            </>
-           )}
+            <GithubPage
+              githubSince={githubSince}
+              githubLoading={githubLoading}
+              githubRepos={githubRepos}
+              isBookmarked={isBookmarked}
+              isInMaterials={isInMaterials}
+              toggleBookmark={toggleBookmark}
+              toggleMaterial={toggleMaterial}
+              translationOpen={translationOpen}
+              toggleGithubTranslation={toggleGithubTranslation}
+              getTranslation={getTranslation}
+              githubInsights={githubInsights}
+              requestGithubInsight={requestGithubInsight}
+              githubInsightLoading={githubInsightLoading}
+              setLightbox={setLightbox}
+            />
+          )}
 
           {nav === 'square' && <CommunityPage user={user} onRequireAuth={() => { setAuthMode('login'); setShowAuthModal(true); }} />}
 
           {nav === 'profile-center' && (
-            <div className="product-page profile-center-page">
-              <section className="product-hero profile-hero">
-                <div>
-                  <div className="workbench-kicker">Personal Intelligence Memory</div>
-                  <h1>用户画像</h1>
-                  <p>设置关注领域、领域优先级、信号源优先级，并按日期记录每日 AI 画像，让系统越用越懂你。</p>
-                </div>
-                <div className="product-hero-actions">
-                  <button className="ai-primary-action" onClick={generateDailyProfileSnapshot}>生成今日画像</button>
-                  <button className="secondary-action" onClick={() => setShowInterestModal(true)}>调整关注领域</button>
-                </div>
-              </section>
-
-              <BlockGrid columns={3}>
-                <BlockStat variant="card" label="关注领域" value={selectedInterests.length} desc={intelligenceProfile.focusLabels.slice(0, 4).join('、') || '尚未设置'} />
-                <BlockStat variant="card" label="阅读点击" value={readingHistory.length} desc="近 100 条点击记录用于校准推荐" />
-                <BlockStat variant="card" label="收藏资讯" value={bookmarks.length} desc="收藏会提高相似主题和来源权重" />
-                <BlockStat variant="card" label="每日画像" value={dailyProfileSnapshots.length} desc="按日期保留 AI 对你的理解变化" />
-              </BlockGrid>
-
-              <section className="profile-learning-panel">
-                <div className="profile-learning-main">
-                  <div className="section-header">
-                    <h2 className="section-title">{ICONS.sparkles} 画像学习引擎</h2>
-                    <p className="section-desc">系统把关注领域、阅读点击、收藏、素材沉淀和反馈动作汇总成可解释的推荐记忆。</p>
-                  </div>
-                  <div className="profile-learning-score">
-                    <strong>{profileLearningEngine.confidence}%</strong>
-                    <span>{profileLearningEngine.confidenceLabel} · {profileLearningEngine.behaviorDepth}</span>
-                    <p>{profileLearningEngine.summary}</p>
-                  </div>
-                  <div className="profile-learning-actions">
-                    {(profileLearningEngine.nextActions.length ? profileLearningEngine.nextActions : ['继续阅读每日汇报并收藏真正有价值的内容']).map(action => (
-                      <button key={action} onClick={() => showToast(action)}>{action}</button>
-                    ))}
-                  </div>
-                </div>
-                <div className="profile-learning-side">
-                  <div>
-                    <span>强领域</span>
-                    <p>{profileLearningEngine.topCategories.slice(0, 3).map(item => item.label).join('、') || '等待校准'}</p>
-                  </div>
-                  <div>
-                    <span>信任来源</span>
-                    <p>{profileLearningEngine.topSources.slice(0, 3).map(item => item.name).join('、') || '等待阅读行为'}</p>
-                  </div>
-                  <div>
-                    <span>记忆关键词</span>
-                    <p>{profileLearningEngine.topTags.slice(0, 5).map(item => item.name).join('、') || '暂无'}</p>
-                  </div>
-                  <div>
-                    <span>探索盲区</span>
-                    <p>{profileLearningEngine.blindSpots.slice(0, 3).join('、') || '覆盖较均衡'}</p>
-                  </div>
-                </div>
-              </section>
-
-              <section className="profile-control-layout">
-                <div className="profile-control-panel">
-                  <div className="section-header">
-                    <h2 className="section-title">{ICONS.target} 领域优先级</h2>
-                    <p className="section-desc">一级进入核心必看，二级正常参与，三级保留探索价值但降低出现频率。</p>
-                  </div>
-                  <div className="priority-list">
-                    {profilePriorityItems.map(item => (
-                      <div key={item.id} className="priority-row" data-testid="profile-domain-row" data-domain-id={item.id}>
-                        <span>{ICONS[item.icon]} {item.label}</span>
-                        <div className="profile-tier-control" role="group" aria-label={`${item.label}关注等级`}>
-                          {PROFILE_TIER_OPTIONS.map(option => (
-                            <button
-                              key={option.id}
-                              type="button"
-                              data-testid="profile-domain-tier"
-                              data-tier={option.id}
-                              aria-pressed={item.tier === option.id}
-                              className={item.tier === option.id ? 'active' : ''}
-                              onClick={() => setDomainTiers(prev => ({ ...prev, [item.id]: option.id }))}
-                            >
-                              {option.label}
-                            </button>
-                          ))}
-                        </div>
-                        <strong>{PROFILE_TIERS[item.tier]?.shortLabel || '二级'}</strong>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="profile-control-panel">
-                  <div className="section-header">
-                    <h2 className="section-title">{ICONS.layers} 信号源优先级</h2>
-                    <p className="section-desc">显式信任等级优先于隐式行为，避免一次误点长期改变信源判断。</p>
-                  </div>
-                  <div className="priority-list">
-                    {sourcePriorityItems.map(item => (
-                      <div key={item.name} className="priority-row" data-testid="profile-source-row" data-source-id={item.name}>
-                        <span>{item.name}</span>
-                        <div className="profile-tier-control" role="group" aria-label={`${item.name}信源等级`}>
-                          {PROFILE_TIER_OPTIONS.map(option => (
-                            <button
-                              key={option.id}
-                              type="button"
-                              data-testid="profile-source-tier"
-                              data-tier={option.id}
-                              aria-pressed={item.tier === option.id}
-                              className={item.tier === option.id ? 'active' : ''}
-                              onClick={() => setSourceTiers(prev => ({ ...prev, [item.name]: option.id }))}
-                            >
-                              {option.label}
-                            </button>
-                          ))}
-                        </div>
-                        <strong>{PROFILE_TIERS[item.tier]?.shortLabel || '二级'}</strong>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </section>
-
-              <section className="profile-special-follows" data-testid="profile-special-follows">
-                <div className="section-header"><h2 className="section-title">{ICONS.star} 特别关注</h2><p className="section-desc">手动添加小众信息源、博主或特定URL，始终优先推荐。</p></div>
-                {specialFollows.length === 0 ? (
-                  <div className="empty-state"><p>暂无特别关注</p><p className="empty-state-hint">添加后这些目标的新内容会优先进入个人必看通道</p></div>
-                ) : (
-                  <div className="special-follows-list">
-                    {specialFollows.map(f => (
-                      <div key={f.id} className="special-follow-item">
-                        <span className="special-follow-type">{SPECIAL_FOLLOW_TYPES.find(type => type.id === f.type)?.label || '信源'}</span>
-                        <span className="special-follow-name">{f.target}</span>
-                        <span className="special-follow-note">{f.note || '无备注'}</span>
-                        <button type="button" className="special-follow-edit" onClick={() => editSpecialFollow(f)}>编辑</button>
-                        <button type="button" className="special-follow-remove" onClick={() => {
-                          setSpecialFollows(prev => prev.filter(x => x.id !== f.id));
-                          if (editingSpecialFollowId === f.id) resetSpecialFollowForm();
-                        }}>删除</button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-                <div className="special-follow-form">
-                  <select data-testid="profile-special-type" value={specialFollowForm.type} onChange={event => setSpecialFollowForm(prev => ({ ...prev, type: event.target.value }))} aria-label="特别关注类型">
-                    {SPECIAL_FOLLOW_TYPES.map(type => <option key={type.id} value={type.id}>{type.label}</option>)}
-                  </select>
-                  <input data-testid="profile-special-target" value={specialFollowForm.target} onChange={event => setSpecialFollowForm(prev => ({ ...prev, target: event.target.value }))} placeholder="信源、博主、关键词或 URL" />
-                  <input data-testid="profile-special-note" value={specialFollowForm.note} onChange={event => setSpecialFollowForm(prev => ({ ...prev, note: event.target.value }))} placeholder="备注（可选）" />
-                  <button type="button" data-testid="profile-special-submit" onClick={submitSpecialFollow}>{editingSpecialFollowId ? '保存' : '添加'}</button>
-                  {editingSpecialFollowId && <button type="button" className="secondary-action" onClick={resetSpecialFollowForm}>取消</button>}
-                </div>
-              </section>
-
-              <section className="profile-calibration-panel">
-                <div className="section-header">
-                  <h2 className="section-title">{ICONS.sparkles} 推荐校准状态</h2>
-                  <p className="section-desc">这些信号已经接入每日汇报排序，让系统从“你设置了什么、读了什么、收藏了什么”里持续学习。</p>
-                </div>
-                <div className="profile-calibration-grid">
-                  {profileCalibrationSignals.map(signal => (
-                    <div key={signal.label} className="profile-calibration-card">
-                      <span>{signal.label}</span>
-                      <strong>{signal.value}</strong>
-                      <p>{signal.desc}</p>
-                    </div>
-                  ))}
-                </div>
-              </section>
-
-              <section className="profile-memory-panel">
-                <div className="section-header">
-                  <h2 className="section-title">{ICONS.calendar} 每日 AI 画像记录</h2>
-                  <p className="section-desc">每日记录会保留系统对你的关注领域、追踪关键词和输出目标的理解。</p>
-                </div>
-                {dailyProfileSnapshots.length === 0 ? (
-                  <div className="empty-state"><p>还没有画像记录</p><button onClick={generateDailyProfileSnapshot}>生成第一条记录</button></div>
-                ) : (
-                  <div className="profile-snapshot-list">
-                    {dailyProfileSnapshots.map(snapshot => (
-                      <article key={snapshot.date} className="profile-snapshot">
-                        <span>{snapshot.date}</span>
-                        <strong>{snapshot.depth} · {snapshot.outputGoal}</strong>
-                        <p>关注：{snapshot.focus.join('、') || '未设置'}；追踪：{snapshot.tracked.join('、') || '暂无'}；来源：{snapshot.sources.join('、') || '暂无'}</p>
-                      </article>
-                    ))}
-                  </div>
-                )}
-              </section>
-            </div>
+            <ProfilePage
+              intelligenceProfile={intelligenceProfile}
+              bookmarks={bookmarks}
+              readingHistory={readingHistory}
+              dailyProfileSnapshots={dailyProfileSnapshots}
+              profileLearningEngine={profileLearningEngine}
+              profilePriorityItems={profilePriorityItems}
+              setDomainTiers={setDomainTiers}
+              sourcePriorityItems={sourcePriorityItems}
+              setSourceTiers={setSourceTiers}
+              specialFollows={specialFollows}
+              setSpecialFollows={setSpecialFollows}
+              specialFollowForm={specialFollowForm}
+              setSpecialFollowForm={setSpecialFollowForm}
+              editingSpecialFollowId={editingSpecialFollowId}
+              setEditingSpecialFollowId={setEditingSpecialFollowId}
+              profileCalibrationSignals={profileCalibrationSignals}
+              generateDailyProfileSnapshot={generateDailyProfileSnapshot}
+              setShowInterestModal={setShowInterestModal}
+            />
           )}
 
           {/* READING LIST - 阅读列表 */}

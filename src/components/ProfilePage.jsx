@@ -71,70 +71,190 @@ export default function ProfilePage({
 
   return (
     <div className="product-page profile-center-page">
-      <section className="product-hero profile-hero">
-        <div>
-          <div className="workbench-kicker">Personal Intelligence Memory</div>
-          <h1>用户画像</h1>
-          <p>设置关注领域、领域优先级、信号源优先级，并按日期记录每日 AI 画像，让系统越用越懂你。</p>
-        </div>
-        <div className="product-hero-actions">
-          <button className="ai-primary-action" onClick={generateDailyProfileSnapshot}>生成今日画像</button>
-          <button className="secondary-action" onClick={() => setShowInterestModal(true)}>调整关注领域</button>
-        </div>
-      </section>
+              <section className="product-hero profile-hero">
+                <div>
+                  <div className="workbench-kicker">Personal Intelligence Memory</div>
+                  <h1>用户画像</h1>
+                  <p>设置关注领域、领域优先级、信号源优先级，并按日期记录每日 AI 画像，让系统越用越懂你。</p>
+                </div>
+                <div className="product-hero-actions">
+                  <button className="ai-primary-action" onClick={generateDailyProfileSnapshot}>生成今日画像</button>
+                  <button className="secondary-action" onClick={() => setShowInterestModal(true)}>调整关注领域</button>
+                </div>
+              </section>
 
-      <BlockGrid columns={3}>
-        <BlockStat variant="card" label="关注领域" value={intelligenceProfile.focusLabels.length} desc={intelligenceProfile.focusLabels.slice(0, 4).join('、') || '尚未设置'} />
-        <BlockStat variant="card" label="阅读点击" value={readingHistory.length} desc="近 100 条点击记录用于校准推荐" />
-        <BlockStat variant="card" label="收藏资讯" value={bookmarks.length} desc="收藏会提高相似主题和来源权重" />
-        <BlockStat variant="card" label="每日画像" value={dailyProfileSnapshots.length} desc="按日期保留 AI 对你的理解变化" />
-      </BlockGrid>
+              <BlockGrid columns={3}>
+                <BlockStat variant="card" label="关注领域" value={selectedInterests.length} desc={intelligenceProfile.focusLabels.slice(0, 4).join('、') || '尚未设置'} />
+                <BlockStat variant="card" label="阅读点击" value={readingHistory.length} desc="近 100 条点击记录用于校准推荐" />
+                <BlockStat variant="card" label="收藏资讯" value={bookmarks.length} desc="收藏会提高相似主题和来源权重" />
+                <BlockStat variant="card" label="每日画像" value={dailyProfileSnapshots.length} desc="按日期保留 AI 对你的理解变化" />
+              </BlockGrid>
 
-      <section className="profile-control-layout">
-        <div className="profile-control-panel">
-          <div className="section-header">
-            <h2 className="section-title">{ICONS.target} 领域优先级</h2>
-            <p className="section-desc">一级进入核心必看，二级正常参与，三级保留探索价值但降低出现频率。</p>
-          </div>
-          <div className="priority-list">
-            {profilePriorityItems.map(item => (
-              <div key={item.id} className="priority-row" data-testid="profile-domain-row" data-domain-id={item.id}>
-                <span>{ICONS[item.icon]} {item.label}</span>
-                <div className="profile-tier-control" role="group" aria-label={item.label + '关注等级'}>
+              <section className="profile-learning-panel">
+                <div className="profile-learning-main">
+                  <div className="section-header">
+                    <h2 className="section-title">{ICONS.sparkles} 画像学习引擎</h2>
+                    <p className="section-desc">系统把关注领域、阅读点击、收藏、素材沉淀和反馈动作汇总成可解释的推荐记忆。</p>
+                  </div>
+                  <div className="profile-learning-score">
+                    <strong>{profileLearningEngine.confidence}%</strong>
+                    <span>{profileLearningEngine.confidenceLabel} · {profileLearningEngine.behaviorDepth}</span>
+                    <p>{profileLearningEngine.summary}</p>
+                  </div>
+                  <div className="profile-learning-actions">
+                    {(profileLearningEngine.nextActions.length ? profileLearningEngine.nextActions : ['继续阅读每日汇报并收藏真正有价值的内容']).map(action => (
+                      <button key={action} onClick={() => showToast(action)}>{action}</button>
+                    ))}
+                  </div>
+                </div>
+                <div className="profile-learning-side">
+                  <div>
+                    <span>强领域</span>
+                    <p>{profileLearningEngine.topCategories.slice(0, 3).map(item => item.label).join('、') || '等待校准'}</p>
+                  </div>
+                  <div>
+                    <span>信任来源</span>
+                    <p>{profileLearningEngine.topSources.slice(0, 3).map(item => item.name).join('、') || '等待阅读行为'}</p>
+                  </div>
+                  <div>
+                    <span>记忆关键词</span>
+                    <p>{profileLearningEngine.topTags.slice(0, 5).map(item => item.name).join('、') || '暂无'}</p>
+                  </div>
+                  <div>
+                    <span>探索盲区</span>
+                    <p>{profileLearningEngine.blindSpots.slice(0, 3).join('、') || '覆盖较均衡'}</p>
+                  </div>
+                </div>
+              </section>
 
-      <section className="profile-learning-panel">
-        <div className="profile-learning-main">
-          <div className="section-header">
-            <h2 className="section-title">{ICONS.sparkles} 画像学习引擎</h2>
-            <p className="section-desc">系统把关注领域、阅读点击、收藏、素材沉淀和反馈动作汇总成可解释的推荐记忆。</p>
-          </div>
-          <div className="profile-learning-score">
-            <strong>{profileLearningEngine.confidence}%</strong>
-            <span>{profileLearningEngine.confidenceLabel} · {profileLearningEngine.behaviorDepth}</span>
-            <p>{profileLearningEngine.summary}</p>
-          </div>
-          <div className="profile-learning-actions">
-            {(profileLearningEngine.nextActions.length ? profileLearningEngine.nextActions : ['继续阅读每日汇报并收藏真正有价值的内容']).map(action => (
-              <button key={action} onClick={() => showToast(action)}>{action}</button>
-            ))}
-          </div>
-        </div>
-        <div className="profile-learning-side">
-          <div>
-            <span>强领域</span>
-            <p>{profileLearningEngine.topCategories.slice(0, 3).map(item => item.label).join('、') || '等待校准'}</p>
-          </div>
-          <div>
-            <span>信任来源</span>
-            <p>{profileLearningEngine.topSources.slice(0, 3).map(item => item.name).join('、') || '等待阅读行为'}</p>
-          </div>
-          <div>
-            <span>记忆关键词</span>
-            <p>{profileLearningEngine.topTags.slice(0, 5).map(item => item.name).join('、') || '暂无'}</p>
-          </div>
-          <div>
-            <span>探索盲区</span>
-            <p>{profileLearningEngine.blindSpots.slice(0, 3).join('、') || '覆盖较均衡'}</p>
-          </div>
-        </div>
-      </section>
+              <section className="profile-control-layout">
+                <div className="profile-control-panel">
+                  <div className="section-header">
+                    <h2 className="section-title">{ICONS.target} 领域优先级</h2>
+                    <p className="section-desc">一级进入核心必看，二级正常参与，三级保留探索价值但降低出现频率。</p>
+                  </div>
+                  <div className="priority-list">
+                    {profilePriorityItems.map(item => (
+                      <div key={item.id} className="priority-row" data-testid="profile-domain-row" data-domain-id={item.id}>
+                        <span>{ICONS[item.icon]} {item.label}</span>
+                        <div className="profile-tier-control" role="group" aria-label={item.label + '关注等级'}>
+                          {PROFILE_TIER_OPTIONS.map(option => (
+                            <button
+                              key={option.id}
+                              type="button"
+                              data-testid="profile-domain-tier"
+                              data-tier={option.id}
+                              aria-pressed={item.tier === option.id}
+                              className={item.tier === option.id ? 'active' : ''}
+                              onClick={() => setDomainTiers(prev => ({ ...prev, [item.id]: option.id }))}
+                            >
+                              {option.label}
+                            </button>
+                          ))}
+                        </div>
+                        <strong>{PROFILE_TIERS[item.tier]?.shortLabel || '二级'}</strong>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="profile-control-panel">
+                  <div className="section-header">
+                    <h2 className="section-title">{ICONS.layers} 信号源优先级</h2>
+                    <p className="section-desc">显式信任等级优先于隐式行为，避免一次误点长期改变信源判断。</p>
+                  </div>
+                  <div className="priority-list">
+                    {sourcePriorityItems.map(item => (
+                      <div key={item.name} className="priority-row" data-testid="profile-source-row" data-source-id={item.name}>
+                        <span>{item.name}</span>
+                        <div className="profile-tier-control" role="group" aria-label={item.name + '信源等级'}>
+                          {PROFILE_TIER_OPTIONS.map(option => (
+                            <button
+                              key={option.id}
+                              type="button"
+                              data-testid="profile-source-tier"
+                              data-tier={option.id}
+                              aria-pressed={item.tier === option.id}
+                              className={item.tier === option.id ? 'active' : ''}
+                              onClick={() => setSourceTiers(prev => ({ ...prev, [item.name]: option.id }))}
+                            >
+                              {option.label}
+                            </button>
+                          ))}
+                        </div>
+                        <strong>{PROFILE_TIERS[item.tier]?.shortLabel || '二级'}</strong>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </section>
+
+              <section className="profile-special-follows" data-testid="profile-special-follows">
+                <div className="section-header"><h2 className="section-title">{ICONS.star} 特别关注</h2><p className="section-desc">手动添加小众信息源、博主或特定URL，始终优先推荐。</p></div>
+                {specialFollows.length === 0 ? (
+                  <div className="empty-state"><p>暂无特别关注</p><p className="empty-state-hint">添加后这些目标的新内容会优先进入个人必看通道</p></div>
+                ) : (
+                  <div className="special-follows-list">
+                    {specialFollows.map(f => (
+                      <div key={f.id} className="special-follow-item">
+                        <span className="special-follow-type">{SPECIAL_FOLLOW_TYPES.find(type => type.id === f.type)?.label || '信源'}</span>
+                        <span className="special-follow-name">{f.target}</span>
+                        <span className="special-follow-note">{f.note || '无备注'}</span>
+                        <button type="button" className="special-follow-edit" onClick={() => editFollow(f)}>编辑</button>
+                        <button type="button" className="special-follow-remove" onClick={() => {
+                          setSpecialFollows(prev => prev.filter(x => x.id !== f.id));
+                          if (editingSpecialFollowId === f.id) resetForm();
+                        }}>删除</button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <div className="special-follow-form">
+                  <select data-testid="profile-special-type" value={specialFollowForm.type} onChange={event => setSpecialFollowForm(prev => ({ ...prev, type: event.target.value }))} aria-label="特别关注类型">
+                    {SPECIAL_FOLLOW_TYPES.map(type => <option key={type.id} value={type.id}>{type.label}</option>)}
+                  </select>
+                  <input data-testid="profile-special-target" value={specialFollowForm.target} onChange={event => setSpecialFollowForm(prev => ({ ...prev, target: event.target.value }))} placeholder="信源、博主、关键词或 URL" />
+                  <input data-testid="profile-special-note" value={specialFollowForm.note} onChange={event => setSpecialFollowForm(prev => ({ ...prev, note: event.target.value }))} placeholder="备注（可选）" />
+                  <button type="button" data-testid="profile-special-submit" onClick={submit}>{editingSpecialFollowId ? '保存' : '添加'}</button>
+                  {editingSpecialFollowId && <button type="button" className="secondary-action" onClick={resetForm}>取消</button>}
+                </div>
+              </section>
+
+              <section className="profile-calibration-panel">
+                <div className="section-header">
+                  <h2 className="section-title">{ICONS.sparkles} 推荐校准状态</h2>
+                  <p className="section-desc">这些信号已经接入每日汇报排序，让系统从“你设置了什么、读了什么、收藏了什么”里持续学习。</p>
+                </div>
+                <div className="profile-calibration-grid">
+                  {profileCalibrationSignals.map(signal => (
+                    <div key={signal.label} className="profile-calibration-card">
+                      <span>{signal.label}</span>
+                      <strong>{signal.value}</strong>
+                      <p>{signal.desc}</p>
+                    </div>
+                  ))}
+                </div>
+              </section>
+
+              <section className="profile-memory-panel">
+                <div className="section-header">
+                  <h2 className="section-title">{ICONS.calendar} 每日 AI 画像记录</h2>
+                  <p className="section-desc">每日记录会保留系统对你的关注领域、追踪关键词和输出目标的理解。</p>
+                </div>
+                {dailyProfileSnapshots.length === 0 ? (
+                  <div className="empty-state"><p>还没有画像记录</p><button onClick={generateDailyProfileSnapshot}>生成第一条记录</button></div>
+                ) : (
+                  <div className="profile-snapshot-list">
+                    {dailyProfileSnapshots.map(snapshot => (
+                      <article key={snapshot.date} className="profile-snapshot">
+                        <span>{snapshot.date}</span>
+                        <strong>{snapshot.depth} · {snapshot.outputGoal}</strong>
+                        <p>关注：{snapshot.focus.join('、') || '未设置'}；追踪：{snapshot.tracked.join('、') || '暂无'}；来源：{snapshot.sources.join('、') || '暂无'}</p>
+                      </article>
+                    ))}
+                  </div>
+                )}
+              </section>
+            </div>
+  );
+}
