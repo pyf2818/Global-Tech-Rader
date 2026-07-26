@@ -38,6 +38,9 @@ import GithubPage from './components/GithubPage.jsx';
 import TrendingPage from './components/TrendingPage.jsx';
 import HomePage from './components/HomePage.jsx';
 import AgentsPage from './components/AgentsPage.jsx';
+import CalendarPage from './components/CalendarPage.jsx';
+import MaterialsPage from './components/MaterialsPage.jsx';
+import ReadingListPage from './components/ReadingListPage.jsx';
 import { useProfileSync } from './hooks/useProfileSync.js';
 import {
   PROFILE_TIER_OPTIONS,
@@ -5831,9 +5834,6 @@ ${signals}
                     <button className="nav-follow-add-btn" onClick={() => addFollowKeyword()}>{ICONS.plus}</button>
                   </div>
                 </div>
-              )}
-            </div>
-          )}
         </nav>
 
         <div className="sidebar-footer">
@@ -5991,125 +5991,9 @@ ${signals}
                   </div>
                 </div>
               )}
-              {(nav === 'all' || nav === 'trending' || nav === 'reading-list' || nav === 'recommendations' || nav === 'materials' || nav === 'editor') && (
-                <>
-                  <div className="mode-tabs">
-                    {MODES.map(m => <button key={m.id} className={`mode-tab ${mode === m.id ? 'active' : ''}`} onClick={() => setMode(m.id)}>{m.label}</button>)}
-                  </div>
-                  <div className="region-filter-wrap">
-                    <button className={`region-filter-btn ${regionFilter === 'all' ? 'active' : ''}`} onClick={() => setRegionFilter('all')}>全部</button>
-                    <button className={`region-filter-btn ${regionFilter === 'domestic' ? 'active' : ''}`} onClick={() => setRegionFilter('domestic')}>国内</button>
-                    <button className={`region-filter-btn ${regionFilter === 'overseas' ? 'active' : ''}`} onClick={() => setRegionFilter('overseas')}>国外</button>
-                  </div>
-                  {nav === 'all' && (
-                    <div className="source-filter-wrap">
-                      <select id="source-filter" value={sourceFilter} onChange={(e) => setSourceFilter(e.target.value)} className="source-filter-select">
-                        <option value="all">全部来源</option>
-                        {sourceOptions.slice(0, 20).map(([name, count]) => <option key={name} value={name}>{name} ({count})</option>)}
-                      </select>
-                    </div>
-                  )}
-                  <div className="view-toggle">
-                    {VIEW_MODES.map(v => <button key={v.id} className={`view-btn ${viewMode === v.id ? 'active' : ''}`} onClick={() => setViewMode(v.id)} title={v.label}>{v.id === 'compact' ? ICONS.list : v.id === 'standard' ? ICONS.rows : ICONS.grid3}</button>)}
-                  </div>
-                </>
-              )}
-              {(nav === 'all' || nav === 'trending' || nav === 'github') && (
-                <>
-                  {nav === 'all' && (
-                    <button className="globe-entry-btn" onClick={() => setGlobeFullscreenOpen(true)} title="全球科技大屏">
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
-                    全球大屏
-                    </button>
-                  )}
-                  <button className={`btn-refresh ${nav === 'all' ? 'btn-refresh-all' : ''}`} onClick={() => { if (nav === 'all') loadNews(); else if (nav === 'trending') loadTrending(false, trendingPlatform, trendingType); else if (nav === 'github') loadGithub(); }}>
-                    {ICONS.refresh}
-                  </button>
-                  {nav === 'trending' && (
-                    <>
-                      <div className="trending-type-tabs">
-                        {TRENDING_TYPES.map(t => (
-                          <button key={t.id} className={`trending-type-tab ${trendingType === t.id ? 'active' : ''}`} onClick={() => { setTrendingType(t.id); loadTrending(false, trendingPlatform, t.id); }}>
-                            <span className="trending-type-icon">{t.icon}</span>
-                            {t.label}
-                          </button>
-                        ))}
-                      </div>
-                      <div className="trending-platform-topbar">
-                        <select 
-                          className="platform-dropdown-topbar"
-                          value={trendingPlatform} 
-                          onChange={(e) => { setTrendingPlatform(e.target.value); loadTrending(false, e.target.value, trendingType); }}
-                        >
-                        <option value="all">全部平台</option>
-                        <optgroup label="国内平台">
-                          <option value="36氪">36氪</option>
-                          <option value="少数派">少数派</option>
-                          <option value="爱范儿">爱范儿</option>
-                          <option value="品玩">品玩</option>
-                          <option value="虎扑">虎扑</option>
-                          <option value="IT之家">IT之家</option>
-                        </optgroup>
-                        <optgroup label="国际平台">
-                          <option value="Hacker News">Hacker News</option>
-                          <option value="Product Hunt">Product Hunt</option>
-                          <option value="Dev.to">Dev.to</option>
-                          <option value="GitHub">GitHub</option>
-                          <option value="TechCrunch">TechCrunch</option>
-                          <option value="The Verge">The Verge</option>
-                          <option value="Ars Technica">Ars Technica</option>
-                          <option value="Wired">Wired</option>
-                          <option value="MIT Review">MIT Review</option>
-                          <option value="Engadget">Engadget</option>
-                          <option value="Slashdot">Slashdot</option>
-                          <option value="Smashing Mag">Smashing Mag</option>
-                          <option value="Lobsters">Lobsters</option>
-                        </optgroup>
-                      </select>
-                    </div>
-                    </>
-                  )}
-                </>
-              )}
-            </div>
-          </div>
-        </header>
-
-        {showStatsBar && <div className="stats-bar">
-          {nav === 'all' && <><div className="stat-item"><span className="stat-value">{items.length}</span><span className="stat-label">资讯总数</span></div><div className="stat-item"><span className="stat-value highlight">{filtered.length}</span><span className="stat-label">筛选结果</span></div><div className="stat-item"><span className="stat-value live">{stats.sourceCount - stats.failedSources}</span><span className="stat-label">活跃源</span></div></>}
-          {nav === 'trending' && <><div className="stat-item"><span className="stat-value highlight">{trendingItems.length}</span><span className="stat-label">热门榜单</span></div><div className="stat-item"><span className="stat-value live">热门</span><span className="stat-label">全网热搜</span></div></>}
-          {nav === 'github' && <><div className="stat-item"><span className="stat-value highlight">{githubRepos.length}</span><span className="stat-label">热门项目</span></div><div className="stat-item"><span className="stat-value live">{GITHUB_PERIODS.find(p => p.id === githubSince)?.label || '周榜'}</span><span className="stat-label">当前榜单</span></div></>}
-          {nav === 'reading-list' && <><div className="stat-item"><span className="stat-value highlight">{bookmarks.length}</span><span className="stat-label">收藏总数</span></div><div className="stat-item"><span className="stat-value live">{bookmarks.filter(b => !b.isRead).length}</span><span className="stat-label">未读</span></div></>}
-          {nav === 'calendar' && <><div className="stat-item"><span className="stat-value highlight">{events.length}</span><span className="stat-label">日程事件</span></div></>}
-          {nav === 'recommendations' && <><div className="stat-item"><span className="stat-value highlight">{filtered.length}</span><span className="stat-label">推荐内容</span></div><div className="stat-item"><span className="stat-value live">{selectedInterests.length}</span><span className="stat-label">兴趣领域</span></div></>}
-          <div className="stat-item time">{ICONS.clock}<span>{stats.updatedAt ? formatTime(stats.updatedAt) : '--'}</span></div>
-          <button className="panel-toggle" onClick={() => setPanelCollapsed(c => !c)}>{panelCollapsed ? ICONS.chevronLeft : ICONS.chevronRight}</button>
-        </div>}
-
-        {nav === 'all' && allActiveFilters.length > 0 && (
-          <div className="active-filters-bar">
-            <span className="active-filters-label">当前筛选</span>
-            <div className="active-filters-chips">
-              {allActiveFilters.map(chip => (
-                <button key={chip.key} className="filter-chip" onClick={chip.clear} title="点击移除">
-                  <span>{chip.label}</span>
-                  <span className="filter-chip-x">×</span>
-                </button>
-              ))}
-              <button className="filter-chip-clear-all" onClick={clearAllFilters}>清空全部</button>
-            </div>
-          </div>
-        )}
-
-        <div className={`feed custom-scrollbar ${(nav === 'home' || nav === 'recommendations') ? 'feed-workbench' : ''} ${nav === 'stock' ? 'feed-stock' : ''}`} ref={feedRef}>
-          {nav === 'stock' && (
-            <Suspense fallback={<div className="page-loading-skeleton" />}>
-              <StockPage llmConfig={llmConfig} categories={categories} onOpenLlmConfig={() => setShowLlmQuickConfig(true)} />
-            </Suspense>
-          )}
-          {nav === 'home' && (
-            <HomePage
-              key="home"
+          {nav === 'materials' && (
+            <MaterialsPage
+              materials={materials}
               llmConfig={llmConfig}
               intelligenceProfile={intelligenceProfile}
               workbenchItems={workbenchItems}
@@ -6574,48 +6458,13 @@ ${signals}
 
           {/* READING LIST - 阅读列表 */}
           {nav === 'reading-list' && (
-            <div className="trends-dashboard">
-              <div className="trends-header">
-                <h2>{ICONS.bookmark}<span>阅读列表</span></h2>
-                <p className="trends-desc">共 {bookmarks.length} 条收藏，{bookmarks.filter(b => !b.isRead).length} 条未读</p>
-              </div>
-              {bookmarks.length === 0 ? (
-                <section className="trends-section">
-                  <div className="empty-state">
-                    <p>暂无收藏内容</p>
-                    <p className="hint">浏览资讯时点击收藏按钮，将感兴趣的内容添加到阅读列表</p>
-                  </div>
-                </section>
-              ) : (
-                <section className="trends-section">
-                  <div className="bookmarks-list">
-                    {bookmarks.map(b => (
-                      <div key={b.id} className={`bookmark-item ${b.isRead ? 'read' : ''}`}>
-                        <div className="bookmark-main">
-                          <a href={b.url} target="_blank" rel="noopener noreferrer" className="bookmark-title">{b.title}</a>
-                          <div className="bookmark-meta">
-                            <span className="bookmark-source">{b.source}</span>
-                            <span className="bookmark-date">{new Date(b.savedAt).toLocaleDateString('zh-CN')}</span>
-                            {b.category && <span className="bookmark-category">{categories.find(c => c.id === b.category)?.label || b.category}</span>}
-                          </div>
-                          {b.summary && <p className="bookmark-summary">{b.summary}</p>}
-                        </div>
-                        <div className="bookmark-actions">
-                          <button
-                            className={`bookmark-read-btn ${b.isRead ? 'read' : ''}`}
-                            onClick={() => toggleRead(b.id)}
-                            title={b.isRead ? '标记为未读' : '标记为已读'}
-                          >
-                            {b.isRead ? '已读' : '未读'}
-                          </button>
-                          <button className="bookmark-remove" onClick={() => setBookmarks(prev => prev.filter(x => x.id !== b.id))} title="移除">{ICONS.x}</button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </section>
-              )}
-            </div>
+            <ReadingListPage
+              bookmarks={bookmarks}
+              categories={categories}
+              toggleRead={toggleRead}
+              setBookmarks={setBookmarks}
+            />
+          )}
           )}
 
           {/* CUSTOM URL - 自定义抓取 */}
@@ -6796,44 +6645,11 @@ ${signals}
 
           {/* CALENDAR - 日历管理 */}
           {nav === 'calendar' && (
-            <div className="trends-dashboard">
-              <div className="trends-header">
-                <h2>{ICONS.calendar}<span>日历管理</span></h2>
-                <div className="header-actions">
-                  <button className="btn-new-article-pro" onClick={() => setShowEventForm(true)}>
-                    {ICONS.plus}
-                    <span>添加事件</span>
-                  </button>
-                </div>
-              </div>
-              {events.length === 0 ? (
-                <section className="trends-section">
-                  <div className="empty-state">
-                    <p>暂无日程事件</p>
-                    <p className="hint">点击"添加事件"按钮创建你的第一个日程</p>
-                  </div>
-                </section>
-              ) : (
-                <section className="trends-section">
-                  <div className="events-list">
-                    {events.map(e => (
-                      <div key={e.id} className="event-item">
-                        <div className="event-date">
-                          <span className="event-day">{new Date(e.date).getDate()}</span>
-                          <span className="event-month">{new Date(e.date).getMonth() + 1}月</span>
-                        </div>
-                        <div className="event-content">
-                          <h4 className="event-title">{e.title}</h4>
-                          {e.description && <p className="event-desc">{e.description}</p>}
-                          {e.time && <p className="event-time">{e.time}</p>}
-                        </div>
-                        <button className="event-remove" onClick={() => setEvents(prev => prev.filter(x => x.id !== e.id))} title="删除">{ICONS.x}</button>
-                      </div>
-                    ))}
-                  </div>
-                </section>
-              )}
-            </div>
+            <CalendarPage
+              events={events}
+              setShowEventForm={setShowEventForm}
+              removeEvent={removeEvent}
+            />
           )}
 
            {/* 洞察分析 - 统一仪表盘 */}
@@ -7503,82 +7319,47 @@ ${signals}
           })()}
 
           {nav === 'materials' && (
-            <div className="trends-dashboard">
-              <div className="trends-header">
-                <h2>{ICONS.layers}<span>素材库</span></h2>
-                <p className="trends-desc">从资讯中收集的素材，共 {materials?.length || 0} 条</p>
-                <div className="header-actions">
-                  <button className="btn-icon" onClick={exportMaterials} title="导出素材">
-                    {ICONS.link}
-                  </button>
-                  <label className="btn-icon" title="导入素材">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                    <input 
-                      type="file" 
-                      accept=".json" 
-                      style={{ display: 'none' }} 
-                      onChange={e => { if (e.target.files[0]) importMaterials(e.target.files[0]); }}
-                    />
-                  </label>
-                  <button className="btn-add-material" onClick={() => setShowAddMaterial(true)}>
-                    {ICONS.plus} 添加素材
-                  </button>
-                </div>
-              </div>
-
-              <section className="trends-section">
-                <div className="materials-toolbar">
-                  <div className="materials-toolbar-row">
-                    <div className="space-tabs">
-                      <button 
-                        className={`space-tab ${materialSpaceFilter === 'all' ? 'active' : ''}`}
-                        onClick={() => setMaterialSpaceFilter('all')}
-                      >
-                        全部 ({materials?.length || 0})
-                      </button>
-                      {materialSpaces.map(space => {
-                        const count = (materials || []).filter(m => m.spaceId === space.id).length;
-                        return (
-                          <button 
-                            key={space.id}
-                            className={`space-tab ${materialSpaceFilter === String(space.id) ? 'active' : ''}`}
-                            onClick={() => setMaterialSpaceFilter(String(space.id))}
-                          >
-                            {space.name} ({count})
-                          </button>
-                        );
-                      })}
-                      <button className="space-tab space-tab-add" onClick={() => setShowSpaceForm(true)}>+ 新建空间</button>
-                    </div>
-                  </div>
-                  <div className="materials-toolbar-row">
-                    <div className="material-search">
-                      {ICONS.search}
-                      <input 
-                        type="text" 
-                        placeholder="搜索素材内容、来源、标签..." 
-                        value={materialSearch} 
-                        onChange={e => setMaterialSearch(e.target.value)} 
-                      />
-                    </div>
-                    <select className="material-filter" value={materialFilter} onChange={e => setMaterialFilter(e.target.value)}>
-                      <option value="all">全部类型</option>
-                      <option value="quote">金句</option>
-                      <option value="data">数据</option>
-                      <option value="case">案例</option>
-                      <option value="viewpoint">观点</option>
-                      <option value="chart">图表</option>
-                    </select>
-                    <select className="material-filter" value={materialTimeRange} onChange={e => setMaterialTimeRange(e.target.value)}>
-                      <option value="all">全部时间</option>
-                      <option value="7d">近 7 天</option>
-                      <option value="30d">近 30 天</option>
-                    </select>
-                    {allMaterialSources.length > 0 && (
-                      <select className="material-filter" value={materialSourceFilter} onChange={e => setMaterialSourceFilter(e.target.value)}>
-                        <option value="all">全部来源</option>
-                        {allMaterialSources.map(s => <option key={s} value={s}>{s}</option>)}
-                      </select>
+            <MaterialsPage
+              materials={materials}
+              materialSpaces={materialSpaces}
+              materialSearch={materialSearch}
+              setMaterialSearch={setMaterialSearch}
+              materialFilter={materialFilter}
+              setMaterialFilter={setMaterialFilter}
+              materialSpaceFilter={materialSpaceFilter}
+              setMaterialSpaceFilter={setMaterialSpaceFilter}
+              materialTimeRange={materialTimeRange}
+              setMaterialTimeRange={setMaterialTimeRange}
+              materialSourceFilter={materialSourceFilter}
+              setMaterialSourceFilter={setMaterialSourceFilter}
+              allMaterialSources={allMaterialSources}
+              materialTags={materialTags}
+              setMaterialTags={setMaterialTags}
+              allMaterialTags={allMaterialTags}
+              filteredMaterials={filteredMaterials}
+              selectedMaterials={selectedMaterials}
+              exportMaterials={exportMaterials}
+              importMaterials={importMaterials}
+              toggleMaterialStar={toggleMaterialStar}
+              removeMaterial={removeMaterial}
+              batchRemoveMaterials={batchRemoveMaterials}
+              assignMaterialsToSpace={assignMaterialsToSpace}
+              clearMaterialSelection={clearMaterialSelection}
+              selectAllMaterials={selectAllMaterials}
+              toggleMaterialSelection={toggleMaterialSelection}
+              continueMaterialInWorkbench={continueMaterialInWorkbench}
+              materialRefCounts={materialRefCounts}
+              showSpaceForm={showSpaceForm}
+              setShowSpaceForm={setShowSpaceForm}
+              newSpaceName={newSpaceName}
+              setNewSpaceName={setNewSpaceName}
+              createMaterialSpace={createMaterialSpace}
+              showAddMaterial={showAddMaterial}
+              setShowAddMaterial={setShowAddMaterial}
+              addManualMaterial={addManualMaterial}
+              setLightbox={setLightbox}
+            />
+          )}
                     )}
                   </div>
                   {allMaterialTags.length > 0 && (
