@@ -12,29 +12,31 @@ import { showToast } from '../utils/toast.js';
  *
  * 跨域依赖（由调用方以参数传入，避免循环依赖）：
  *   - creativeWorkspace: useCreativeWorkspace() 返回值，用于 addAsset/removeAsset
- *   - goNav: 导航函数
+ *   - setNav: 导航 setter（setNav('home') 替代 goNav，在 App.jsx 第一批 useState 即可用）
  *   - setCopilotPendingMessage: 设置 AI 工作站待发送消息
  *   - setShowAddMaterial: 控制添加素材弹窗
  *   - setShowSpaceForm: 控制素材空间表单
  *   - materialSpaceFilter / setMaterialSpaceFilter: 当前空间筛选
- *   - filteredMaterials: 经 useMaterialsMemos 派生的筛选后素材列表
  *   - buildNewsCardInsight: 可选，从资讯卡片构造洞察文本
+ *
+ * NOTE: filteredMaterials / selectAllMaterials 已移回 App.jsx，在 useMaterialsMemos 之后定义，
+ *       避免循环依赖（useMaterialsMemos 需要本 hook 提供的 materials）。
  */
 export function useBookmarkMaterial({
   creativeWorkspace,
-  goNav,
+  setNav,
   setCopilotPendingMessage,
   setShowAddMaterial,
   setShowSpaceForm,
   materialSpaceFilter,
   setMaterialSpaceFilter,
-  filteredMaterials = [],
   buildNewsCardInsight,
 } = {}) {
   const [bookmarks, setBookmarks] = useState(() => loadLS('bookmarks', []));
   const [materials, setMaterials] = useState(() => loadLS('materials', []));
   const [materialSpaces, setMaterialSpaces] = useState(() => loadLS('materialSpaces', []));
   const [newSpaceName, setNewSpaceName] = useState('');
+  // selectedMaterials 保留在 hook 内，selectAllMaterials 移到 App.jsx（依赖 filteredMaterials）
   const [selectedMaterials, setSelectedMaterials] = useState([]);
 
   // 持久化：与原 App.jsx 统一同步 effect 保持一致，单独写一份只管本 hook 的 state
@@ -182,9 +184,9 @@ export function useBookmarkMaterial({
       '',
       '请输出：1）核心判断 2）证据缺口 3）下一步研究清单 4）可沉淀为文章的结构。',
     ].join('\n'));
-    goNav?.('home');
+    setNav?.('home');
     showToast('已发送到 AI 工作站继续研究');
-  }, [goNav, setCopilotPendingMessage]);
+  }, [setNav, setCopilotPendingMessage]);
 
   const removeMaterial = useCallback((id) => {
     setMaterials(prev => prev.filter(m => m.id !== id));
@@ -203,9 +205,8 @@ export function useBookmarkMaterial({
     setSelectedMaterials(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
   }, []);
 
-  const selectAllMaterials = useCallback(() => {
-    setSelectedMaterials(filteredMaterials.map(m => m.id));
-  }, [filteredMaterials]);
+  // selectAllMaterials moved to App.jsx — depends on filteredMaterials (useMaterialsMemos),
+  // which in turn depends on materials from this hook (would cause TDZ if kept here).
 
   const clearMaterialSelection = useCallback(() => {
     setSelectedMaterials([]);
@@ -294,7 +295,7 @@ export function useBookmarkMaterial({
     batchRemoveMaterials,
     updateMaterialTags,
     toggleMaterialSelection,
-    selectAllMaterials,
+    // selectAllMaterials is defined in App.jsx after useMaterialsMemos
     clearMaterialSelection,
     updateMaterialNote,
     assignMaterialsToSpace,

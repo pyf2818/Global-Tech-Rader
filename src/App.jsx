@@ -1319,19 +1319,18 @@ function App() {
     toggleBookmark, isBookmarked, isInMaterials, toggleRead,
     detectMaterialType, toggleMaterial, addManualMaterial,
     continueMaterialInWorkbench, removeMaterial, batchRemoveMaterials,
-    updateMaterialTags, toggleMaterialSelection, selectAllMaterials,
+    updateMaterialTags, toggleMaterialSelection,
     clearMaterialSelection, updateMaterialNote, assignMaterialsToSpace,
     createMaterialSpace, deleteMaterialSpace, toggleMaterialStar,
     exportMaterials, importMaterials,
   } = useBookmarkMaterial({
     creativeWorkspace,
-    goNav,
+    setNav,
     setCopilotPendingMessage,
     setShowAddMaterial,
     setShowSpaceForm,
     materialSpaceFilter,
     setMaterialSpaceFilter,
-    filteredMaterials,
   });
 
   const {
@@ -3497,6 +3496,12 @@ ${signals}
     articleStatusFilter, articleTemplateFilter, articleSort, articleExportFilter,
   });
   }, [articles, articleExportFilter]);
+
+  // selectAllMaterials depends on filteredMaterials (from useMaterialsMemos above),
+  // so it must be defined here rather than inside useBookmarkMaterial.
+  const selectAllMaterials = useCallback(() => {
+    setSelectedMaterials(filteredMaterials.map(m => m.id));
+  }, [filteredMaterials, setSelectedMaterials]);
 
   function addFollowKeyword(kw) {
     const keyword = kw || newKeyword;
@@ -5899,11 +5904,6 @@ ${signals}
     testLlmConnection();
   }
 
-  }
-
-
-
-
-
+}
 
 export default App;
