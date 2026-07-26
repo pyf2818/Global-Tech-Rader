@@ -61,7 +61,7 @@ function RecommendationsPage({
         loading={externalIntelligenceLoading}
         error={externalIntelligenceError}
         updatedAt={externalIntelligenceUpdatedAt}
-        onRefresh={loadExternalIntelligence}
+        onRefresh={() => loadExternalIntelligence(selectedInterests)}
       />
       <RecommendationFeed
         lanes={displayRecommendationLanes}
