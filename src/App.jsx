@@ -2612,6 +2612,29 @@ ${materialLines || '暂无素材'}`;
     }
   }, [scopedAgentItems, items, materials, detectMaterialType, updateWorkflowActionStatus, agentWorkflowPrompt, agentWorkflowResult.content, todayProfileSnapshot, agentWorkflowRun.id]);
 
+  const {
+    bookmarks, setBookmarks,
+    materials, setMaterials,
+    selectedMaterials, setSelectedMaterials,
+    materialSpaces, setMaterialSpaces,
+    newSpaceName, setNewSpaceName,
+    toggleBookmark, isBookmarked, isInMaterials, toggleRead,
+    detectMaterialType, toggleMaterial, addManualMaterial,
+    continueMaterialInWorkbench, removeMaterial, batchRemoveMaterials,
+    updateMaterialTags, toggleMaterialSelection, selectAllMaterials,
+    clearMaterialSelection, updateMaterialNote, assignMaterialsToSpace,
+    createMaterialSpace, deleteMaterialSpace, toggleMaterialStar,
+    exportMaterials, importMaterials,
+  } = useBookmarkMaterial({
+    creativeWorkspace,
+    goNav,
+    setCopilotPendingMessage,
+    setShowAddMaterial,
+    setShowSpaceForm,
+    materialSpaceFilter,
+    setMaterialSpaceFilter,
+    filteredMaterials,
+  });
   const runAgentWorkflow = useCallback(async (mission, customPrompt = '') => {
     const selectedMission = mission || intelligenceMissions[0];
     if (!selectedMission) return;
@@ -3651,29 +3674,6 @@ ${signals}
     setFocusedIndex(-1);
     setMobileMenuOpen(false);
   };
-  const {
-    bookmarks, setBookmarks,
-    materials, setMaterials,
-    selectedMaterials, setSelectedMaterials,
-    materialSpaces, setMaterialSpaces,
-    newSpaceName, setNewSpaceName,
-    toggleBookmark, isBookmarked, isInMaterials, toggleRead,
-    detectMaterialType, toggleMaterial, addManualMaterial,
-    continueMaterialInWorkbench, removeMaterial, batchRemoveMaterials,
-    updateMaterialTags, toggleMaterialSelection, selectAllMaterials,
-    clearMaterialSelection, updateMaterialNote, assignMaterialsToSpace,
-    createMaterialSpace, deleteMaterialSpace, toggleMaterialStar,
-    exportMaterials, importMaterials,
-  } = useBookmarkMaterial({
-    creativeWorkspace,
-    goNav,
-    setCopilotPendingMessage,
-    setShowAddMaterial,
-    setShowSpaceForm,
-    materialSpaceFilter,
-    setMaterialSpaceFilter,
-    filteredMaterials,
-  });
   const wideWorkspaceNavs = ['home', 'recommendations', 'studio', 'agents', 'editor', 'materials', 'square', 'profile-center'];
   // 右侧面板：「全部动态」显示关注关键词；「AI 情报首页」显示情报时间线；「精准推荐」显示日期竖向时间线
   const showRightPanel = nav === 'recommendations';
