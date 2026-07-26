@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { renderMarkdown } from '../utils/markdown.jsx';
 
 function parseCitationIds(text = '') {
   return [...String(text).matchAll(/\[asset:([^\]]+)\]/gi)]
@@ -30,6 +31,7 @@ export default function CreativeWorkspace({ workspace, onOpenEditor, onOpenMater
   const [selectedAssetId, setSelectedAssetId] = useState(workspace?.assets?.[0]?.id || '');
   const [proposal, setProposal] = useState('');
   const [exportFormat, setExportFormat] = useState('md');
+  const [showAssetPreview, setShowAssetPreview] = useState(false);
 
   const assets = workspace?.assets || [];
   const documents = workspace?.documents || [];
@@ -148,14 +150,29 @@ export default function CreativeWorkspace({ workspace, onOpenEditor, onOpenMater
             {assets.length === 0 && <p className="creative-empty">No assets yet. Save news cards or AI Elf outputs into the material library first.</p>}
           </div>
           {selectedAsset && (
-            <p className="creative-asset-provenance">
-              <span>{selectedAsset.citation?.title || selectedAsset.title} / {selectedAsset.citation?.source || selectedAsset.source || 'Unknown source'}</span>
-              {(selectedAsset.citation?.url || selectedAsset.url) && (
-                <a href={selectedAsset.citation?.url || selectedAsset.url} target="_blank" rel="noreferrer">
-                  {selectedAsset.citation?.url || selectedAsset.url}
-                </a>
+            <>
+              <p className="creative-asset-provenance">
+                <span>{selectedAsset.citation?.title || selectedAsset.title} / {selectedAsset.citation?.source || selectedAsset.source || 'Unknown source'}</span>
+                {(selectedAsset.citation?.url || selectedAsset.url) && (
+                  <a href={selectedAsset.citation?.url || selectedAsset.url} target="_blank" rel="noreferrer">
+                    {selectedAsset.citation?.url || selectedAsset.url}
+                  </a>
+                )}
+              </p>
+              <button
+                type="button"
+                className="creative-toggle-preview"
+                onClick={() => setShowAssetPreview(v => !v)}
+                aria-expanded={showAssetPreview}
+              >
+                {showAssetPreview ? '收起预览' : '查看完整内容'}
+              </button>
+              {showAssetPreview && (
+                <div className="creative-asset-preview">
+                  {renderMarkdown(selectedAsset.fullContent || selectedAsset.content || selectedAsset.summary || '')}
+                </div>
               )}
-            </p>
+            </>
           )}
           <button type="button" className="creative-primary" onClick={createFromAsset} disabled={!selectedAsset}>
             Create from asset

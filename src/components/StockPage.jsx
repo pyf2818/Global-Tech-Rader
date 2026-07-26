@@ -765,6 +765,7 @@ export default function StockPage({ llmConfig, onOpenLlmConfig }) {
   const [adjust, setAdjust] = useState(() => localStorage.getItem('stockKlineAdjust') || '1');
   const [leftPanelOpen, setLeftPanelOpen] = useState(() => localStorage.getItem('stockLeftPanelOpen') !== 'false');
   const [rightPanelOpen, setRightPanelOpen] = useState(() => localStorage.getItem('stockRightPanelOpen') !== 'false');
+  const [showAnalysis, setShowAnalysis] = useState(() => localStorage.getItem('stockShowAnalysis') !== 'false');
   const [experienceMode, setExperienceMode] = useState(() => localStorage.getItem('stockExperienceMode') || 'beginner');
   const [benchmarkCode, setBenchmarkCode] = useState(() => localStorage.getItem('stockBenchmarkCode') || 'sh000001');
   const [clockNow, setClockNow] = useState(() => Date.now());
@@ -776,6 +777,7 @@ export default function StockPage({ llmConfig, onOpenLlmConfig }) {
   useEffect(() => { localStorage.setItem('stockKlineAdjust', adjust); }, [adjust]);
   useEffect(() => { localStorage.setItem('stockLeftPanelOpen', String(leftPanelOpen)); }, [leftPanelOpen]);
   useEffect(() => { localStorage.setItem('stockRightPanelOpen', String(rightPanelOpen)); }, [rightPanelOpen]);
+  useEffect(() => { localStorage.setItem('stockShowAnalysis', String(showAnalysis)); }, [showAnalysis]);
   useEffect(() => { localStorage.setItem('stockExperienceMode', experienceMode); }, [experienceMode]);
   useEffect(() => { localStorage.setItem('stockBenchmarkCode', benchmarkCode); }, [benchmarkCode]);
   useEffect(() => {
@@ -914,7 +916,9 @@ export default function StockPage({ llmConfig, onOpenLlmConfig }) {
       const normalized = normalizeRealtimePayload(payload);
       setRealtime(normalized.realtime);
       setMarketDataState(normalized.state);
-      setSelectedName(normalized.realtime?.name || code);
+      // 后端若返回真实 name 则更新；否则保留 pickStock 已设的 name，避免用 code 覆盖
+      const apiName = normalized.realtime?.name;
+      if (apiName) setSelectedName(apiName);
       // 分时图（指数和个股都支持）
       const tRes = await fetch(`/api/stock/timeline?code=${code}`);
       setTimelineData(await tRes.json());
@@ -934,19 +938,33 @@ export default function StockPage({ llmConfig, onOpenLlmConfig }) {
     } catch { /* ignore */ }
   }, []);
 
-  // 实时行情轮询：每 10 秒刷新选中个股行情（东方财富级实时体验）
+  // 实时行情轮询：每 2 秒刷新选中个股行情（接近实时）
   useEffect(() => {
     if (!selectedCode) return;
-    const timer = setInterval(() => refreshRealtime(selectedCode), 10000);
+    const timer = setInterval(() => refreshRealtime(selectedCode), 2000);
     return () => clearInterval(timer);
   }, [selectedCode, refreshRealtime]);
 
-  // 大盘指数轮询：每 30 秒刷新 dashboard（指数 + 涨跌家数）
+  // 大盘指数轮询：每 5 秒刷新 dashboard（指数 + 涨跌家数）
   useEffect(() => {
     if (!dashboard) return;
-    const timer = setInterval(() => loadDashboard(), 30000);
+    const timer = setInterval(() => loadDashboard(), 5000);
     return () => clearInterval(timer);
   }, [dashboard, loadDashboard]);
+
+  // K 线 / 分时图轮询：每 10 秒重新加载保持图表实时
+  useEffect(() => {
+    if (!selectedCode || period === 'timeline') return;
+    const timer = setInterval(() => setKlineReloadKey(k => k + 1), 10000);
+    return () => clearInterval(timer);
+  }, [selectedCode, period]);
+
+  // 分时图轮询：每 5 秒重新加载保持分时线实时
+  useEffect(() => {
+    if (!selectedCode || period !== 'timeline') return;
+    const timer = setInterval(() => setKlineReloadKey(k => k + 1), 5000);
+    return () => clearInterval(timer);
+  }, [selectedCode, period]);
 
   // K线按需加载（切到日K/周K/月K时）
   useEffect(() => {
@@ -976,10 +994,17 @@ export default function StockPage({ llmConfig, onOpenLlmConfig }) {
   useEffect(() => { if (selectedCode) loadStock(selectedCode); }, [selectedCode, loadStock]);
 
   const doSearch = useCallback(async () => {
-    if (!searchKeyword.trim()) return;
+    if (!searchKeyword.trim()) { setSearchResults([]); return; }
     try { const res = await fetch(`/api/stock/search?keyword=${encodeURIComponent(searchKeyword)}`); setSearchResults(await res.json()); }
     catch { setSearchResults([]); }
   }, [searchKeyword]);
+
+  // 输入即时搜索（debounce 300ms），不必按回车
+  useEffect(() => {
+    if (!searchKeyword.trim()) { setSearchResults([]); return; }
+    const timer = setTimeout(() => doSearch(), 300);
+    return () => clearTimeout(timer);
+  }, [searchKeyword, doSearch]);
 
   const isSelectedInWatchlist = inWatchlist(selectedCode);
   const selectedStock = useMemo(() => ({
@@ -1036,6 +1061,8 @@ export default function StockPage({ llmConfig, onOpenLlmConfig }) {
 
   const pickStock = (code, name) => {
     setSelectedCode(code);
+    // 立即更新名称，避免依赖 loadStock 异步回调（接口异常时 name 会变成 code）
+    if (name) setSelectedName(name);
     setSearchKeyword('');
     setSearchResults([]);
   };
@@ -1061,20 +1088,32 @@ export default function StockPage({ llmConfig, onOpenLlmConfig }) {
             <>
               <div className="dropdown-backdrop" onClick={() => setSearchResults([])} />
               <div className="stock-search-dropdown">
-                {searchResults.map(s => (
-                  <button key={s.secid} className="stock-search-item" onClick={() => pickStock(s.code, s.name)}>
-                    <span className="stock-search-code">{s.code}</span>
-                    <span className="stock-search-name">{s.name}</span>
-                    <span className="stock-search-market">{s.market}</span>
-                  </button>
-                ))}
+                {searchResults.map(s => {
+                  const inList = inWatchlist(s.code);
+                  return (
+                    <div key={s.secid} className="stock-search-item">
+                      <button className="stock-search-main" onClick={() => pickStock(s.code, s.name)}>
+                        <span className="stock-search-code">{s.code}</span>
+                        <span className="stock-search-name">{s.name}</span>
+                        <span className="stock-search-market">{s.market}</span>
+                      </button>
+                      <button
+                        className={`stock-search-add ${inList ? 'in-list' : ''}`}
+                        onClick={() => { toggleStock({ code: s.code, name: s.name, secid: s.secid }); setSearchResults([]); setSearchKeyword(''); }}
+                        title={inList ? '已自选，点击移除' : '加入自选'}
+                      >
+                        {inList ? '✓' : '+'}
+                      </button>
+                    </div>
+                  );
+                })}
               </div>
             </>
           )}
         </div>
-        <div className="stock3-data-status" title={`数据源：${realtime?.dataSource || '等待行情'}；最近拉取：${quoteUpdatedLabel}；个股每 10 秒轮询，不是逐笔行情`}>
+        <div className="stock3-data-status" title={`数据源：${realtime?.dataSource || '等待行情'}；最近拉取：${quoteUpdatedLabel}；个股每 2 秒轮询，图表每 5-10 秒刷新`}>
           <span className={`stock3-data-dot ${realtime ? 'live' : ''}`} />
-          <span>{marketDataState.stale ? '缓存行情' : marketDataState.unavailable ? '行情不可用' : '轮询行情'} {marketDataState.timestamp ? new Date(marketDataState.timestamp).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : marketClockLabel}</span>
+          <span>{marketDataState.stale ? '缓存行情' : marketDataState.unavailable ? '行情不可用' : '实时行情'} {marketClockLabel}</span>
         </div>
         <div className="stock3-experience-switch" role="tablist" aria-label="使用模式">
           <button type="button" className={experienceMode === 'beginner' ? 'active' : ''} onClick={() => setExperienceMode('beginner')} role="tab" aria-selected={experienceMode === 'beginner'}>新手</button>
@@ -1340,24 +1379,37 @@ export default function StockPage({ llmConfig, onOpenLlmConfig }) {
       </div>
 
       {/* 算法技术分析始终可用，LLM 仅增强自然语言表述 */}
-      <section ref={analysisRef} className="stock3-panel stock-ai-panel">
+      <section ref={analysisRef} className={`stock3-panel stock-ai-panel${showAnalysis ? '' : ' collapsed'}`}>
         <div className="stock-ai-panel-head">
           <div className="stock3-panel-label">
             {ICONS.sparkle} {ai.diagnosis?.mode === 'ai' ? 'AI 增强分析' : '算法技术分析'}
             {!ai.llmReady && <button type="button" className="stock-ai-unready" onClick={onOpenLlmConfig}>配置 AI 增强</button>}
           </div>
-          {(ai.diagnosis || ai.diagnoseError) && (
-            <button className="stock-ai-rerun" onClick={runDiagnosis} disabled={ai.diagnosing}>{ICONS.refresh}<span>重新分析</span></button>
-          )}
+          <div className="stock-ai-panel-actions">
+            {(ai.diagnosis || ai.diagnoseError) && showAnalysis && (
+              <button className="stock-ai-rerun" onClick={runDiagnosis} disabled={ai.diagnosing}>{ICONS.refresh}<span>重新分析</span></button>
+            )}
+            <button
+              type="button"
+              className="stock-ai-toggle"
+              onClick={() => setShowAnalysis(v => !v)}
+              title={showAnalysis ? '收起分析' : '展开分析'}
+              aria-expanded={showAnalysis}
+            >
+              {showAnalysis ? '收起' : '展开'}
+            </button>
+          </div>
         </div>
-        {!ai.diagnosis && !ai.diagnosing && !ai.diagnoseError && (
-          <button className="stock-ai-run" onClick={runDiagnosis} disabled={!realtime || marketDataState.unavailable}>
-            {ICONS.sparkle}<span>{ai.llmReady ? '生成 AI 增强分析' : '生成算法分析'}</span>
-          </button>
-        )}
-        {ai.diagnosing && <div className="stock-ai-loading"><div className="spinner" /><span>正在计算技术指标…</span></div>}
-        {ai.diagnoseError && <div className="stock-ai-error">{ai.diagnoseError}<button onClick={runDiagnosis}>重试</button></div>}
-        {ai.diagnosis && (
+        {showAnalysis && (
+          <>
+            {!ai.diagnosis && !ai.diagnosing && !ai.diagnoseError && (
+              <button className="stock-ai-run" onClick={runDiagnosis} disabled={!realtime || marketDataState.unavailable}>
+                {ICONS.sparkle}<span>{ai.llmReady ? '生成 AI 增强分析' : '生成算法分析'}</span>
+              </button>
+            )}
+            {ai.diagnosing && <div className="stock-ai-loading"><div className="spinner" /><span>正在计算技术指标…</span></div>}
+            {ai.diagnoseError && <div className="stock-ai-error">{ai.diagnoseError}<button onClick={runDiagnosis}>重试</button></div>}
+            {ai.diagnosis && (
           <div className="stock-ai-result stock-analysis-result">
             <div className="stock-analysis-summary">
               <div><span>综合评级</span><strong>{ai.diagnosis.rating}</strong></div>
@@ -1408,6 +1460,8 @@ export default function StockPage({ llmConfig, onOpenLlmConfig }) {
               {(ai.diagnosis.evidence || []).map(item => <span key={item.key}>{item.label}：{item.value}</span>)}
             </div>
           </div>
+        )}
+          </>
         )}
       </section>
 

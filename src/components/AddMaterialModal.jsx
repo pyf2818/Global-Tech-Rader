@@ -27,6 +27,8 @@ export default function AddMaterialModal({
                 note: fd.get('note') || '',
                 spaceId: fd.get('spaceId') || null
               });
+              setShowAddMaterial(false);
+              e.target.reset();
             }}>
               <div className="form-group">
                 <label>类型</label>

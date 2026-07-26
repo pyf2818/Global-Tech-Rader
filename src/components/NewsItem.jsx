@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { ICONS, MODE_MAP, REGION_MAP } from '../constants/index.jsx';
 import { getGradeColors, isEnglishText, formatRelative } from '../utils/format.js';
 
@@ -97,15 +98,12 @@ function NewsItem({ item, index, viewMode = 'standard', isFocused = false, isBoo
   return (
     <article
       className={`news-item view-${viewMode} ${isFocused ? 'focused' : ''} ${isFollowed ? 'followed' : ''}`}
-      style={{ animationDelay: `${index * 40}ms` }}
+      style={{ animationDelay: `${Math.min(index * 40, 600)}ms` }}
       data-index={index}
       data-testid="news-item"
       data-item-id={item.id || ''}
-      data-title={item.title || ''}
       data-source={item.source || ''}
       data-category={item.category || ''}
-      data-must-read-score={Number.isFinite(item.mustReadScore) ? item.mustReadScore : ''}
-      data-score-parts={JSON.stringify(item.recommendationScoreParts || item.scoreParts?.personal || {})}
       draggable
       onDragStart={handleDragStart}
     >
@@ -208,4 +206,4 @@ function NewsItem({ item, index, viewMode = 'standard', isFocused = false, isBoo
   );
 }
 
-export default NewsItem;
+export default memo(NewsItem);

@@ -12,6 +12,18 @@ import { isGoodImageUrl, normalizeImageKey } from '../images/imageProcessing.js'
 export const newsCache = { data: null, expiresAt: 0, key: '' };
 let fetchingPromise = null; // 防止并发抓取循环
 
+// 涉华关键词（中英混合匹配）—— 与前端保持一致，服务端预计算避免前端同步扫描
+const CHINA_FOCUSED_KEYWORDS = ['China', '中国', '中企', '中国企业', '人民币', '华为', '腾讯', '阿里巴巴', '字节跳动', '对华', '涉华', '中美', '中欧', '一带一路', 'RCEP', '东盟'];
+function computeIsChinaFocused(item) {
+  const textToMatch = `${item.title || ''} ${item.summary || ''} ${Array.isArray(item.tags) ? item.tags.join(' ') : ''}`.toLowerCase();
+  return CHINA_FOCUSED_KEYWORDS.some(kw => {
+    if (/^[a-zA-Z\s]+$/.test(kw)) {
+      return textToMatch.includes(kw.toLowerCase()) || textToMatch.includes(kw);
+    }
+    return textToMatch.includes(kw.toLowerCase());
+  });
+}
+
 export function mergeDiverseItems(items, sourceResults, maxItems, perSourceLimit) {
   const seen = new Set();
   const deduped = [];
@@ -131,13 +143,14 @@ export async function getNews(blocked, customSources, page = 0, pageSize = PAGE_
     // 多源交叉验证 + 质量评分
     fullItems = crossVerifyItems(deduped);
 
-    // 为每个item添加源等级信息
+    // 为每个item添加源等级信息 + 预计算涉华标记
     fullItems.forEach(item => {
       const gradeInfo = getSourceGradeInfo(item.source);
       item.sourceGrade = gradeInfo.weight;
       item.sourceGradeLabel = gradeInfo.label;
       item.sourceGradeColor = gradeInfo.color;
       item.sourceGradeIcon = gradeInfo.icon;
+      item.isChinaFocused = computeIsChinaFocused(item);
     });
 
     // 按综合质量分数降序排列（高分优先），同一分数时按源等级排序
@@ -192,25 +205,29 @@ export async function getNews(blocked, customSources, page = 0, pageSize = PAGE_
 
     const itemsWithoutImage = fullItems.filter(item => !item.imageUrl && item.url);
     if (itemsWithoutImage.length > 0) {
-      console.log(`[getNews] Resolving images for ${itemsWithoutImage.length} items without images (max: ${MEDIA_CONFIG.MAX_RESOLVE_ITEMS})`);
+      console.log(`[getNews] Scheduling background image resolution for ${itemsWithoutImage.length} items (max: ${MEDIA_CONFIG.MAX_RESOLVE_ITEMS}, async — response will not wait)`);
 
-      const imageSettled = await Promise.allSettled(itemsWithoutImage.slice(0, MEDIA_CONFIG.MAX_RESOLVE_ITEMS).map(async (item) => {
+      // 异步解析图片：fire-and-forget，不阻塞当前响应
+      // 解析结果写入同一份 fullItems 引用，下次命中缓存时即可看到图片
+      Promise.allSettled(itemsWithoutImage.slice(0, MEDIA_CONFIG.MAX_RESOLVE_ITEMS).map(async (item) => {
         try {
           const resolved = await resolveImageWithScrapling(item.url);
           return { id: item.id, imageUrl: resolved.imageUrl, videoUrl: resolved.videoUrl || item.videoUrl, images: resolved.images || [] };
         } catch { return null; }
-      }));
-
-      imageSettled.forEach(result => {
-        if (result.status === 'fulfilled' && result.value) {
-          const idx = fullItems.findIndex(i => i.id === result.value.id);
-          if (idx >= 0) {
-            if (result.value.imageUrl) fullItems[idx].imageUrl = result.value.imageUrl;
-            if (result.value.videoUrl) fullItems[idx].videoUrl = result.value.videoUrl;
-            if (result.value.images?.length) fullItems[idx].images = result.value.images;
+      })).then(imageSettled => {
+        imageSettled.forEach(result => {
+          if (result.status === 'fulfilled' && result.value) {
+            const idx = fullItems.findIndex(i => i.id === result.value.id);
+            if (idx >= 0) {
+              if (result.value.imageUrl) fullItems[idx].imageUrl = result.value.imageUrl;
+              if (result.value.videoUrl) fullItems[idx].videoUrl = result.value.videoUrl;
+              if (result.value.images?.length) fullItems[idx].images = result.value.images;
+            }
           }
-        }
-      });
+        });
+        // 更新统计（后台完成时）
+        mediaStats.lastUpdate = new Date().toISOString();
+      }).catch(() => { /* 后台图片解析失败不影响主流程 */ });
     }
 
     // 更新统计

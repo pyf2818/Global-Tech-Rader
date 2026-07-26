@@ -45,8 +45,8 @@ export async function pickRootDirectory() {
   return handle;
 }
 
-/* 从 IndexedDB 恢复 handle，需调用 queryPermission/requestPermission 重新激活 */
-export async function restoreRootDirectory() {
+/* 从 IndexedDB 读取已保存的 handle，但不请求权限（用于检测是否需要重新激活） */
+export async function peekSavedHandle() {
   if (!isFileSystemSupported()) return null;
   const db = await openDB();
   const handle = await new Promise((resolve, reject) => {
@@ -55,12 +55,35 @@ export async function restoreRootDirectory() {
     req.onsuccess = () => resolve(req.result || null);
     req.onerror = () => reject(req.error);
   });
+  return handle || null;
+}
+
+/* 对一个 handle 请求读写权限，需在用户手势（点击）中调用 */
+export async function requestHandlePermission(handle) {
+  if (!handle) return false;
+  const perm = await handle.queryPermission({ mode: 'readwrite' });
+  if (perm === 'granted') return true;
+  const requested = await handle.requestPermission({ mode: 'readwrite' });
+  return requested === 'granted';
+}
+
+/* 从 IndexedDB 恢复 handle，需调用 queryPermission/requestPermission 重新激活
+ * - 权限已是 granted 时直接返回 handle（无需用户手势）
+ * - 权限为 prompt/denied 时返回 null，调用方应改用 peekSavedHandle + requestHandlePermission 在用户手势中重试
+ */
+export async function restoreRootDirectory() {
+  if (!isFileSystemSupported()) return null;
+  const handle = await peekSavedHandle();
   if (!handle) return null;
-  // 重新激活权限
   const perm = await handle.queryPermission({ mode: 'readwrite' });
   if (perm === 'granted') return handle;
-  const requested = await handle.requestPermission({ mode: 'readwrite' });
-  return requested === 'granted' ? handle : null;
+  // prompt/denied 状态下 requestPermission 需用户手势，effect 中调用会失败
+  try {
+    const requested = await handle.requestPermission({ mode: 'readwrite' });
+    return requested === 'granted' ? handle : null;
+  } catch {
+    return null;
+  }
 }
 
 export async function clearRootDirectory() {

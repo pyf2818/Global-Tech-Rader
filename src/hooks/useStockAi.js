@@ -3,8 +3,11 @@
  * 提供：AI 个股诊断 / AI 市场早报 / 自选股智能监控
  * 全部调用 /api/ai-generate，无 LLM 配置时返回引导提示。
  * 合规：仅基于数据做技术面/资金面客观解读，不给买卖建议，标注「仅供参考」。
+ *
+ * 架构：模块级 store，hook 只是订阅。组件 unmount 后正在跑的 AI 任务继续，
+ *      回到页面时从 store 恢复最新状态。llmConfig 由 hook 同步进 store 供 actions 使用。
  */
-import { useState, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { analyzeStock } from '../domain/stock/algorithmAnalysis.js';
 
 const COMPLIANCE_SUFFIX = '\n\n（以上内容由 AI 基于公开行情数据生成，仅供参考，不构成投资建议）';
@@ -48,6 +51,21 @@ async function callLlm(llmConfig, systemPrompt, userPrompt) {
   return data.content;
 }
 
+// ===== 模块级 store：组件 unmount 后任务继续，store 保持状态 =====
+const store = {
+  state: {
+    llmConfig: null,
+    diagnosing: false, diagnosis: null, diagnoseError: '',
+    briefingLoading: false, briefing: null, briefingError: '',
+    briefingHistory: loadBriefingHistory(),
+    alertChecking: false, alertResults: [],
+  },
+  subscribers: new Set(),
+  subscribe(fn) { this.subscribers.add(fn); return () => this.subscribers.delete(fn); },
+  notify() { this.subscribers.forEach(fn => fn(this.state)); },
+  setState(patch) { this.state = { ...this.state, ...patch }; this.notify(); },
+};
+
 export async function runStockAnalysis({ input, llmConfig, callLlm: invokeLlm = callLlm }) {
   const algorithm = analyzeStock(input);
   const algorithmResult = {
@@ -83,43 +101,36 @@ export async function runStockAnalysis({ input, llmConfig, callLlm: invokeLlm = 
 
 export function useStockAi(llmConfig) {
   const llmReady = useLlmReady(llmConfig);
-  const [diagnosing, setDiagnosing] = useState(false);
-  const [diagnosis, setDiagnosis] = useState(null);
-  const [diagnoseError, setDiagnoseError] = useState('');
 
-  const [briefingLoading, setBriefingLoading] = useState(false);
-  const [briefing, setBriefing] = useState(null);
-  const [briefingError, setBriefingError] = useState('');
-  const [briefingHistory, setBriefingHistory] = useState(loadBriefingHistory);
+  // 把最新 llmConfig 同步进 store（actions 从 store 读取，避免组件卸载后丢失配置）
+  useEffect(() => { store.setState({ llmConfig }); }, [llmConfig]);
 
-  const [alertChecking, setAlertChecking] = useState(false);
-  const [alertResults, setAlertResults] = useState([]);
+  // 订阅 store，组件 unmount 后自动取消订阅
+  const [snapshot, setSnapshot] = useState(store.state);
+  useEffect(() => store.subscribe(setSnapshot), []);
 
   // ===== 模块 A：确定性算法分析 + 可选 AI 增强 =====
   const diagnoseStock = useCallback(async ({ stock, kline, benchmarkKline, benchmark, realtime, sectors }) => {
-    setDiagnosing(true);
-    setDiagnoseError('');
+    store.setState({ diagnosing: true, diagnoseError: '' });
     try {
       const result = await runStockAnalysis({
         input: { stock, realtime, klines: kline?.klines || [], benchmarkKlines: benchmarkKline?.klines || [], benchmark },
-        llmConfig,
+        llmConfig: store.state.llmConfig,
       });
-      setDiagnosis({ ...result, at: Date.now() });
+      store.setState({ diagnosis: { ...result, at: Date.now() }, diagnosing: false });
     } catch (e) {
-      setDiagnoseError(e.message || '行情分析失败');
+      store.setState({ diagnoseError: e.message || '行情分析失败', diagnosing: false });
     }
-    setDiagnosing(false);
-  }, [llmConfig]);
+  }, []);
 
   // ===== 模块 B：AI 市场早报 =====
-  // 输入：大盘指数 + 活跃样本 + 板块
   const generateMorningBrief = useCallback(async ({ indices, stocks, sectors, coverage }) => {
-    if (!llmReady) {
-      setBriefingError('请先配置大模型');
+    const cfg = store.state.llmConfig;
+    if (!cfg || !cfg.baseUrl || !cfg.apiKey || !cfg.selectedModel) {
+      store.setState({ briefingError: '请先配置大模型' });
       return;
     }
-    setBriefingLoading(true);
-    setBriefingError('');
+    store.setState({ briefingLoading: true, briefingError: '' });
     try {
       const stockRows = stocks || [];
       const sectorRows = sectors || [];
@@ -140,7 +151,7 @@ export function useStockAi(llmConfig) {
 ## 六、风险清单
 ## 七、今日观察清单
 ## 八、数据边界
-规则：明确区分“数据事实”和“分析推断”；解释驱动因素时只能写待验证假设，不能伪造新闻、公告、财务、资金流或宏观数据；同时给出支持证据、反向证据和失效条件；不提供确定性涨跌预测、目标价或买卖指令。内容具体、可复核，避免空泛套话。`;
+规则：明确区分"数据事实"和"分析推断"；解释驱动因素时只能写待验证假设，不能伪造新闻、公告、财务、资金流或宏观数据；同时给出支持证据、反向证据和失效条件；不提供确定性涨跌预测、目标价或买卖指令。内容具体、可复核，避免空泛套话。`;
       const userPrompt = `生成时间：${generatedAt}
 数据口径：${coverage?.label || '行情样本'}，共 ${stockRows.length} 只；上涨 ${up}、下跌 ${down}。这不是全市场涨跌家数。
 数据频率：轮询行情，不是交易所逐笔数据。
@@ -154,37 +165,38 @@ ${stockText}
 【板块涨幅样本】
 ${sectorText}
 
-请基于以上有限数据完成早报，并在“数据边界”中明确缺少全市场广度、财务、公告、新闻、资金流、估值与持仓数据。`;
+请基于以上有限数据完成早报，并在"数据边界"中明确缺少全市场广度、财务、公告、新闻、资金流、估值与持仓数据。`;
 
-      const content = await callLlm(llmConfig, systemPrompt, userPrompt);
+      const content = await callLlm(cfg, systemPrompt, userPrompt);
       const record = {
         id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
         content: content + COMPLIANCE_SUFFIX,
         at: Date.now(),
         meta: { indexCount: indices?.length || 0, stockCount: stockRows.length, sectorCount: sectorRows.length, coverage: coverage?.label || '行情样本' },
       };
-      setBriefing(record);
-      setBriefingHistory(current => {
-        const next = [record, ...current].slice(0, BRIEFING_HISTORY_LIMIT);
-        persistBriefingHistory(next);
-        return next;
+      store.setState({
+        briefing: record,
+        briefingLoading: false,
+        briefingHistory: (() => {
+          const next = [record, ...store.state.briefingHistory].slice(0, BRIEFING_HISTORY_LIMIT);
+          persistBriefingHistory(next);
+          return next;
+        })(),
       });
     } catch (e) {
-      setBriefingError(e.message || '早报生成失败');
+      store.setState({ briefingError: e.message || '早报生成失败', briefingLoading: false });
     }
-    setBriefingLoading(false);
-  }, [llmConfig, llmReady]);
+  }, []);
 
   // ===== 模块 C：自选股智能监控 =====
-  // 对自选股逐一检查条件，命中时用 LLM 生成提醒文案
   const checkAlerts = useCallback(async (watchlist, conditions) => {
-    if (!llmReady) {
+    const cfg = store.state.llmConfig;
+    if (!cfg || !cfg.baseUrl || !cfg.apiKey || !cfg.selectedModel) {
       return { needConfig: true };
     }
     if (!watchlist || watchlist.length === 0) return { hits: [] };
-    setAlertChecking(true);
+    store.setState({ alertChecking: true });
     try {
-      // 拉取每只自选股的实时数据
       const results = await Promise.all(watchlist.map(async (stock) => {
         try {
           const res = await fetch(`/api/stock/realtime?code=${stock.code}`);
@@ -193,7 +205,6 @@ ${sectorText}
         } catch { return { stock, realtime: null }; }
       }));
 
-      // 本地规则初筛（命中条件的才发给 LLM）
       const hitItems = [];
       for (const { stock, realtime } of results) {
         if (!realtime) continue;
@@ -202,50 +213,58 @@ ${sectorText}
       }
 
       if (hitItems.length === 0) {
-        setAlertResults([]);
+        store.setState({ alertResults: [], alertChecking: false });
         return { hits: [] };
       }
 
-      // LLM 批量生成提醒文案
       const systemPrompt = '你是股市监控助手。基于命中的监控条件，用中文为每只股票生成一句话提醒。客观陈述触发事实，不给买卖建议。每只 30 字内。';
       const itemsText = hitItems.map((h, i) => `${i + 1}. ${h.stock.name}(${h.stock.code}) 现价${h.realtime.price} 涨跌${h.realtime.changePct}% 触发：${h.reason}`).join('\n');
-      const content = await callLlm(llmConfig, systemPrompt, `以下自选股命中监控条件：\n${itemsText}\n\n请逐只生成提醒。`);
+      const content = await callLlm(cfg, systemPrompt, `以下自选股命中监控条件：\n${itemsText}\n\n请逐只生成提醒。`);
 
-      setAlertResults(hitItems.map((h, i) => ({ ...h, aiText: extractLine(content, i) || h.reason })));
-      setAlertChecking(false);
+      store.setState({
+        alertResults: hitItems.map((h, i) => ({ ...h, aiText: extractLine(content, i) || h.reason })),
+        alertChecking: false,
+      });
       return { hits: hitItems };
     } catch (e) {
-      setAlertChecking(false);
+      store.setState({ alertChecking: false });
       return { error: e.message || '监控检查失败' };
     }
-  }, [llmConfig, llmReady]);
+  }, []);
 
-  const clearDiagnosis = useCallback(() => { setDiagnosis(null); setDiagnoseError(''); }, []);
-  const clearBriefing = useCallback(() => { setBriefing(null); setBriefingError(''); }, []);
-  const openBriefing = useCallback(record => { setBriefing(record); setBriefingError(''); }, []);
+  const clearDiagnosis = useCallback(() => store.setState({ diagnosis: null, diagnoseError: '' }), []);
+  const clearBriefing = useCallback(() => store.setState({ briefing: null, briefingError: '' }), []);
+  const openBriefing = useCallback(record => store.setState({ briefing: record, briefingError: '' }), []);
   const deleteBriefing = useCallback(id => {
-    setBriefingHistory(current => {
-      const next = current.filter(record => record.id !== id);
-      persistBriefingHistory(next);
-      return next;
+    const next = store.state.briefingHistory.filter(record => record.id !== id);
+    persistBriefingHistory(next);
+    store.setState({
+      briefingHistory: next,
+      briefing: store.state.briefing?.id === id ? null : store.state.briefing,
     });
-    setBriefing(current => current?.id === id ? null : current);
   }, []);
   const clearBriefingHistory = useCallback(() => {
     persistBriefingHistory([]);
-    setBriefingHistory([]);
-    setBriefing(null);
+    store.setState({ briefingHistory: [], briefing: null });
   }, []);
 
   return {
     llmReady,
     // 诊断
-    diagnosing, diagnosis, diagnoseError, diagnoseStock, clearDiagnosis,
+    diagnosing: snapshot.diagnosing,
+    diagnosis: snapshot.diagnosis,
+    diagnoseError: snapshot.diagnoseError,
+    diagnoseStock, clearDiagnosis,
     // 早报
-    briefingLoading, briefing, briefingError, briefingHistory,
+    briefingLoading: snapshot.briefingLoading,
+    briefing: snapshot.briefing,
+    briefingError: snapshot.briefingError,
+    briefingHistory: snapshot.briefingHistory,
     generateMorningBrief, clearBriefing, openBriefing, deleteBriefing, clearBriefingHistory,
     // 监控
-    alertChecking, alertResults, checkAlerts,
+    alertChecking: snapshot.alertChecking,
+    alertResults: snapshot.alertResults,
+    checkAlerts,
   };
 }
 

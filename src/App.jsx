@@ -946,7 +946,8 @@ function App() {
   const [newsPage, setNewsPage] = useState(0);
   const [newsHasMore, setNewsHasMore] = useState(true);
   const [renderLimit, setRenderLimit] = useState(40);
-  const filteredRef = useRef(0);
+  // 同步跟踪 filtered.length 给 IntersectionObserver 用（避免 observer 依赖 filtered 触发重建）
+  const filteredLengthRef = useRef(0);
   const [debouncedQuery, setDebouncedQuery] = useState('');
   const [error, setError] = useState('');
   const [blocked, setBlocked] = useState('');
@@ -1489,6 +1490,42 @@ function App() {
     return () => cancelAnimationFrame(raf);
   }, [scrollingNewsPaused, scrollingNews.length]);
 
+  // 滚动资讯手动拖拽：按下并拖动直接控制 scrollLeft
+  const scrollingNewsDragRef = useRef({ dragging: false, startX: 0, startScroll: 0, moved: false });
+  const handleScrollingNewsMouseMove = useCallback((e) => {
+    const ref = scrollingNewsDragRef.current;
+    if (!ref.dragging) return;
+    const el = scrollingNewsRef.current;
+    if (!el) return;
+    const dx = e.clientX - ref.startX;
+    if (Math.abs(dx) > 3) ref.moved = true;
+    el.scrollLeft = ref.startScroll - dx;
+  }, []);
+  const handleScrollingNewsMouseUp = useCallback(() => {
+    const ref = scrollingNewsDragRef.current;
+    ref.dragging = false;
+    window.removeEventListener('mousemove', handleScrollingNewsMouseMove);
+    window.removeEventListener('mouseup', handleScrollingNewsMouseUp);
+    // 拖拽结束后短暂保持暂停状态，给用户一个自然的间隙
+    if (ref.moved) {
+      setScrollingNewsPaused(true);
+      setTimeout(() => setScrollingNewsPaused(false), 1200);
+    }
+  }, [handleScrollingNewsMouseMove]);
+  const handleScrollingNewsMouseDown = useCallback((e) => {
+    const el = scrollingNewsRef.current;
+    if (!el) return;
+    e.preventDefault(); // 防止文字选中
+    scrollingNewsDragRef.current = {
+      dragging: true,
+      startX: e.clientX,
+      startScroll: el.scrollLeft,
+      moved: false,
+    };
+    window.addEventListener('mousemove', handleScrollingNewsMouseMove);
+    window.addEventListener('mouseup', handleScrollingNewsMouseUp);
+  }, [handleScrollingNewsMouseMove, handleScrollingNewsMouseUp]);
+
   useEffect(() => {
     if (!lightbox.open) return;
     const handler = (e) => { if (e.key === 'Escape') setLightbox({ open: false, src: '', title: '', images: [], index: 0 }); };
@@ -1511,14 +1548,15 @@ function App() {
     const observer = new IntersectionObserver(
       (entries) => {
         if (!entries[0].isIntersecting) return;
-        // 优先增加渲染数（渲染分页），已加载数据渲染完才请求 API 加载更多
-        if (filteredRef.current > renderLimit) {
-          setRenderLimit(r => r + 40);
-        } else if (newsHasMore && !loadingMore) {
+        // 滚动接近底部时同时做两件事（不互斥）：
+        // 1) 渲染分页：每批 +20 让 DOM 增长平滑，避免一次 +40 卡顿
+        // 2) 后端预加载：在用户看到底部前提前请求下一页
+        setRenderLimit(r => (filteredLengthRef.current > r ? r + 20 : r));
+        if (newsHasMore && !loadingMore) {
           loadMoreNews();
         }
       },
-      { root: el, rootMargin: '200px' }
+      { root: el, rootMargin: '800px 0px' }
     );
     const sentinel = document.getElementById('load-more-sentinel');
     if (sentinel) observer.observe(sentinel);
@@ -1593,10 +1631,21 @@ function App() {
     loadNews(blocked, false, debouncedQuery);
   }, [debouncedQuery, category, mode, sourceFilter]);
   useEffect(() => {
-    if (nav === 'trending' && trendingItems.length === 0) loadTrending();
-    if (nav === 'github' && githubRepos.length === 0) loadGithub();
     if (nav === 'recommendations') loadNews(blocked, false, debouncedQuery);
   }, [nav]);
+  // 后台预加载：进入首页即拉取热门/GitHub/资讯，避免切 tab 时白屏等待
+  const backgroundLoadedRef = useRef(false);
+  useEffect(() => {
+    if (backgroundLoadedRef.current) return;
+    backgroundLoadedRef.current = true;
+    if (trendingItems.length === 0) loadTrending();
+    if (githubRepos.length === 0) loadGithub();
+    if (items.length === 0) loadNews(blocked, false, debouncedQuery);
+    // 后台预取股票/3D 地球/AI 工作站等 lazy chunk，切到对应 tab 时无需再等下载
+    import('./components/StockPage.jsx').catch(() => {});
+    // 预取股票 dashboard 数据填充服务端缓存，切到 stock tab 时秒出
+    fetch('/api/stock/dashboard').catch(() => {});
+  }, []);
 
   // 趋势分析数据
   const trendData = useMemo(() => {
@@ -1693,6 +1742,9 @@ function App() {
 
     return result;
   }, [items, category, mode, sourceFilter, followKeywords, regionFilter]);
+
+  // 同步 filtered.length 到 ref（供 IntersectionObserver 闭包读取最新值）
+  useEffect(() => { filteredLengthRef.current = filtered.length; }, [filtered.length]);
 
   // 「全部动态」当前活动筛选 —— 用于 chip 条展示与一键清除
   const allActiveFilters = useMemo(() => {
@@ -3315,19 +3367,9 @@ ${blueprintSummary}`,
           const sampleRegions = d.items.slice(0, 3).map(i => ({ title: i.title?.substring(0, 30), region: i.region }));
         }
         
-        // 标记涉华内容
-        const chinaFocusedKeywords = ['China', '中国', '中企', '中国企业', '人民币', '华为', '腾讯', '阿里巴巴', '字节跳动', '对华', '涉华', '中美', '中欧', '一带一路', 'RCEP', '东盟'];
-        const itemsWithChinaTag = (d.items || []).map(item => {
-          const textToMatch = `${item.title} ${item.summary} ${item.tags ? item.tags.join(' ') : ''}`.toLowerCase();
-          const isChinaFocused = chinaFocusedKeywords.some(kw => {
-            if (/^[a-zA-Z\s]+$/.test(kw)) {
-              return textToMatch.includes(kw.toLowerCase()) || textToMatch.includes(kw);
-            }
-            return textToMatch.includes(kw.toLowerCase());
-          });
-          return { ...item, isChinaFocused };
-        });
-        
+        // isChinaFocused 已由后端 /api/news 预计算（getNews 中 computeIsChinaFocused），直接消费
+        const itemsWithChinaTag = d.items || [];
+
         if (append) {
           setItems(prev => [...prev, ...itemsWithChinaTag]);
         } else {
@@ -3720,6 +3762,7 @@ ${signals}
                 className="scrolling-news-content"
                 onMouseEnter={() => setScrollingNewsPaused(true)}
                 onMouseLeave={() => setScrollingNewsPaused(false)}
+                onMouseDown={handleScrollingNewsMouseDown}
               >
                 <div className="scrolling-news-track">
                   {[...scrollingNews, ...scrollingNews].map((item, index) => (
@@ -4161,7 +4204,8 @@ ${signals}
                   {(newsHasMore || filtered.length > renderLimit) && (
                     <div id="load-more-sentinel" className="load-more-area">
                       {loadingMore && <div className="load-more-spinner"><div className="spinner" /><span>加载中...</span></div>}
-                      {!loadingMore && <span className="load-more-hint">滚动加载更多</span>}
+                      {!loadingMore && newsHasMore && <span className="load-more-hint">向下滚动加载更多</span>}
+                      {!loadingMore && !newsHasMore && <span className="load-more-hint">继续滚动查看更多</span>}
                     </div>
                   )}
                   {!newsHasMore && filtered.length <= renderLimit && (

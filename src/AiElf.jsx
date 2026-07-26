@@ -479,7 +479,8 @@ ${baseContent}
       startX: e.clientX,
       startY: e.clientY,
       initialX: position.x,
-      initialY: position.y
+      initialY: position.y,
+      moved: false, // 移动距离超过阈值才视为真正拖拽，避免误触发点击
     };
   }, [position]);
 
@@ -488,6 +489,8 @@ ${baseContent}
     if (!isDragging) return;
     const dx = e.clientX - dragRef.current.startX;
     const dy = e.clientY - dragRef.current.startY;
+    // 移动超过 5px 才标记为真拖拽，避免微小抖动被误判
+    if (!dragRef.current.moved && Math.hypot(dx, dy) > 5) dragRef.current.moved = true;
     setPosition({
       x: Math.max(0, Math.min(window.innerWidth - AVATAR_SIZE, dragRef.current.initialX + dx)),
       y: Math.max(0, Math.min(window.innerHeight - AVATAR_SIZE, dragRef.current.initialY + dy))
@@ -497,6 +500,12 @@ ${baseContent}
   // 拖拽结束
   const handleMouseUp = useCallback(() => {
     setIsDragging(false);
+  }, []);
+
+  // 点击切换：仅在未真正拖拽时触发
+  const handleAvatarClick = useCallback(() => {
+    if (dragRef.current.moved) return; // 真拖拽过则不切换 isOpen
+    setIsOpen(prev => !prev);
   }, []);
 
   useEffect(() => {
@@ -976,8 +985,8 @@ ${baseContent}
           height: AVATAR_SIZE
         }}
         onMouseDown={handleMouseDown}
-        onClick={() => !isDragging && setIsOpen(!isOpen)}
-        title="AI精灵助手"
+        onClick={handleAvatarClick}
+        title="AI精灵助手（点击打开 / 拖动移动）"
       >
         <img
           src={avatarImage || '/ai-elf-avatar.png'}

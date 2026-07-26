@@ -30,12 +30,14 @@ const DEFAULT_HOT_STOCKS = [
   { secid: '1.688981', code: 'sh688981', name: '中芯国际' },
 ];
 
-// 缓存：单标的实时 8s，批量看板 30s，K线 10min
+// 缓存：单标的实时 8s，批量看板 30s，K线 10min，活跃股池 5min
 const realtimeCache = new Map();
 const klineCache = new Map();
-const REALTIME_TTL = 8 * 1000;
-const BATCH_REALTIME_TTL = 30 * 1000;
+const REALTIME_TTL = 2 * 1000;
+const BATCH_REALTIME_TTL = 5 * 1000;
 const KLINE_TTL = 10 * 60 * 1000;
+const ACTIVE_POOL_TTL = 5 * 60 * 1000;
+const activeMarketPoolCache = { value: null, t: 0 };
 
 function nowMs() { return Date.now(); }
 
@@ -298,11 +300,29 @@ export function parseMarketPoolItem(d) {
 }
 
 async function getActiveMarketPool() {
-  const url = `${SECTOR_LIST_URL}?pn=1&pz=${MARKET_POOL_SIZE}&po=1&np=1&fltt=2&invt=2&fid=f6&fs=${A_SHARE_FILTER}&fields=f2,f3,f4,f5,f6,f12,f13,f14,f15,f16,f17,f18`;
-  const res = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } });
-  if (!res.ok) throw new Error(`market pool upstream returned ${res.status}`);
-  const json = await res.json();
-  return (json?.data?.diff || []).map(parseMarketPoolItem).filter(Boolean);
+  // 5 分钟缓存：避免短时间内重复请求被东方财富限速
+  const cached = activeMarketPoolCache.value;
+  if (cached && nowMs() - activeMarketPoolCache.t < ACTIVE_POOL_TTL) return cached;
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 8000); // 8s 超时
+  try {
+    const url = `${SECTOR_LIST_URL}?pn=1&pz=${MARKET_POOL_SIZE}&po=1&np=1&fltt=2&invt=2&fid=f6&fs=${A_SHARE_FILTER}&fields=f2,f3,f4,f5,f6,f12,f13,f14,f15,f16,f17,f18`;
+    const res = await fetch(url, {
+      headers: { 'User-Agent': 'Mozilla/5.0', 'Referer': 'https://quote.eastmoney.com/' },
+      signal: controller.signal,
+    });
+    if (!res.ok) throw new Error(`market pool upstream returned ${res.status}`);
+    const json = await res.json();
+    const items = (json?.data?.diff || []).map(parseMarketPoolItem).filter(Boolean);
+    if (items.length > 0) {
+      activeMarketPoolCache.value = items;
+      activeMarketPoolCache.t = nowMs();
+    }
+    return items;
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 // K线：klt=101日 102周 103月 5/15/30/60 分钟；fqt=0不复权 1前复权 2后复权
@@ -419,7 +439,7 @@ export async function getDashboard() {
     getRealtimeBatch(indexSecids),
     getActiveMarketPool().catch(() => null),
   ]);
-  const dynamicStocks = Array.isArray(poolResult) && poolResult.length >= 10 ? poolResult : null;
+  const dynamicStocks = Array.isArray(poolResult) && poolResult.length >= 3 ? poolResult : null;
   const stocks = dynamicStocks || await getRealtimeBatch(fallbackSecids);
   return {
     indices,
@@ -436,23 +456,61 @@ export async function getDashboard() {
   };
 }
 
-// 搜索股票（东方财富搜索接口）
+// 搜索股票（腾讯智能搜索 + 东方财富模糊查询双源，返回标准化数组）
 export async function searchStock(keyword) {
   if (!keyword) return [];
-  const url = `https://searchapi.eastmoney.com/api/suggest/get?input=${encodeURIComponent(keyword)}&type=14&token=D43BF722C8E33BDC906FB84D85E326E8&count=10`;
+  const results = [];
+  const seen = new Set();
+
+  // 源 1：腾讯智能搜索（同时支持代码和中文名，返回最佳匹配）
+  // 返回格式：v_hint="sh~600519~贵州茅台~gzmt~GP-A"
   try {
-    const res = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } });
-    const json = await res.json();
-    const list = json.QuotationCodeTable?.Data || [];
-    return list.map(d => ({
-      secid: `${d.MktNum}.${d.Code}`,
-      code: d.Code,
-      name: d.Name,
-      market: d.MktNum === 1 ? 'sh' : d.MktNum === 0 ? 'sz' : d.MktNum === 105 ? 'us' : 'hk',
-    }));
+    const tencentUrl = `https://smartbox.gtimg.cn/s3/?t=all&q=${encodeURIComponent(keyword)}`;
+    const res = await fetch(tencentUrl, { headers: { 'User-Agent': 'Mozilla/5.0' } });
+    const text = await res.text();
+    const match = text.match(/v_hint="([^"]+)"/);
+    if (match && match[1]) {
+      const fields = match[1].split('~');
+      if (fields.length >= 4 && fields[3]) {
+        const market = fields[0]; // sh/sz/hk/us
+        const code = fields[1];
+        const name = fields[2];
+        const py = fields[3];
+        const secid = market === 'sh' ? `1.${code}` : market === 'sz' ? `0.${code}` : `${market}.${code}`;
+        if (!seen.has(secid) && code && name) {
+          seen.add(secid);
+          results.push({ secid, code, name, market, py });
+        }
+      }
+    }
   } catch (e) {
-    return [];
+    // 腾讯失败继续尝试东方财富
   }
+
+  // 源 2：东方财富搜索 API（多结果回退，JSONP 格式）
+  try {
+    const url = `https://searchapi.eastmoney.com/api/suggest/get?input=${encodeURIComponent(keyword)}&type=14&token=D43BF722C8E33BDC906FB84D85E326E8&count=15&mode=1`;
+    const res = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } });
+    const text = await res.text();
+    const match = text.match(/^[a-zA-Z0-9_$]+\s*\(([\s\S]+)\)\s*;?\s*$/);
+    const jsonText = match ? match[1] : text;
+    const json = JSON.parse(jsonText);
+    const list = json.QuotationCodeTable?.Data || [];
+    for (const d of list) {
+      const mkt = d.MktNum;
+      const market = mkt === 1 ? 'sh' : mkt === 0 ? 'sz' : mkt === 105 ? 'us' : mkt === 116 ? 'hk' : mkt === 3 ? 'bj' : 'other';
+      const code = d.Code;
+      const secid = `${mkt}.${code}`;
+      if (!seen.has(secid)) {
+        seen.add(secid);
+        results.push({ secid, code, name: d.Name, market });
+      }
+    }
+  } catch (e) {
+    // 东方财富失败时只用腾讯结果
+  }
+
+  return results.slice(0, 15);
 }
 
 export const STOCK_DEFAULTS = { DEFAULT_INDICES, DEFAULT_HOT_STOCKS };

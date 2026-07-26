@@ -42,7 +42,7 @@ export default function IntelligenceFeedPanel({
   const lead = items[0];
   const topSectors = Array.isArray(weeklySectors?.sectors) ? weeklySectors.sectors.slice(0, 6) : [];
   const leadSector = weeklySectors?.leadSector || topSectors[0];
-  const topAlerts = Array.isArray(alerts) ? alerts.slice(0, 8) : [];
+  const topAlerts = Array.isArray(alerts) ? alerts.slice(0, 6) : [];
 
   return (
     <section className="intelligence-feed-panel" aria-label="AI 行业情报">
@@ -117,7 +117,7 @@ export default function IntelligenceFeedPanel({
             </div>
             {opportunities.length > 0 && (
               <div className="intelligence-opportunity-list">
-                {opportunities.slice(0, 12).map(signal => (
+                {opportunities.slice(0, 6).map(signal => (
                   <div key={signal.id} className={`intelligence-opportunity ${signal.type || 'watch'}`}>
                     <span>{signal.label || 'Opportunity'}</span>
                     <strong>{signal.title}</strong>
@@ -156,7 +156,7 @@ export default function IntelligenceFeedPanel({
 
       {items.length > 1 && (
         <div className="intelligence-mini-list">
-          {items.slice(1, 31).map(item => (
+          {items.slice(1, 13).map(item => (
             <a key={item.id} href={item.url} target="_blank" rel="noreferrer" className="intelligence-mini-item">
               <span>{formatScore(item.intelligenceScore)}</span>
               <strong>{item.title}</strong>

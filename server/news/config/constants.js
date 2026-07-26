@@ -1,8 +1,8 @@
 // ========== 多媒体配置 ==========
 export const MEDIA_CONFIG = {
   // 抓取配置
-  MAX_RESOLVE_ITEMS: 80,        // 最多抓取80条无图片新闻（从60提高）
-  RESOLVE_TIMEOUT: 15000,       // 抓取超时（毫秒，从12秒提高到15秒）
+  MAX_RESOLVE_ITEMS: 20,        // 后台异步解析图片的上限（从80降低，避免拖慢下轮缓存填充）
+  RESOLVE_TIMEOUT: 10000,       // 抓取超时（毫秒，从15秒降低到10秒，快速失败）
   USE_SCRAPLING: true,          // 启用 Scrapling 动态渲染（从false改为true）
   SCRAPLING_MODE: 'dynamic',    // Scrapling 模式（basic/dynamic/stealth）
   SCRAPLING_TIMEOUT: 18000,     // Scrapling 超时（毫秒，从15秒提高到18秒）

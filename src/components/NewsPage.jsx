@@ -46,6 +46,22 @@ function NewsPage({
 }) {
   return (
     <>
+      {/* Active Filters Chip Bar */}
+      {allActiveFilters.length > 0 && (
+        <div className="active-filters-bar">
+          <span className="active-filters-label">当前筛选：</span>
+          <div className="active-filters-chips">
+            {allActiveFilters.map(chip => (
+              <span key={chip.key} className="filter-chip">
+                {chip.label}
+                <button className="filter-chip-x" onClick={chip.clear} title="移除该筛选">×</button>
+              </span>
+            ))}
+            <button className="filter-chip-clear-all" onClick={clearAllFilters}>清空全部</button>
+          </div>
+        </div>
+      )}
+
       {/* Event Clusters */}
       {eventClusters.length > 0 && category === 'all' && mode === 'all' && !query && (
         <div className="event-clusters">

@@ -41,6 +41,27 @@ function saveSessions(sessions) {
   try { localStorage.setItem('aiCopilotSessions', JSON.stringify(sessions)); } catch {}
 }
 
+// ===== 模块级 sessions store：组件 unmount 后流式 fetch 继续，重新 mount 从 store 恢复 =====
+const sessionsStore = {
+  state: {
+    sessions: loadSessions(),
+    activeSessionId: null,
+    isStreaming: false,
+  },
+  subscribers: new Set(),
+  subscribe(fn) { this.subscribers.add(fn); return () => this.subscribers.delete(fn); },
+  notify() { this.subscribers.forEach(fn => fn(this.state)); },
+  setState(patch) {
+    this.state = { ...this.state, ...patch };
+    // sessions 变化时持续写回 localStorage（即使组件已卸载）
+    if (patch.sessions !== undefined) saveSessions(patch.sessions);
+    this.notify();
+  },
+};
+
+// 模块级 abortController，跨组件生命周期保持
+let activeAbortController = null;
+
 export default function AiChatPanel({
   llmConfig,
   intelligenceProfile,
@@ -59,19 +80,30 @@ export default function AiChatPanel({
   materials,
   variant = 'copilot',
 }) {
-  const [sessions, setSessions] = useState(loadSessions);
+  // 订阅模块级 sessionsStore：组件 unmount 后流式 fetch 继续更新 store，
+  // 重新 mount 时 useState 初始化从 store 读取最新状态
+  const [storeSnapshot, setStoreSnapshot] = useState(sessionsStore.state);
+  useEffect(() => sessionsStore.subscribe(setStoreSnapshot), []);
+  const sessions = storeSnapshot.sessions;
+  const activeSessionId = storeSnapshot.activeSessionId
+    || (storeSnapshot.sessions.length > 0 ? storeSnapshot.sessions[0].id : null);
+  const isStreaming = storeSnapshot.isStreaming;
+  // 暴露给原 setSessions 调用点的兼容函数：写入 store + 持久化
+  const setSessions = useCallback((updater) => {
+    const prev = sessionsStore.state.sessions;
+    const next = typeof updater === 'function' ? updater(prev) : updater;
+    sessionsStore.setState({ sessions: next });
+  }, []);
+  const setActiveSessionId = useCallback((id) => sessionsStore.setState({ activeSessionId: id }), []);
+  const setIsStreaming = useCallback((v) => sessionsStore.setState({ isStreaming: v }), []);
+
   const [workspaceFiles, setWorkspaceFiles] = useState([]); // 工作空间加入上下文的文件
   const [memoriesVersion, setMemoriesVersion] = useState(0); // 会话记忆版本（摘要生成后刷新）
   const [learnedVersion, setLearnedVersion] = useState(0); // 学习画像版本（观测后刷新）
   const [autoTodos, setAutoTodos] = useState([]); // 对话自动提取的行动项
   const [excludeAllEvidence, setExcludeAllEvidence] = useState(false); // 一键排除全部情报上下文
 
-  const [activeSessionId, setActiveSessionId] = useState(() => {
-    const saved = loadSessions();
-    return saved.length > 0 ? saved[0].id : null;
-  });
   const [input, setInput] = useState('');
-  const [isStreaming, setIsStreaming] = useState(false);
   const [selectedModel, setSelectedModel] = useState(llmConfig?.selectedModel || '');
   const [attachments, setAttachments] = useState([]);
   const [sessionCollapsed, setSessionCollapsed] = useState(false);
@@ -151,8 +183,7 @@ export default function AiChatPanel({
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages.length]);
 
-  // Sync sessions to localStorage
-  useEffect(() => { saveSessions(sessions); }, [sessions]);
+  // sessions 持久化由 sessionsStore.setState 自动处理（流式过程中持续写回）
 
   // Build system prompt
   const systemPrompt = useMemo(() => {
@@ -414,6 +445,7 @@ export default function AiChatPanel({
     try {
       const controller = new AbortController();
       abortControllerRef.current = controller;
+      activeAbortController = controller; // 模块级引用，组件 unmount 后仍可 abort
       const response = await fetch('/api/ai-generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -518,13 +550,14 @@ export default function AiChatPanel({
       }));
     } finally {
       abortControllerRef.current = null;
+      activeAbortController = null;
       setIsStreaming(false);
     }
   }, [input, messages, isStreaming, llmConfig, selectedModel, systemPrompt, onOpenLlmConfig, activeSessionId, intelligenceContext]);
 
   // 停止生成
   const stopGeneration = useCallback(() => {
-    abortControllerRef.current?.abort();
+    abortControllerRef.current?.abort() || activeAbortController?.abort();
   }, []);
 
   // 复制消息内容到剪贴板

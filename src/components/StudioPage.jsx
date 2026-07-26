@@ -1,7 +1,8 @@
-import { useMemo } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import CreativeWorkspace from './CreativeWorkspace.jsx';
 import { BlockGrid, BlockPanel } from '../blocks/index.js';
 import { ICONS } from '../constants/index.jsx';
+import { renderMarkdown } from '../utils/markdown.jsx';
 
 export default function StudioPage({
   goNav,
@@ -55,6 +56,16 @@ export default function StudioPage({
     { type: '指定回复', desc: '沉淀可复用的固定输出结构' },
     { type: '输出', desc: '导出到素材库、文章或本地知识库' }
   ], []);
+
+  // 工作空间文件预览侧边 panel（双击触发）
+  const [previewAsset, setPreviewAsset] = useState(null);
+  useEffect(() => {
+    if (!previewAsset) return;
+    const onKey = e => { if (e.key === 'Escape') setPreviewAsset(null); };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [previewAsset]);
+  const previewContent = previewAsset ? (previewAsset.fullContent || previewAsset.content || previewAsset.summary || '') : '';
 
   return (
     <div className="product-page studio-page">
@@ -125,9 +136,13 @@ export default function StudioPage({
       <section className="studio-asset-row">
         <BlockPanel title="最近素材" action={<button onClick={() => goNav('materials')}>管理素材库（{materials.length}）</button>}>
           {materials.length > 0 ? (
-            <ul className="studio-asset-list">
+            <ul className="studio-asset-list studio-asset-list-clickable">
               {materials.slice(0, 3).map(m => (
-                <li key={m.id}><strong>{m.title}</strong><p>{m.summary}</p></li>
+                <li key={m.id} className="has-dblclick" onDoubleClick={() => setPreviewAsset(m)} title="双击在侧边预览">
+                  <strong>{m.title}</strong>
+                  <p>{m.summary || (m.content ? String(m.content).slice(0, 120) : '') || '—'}</p>
+                  <span className="studio-asset-open">{ICONS.arrowRight}</span>
+                </li>
               ))}
             </ul>
           ) : (
@@ -146,6 +161,31 @@ export default function StudioPage({
           )}
         </BlockPanel>
       </section>
+
+      {previewAsset && (
+        <>
+          <div className="workspace-side-panel-backdrop" onClick={() => setPreviewAsset(null)} />
+          <aside className="workspace-side-panel" role="dialog" aria-modal="false" aria-label="素材预览">
+            <div className="workspace-side-panel-head">
+              <div className="workspace-side-panel-meta">
+                <span className="workspace-side-panel-type">{previewAsset.type || 'material'}</span>
+                <h3>{previewAsset.title || '未命名素材'}</h3>
+                {previewAsset.source && <span className="workspace-side-panel-path">来源：{previewAsset.source}</span>}
+              </div>
+              <button className="workspace-side-panel-close" onClick={() => setPreviewAsset(null)} title="关闭 (Esc)">{ICONS.x}</button>
+            </div>
+            <div className="workspace-side-panel-body">
+              {previewContent ? renderMarkdown(previewContent) : <p className="workspace-side-panel-empty">该素材暂无可显示内容</p>}
+            </div>
+            <div className="workspace-side-panel-foot">
+              {previewAsset.url && (
+                <a href={previewAsset.url} target="_blank" rel="noreferrer" className="workspace-side-panel-link">查看原文</a>
+              )}
+              <button className="workspace-side-panel-action" onClick={() => { setPreviewAsset(null); goNav('materials'); }}>在素材库中管理</button>
+            </div>
+          </aside>
+        </>
+      )}
     </div>
   );
 }
