@@ -24,6 +24,8 @@ import { useUI } from './hooks/useUI.js';
 import { useCreativeWorkspace } from './hooks/useCreativeWorkspace.js';
 import { useCalendarMemos } from './hooks/useCalendarMemos.js';
 import { useMaterialsMemos } from './hooks/useMaterialsMemos.js';
+import { useWorkflowMeta } from './hooks/useWorkflowMeta.js';
+import { useNewsFilter } from './hooks/useNewsFilter.js';
 import { useAgents } from './hooks/useAgents.js';
 import { useExternalIntelligence } from './hooks/useExternalIntelligence.js';
 import { BlockGrid, BlockPanel, BlockStat, BlockToolbar } from './blocks/index.js';
@@ -1319,21 +1321,7 @@ function App() {
   // 滚动资讯热点状态：从实时 items 派生热门资讯，保证数据准确实时
   const [scrollingNewsPaused, setScrollingNewsPaused] = useState(false);
   const scrollingNewsRef = useRef(null);
-  const scrollingNews = useMemo(() => {
-    const sorted = [...items]
-      .filter(item => item.title)
-      .sort((a, b) => (b.mustReadScore || b.hot || 0) - (a.mustReadScore || a.hot || 0))
-      .slice(0, 12);
-    if (sorted.length > 0) return sorted.map(item => ({
-      id: item.id,
-      title: item.title,
-      category: item.category,
-      source: item.source || '',
-      time: item.publishedAt ? formatRelative(item.publishedAt) : '',
-      hot: (item.mustReadScore || 0) >= 60,
-    }));
-    return [];
-  }, [items]);
+  const { scrollingNews, sourceStats, availableNewsDates, sourceOptions } = useNewsFilter(items, category, mode);
 
   const editorTextareaRef = useRef(null);
   const imageInputRef = useRef(null);
@@ -1653,17 +1641,6 @@ function App() {
     }
 
     return result;
-  }, [items, category, mode, sourceFilter, followKeywords, regionFilter]);
-
-  // 同步 filtered.length 到 ref，供 IntersectionObserver 回调读取（避免 TDZ）
-  filteredRef.current = filtered.length;
-
-  const sourceOptions = useMemo(() => {
-    const counts = new Map();
-    items
-      .filter(item => {
-        const cat = category === 'all' || item.category === category;
-        const md = mode === 'all' || item.mode === mode;
         return cat && md;
       })
       .forEach(item => counts.set(item.source, (counts.get(item.source) || 0) + 1));
@@ -1719,16 +1696,11 @@ function App() {
     });
     return [...allMap.entries()]
       .map(([tag, count]) => ({ tag, count, trend: last24hMap.get(tag) || 0, score: count + (last24hMap.get(tag) || 0) * 2 }))
-      .sort((a, b) => b.score - a.score)
       .slice(0, 8);
   }, [filtered]);
 
   const sourceStats = useMemo(() => items.reduce((s, i) => ({ ...s, [i.region]: (s[i.region] || 0) + 1 }), { domestic: 0, overseas: 0, global: 0 }), [items]);
 
-  const availableNewsDates = useMemo(() => {
-    const dates = [...new Set(items.map(item => item.publishedAt?.slice(0, 10)).filter(Boolean))].sort((a, b) => b.localeCompare(a));
-    return dates.slice(0, 14);
-  }, [items]);
 
   useEffect(() => {
     if (!items.length || !availableNewsDates.length) return;
@@ -2845,39 +2817,7 @@ function App() {
 
   const aiActionPrompts = useMemo(() => intelligenceMissions.slice(0, 4), [intelligenceMissions]);
 
-  const workflowTypeMeta = useMemo(() => ({
-    input: { label: '输入', tone: 'blue' },
-    llm: { label: '大模型 Prompt', tone: 'cyan' },
-    skill: { label: '工具 Skills', tone: 'green' },
-    condition: { label: '条件语句', tone: 'amber' },
-    classifier: { label: '分类语句', tone: 'violet' },
-    reply: { label: '指定回复', tone: 'rose' },
-    output: { label: '输出', tone: 'slate' }
-  }), []);
-
-  const workflowRunStatusMeta = useMemo(() => ({
-    idle: { label: '待运行', tone: 'neutral' },
-    running: { label: '运行中', tone: 'running' },
-    completed: { label: '已完成', tone: 'success' },
-    blocked: { label: '待配置', tone: 'blocked' },
-    failed: { label: '失败', tone: 'failed' }
-  }), []);
-
-  const selectedWorkflowNode = useMemo(() => {
-    return agentWorkflowDraft.nodes.find(node => node.id === selectedWorkflowNodeId) || agentWorkflowDraft.nodes[0] || null;
-  }, [agentWorkflowDraft.nodes, selectedWorkflowNodeId]);
-
-  const selectedWorkflowConnections = useMemo(() => {
-    const index = agentWorkflowDraft.nodes.findIndex(node => node.id === selectedWorkflowNodeId);
-    return {
-      previous: index > 0 ? agentWorkflowDraft.nodes[index - 1] : null,
-      next: index >= 0 && index < agentWorkflowDraft.nodes.length - 1 ? agentWorkflowDraft.nodes[index + 1] : null
-    };
-  }, [agentWorkflowDraft.nodes, selectedWorkflowNodeId]);
-
-  const enabledWorkflowNodes = useMemo(() => {
-    return agentWorkflowDraft.nodes.filter(node => node.enabled !== false);
-  }, [agentWorkflowDraft.nodes]);
+  const { workflowTypeMeta, workflowRunStatusMeta, selectedWorkflowNode, selectedWorkflowConnections, enabledWorkflowNodes } = useWorkflowMeta(agentWorkflowDraft, selectedWorkflowNodeId);
 
   const workflowBlueprintText = useMemo(() => {
     return `${agentWorkflowDraft.name}
