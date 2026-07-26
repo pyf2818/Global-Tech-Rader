@@ -1346,6 +1346,68 @@ function App() {
     insertAiResult, clearAiResult, aiAction,
     exportArticleToFile, copyArticleAsRichText, exportArticle,
     articleCitations, saveArticleVersion,
+  // bookmarks / materials state must precede useArticleEditor (which consumes materials)
+  const {
+    bookmarks, setBookmarks,
+    materials, setMaterials,
+    selectedMaterials, setSelectedMaterials,
+    materialSpaces, setMaterialSpaces,
+    newSpaceName, setNewSpaceName,
+    toggleBookmark, isBookmarked, isInMaterials, toggleRead,
+    detectMaterialType, toggleMaterial, addManualMaterial,
+    continueMaterialInWorkbench, removeMaterial, batchRemoveMaterials,
+    updateMaterialTags, toggleMaterialSelection, selectAllMaterials,
+    clearMaterialSelection, updateMaterialNote, assignMaterialsToSpace,
+    createMaterialSpace, deleteMaterialSpace, toggleMaterialStar,
+    exportMaterials, importMaterials,
+  } = useBookmarkMaterial({
+    creativeWorkspace,
+    goNav,
+    setCopilotPendingMessage,
+    setShowAddMaterial,
+    setShowSpaceForm,
+    materialSpaceFilter,
+    setMaterialSpaceFilter,
+    filteredMaterials,
+  });
+
+  const {
+    articles, setArticles,
+    articleSpaces, setArticleSpaces,
+    currentArticleId, setCurrentArticleId,
+    editorTab, setEditorTab,
+    editorCursorPos, setEditorCursorPos,
+    showTemplateMenu, setShowTemplateMenu,
+    showAiPanel, setShowAiPanel,
+    showImagePanel, setShowImagePanel,
+    aiResult, setAiResult,
+    aiCustomPrompt, setAiCustomPrompt,
+    autoSaveTimer, setAutoSaveTimer,
+    lastSavedAt, setLastSavedAt,
+    articleTagInput, setArticleTagInput,
+    editingArticleTag, setEditingArticleTag,
+    articleSpaceFilter, setArticleSpaceFilter,
+    articleMaterialSpaceFilter, setArticleMaterialSpaceFilter,
+    articleSpaceFormOpen, setArticleSpaceFormOpen,
+    newArticleSpaceName, setNewArticleSpaceName,
+    articleSpaceForNewArticle, setArticleSpaceForNewArticle,
+    articleSearch, setArticleSearch,
+    articleStatusFilter, setArticleStatusFilter,
+    articleTemplateFilter, setArticleTemplateFilter,
+    articleSort, setArticleSort,
+    articleExportFilter, setArticleExportFilter,
+    createArticle, updateArticle, deleteArticle, duplicateArticle,
+    addArticleTag, removeArticleTag,
+    triggerAutoSave,
+    handleContentChange, handleTitleChange,
+    insertAtCursor, insertMaterialAtCursor,
+    removeLinkedMaterial,
+    handleImageUpload, handlePaste,
+    createArticleSpace, deleteArticleSpace,
+    assignArticleToSpace, batchAssignArticlesToSpace,
+    insertAiResult, clearAiResult, aiAction,
+    exportArticleToFile, copyArticleAsRichText, exportArticle,
+    articleCitations, saveArticleVersion,
   } = useArticleEditor({ llmConfig, materials, editorTextareaRef });
 
   const feedRef = useRef(null);
@@ -2612,29 +2674,8 @@ ${materialLines || '暂无素材'}`;
     }
   }, [scopedAgentItems, items, materials, detectMaterialType, updateWorkflowActionStatus, agentWorkflowPrompt, agentWorkflowResult.content, todayProfileSnapshot, agentWorkflowRun.id]);
 
-  const {
-    bookmarks, setBookmarks,
-    materials, setMaterials,
-    selectedMaterials, setSelectedMaterials,
-    materialSpaces, setMaterialSpaces,
-    newSpaceName, setNewSpaceName,
-    toggleBookmark, isBookmarked, isInMaterials, toggleRead,
-    detectMaterialType, toggleMaterial, addManualMaterial,
-    continueMaterialInWorkbench, removeMaterial, batchRemoveMaterials,
-    updateMaterialTags, toggleMaterialSelection, selectAllMaterials,
-    clearMaterialSelection, updateMaterialNote, assignMaterialsToSpace,
-    createMaterialSpace, deleteMaterialSpace, toggleMaterialStar,
-    exportMaterials, importMaterials,
-  } = useBookmarkMaterial({
-    creativeWorkspace,
-    goNav,
-    setCopilotPendingMessage,
-    setShowAddMaterial,
-    setShowSpaceForm,
-    materialSpaceFilter,
-    setMaterialSpaceFilter,
-    filteredMaterials,
-  });
+  // (useBookmarkMaterial moved above useArticleEditor — provides materials which the latter consumes)
+
   const runAgentWorkflow = useCallback(async (mission, customPrompt = '') => {
     const selectedMission = mission || intelligenceMissions[0];
     if (!selectedMission) return;
