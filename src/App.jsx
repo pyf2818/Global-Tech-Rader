@@ -945,7 +945,7 @@ function App() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [newsPage, setNewsPage] = useState(0);
   const [newsHasMore, setNewsHasMore] = useState(true);
-  const [renderLimit, setRenderLimit] = useState(30);
+  const [renderLimit, setRenderLimit] = useState(40);
   const filteredRef = useRef(0);
   const [debouncedQuery, setDebouncedQuery] = useState('');
   const [error, setError] = useState('');
@@ -1513,7 +1513,7 @@ function App() {
         if (!entries[0].isIntersecting) return;
         // 优先增加渲染数（渲染分页），已加载数据渲染完才请求 API 加载更多
         if (filteredRef.current > renderLimit) {
-          setRenderLimit(r => r + 30);
+          setRenderLimit(r => r + 40);
         } else if (newsHasMore && !loadingMore) {
           loadMoreNews();
         }
@@ -1677,15 +1677,22 @@ function App() {
       const sampleRegions = items.slice(0, 5).map(i => ({ title: i.title?.substring(0, 30), region: i.region }));
     }
 
-    if (followKeywords.length > 0) {
-      result.sort((a, b) => {
-        const aFollow = followKeywords.some(kw => `${a.title} ${a.summary}`.toLowerCase().includes(kw.toLowerCase())) ? 0 : 1;
-        const bFollow = followKeywords.some(kw => `${b.title} ${b.summary}`.toLowerCase().includes(kw.toLowerCase())) ? 0 : 1;
-        return aFollow - bFollow;
-      });
-    }
+    // 综合质量排序：qualityScore（多源交叉验证×源权重）+ mustReadScore + 关注词加权
+    const followLc = followKeywords.map(kw => kw.toLowerCase());
+    result.sort((a, b) => {
+      // 1. 关注词命中：命中加分 +50，置于前列
+      const aFollow = followLc.some(kw => `${a.title} ${a.summary}`.toLowerCase().includes(kw)) ? 50 : 0;
+      const bFollow = followLc.some(kw => `${b.title} ${b.summary}`.toLowerCase().includes(kw)) ? 50 : 0;
+      // 2. 质量分（后端 qualityScore 范围 0~30+）
+      const aQ = (a.qualityScore || 0) + (a.mustReadScore || 0) + aFollow;
+      const bQ = (b.qualityScore || 0) + (b.mustReadScore || 0) + bFollow;
+      if (bQ !== aQ) return bQ - aQ;
+      // 3. 同分时按发布时间倒序
+      return new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime();
+    });
 
     return result;
+  }, [items, category, mode, sourceFilter, followKeywords, regionFilter]);
 
   // 「全部动态」当前活动筛选 —— 用于 chip 条展示与一键清除
   const allActiveFilters = useMemo(() => {
@@ -1738,9 +1745,6 @@ function App() {
       .map(([tag, count]) => ({ tag, count, trend: last24hMap.get(tag) || 0, score: count + (last24hMap.get(tag) || 0) * 2 }))
       .slice(0, 8);
   }, [filtered]);
-
-  const sourceStats = useMemo(() => items.reduce((s, i) => ({ ...s, [i.region]: (s[i.region] || 0) + 1 }), { domestic: 0, overseas: 0, global: 0 }), [items]);
-
 
   useEffect(() => {
     if (!items.length || !availableNewsDates.length) return;
@@ -3294,7 +3298,7 @@ ${blueprintSummary}`,
   }, [focusedIndex]);
 
   function loadNews(b = blocked, append = false, searchQuery = '') {
-    if (!append) { setLoading(true); setError(''); setNewsPage(0); setNewsHasMore(true); setRenderLimit(30); }
+    if (!append) { setLoading(true); setError(''); setNewsPage(0); setNewsHasMore(true); setRenderLimit(40); }
     const page = append ? newsPage + 1 : 0;
     const customParams = customSources.map(s => `custom=${encodeURIComponent(JSON.stringify(s))}`).join('&');
     const disabledParam = disabledSources.length > 0 ? `&disabledSources=${encodeURIComponent(disabledSources.join(','))}` : '';
@@ -3495,7 +3499,6 @@ ${signals}
     articles, articleSpaceFilter, articleSearch,
     articleStatusFilter, articleTemplateFilter, articleSort, articleExportFilter,
   });
-  }, [articles, articleExportFilter]);
 
   // selectAllMaterials depends on filteredMaterials (from useMaterialsMemos above),
   // so it must be defined here rather than inside useBookmarkMaterial.
@@ -3823,6 +3826,86 @@ ${signals}
                   </div>
                 </div>
               )}
+              {(nav === 'all' || nav === 'trending' || nav === 'reading-list' || nav === 'recommendations' || nav === 'materials' || nav === 'editor') && (
+                <>
+                  <div className="mode-tabs">
+                    {MODES.map(m => <button key={m.id} className={`mode-tab ${mode === m.id ? 'active' : ''}`} onClick={() => setMode(m.id)}>{m.label}</button>)}
+                  </div>
+                  <div className="region-filter-wrap">
+                    <button className={`region-filter-btn ${regionFilter === 'all' ? 'active' : ''}`} onClick={() => setRegionFilter('all')}>全部</button>
+                    <button className={`region-filter-btn ${regionFilter === 'domestic' ? 'active' : ''}`} onClick={() => setRegionFilter('domestic')}>国内</button>
+                    <button className={`region-filter-btn ${regionFilter === 'overseas' ? 'active' : ''}`} onClick={() => setRegionFilter('overseas')}>国外</button>
+                  </div>
+                  {nav === 'all' && (
+                    <div className="source-filter-wrap">
+                      <select id="source-filter" value={sourceFilter} onChange={(e) => setSourceFilter(e.target.value)} className="source-filter-select">
+                        <option value="all">全部来源</option>
+                        {sourceOptions.slice(0, 20).map(([name, count]) => <option key={name} value={name}>{name} ({count})</option>)}
+                      </select>
+                    </div>
+                  )}
+                  <div className="view-toggle">
+                    {VIEW_MODES.map(v => <button key={v.id} className={`view-btn ${viewMode === v.id ? 'active' : ''}`} onClick={() => setViewMode(v.id)} title={v.label}>{v.id === 'compact' ? ICONS.list : v.id === 'standard' ? ICONS.rows : ICONS.grid3}</button>)}
+                  </div>
+                </>
+              )}
+              {(nav === 'all' || nav === 'trending' || nav === 'github') && (
+                <>
+                  {nav === 'all' && (
+                    <button className="globe-entry-btn" onClick={() => setGlobeFullscreenOpen(true)} title="全球科技大屏">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+                      全球大屏
+                    </button>
+                  )}
+                  <button className={`btn-refresh ${nav === 'all' ? 'btn-refresh-all' : ''}`} onClick={() => { if (nav === 'all') loadNews(); else if (nav === 'trending') loadTrending(false, trendingPlatform, trendingType); else if (nav === 'github') loadGithub(); }}>
+                    {ICONS.refresh}
+                  </button>
+                  {nav === 'trending' && (
+                    <>
+                      <div className="trending-type-tabs">
+                        {TRENDING_TYPES.map(t => (
+                          <button key={t.id} className={`trending-type-tab ${trendingType === t.id ? 'active' : ''}`} onClick={() => { setTrendingType(t.id); loadTrending(false, trendingPlatform, t.id); }}>
+                            <span className="trending-type-icon">{t.icon}</span>
+                            {t.label}
+                          </button>
+                        ))}
+                      </div>
+                      <div className="trending-platform-topbar">
+                        <select
+                          className="platform-dropdown-topbar"
+                          value={trendingPlatform}
+                          onChange={(e) => { setTrendingPlatform(e.target.value); loadTrending(false, e.target.value, trendingType); }}
+                        >
+                        <option value="all">全部平台</option>
+                        <optgroup label="国内平台">
+                          <option value="36氪">36氪</option>
+                          <option value="少数派">少数派</option>
+                          <option value="爱范儿">爱范儿</option>
+                          <option value="品玩">品玩</option>
+                          <option value="虎扑">虎扑</option>
+                          <option value="IT之家">IT之家</option>
+                        </optgroup>
+                        <optgroup label="国际平台">
+                          <option value="Hacker News">Hacker News</option>
+                          <option value="Product Hunt">Product Hunt</option>
+                          <option value="Dev.to">Dev.to</option>
+                          <option value="GitHub">GitHub</option>
+                          <option value="TechCrunch">TechCrunch</option>
+                          <option value="The Verge">The Verge</option>
+                          <option value="Ars Technica">Ars Technica</option>
+                          <option value="Wired">Wired</option>
+                          <option value="MIT Review">MIT Review</option>
+                          <option value="Engadget">Engadget</option>
+                          <option value="Slashdot">Slashdot</option>
+                          <option value="Smashing Mag">Smashing Mag</option>
+                          <option value="Lobsters">Lobsters</option>
+                        </optgroup>
+                      </select>
+                    </div>
+                    </>
+                  )}
+                </>
+              )}
           </div>
         </div>
         </header>
@@ -3839,9 +3922,9 @@ ${signals}
         </div>}
 
         <div className={`feed custom-scrollbar ${(nav === 'home' || nav === 'recommendations') ? 'feed-workbench' : ''} ${nav === 'stock' ? 'feed-stock' : ''}`} ref={feedRef}>
-          {nav === 'materials' && (
-            <MaterialsPage
-              materials={materials}
+          {nav === 'home' && (
+            <AiChatPanel
+              variant="main"
               llmConfig={llmConfig}
               intelligenceProfile={intelligenceProfile}
               workbenchItems={workbenchItems}
@@ -3851,186 +3934,16 @@ ${signals}
               onOpenLlmConfig={() => setShowLlmQuickConfig(true)}
               pendingMessage={copilotPendingMessage}
               onMessageSent={() => setCopilotPendingMessage('')}
-              selectedNewsDate={selectedNewsDate}
-              algorithmBriefing={algorithmBriefing}
-              externalIntelligenceItems={externalIntelligenceItems}
-              recommendationLanes={recommendationLanes}
+              intelligenceContext={{
+                date: selectedNewsDate,
+                briefing: algorithmBriefing,
+                items: [...externalIntelligenceItems, ...recommendationLanes.public, ...recommendationLanes.personal].slice(0, 16),
+              }}
               onOpenNewspaper={() => setShowNewspaperOverlay(true)}
               todayBriefing={todayBriefing}
               todayLanes={todayLanes}
               materials={materials}
             />
-          )}
-          {nav === 'today-legacy' && (
-            <div className="workbench-shell">
-              <section className="workbench-overview">
-                <div className="workbench-hero-copy">
-                  <div className="workbench-kicker">Personal Intelligence</div>
-                  <h1 className="workbench-title">今日情报工作台</h1>
-                  <p className="workbench-subtitle">少看一点，理解更深一点。系统会按日期、关注领域和来源质量帮你收敛到真正值得读的内容。</p>
-                <div className="hero-briefing-summary">
-                  <BlockStat value={insightData.todayCount} label="今日资讯" size="md" />
-                  <BlockStat value={topMustRead.length} label="必读推荐" size="md" />
-                  <BlockStat value={selectedInterests.length} label="关注领域" size="md" />
-                  <BlockStat value={`${Math.abs(insightData.dailyChange || 0)}%`} label="日变化" size="md" trendDir={(insightData.dailyChange || 0) >= 0 ? 'up' : 'down'} />
-                </div>
-                </div>
-
-                <div className="timeline-manager">
-                  <div className="date-manager-head">
-                    <span>日期管理</span>
-                    <input
-                      type="date"
-                      value={selectedNewsDate}
-                      onChange={e => setSelectedNewsDate(e.target.value)}
-                    />
-                  </div>
-                  <div className="date-pill-row">
-                    {availableNewsDates.slice(0, 7).map(date => (
-                      <button
-                        key={date}
-                        className={`date-pill ${selectedNewsDate === date ? 'active' : ''}`}
-                        onClick={() => setSelectedNewsDate(date)}
-                      >
-                        <span>{date.slice(5)}</span>
-                        <small>{items.filter(item => item.publishedAt?.slice(0, 10) === date).length}</small>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="workbench-preferences">
-                  <div className="workbench-block-title">关注领域</div>
-                  <ColorfulBubbles
-                    interests={selectedInterests}
-                    categories={categories}
-                    onBubbleClick={(catId) => setCategory(catId)}
-                    onEmptyClick={() => setShowInterestModal(true)}
-                  />
-                </div>
-
-              </section>
-
-              <section className="workbench-feed-panel">
-                <div className="workbench-toolbar">
-                  <div>
-                    <div className="workbench-section-label">Daily Briefing</div>
-                    <h2>今日推荐</h2>
-                  </div>
-                  <div className="workbench-toolbar-actions">
-                    <div className="search-wrap workbench-search">
-                      {ICONS.search}
-                      <input ref={searchInputRef} value={query} onChange={e => setQuery(e.target.value)} placeholder="搜索技术、公司、项目..." />
-                    </div>
-                    <button className="btn-refresh workbench-refresh" onClick={() => loadNews()}>
-                      {ICONS.refresh}
-                      <span>刷新</span>
-                    </button>
-                  </div>
-                </div>
-
-                <BlockToolbar hidden>
-                  <BlockToolbar.Pills
-                    options={[{ id: 'all', label: '全部' }, ...MODES.filter(m => m.id !== 'all').map(m => ({ id: m.id, label: m.label }))]}
-                    value={mode}
-                    onChange={setMode}
-                    ariaLabel="模式筛选"
-                  />
-                  <BlockToolbar.Pills
-                    options={[{ id: 'all', label: '全球' }, { id: 'domestic', label: '国内' }, { id: 'overseas', label: '海外' }]}
-                    value={regionFilter}
-                    onChange={setRegionFilter}
-                    ariaLabel="地区筛选"
-                  />
-                </BlockToolbar>
-
-                {loading && <div className="feed-list">{Array.from({ length: 5 }).map((_, i) => <SkeletonCard key={i} viewMode="standard" />)}</div>}
-                {error && <div className="error-state"><p>加载失败: {error}</p><button onClick={() => loadNews()}>重试</button></div>}
-                {!loading && !error && workbenchItems.length === 0 && (
-                  <div className="empty-state">
-                    <p>当前日期还没有匹配资讯</p>
-                    <button onClick={() => { setQuery(''); setCategory('all'); setMode('all'); setSourceFilter('all'); }}>重置筛选</button>
-                  </div>
-                )}
-                {!loading && !error && workbenchItems.length > 0 && (
-                  <div className="workbench-news-list">
-                    <div className="hotspot-list">
-                      <div className="hotspot-header">
-                        <h3>🔥 当前热点</h3>
-                        <span className="hotspot-subtitle">多信源热度 · 随时间消退</span>
-                      </div>
-                      {topMustRead.slice(0, 5).map((item, i) => (
-                        <div
-                          key={item.id}
-                          className="hotspot-row"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            recordReading(item);
-                            if (item.url) window.open(item.url, '_blank');
-                          }}
-                          title={item.title}
-                        >
-                          <span className="hotspot-rank">{i + 1}</span>
-                          <span className="hotspot-title">{item.title}</span>
-                          <span className="hotspot-meta">
-                            {(item.recommendationReasons?.length || 0)} 信源 · {formatTime(item.publishedAt || item.time)}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-
-                    <div className="profile-recommendations">
-                      <div className="profile-rec-header">
-                        <h3>为你推荐</h3>
-                        <span className="hotspot-subtitle">基于你的画像偏好</span>
-                      </div>
-                      {profileRecommendations.slice(0, profilePage * 10).map((item, i) => (
-                        <div key={item.id} className="profile-rec-item-wrap">
-                          <NewsItem
-                            item={item}
-                            index={i}
-                            viewMode="standard"
-                            isFocused={focusedIndex === i + topMustRead.length}
-                            isBookmarked={isBookmarked(item.id)}
-                            isInMaterials={isInMaterials(item.id)}
-                            onBookmark={() => toggleBookmark(item)}
-                            onAddMaterial={() => toggleMaterial(item)}
-                            onSummary={() => handleSummaryToggle(item)}
-                            isSummaryOpen={expandedSummary[item.id]}
-                            summaryText={getSummaryEntry(item)?.text || ''}
-                            summaryMode={getSummaryEntry(item)?.mode || ''}
-                            summaryLoading={Boolean(summaryLoading[item.id])}
-                            isFollowed={followKeywords.some(kw => `${item.title} ${item.summary}`.toLowerCase().includes(kw.toLowerCase()))}
-                            onRead={() => recordReading(item)}
-                            showTranslation={translationOpen[item.id]}
-                            onToggleTranslation={() => setTranslationOpen(p => ({ ...p, [item.id]: !p[item.id] }))}
-                            onRequestTranslation={() => requestTranslation(item)}
-                            isTranslating={translatingItems[item.id]}
-                            translation={getTranslation(item)}
-                            onOpenLightbox={(src, title, images, index) => setLightbox({ open: true, src, title, images: images || [], index: index || 0 })}
-                            onAskAi={sendCopilotAbout}
-                            showRecommendation
-                          />
-                        </div>
-                      ))}
-                      {profileRecommendations.length > profilePage * 10 && profilePage * 10 < 40 && (
-                        <div className="profile-load-more">
-                          <button onClick={() => setProfilePage(p => p + 1)}>加载更多</button>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* 滚动加载 sentinel — 让 IntersectionObserver 在 today 视图也能触发 */}
-                    {workbenchItems.length > 0 && (
-                      <div id="load-more-sentinel" className="load-more-area load-more-sentinel-center">
-                        <span className="load-more-hint load-more-sentinel-done">已展示全部推荐内容</span>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </section>
-
-            </div>
           )}
 
           {nav === 'studio' && (
@@ -4279,6 +4192,12 @@ ${signals}
             />
           )}
 
+          {nav === 'stock' && (
+            <Suspense fallback={<div className="empty-state"><p>加载股市终端...</p></div>}>
+              <StockPage llmConfig={llmConfig} onOpenLlmConfig={() => setShowLlmQuickConfig(true)} />
+            </Suspense>
+          )}
+
           {nav === 'square' && <CommunityPage user={user} onRequireAuth={() => { setAuthMode('login'); setShowAuthModal(true); }} />}
 
           {nav === 'profile-center' && (
@@ -4301,6 +4220,7 @@ ${signals}
               profileCalibrationSignals={profileCalibrationSignals}
               generateDailyProfileSnapshot={generateDailyProfileSnapshot}
               setShowInterestModal={setShowInterestModal}
+              selectedInterests={selectedInterests}
             />
           )}
 
@@ -4312,7 +4232,6 @@ ${signals}
               toggleRead={toggleRead}
               setBookmarks={setBookmarks}
             />
-          )}
           )}
 
           {/* CUSTOM URL - 自定义抓取 */}
@@ -5210,7 +5129,6 @@ ${signals}
               setLightbox={setLightbox}
             />
           )}
-                    )}
           <AddMaterialModal showAddMaterial={showAddMaterial} setShowAddMaterial={setShowAddMaterial} addManualMaterial={addManualMaterial} materialSpaces={materialSpaces} />
 
 {nav === 'editor' && <ArticleEditor editorFullscreen={editorFullscreen} setEditorFullscreen={setEditorFullscreen} editorTextareaRef={editorTextareaRef} imageInputRef={imageInputRef} articles={articles} setArticles={setArticles} currentArticleId={currentArticleId} setCurrentArticleId={setCurrentArticleId} editorTab={editorTab} setEditorTab={setEditorTab} editorCursorPos={editorCursorPos} setEditorCursorPos={setEditorCursorPos} showTemplateMenu={showTemplateMenu} setShowTemplateMenu={setShowTemplateMenu} showAiPanel={showAiPanel} setShowAiPanel={setShowAiPanel} showImagePanel={showImagePanel} setShowImagePanel={setShowImagePanel} aiResult={aiResult} setAiResult={setAiResult} aiCustomPrompt={aiCustomPrompt} setAiCustomPrompt={setAiCustomPrompt} autoSaveTimer={autoSaveTimer} setAutoSaveTimer={setAutoSaveTimer} lastSavedAt={lastSavedAt} setLastSavedAt={setLastSavedAt} articleTagInput={articleTagInput} setArticleTagInput={setArticleTagInput} editingArticleTag={editingArticleTag} setEditingArticleTag={setEditingArticleTag} articleSpaces={articleSpaces} setArticleSpaces={setArticleSpaces} materialSpaces={materialSpaces} setMaterialSpaces={setMaterialSpaces} articleSpaceFilter={articleSpaceFilter} setArticleSpaceFilter={setArticleSpaceFilter} articleMaterialSpaceFilter={articleMaterialSpaceFilter} setArticleMaterialSpaceFilter={setArticleMaterialSpaceFilter} articleSpaceFormOpen={articleSpaceFormOpen} setArticleSpaceFormOpen={setArticleSpaceFormOpen} newArticleSpaceName={newArticleSpaceName} setNewArticleSpaceName={setNewArticleSpaceName} articleSpaceForNewArticle={articleSpaceForNewArticle} setArticleSpaceForNewArticle={setArticleSpaceForNewArticle} articleSearch={articleSearch} setArticleSearch={setArticleSearch} articleStatusFilter={articleStatusFilter} setArticleStatusFilter={setArticleStatusFilter} articleTemplateFilter={articleTemplateFilter} setArticleTemplateFilter={setArticleTemplateFilter} articleSort={articleSort} setArticleSort={setArticleSort} filteredArticles={filteredArticles} articleExportFilter={articleExportFilter} setArticleExportFilter={setArticleExportFilter} createArticle={createArticle} updateArticle={updateArticle} deleteArticle={deleteArticle} duplicateArticle={duplicateArticle} addArticleTag={addArticleTag} removeArticleTag={removeArticleTag} triggerAutoSave={triggerAutoSave} handleContentChange={handleContentChange} handleTitleChange={handleTitleChange} insertAtCursor={insertAtCursor} insertMaterialAtCursor={insertMaterialAtCursor} removeLinkedMaterial={removeLinkedMaterial} handleImageUpload={handleImageUpload} handlePaste={handlePaste} createArticleSpace={createArticleSpace} deleteArticleSpace={deleteArticleSpace} assignArticleToSpace={assignArticleToSpace} batchAssignArticlesToSpace={batchAssignArticlesToSpace} insertAiResult={insertAiResult} clearAiResult={clearAiResult} exportArticleToFile={exportArticleToFile} copyArticleAsRichText={copyArticleAsRichText} workspace={creativeWorkspace} materials={materials} llmConfig={llmConfig} />}

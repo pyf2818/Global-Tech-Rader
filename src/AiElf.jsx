@@ -1,8 +1,9 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 
 // AI精灵助手组件 - Agent系统 + 历史记录 + 自适应窗口
-export default function AiElf({ llmConfig, avatarImage, elfName, onExportToMaterials, onContinueInWorkbench, agents, currentAgent, onChangeAgent, externalQuotedContext, intelligenceProfile, intelligenceMissions }) {
-  const [isOpen, setIsOpen] = useState(false);
+// embedded=true 时以全屏工作站模式渲染（无悬浮按钮、强制展开、占满父容器）
+export default function AiElf({ llmConfig, avatarImage, elfName, onExportToMaterials, onContinueInWorkbench, agents, currentAgent, onChangeAgent, externalQuotedContext, intelligenceProfile, intelligenceMissions, embedded = false }) {
+  const [isOpen, setIsOpen] = useState(embedded);
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
   const [activeAgentId, setActiveAgentId] = useState(currentAgent || 'analyst');

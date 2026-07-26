@@ -27,6 +27,7 @@ export default function ProfilePage({
   profileCalibrationSignals,
   generateDailyProfileSnapshot,
   setShowInterestModal,
+  selectedInterests,
 }) {
   const resetForm = () => {
     setSpecialFollowForm({ type: 'source', target: '', note: '' });

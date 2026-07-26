@@ -101,7 +101,7 @@ export async function getNews(blocked, customSources, page = 0, pageSize = PAGE_
       blockedCount = newsCache.data.blockedCount;
     } else {
     console.log('[getNews] Cache invalid, fetching from sources...', { total: allSources.length });
-    const BATCH_SIZE = 12;
+    const BATCH_SIZE = 18;
     const doFetch = async () => {
     const allSettled = [];
     for (let i = 0; i < allSources.length; i += BATCH_SIZE) {

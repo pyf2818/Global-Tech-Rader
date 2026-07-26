@@ -97,9 +97,9 @@ export default function ArticleEditor({
                     const wordCount = article.content.replace(/\s/g, '').length;
                     const paragraphCount = article.content.split(/\n\s*\n/).filter(p => p.trim()).length;
                     const readMinutes = Math.max(1, Math.ceil(wordCount / 500));
-                    const linkedMaterials = materials.filter(m => article.materials.includes(m.id));
-                    const versionCount = String(workspace?.activeDocumentId) === String(article.id)
-                      ? workspace.versions.length
+                    const linkedMaterials = materials.filter(m => (article.materials || []).includes(m.id));
+                    const versionCount = workspace && String(workspace?.activeDocumentId) === String(article.id)
+                      ? (workspace.versions?.length || 0)
                       : loadCreativeVersions(article.id).length;
 
                     return (
@@ -507,7 +507,7 @@ export default function ArticleEditor({
                               {linkedMaterials.map(m => (
                                 <div key={m.id} className="linked-material-item">
                                   <span className={`material-type-badge type-${m.type}`}>{MATERIAL_TYPES[m.type] || m.type}</span>
-                                  <span className="linked-material-text">{m.content.slice(0, 50)}...</span>
+                                  <span className="linked-material-text">{String(m.content || '').slice(0, 50)}...</span>
                                   <button className="linked-material-remove" onClick={() => removeLinkedMaterial(article, m.id)} title="移除引用">{ICONS.x}</button>
                                 </div>
                               ))}
@@ -516,7 +516,7 @@ export default function ArticleEditor({
                           {materials.length > 0 && (
                             <div className="materials-picker-list">
                               {materials
-                                .filter(m => !article.materials.includes(m.id))
+                                .filter(m => !(article.materials || []).includes(m.id))
                                 .filter(m => articleMaterialSpaceFilter === 'all' || m.spaceId === Number(articleMaterialSpaceFilter))
                                 .slice(0, 20)
                                 .map(m => (
@@ -526,10 +526,10 @@ export default function ArticleEditor({
                                     onClick={() => insertMaterialAtCursor(article, m)}
                                     draggable
                                     onDragStart={e => { e.dataTransfer.setData('text/plain', JSON.stringify({ materialId: m.id })); e.dataTransfer.effectAllowed = 'copy'; }}
-                                    title={m.content}
+                                    title={String(m.content || '')}
                                   >
                                     <span className={`material-type-badge type-${m.type}`}>{MATERIAL_TYPES[m.type] || m.type}</span>
-                                    <span className="material-picker-content">{m.content.slice(0, 40)}...</span>
+                                    <span className="material-picker-content">{String(m.content || '').slice(0, 40)}...</span>
                                   </div>
                                 ))}
                             </div>
@@ -609,7 +609,7 @@ export default function ArticleEditor({
                                 <span>{ARTICLE_TEMPLATES[a.template] || a.template}</span>
                                 {a.spaceId && (() => { const sp = articleSpaces.find(s => s.id === a.spaceId); return sp ? <span className="article-space-badge">{sp.name}</span> : null; })()}
                                 <span>{new Date(a.updatedAt).toLocaleDateString('zh-CN')}</span>
-                                {a.tags.length > 0 && a.tags.slice(0, 3).map(t => <span key={t} className="article-tag-pill">{t}</span>)}
+                                {(a.tags || []).length > 0 && (a.tags || []).slice(0, 3).map(t => <span key={t} className="article-tag-pill">{t}</span>)}
                               </div>
                             </div>
                             <div className="article-item-actions">

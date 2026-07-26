@@ -27,7 +27,7 @@ export async function jinaFetch(url, timeoutMs = 8000) {
 const BROWSER_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
 
 export async function fetchSource(source, options = {}) {
-  const timeoutMs = options.timeoutMs || 15_000;
+  const timeoutMs = options.timeoutMs || 10_000;
   console.log('[fetchSource] Fetching:', source.name, source.url);
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);

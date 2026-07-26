@@ -18,6 +18,8 @@ import { isAiElfAsset, normalizeAsset } from '../domain/creative/assetModel.js';
 
 const WELCOME_MSGS = ['今天有什么情报需要我深入分析？', '准备好为你梳理今日要点了', '想从哪条资讯开始剖析？', '随时可以问我今日趋势与风险'];
 
+const EMPTY_MESSAGES = [];
+
 /* 空状态建议卡图标（内联 SVG，保持组件自洽） */
 const SUGGEST_ICONS = {
   trending: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>,
@@ -88,7 +90,7 @@ export default function AiChatPanel({
   const abortControllerRef = useRef(null);
 
   const currentSession = sessions.find(s => s.id === activeSessionId);
-  const messages = currentSession?.messages || [];
+  const messages = currentSession?.messages || EMPTY_MESSAGES;
   const userName = user?.username || '你';
 
   // 检索与当前输入相关的历史记忆（跨对话不失忆）
