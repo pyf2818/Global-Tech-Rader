@@ -12,7 +12,17 @@ import { buildWeeklySectorAnalysis } from '../processors/weeklySectorAnalysis.js
 import { createIntelligenceRepository } from '../repositories/intelligenceRepository.js';
 
 const CACHE_TTL_MS = 5 * 60 * 1000;
+const DEFAULT_INTELLIGENCE_TAKE = 80;
+const MAX_INTELLIGENCE_TAKE = 200;
+const DEFAULT_AGENT_TAKE = 24;
+const MAX_AGENT_TAKE = 60;
+const AIHOT_PROVIDER_TAKE = 100;
 const cache = new Map();
+
+function boundedNumber(value, fallback, { min = 1, max = MAX_INTELLIGENCE_TAKE } = {}) {
+  const parsed = Number.parseInt(value ?? String(fallback), 10);
+  return Math.min(max, Math.max(min, Number.isFinite(parsed) ? parsed : fallback));
+}
 
 function cacheKey(options) {
   return JSON.stringify({
@@ -23,6 +33,8 @@ function cacheKey(options) {
     q: options.q || '',
     cursor: options.cursor || '',
     providers: options.providers || 'all',
+    perSource: options.perSource || '',
+    sources: options.sources || '',
   });
 }
 
@@ -40,16 +52,24 @@ function setCache(key, payload) {
   }
 }
 
+function providerTask(kind, promise) {
+  return promise
+    .then(result => ({ kind, result }))
+    .catch(error => {
+      throw { kind, error };
+    });
+}
+
 function parseOptions(params = {}) {
   return {
     mode: params.mode === 'all' ? 'all' : 'selected',
-    take: Math.min(100, Math.max(1, Number.parseInt(params.take || '50', 10) || 50)),
+    take: boundedNumber(params.take, DEFAULT_INTELLIGENCE_TAKE),
     category: String(params.category || '').trim(),
     since: String(params.since || '').trim(),
     q: String(params.q || params.query || '').trim(),
     cursor: String(params.cursor || '').trim(),
     providers: String(params.providers || 'all').trim(),
-    perSource: Math.min(20, Math.max(1, Number.parseInt(params.perSource || '6', 10) || 6)),
+    perSource: boundedNumber(params.perSource, 10, { min: 1, max: 30 }),
     sources: String(params.sources || '').trim(),
     storage: ['live', 'stored', 'auto'].includes(params.storage) ? params.storage : 'live',
     interests: String(params.interests || '').trim(),
@@ -75,14 +95,21 @@ export async function getIntelligenceItems(params = {}) {
   const providerSet = new Set(String(options.providers || 'all').split(',').map(item => item.trim()).filter(Boolean));
   const useAll = providerSet.has('all') || providerSet.size === 0;
   const tasks = [];
-  if (useAll || providerSet.has('aihot')) tasks.push(fetchAiHotItems(options).then(result => ({ kind: 'aihot', result })));
-  if (useAll || providerSet.has('rss')) tasks.push(fetchRssIntelligenceItems({ ...options, perSource: options.perSource, sources: options.sources }).then(result => ({ kind: 'rss', result })));
+  if (useAll || providerSet.has('aihot')) {
+    tasks.push(providerTask('aihot', fetchAiHotItems({ ...options, take: Math.min(options.take, AIHOT_PROVIDER_TAKE) })));
+  }
+  if (useAll || providerSet.has('rss')) {
+    tasks.push(providerTask('rss', fetchRssIntelligenceItems({ ...options, perSource: options.perSource, sources: options.sources })));
+  }
 
   const settled = await Promise.allSettled(tasks);
   const diagnostics = { providers: [], failedProviders: [] };
   const normalized = settled.flatMap(result => {
     if (result.status !== 'fulfilled') {
-      diagnostics.failedProviders.push({ provider: 'unknown', error: result.reason?.message || 'fetch failed' });
+      diagnostics.failedProviders.push({
+        provider: result.reason?.kind || 'unknown',
+        error: result.reason?.error?.message || result.reason?.message || 'fetch failed',
+      });
       return [];
     }
     const { kind, result: payload } = result.value;
@@ -122,13 +149,13 @@ export async function getIntelligenceItems(params = {}) {
 }
 
 export async function getAgentIntelligenceContext(params = {}) {
-  const take = Math.min(30, Math.max(8, Number.parseInt(params.take || '16', 10) || 16));
+  const take = boundedNumber(params.take, DEFAULT_AGENT_TAKE, { min: 8, max: MAX_AGENT_TAKE });
   const payload = await getIntelligenceItems({ ...params, take });
   const topItems = payload.items.slice(0, take);
   const events = clusterIntelligenceEvents(topItems);
-  const opportunities = buildOpportunitySignals(events).slice(0, 6);
+  const opportunities = buildOpportunitySignals(events).slice(0, 10);
   const weeklySectors = buildWeeklySectorAnalysis(events, { days: 7 });
-  const proactiveAlerts = buildProactiveAlerts({ events, weeklySectors, limit: 5 });
+  const proactiveAlerts = buildProactiveAlerts({ events, weeklySectors, limit: 8 });
 
   return {
     ok: true,
@@ -139,10 +166,10 @@ export async function getAgentIntelligenceContext(params = {}) {
     briefing: {
       title: 'AI Intelligence Context',
       oneLine: buildOneLine(topItems),
-      topEvents: topItems.slice(0, 8).map(toAgentEvent),
+      topEvents: topItems.slice(0, 15).map(toAgentEvent),
       watchEntities: topEntities(topItems),
       opportunities,
-      weeklySectors: weeklySectors.sectors.slice(0, 5),
+      weeklySectors: weeklySectors.sectors.slice(0, 8),
       proactiveAlerts: proactiveAlerts.alerts,
       suggestedQuestions: [
         'Which AI events have the highest industry impact today?',
@@ -169,7 +196,7 @@ export async function getIntelligenceEvents(params = {}) {
     return { ...stored, events: applyPersonalScores(stored.events, options) };
   }
 
-  const take = Math.min(100, Math.max(12, Number.parseInt(params.take || '50', 10) || 50));
+  const take = boundedNumber(params.take, DEFAULT_INTELLIGENCE_TAKE, { min: 12 });
   let payload;
   try {
     payload = await getIntelligenceItems({ ...params, take, storage: 'live' });
@@ -200,7 +227,7 @@ export async function getIntelligenceEvents(params = {}) {
 }
 
 export async function syncIntelligenceSnapshot(params = {}) {
-  const take = Math.min(100, Math.max(12, Number.parseInt(params.take || '60', 10) || 60));
+  const take = boundedNumber(params.take, DEFAULT_INTELLIGENCE_TAKE, { min: 12 });
   const itemsPayload = await getIntelligenceItems({ ...params, take });
   const events = clusterIntelligenceEvents(itemsPayload.items);
   const repository = createIntelligenceRepository();
@@ -251,7 +278,7 @@ export async function getStoredIntelligenceArticles(params = {}) {
 
 export async function getDailyIntelligenceBriefing(params = {}) {
   const options = parseOptions(params);
-  const take = Math.min(100, Math.max(12, Number.parseInt(params.take || '60', 10) || 60));
+  const take = boundedNumber(params.take, DEFAULT_INTELLIGENCE_TAKE, { min: 12 });
   let liveEvents;
   try {
     liveEvents = await getIntelligenceEvents({ ...params, take, storage: options.storage === 'stored' ? 'stored' : 'live' });
@@ -288,7 +315,7 @@ export async function getDailyIntelligenceBriefing(params = {}) {
 }
 
 export async function getIntelligenceEntities(params = {}) {
-  const take = Math.min(100, Math.max(12, Number.parseInt(params.take || '60', 10) || 60));
+  const take = boundedNumber(params.take, DEFAULT_INTELLIGENCE_TAKE, { min: 12 });
   const eventsPayload = await getIntelligenceEvents({ ...params, take, storage: params.storage || 'auto' });
   const entities = buildEntityProfiles(eventsPayload.events);
 
@@ -305,7 +332,7 @@ export async function getIntelligenceEntities(params = {}) {
 }
 
 export async function getIntelligenceEntity(entityId, params = {}) {
-  const take = Math.min(100, Math.max(12, Number.parseInt(params.take || '60', 10) || 60));
+  const take = boundedNumber(params.take, DEFAULT_INTELLIGENCE_TAKE, { min: 12 });
   const eventsPayload = await getIntelligenceEvents({ ...params, take, storage: params.storage || 'auto' });
   const entity = findEntityProfile(eventsPayload.events, entityId);
 
@@ -327,7 +354,7 @@ export async function getIntelligenceEntity(entityId, params = {}) {
 }
 
 export async function getIntelligenceOpportunities(params = {}) {
-  const take = Math.min(100, Math.max(12, Number.parseInt(params.take || '40', 10) || 40));
+  const take = boundedNumber(params.take, 80, { min: 12 });
   const eventsPayload = await getIntelligenceEvents({ ...params, take, storage: params.storage || 'auto' });
   const opportunities = buildOpportunitySignals(eventsPayload.events).slice(0, take);
 
@@ -344,7 +371,7 @@ export async function getIntelligenceOpportunities(params = {}) {
 }
 
 export async function getWeeklySectorAnalysis(params = {}) {
-  const take = Math.min(100, Math.max(20, Number.parseInt(params.take || '80', 10) || 80));
+  const take = boundedNumber(params.take, 120, { min: 20 });
   const days = Math.min(30, Math.max(3, Number.parseInt(params.days || params.since || '7', 10) || 7));
   const eventsPayload = await getIntelligenceEvents({ ...params, take, storage: params.storage || 'auto' });
   const analysis = buildWeeklySectorAnalysis(eventsPayload.events, { days });
@@ -359,8 +386,8 @@ export async function getWeeklySectorAnalysis(params = {}) {
 }
 
 export async function getProactiveIntelligenceAlerts(params = {}) {
-  const take = Math.min(100, Math.max(20, Number.parseInt(params.take || '80', 10) || 80));
-  const limit = Math.min(20, Math.max(1, Number.parseInt(params.limit || '6', 10) || 6));
+  const take = boundedNumber(params.take, 120, { min: 20 });
+  const limit = boundedNumber(params.limit, 8, { min: 1, max: 30 });
   const days = Math.min(30, Math.max(3, Number.parseInt(params.days || params.since || '7', 10) || 7));
   const eventsPayload = await getIntelligenceEvents({ ...params, take, storage: params.storage || 'auto' });
   const weeklySectors = buildWeeklySectorAnalysis(eventsPayload.events, { days });

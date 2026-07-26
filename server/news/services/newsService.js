@@ -10,6 +10,7 @@ import { isGoodImageUrl, normalizeImageKey } from '../images/imageProcessing.js'
 
 // 缓存（服务内部拥有）
 export const newsCache = { data: null, expiresAt: 0, key: '' };
+let fetchingPromise = null; // 防止并发抓取循环
 
 export function mergeDiverseItems(items, sourceResults, maxItems, perSourceLimit) {
   const seen = new Set();
@@ -89,8 +90,32 @@ export async function getNews(blocked, customSources, page = 0, pageSize = PAGE_
     failedSources = newsCache.data.failedSources;
     blockedCount = newsCache.data.blockedCount;
   } else {
-    console.log('[getNews] Cache invalid, fetching from sources...');
-    const settled = await Promise.allSettled(allSources.map(fetchSource));
+    // 如果已有抓取在进行中，等待其完成
+    if (fetchingPromise) {
+      console.log('[getNews] Waiting for ongoing fetch...');
+      await fetchingPromise;
+      // 从缓存读取结果
+      fullItems = newsCache.data.items;
+      sourceResults = newsCache.data.sourceResults;
+      failedSources = newsCache.data.failedSources;
+      blockedCount = newsCache.data.blockedCount;
+    } else {
+    console.log('[getNews] Cache invalid, fetching from sources...', { total: allSources.length });
+    const BATCH_SIZE = 12;
+    const doFetch = async () => {
+    const allSettled = [];
+    for (let i = 0; i < allSources.length; i += BATCH_SIZE) {
+      const batch = allSources.slice(i, i + BATCH_SIZE);
+      const batchNum = Math.floor(i / BATCH_SIZE) + 1;
+      const totalBatches = Math.ceil(allSources.length / BATCH_SIZE);
+      console.log(`[getNews] Fetching batch ${batchNum}/${totalBatches} (${batch.length} sources)`);
+      const batchSettled = await Promise.allSettled(batch.map(source => fetchSource(source)));
+      allSettled.push(...batchSettled);
+    }
+    return allSettled;
+    };
+    fetchingPromise = doFetch().then(r => { fetchingPromise = null; return r; }).catch(e => { fetchingPromise = null; throw e; });
+    const settled = await fetchingPromise;
     console.log('[getNews] Fetch results:', { total: settled.length, fulfilled: settled.filter(r => r.status === 'fulfilled').length, rejected: settled.filter(r => r.status === 'rejected').length });
     sourceResults = settled
       .filter(result => result.status === 'fulfilled')
@@ -221,7 +246,8 @@ export async function getNews(blocked, customSources, page = 0, pageSize = PAGE_
     newsCache.data = { items: fullItems, sourceResults, failedSources, blockedCount };
     newsCache.expiresAt = now + 1000 * 60 * 5;
     newsCache.key = cacheKey;
-  }
+    } // end else (no fetchingPromise)
+    } // end else (!cacheValid)
 
   // 兴趣过滤
   let filteredItems = fullItems;

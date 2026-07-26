@@ -3,11 +3,16 @@ import { parseFeed } from '../../news/parsing/feedParser.js';
 export const INTELLIGENCE_RSS_SOURCES = Object.freeze([
   { name: 'OpenAI Blog', url: 'https://openai.com/blog/rss.xml', region: 'global', defaultCategory: 'ai-models', tier: 'official', trustAllItems: true, enabledByDefault: true },
   { name: 'NVIDIA AI Blog', url: 'https://blogs.nvidia.com/blog/category/deep-learning/feed/', region: 'global', defaultCategory: 'ai-products', tier: 'official', trustAllItems: true, enabledByDefault: true },
+  { name: 'GitHub Blog AI', url: 'https://github.blog/feed/', region: 'global', defaultCategory: 'ai-products', tier: 'developer', enabledByDefault: true },
+  { name: 'Simon Willison', url: 'https://simonwillison.net/atom/everything/', region: 'global', defaultCategory: 'ai-products', tier: 'developer', enabledByDefault: true },
+  { name: 'The Decoder', url: 'https://the-decoder.com/feed/', region: 'global', defaultCategory: 'industry', tier: 'media', enabledByDefault: true },
+  { name: 'TechCrunch AI', url: 'https://techcrunch.com/category/artificial-intelligence/feed/', region: 'global', defaultCategory: 'industry', tier: 'media', trustAllItems: true, enabledByDefault: true },
+  { name: 'OpenRouter Blog', url: 'https://openrouter.ai/blog/feed.xml', region: 'global', defaultCategory: 'ai-products', tier: 'developer', trustAllItems: true, enabledByDefault: true },
+  { name: 'Midjourney Updates', url: 'https://updates.midjourney.com/rss/', region: 'global', defaultCategory: 'ai-products', tier: 'official', trustAllItems: true, enabledByDefault: true },
   { name: 'Anthropic News', url: 'https://www.anthropic.com/news/rss', region: 'global', defaultCategory: 'ai-models', tier: 'official', trustAllItems: true, enabledByDefault: false },
   { name: 'Google DeepMind', url: 'https://deepmind.google/discover/blog/rss/', region: 'global', defaultCategory: 'ai-models', tier: 'official', trustAllItems: true, enabledByDefault: false },
   { name: 'Google Research Blog', url: 'https://research.google/blog/rss/', region: 'global', defaultCategory: 'paper', tier: 'official', enabledByDefault: false },
   { name: 'Meta AI Blog', url: 'https://ai.meta.com/blog/rss/', region: 'global', defaultCategory: 'ai-models', tier: 'official', trustAllItems: true, enabledByDefault: false },
-  { name: 'GitHub Blog AI', url: 'https://github.blog/feed/', region: 'global', defaultCategory: 'ai-products', tier: 'developer', enabledByDefault: false },
   { name: 'ArXiv CS AI', url: 'https://export.arxiv.org/rss/cs.AI', region: 'global', defaultCategory: 'paper', tier: 'research', trustAllItems: true, enabledByDefault: false },
   { name: 'ArXiv CS ML', url: 'https://export.arxiv.org/rss/cs.LG', region: 'global', defaultCategory: 'paper', tier: 'research', trustAllItems: true, enabledByDefault: false },
   { name: 'ArXiv CS CL', url: 'https://export.arxiv.org/rss/cs.CL', region: 'global', defaultCategory: 'paper', tier: 'research', trustAllItems: true, enabledByDefault: false },
@@ -17,8 +22,8 @@ const BROWSER_USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKi
 const AI_RELEVANCE_PATTERN = /\b(ai|artificial intelligence|machine learning|ml|llm|large language model|gpt|claude|gemini|agent|agents|copilot|deep learning|neural|transformer|diffusion|rag|inference|model|open source model|人工智能|大模型|模型|智能体|机器学习|深度学习|推理|多模态|开源模型)\b/i;
 
 function boundedPerSource(value) {
-  const parsed = Number.parseInt(value ?? '8', 10);
-  return Math.min(20, Math.max(1, Number.isFinite(parsed) ? parsed : 8));
+  const parsed = Number.parseInt(value ?? '10', 10);
+  return Math.min(30, Math.max(1, Number.isFinite(parsed) ? parsed : 10));
 }
 
 function selectSources(options = {}) {

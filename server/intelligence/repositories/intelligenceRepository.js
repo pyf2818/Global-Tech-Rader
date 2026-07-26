@@ -168,7 +168,7 @@ export function createIntelligenceRepository(db = getPool()) {
     },
 
     async listEvents({ limit = 30, category = '' } = {}) {
-      const boundedLimit = Math.min(100, Math.max(1, Number.parseInt(limit, 10) || 30));
+      const boundedLimit = Math.min(200, Math.max(1, Number.parseInt(limit, 10) || 30));
       const params = [boundedLimit];
       let where = '';
       if (category) {
@@ -185,7 +185,7 @@ export function createIntelligenceRepository(db = getPool()) {
     },
 
     async listArticles({ limit = 50 } = {}) {
-      const boundedLimit = Math.min(200, Math.max(1, Number.parseInt(limit, 10) || 50));
+      const boundedLimit = Math.min(300, Math.max(1, Number.parseInt(limit, 10) || 50));
       const result = await db.query('select * from intelligence_articles order by published_at desc limit $1', [boundedLimit]);
       return result.rows.map(mapArticle);
     },

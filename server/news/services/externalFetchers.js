@@ -24,14 +24,17 @@ export async function jinaFetch(url, timeoutMs = 8000) {
 }
 
 // ========== 增强的获取源函数（支持 Jina AI Reader 回退）==========
-export async function fetchSource(source) {
+const BROWSER_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
+
+export async function fetchSource(source, options = {}) {
+  const timeoutMs = options.timeoutMs || 15_000;
   console.log('[fetchSource] Fetching:', source.name, source.url);
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 8000);
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
     const response = await fetch(source.url, {
-      headers: { 'User-Agent': 'GlobalTechRadar/0.1 (+https://localhost)' },
+      headers: { 'User-Agent': BROWSER_UA },
       signal: controller.signal
     });
 
@@ -59,6 +62,9 @@ export async function fetchSource(source) {
     }
 
     return { source: source.name, items };
+  } catch (err) {
+    console.log('[fetchSource] Error:', source.name, err.name, err.message, err.cause?.code || err.cause?.message || '');
+    throw err;
   } finally {
     clearTimeout(timeout);
   }

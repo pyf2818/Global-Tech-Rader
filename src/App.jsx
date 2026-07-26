@@ -4369,13 +4369,13 @@ ${blueprintSummary}`,
     setExternalIntelligenceLoading(true);
     setExternalIntelligenceError('');
     try {
-      const intelligenceParams = new URLSearchParams({ take: '24', storage: 'auto' });
+      const intelligenceParams = new URLSearchParams({ take: '140', storage: 'auto' });
       if (selectedInterests.length) intelligenceParams.set('interests', selectedInterests.join(','));
-      const opportunityParams = new URLSearchParams({ take: '8', storage: 'auto' });
+      const opportunityParams = new URLSearchParams({ take: '80', storage: 'auto' });
       if (selectedInterests.length) opportunityParams.set('interests', selectedInterests.join(','));
-      const weeklyParams = new URLSearchParams({ take: '80', storage: 'auto', days: '7' });
+      const weeklyParams = new URLSearchParams({ take: '160', storage: 'auto', days: '7' });
       if (selectedInterests.length) weeklyParams.set('interests', selectedInterests.join(','));
-      const alertParams = new URLSearchParams({ take: '80', storage: 'auto', days: '7', limit: '5' });
+      const alertParams = new URLSearchParams({ take: '160', storage: 'auto', days: '7', limit: '10' });
       if (selectedInterests.length) alertParams.set('interests', selectedInterests.join(','));
       const [eventsResponse, opportunitiesResponse, weeklyResponse, alertsResponse] = await Promise.all([
         fetch(`/api/intelligence/events?${intelligenceParams}`),
@@ -4396,7 +4396,7 @@ ${blueprintSummary}`,
         return;
       }
 
-      const itemsResponse = await fetch('/api/intelligence/items?take=12');
+      const itemsResponse = await fetch('/api/intelligence/items?take=120');
       const itemsPayload = await itemsResponse.json();
       if (!itemsPayload.ok) throw new Error(itemsPayload.error?.message || '行业情报加载失败');
       setExternalIntelligenceItems(Array.isArray(itemsPayload.items) ? itemsPayload.items : []);

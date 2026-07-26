@@ -1,12 +1,14 @@
 const AIHOT_BASE_URL = 'https://aihot.virxact.com';
 const AIHOT_USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
+const DEFAULT_TAKE = 80;
+const MAX_TAKE = 100;
 const VALID_MODES = new Set(['selected', 'all']);
 const VALID_CATEGORIES = new Set(['ai-models', 'ai-products', 'industry', 'paper', 'tip']);
 
 function boundedTake(value) {
-  const parsed = Number.parseInt(value ?? '50', 10);
-  if (!Number.isFinite(parsed)) return 50;
-  return Math.min(100, Math.max(1, parsed));
+  const parsed = Number.parseInt(value ?? String(DEFAULT_TAKE), 10);
+  if (!Number.isFinite(parsed)) return DEFAULT_TAKE;
+  return Math.min(MAX_TAKE, Math.max(1, parsed));
 }
 
 function normalizeMode(value) {

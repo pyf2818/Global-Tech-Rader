@@ -210,6 +210,14 @@ export const SOURCE_WEIGHTS = {
   // 基础信息源（权重0.6）
   'CSDN 热榜': 0.6,
   'IT之家': 0.6,
+  // ========== AIHOT 聚合精选 ==========
+  'AIHOT 精选摘要': 1.0,
+  'AIHOT 全部 AI 动态': 0.95,
+  'Simon Willison 博客': 1.0,
+  'The Decoder': 0.85,
+  'TechCrunch AI': 0.85,
+  'OpenRouter 公告': 0.95,
+  'Midjourney 更新': 0.95,
 };;
 
 // ========== 信息源评级系统 ==========
@@ -405,6 +413,14 @@ export const SOURCE_GRADE_MAP = {
   '知乎AI': 'D',
   '知乎热榜': 'D',
   '知乎科技': 'D',
+  // ========== AIHOT 聚合精选 ==========
+  'AIHOT 精选摘要': 'S',
+  'AIHOT 全部 AI 动态': 'A',
+  'Simon Willison 博客': 'S',
+  'The Decoder': 'B',
+  'TechCrunch AI': 'B',
+  'OpenRouter 公告': 'A',
+  'Midjourney 更新': 'A',
 };;
 
 // 多源交叉验证阈值：同一URL在多少个源出现才算高可信度
@@ -466,6 +482,14 @@ export const DEFAULT_SOURCES = [
   { name: 'Microsoft Research AI', url: 'https://www.microsoft.com/en-us/research/blog/topic/artificial-intelligence/feed/', region: 'overseas', defaultCategory: 'ai-models' },
   { name: 'NVIDIA AI Blog', url: 'https://blogs.nvidia.com/ai/feed/', region: 'overseas', defaultCategory: 'ai-models' },
   { name: 'Amazon AI Blog', url: 'https://aws.amazon.com/blogs/machine-learning/feed/', region: 'overseas', defaultCategory: 'ai-models' },
+  // ========== AIHOT 聚合精选及新增高质量源 ==========
+  { name: 'AIHOT 精选摘要', url: 'https://aihot.virxact.com/feed.xml', region: 'global', defaultCategory: 'ai-models' },
+  { name: 'AIHOT 全部 AI 动态', url: 'https://aihot.virxact.com/feed/all.xml', region: 'global', defaultCategory: 'ai-models' },
+  { name: 'Simon Willison 博客', url: 'https://simonwillison.net/atom/everything/', region: 'global', defaultCategory: 'ai-models' },
+  { name: 'The Decoder', url: 'https://the-decoder.com/feed/', region: 'overseas', defaultCategory: 'ai-models' },
+  { name: 'TechCrunch AI', url: 'https://techcrunch.com/category/artificial-intelligence/feed/', region: 'overseas', defaultCategory: 'ai-models' },
+  { name: 'OpenRouter 公告', url: 'https://openrouter.ai/blog/feed.xml', region: 'overseas', defaultCategory: 'ai-models' },
+  { name: 'Midjourney 更新', url: 'https://updates.midjourney.com/rss/', region: 'overseas', defaultCategory: 'ai-models' },
   // ========== 开发者社区与开源 ==========
   { name: 'Hacker News', url: 'https://hnrss.org/frontpage', region: 'global', defaultCategory: 'open-source' },
   { name: 'Hacker News Best', url: 'https://hnrss.org/best', region: 'global', defaultCategory: 'open-source' },
