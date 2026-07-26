@@ -6647,8 +6647,10 @@ ${signals}
           {nav === 'calendar' && (
             <CalendarPage
               events={events}
-              setShowEventForm={setShowEventForm}
+              setEvents={setEvents}
               removeEvent={removeEvent}
+              showEventForm={showEventForm}
+              setShowEventForm={setShowEventForm}
             />
           )}
 
