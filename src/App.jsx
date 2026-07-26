@@ -1662,11 +1662,6 @@ function App() {
     }
 
     return result;
-        return cat && md;
-      })
-      .forEach(item => counts.set(item.source, (counts.get(item.source) || 0) + 1));
-    return [...counts.entries()].sort((a, b) => b[1] - a[1]);
-  }, [items, category, mode]);
 
   // 「全部动态」当前活动筛选 —— 用于 chip 条展示与一键清除
   const allActiveFilters = useMemo(() => {
@@ -3331,287 +3326,6 @@ ${blueprintSummary}`,
 
   // 书签与素材操作已提取至 useBookmarkMaterial hook
 
-  // 文章操作
-  function createArticle(template = 'blank', spaceId = null) {
-    let templateContent = ARTICLE_TEMPLATE_CONTENT[template] || '';
-    templateContent = templateContent.replace('{DATE}', new Date().toLocaleDateString('zh-CN'));
-    const defaultTitle = template === 'briefing' ? `每日简报 · ${new Date().toLocaleDateString('zh-CN')}` : template === 'blank' ? '未命名文章' : '';
-    const newArticle = {
-      id: Date.now(),
-      title: defaultTitle,
-      content: templateContent,
-      template,
-      materials: [],
-      tags: [],
-      status: 'draft',
-      spaceId: spaceId || null,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      version: 1,
-      images: []
-    };
-    setArticles(prev => [...prev, newArticle]);
-    saveArticleVersion(newArticle, 'create');
-    return newArticle;
-  }
-
-  function updateArticle(id, updates) {
-    setArticles(prev => prev.map(a => a.id === id ? { ...a, ...updates, updatedAt: new Date().toISOString() } : a));
-  }
-
-  function articleCitations(article) {
-    const linkedIds = new Set((article.materials || []).map(id => String(id)));
-    return materials
-      .filter(material => linkedIds.has(String(material.id)))
-      .flatMap(material => {
-        try { return [normalizeAsset(material).citation]; } catch { return []; }
-      });
-  }
-
-  function saveArticleVersion(article, reason = 'manual', content = article.content) {
-    const result = saveDocumentVersion({
-      id: article.id,
-      title: article.title,
-      content,
-      status: article.status,
-      assetIds: article.materials || [],
-      citations: articleCitations(article),
-      createdAt: article.createdAt,
-      updatedAt: article.updatedAt,
-      versionNumber: article.versionNumber || 0,
-    }, {
-      title: article.title,
-      content,
-      assetIds: article.materials || [],
-      citations: articleCitations(article),
-      reason,
-    });
-    if (!result.ok) showToast(result.code === 'LOCAL_STORAGE_QUOTA' ? '版本保存失败：本地空间不足' : '版本保存失败');
-    return result;
-  }
-
-  function deleteArticle(id) {
-    setArticles(prev => prev.filter(a => a.id !== id));
-  }
-
-  function duplicateArticle(id) {
-    const original = articles.find(a => a.id === id);
-    if (!original) return;
-    const copy = {
-      ...original,
-      id: Date.now(),
-      title: `${original.title} (副本)`,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      version: 1
-    };
-    setArticles(prev => [...prev, copy]);
-  }
-
-  function addArticleTag(id, tag) {
-    const trimmed = tag.trim();
-    if (!trimmed) return;
-    setArticles(prev => prev.map(a => a.id === id ? { ...a, tags: a.tags.includes(trimmed) ? a.tags : [...a.tags, trimmed], updatedAt: new Date().toISOString() } : a));
-  }
-
-  function removeArticleTag(id, tag) {
-    setArticles(prev => prev.map(a => a.id === id ? { ...a, tags: a.tags.filter(t => t !== tag), updatedAt: new Date().toISOString() } : a));
-  }
-
-  function triggerAutoSave(article) {
-    if (autoSaveTimer) clearTimeout(autoSaveTimer);
-    const timer = setTimeout(() => {
-      setLastSavedAt(new Date().toISOString());
-      setAutoSaveTimer(null);
-    }, 500);
-    setAutoSaveTimer(timer);
-  }
-
-  function handleContentChange(article, newContent) {
-    updateArticle(article.id, { content: newContent });
-    triggerAutoSave(article);
-  }
-
-  function handleTitleChange(article, newTitle) {
-    updateArticle(article.id, { title: newTitle });
-    triggerAutoSave(article);
-  }
-
-  function insertAtCursor(article, text, wrapBefore, wrapAfter) {
-    const ta = editorTextareaRef.current;
-    if (!ta) {
-      updateArticle(article.id, { content: article.content + (wrapBefore || '') + text + (wrapAfter || '') });
-      return;
-    }
-    const start = ta.selectionStart;
-    const end = ta.selectionEnd;
-    const selected = article.content.substring(start, end);
-    const before = article.content.substring(0, start);
-    const after = article.content.substring(end);
-    const insert = wrapBefore ? wrapBefore + (selected || text) + wrapAfter : text;
-    const newContent = before + insert + after;
-    updateArticle(article.id, { content: newContent });
-    setTimeout(() => {
-      ta.focus();
-      const newPos = wrapBefore ? start + wrapBefore.length + (selected || text).length + (wrapAfter || '').length : start + text.length;
-      ta.setSelectionRange(selected ? start + (wrapBefore || '').length : newPos, newPos);
-    }, 0);
-  }
-
-  function insertMaterialAtCursor(article, material) {
-    const ta = editorTextareaRef.current;
-    const ref = `\n> [${material.content.slice(0, 50)}...](${material.url || ''})\n> 来源: ${material.source}\n\n`;
-    if (!ta) {
-      const newContent = article.content + ref;
-      updateArticle(article.id, { content: newContent, materials: article.materials.includes(material.id) ? article.materials : [...article.materials, material.id] });
-      return;
-    }
-    const start = ta.selectionStart;
-    const before = article.content.substring(0, start);
-    const after = article.content.substring(start);
-    const newContent = before + ref + after;
-    updateArticle(article.id, { content: newContent, materials: article.materials.includes(material.id) ? article.materials : [...article.materials, material.id] });
-    setTimeout(() => {
-      ta.focus();
-      const newPos = start + ref.length;
-      ta.setSelectionRange(newPos, newPos);
-    }, 0);
-  }
-
-  function removeLinkedMaterial(article, materialId) {
-    setArticles(prev => prev.map(a => a.id === article.id ? { ...a, materials: a.materials.filter(id => id !== materialId) } : a));
-  }
-
-  // 处理图片上传
-  function handleImageUpload(article, file) {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const base64 = e.target.result;
-      const alt = file.name.replace(/\.[^/.]+$/, '');
-      const imageId = `img-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-      
-      // 获取图片原始尺寸
-      const img = new Image();
-      img.onload = () => {
-        const imageData = {
-          id: imageId,
-          base64: base64,
-          alt: alt,
-          width: img.width,
-          height: img.height
-        };
-        
-        // 更新文章，添加图片数据
-        const existingImages = article.images || [];
-        const updatedImages = [...existingImages, imageData];
-        updateArticle(article.id, { images: updatedImages });
-        
-        // 在编辑器中插入占位符（默认使用原始尺寸，但允许后续调整）
-        const markdown = `\n![${alt}](#${imageId})\n`;
-        insertAtCursor(article, markdown, '', '');
-      };
-      img.src = base64;
-    };
-    reader.readAsDataURL(file);
-  }
-
-  // 处理粘贴图片
-  function handlePaste(e, article) {
-    const items = e.clipboardData?.items;
-    if (!items) return;
-
-    for (let i = 0; i < items.length; i++) {
-      const item = items[i];
-      if (item.type.indexOf('image') !== -1) {
-        e.preventDefault();
-        const file = item.getAsFile();
-        if (file) {
-          handleImageUpload(article, file);
-        }
-        break;
-      }
-    }
-  }
-
-  // 创作空间管理
-  function createArticleSpace(name) {
-    const trimmed = name.trim();
-    if (!trimmed) return;
-    const newSpace = { id: Date.now(), name: trimmed, createdAt: new Date().toISOString() };
-    setArticleSpaces(prev => [...prev, newSpace]);
-    setNewArticleSpaceName('');
-    setArticleSpaceFormOpen(false);
-  }
-
-  function deleteArticleSpace(id) {
-    setArticleSpaces(prev => prev.filter(s => s.id !== id));
-    setArticles(prev => prev.map(a => a.spaceId === id ? { ...a, spaceId: null } : a));
-    if (articleSpaceFilter === String(id)) setArticleSpaceFilter('all');
-  }
-
-  function assignArticleToSpace(id, spaceId) {
-    setArticles(prev => prev.map(a => a.id === id ? { ...a, spaceId: spaceId || null } : a));
-  }
-
-  function batchAssignArticlesToSpace(ids, spaceId) {
-    setArticles(prev => prev.map(a => ids.includes(a.id) ? { ...a, spaceId: spaceId || null } : a));
-  }
-
-  // AI 辅助写作
-  async function aiAction(article, action, content) {
-    if (!llmConfig.baseUrl || !llmConfig.selectedModel) {
-      setAiResult({ loading: false, content: '', error: '请先配置大模型', action });
-      return;
-    }
-    setAiResult({ loading: true, content: '', error: '', action });
-    try {
-      const res = await fetch('/api/ai-generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          baseUrl: llmConfig.baseUrl,
-          apiKey: llmConfig.apiKey,
-          model: llmConfig.selectedModel,
-          action,
-          content
-        })
-      });
-      const data = await res.json();
-      if (data.ok) {
-        setAiResult({ loading: false, content: typeof data.content === 'string' ? data.content : JSON.stringify(data.content), error: '', action });
-      } else {
-        setAiResult({ loading: false, content: '', error: data.error || '请求失败', action });
-      }
-    } catch (e) {
-      setAiResult({ loading: false, content: '', error: e.message, action });
-    }
-  }
-
-  function insertAiResult(article) {
-    if (!aiResult.content) return;
-    if (aiResult.action === 'title') {
-      updateArticle(article.id, { title: aiResult.content.trim() });
-    } else if (aiResult.action === 'rewrite' || aiResult.action === 'translate_zh' || aiResult.action === 'simplify' || aiResult.action === 'expand') {
-      const selected = window.getSelection().toString();
-      if (selected) {
-        updateArticle(article.id, { content: article.content.replace(selected, aiResult.content) });
-      } else {
-        updateArticle(article.id, { content: article.content + '\n\n' + aiResult.content });
-      }
-    } else if (aiResult.action === 'summary' || aiResult.action === 'outline') {
-      updateArticle(article.id, { content: `> ${aiResult.action === 'summary' ? '摘要' : '大纲'}\n\n${aiResult.content}\n\n---\n\n` + article.content });
-    } else if (aiResult.action === 'custom') {
-      updateArticle(article.id, { content: article.content + '\n\n' + aiResult.content });
-    } else {
-      updateArticle(article.id, { content: article.content + '\n\n' + aiResult.content });
-    }
-    setAiResult({ loading: false, content: '', error: '', action: '' });
-  }
-
-  function clearAiResult() {
-    setAiResult({ loading: false, content: '', error: '', action: '' });
-  }
-
   // AI 每日简报生成
   async function generateAiBrief() {
     if (!llmConfig.baseUrl || !llmConfig.selectedModel) {
@@ -3705,56 +3419,6 @@ ${signals}
     setTimeout(() => toast.remove(), 2000);
   }
 
-  // 导出文章为本地文件
-  function exportArticleToFile(article) {
-    const title = (article.title || '未命名').replace(/[\\/:*?"<>|]/g, '_');
-    
-    // 处理图片占位符（支持大小参数）
-    let exportContent = article.content;
-    if (article.images && article.images.length > 0) {
-      article.images.forEach(img => {
-        // 支持带大小参数的占位符
-        const placeholderPattern = new RegExp(`!\\[([^\\]]*)\\]\\(\\#${img.id}(?:\\|[^)]+)?\\)`, 'g');
-        exportContent = exportContent.replace(placeholderPattern, (match, alt) => {
-          // 解析大小参数
-          const sizeMatch = match.match(/\|w=(\d+)(?:\|h=(\d+))?/);
-          let sizeAttrs = '';
-          if (sizeMatch) {
-            sizeAttrs = ` width="${sizeMatch[1]}"`;
-            if (sizeMatch[2]) {
-              sizeAttrs += ` height="${sizeMatch[2]}"`;
-            }
-          }
-          return `<img src="${img.base64}" alt="${alt || img.alt}"${sizeAttrs} />`;
-        });
-      });
-    }
-    
-    const exportPayload = exportDocument({
-      id: article.id,
-      title: article.title || '未命名',
-      content: `# ${article.title || '未命名'}\n\n> 创建时间: ${new Date(article.createdAt).toLocaleString('zh-CN')}\n> 更新时间: ${new Date(article.updatedAt).toLocaleString('zh-CN')}\n> 模板: ${ARTICLE_TEMPLATES[article.template] || article.template}\n> 状态: ${ARTICLE_STATUS[article.status] || article.status}\n${article.tags.length > 0 ? `> 标签: ${article.tags.join(', ')}\n` : ''}\n---\n\n${exportContent}`,
-      status: article.status,
-      updatedAt: article.updatedAt,
-      citations: articleCitations(article),
-    }, 'md');
-    saveArticleVersion(article, 'export', exportContent);
-    const blob = new Blob([exportPayload.content], { type: exportPayload.mime });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = exportPayload.filename || `${title}.md`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    const toast = document.createElement('div');
-    toast.className = 'material-toast';
-    toast.textContent = '已下载为 markdown 文件';
-    document.body.appendChild(toast);
-    setTimeout(() => toast.remove(), 2000);
-  }
-
   // 导出简报到创作中心
   function exportBriefToEditor() {
     if (!aiBrief.content) return;
@@ -3806,75 +3470,6 @@ ${signals}
     articleStatusFilter, articleTemplateFilter, articleSort, articleExportFilter,
   });
   }, [articles, articleExportFilter]);
-
-  function exportArticle(article, format) {
-    const dateStr = new Date().toISOString().slice(0, 10);
-    const filename = `${article.title.replace(/[^\w\s\u4e00-\u9fff]/g, '')}-${dateStr}`;
-
-    if (format === 'md') {
-      const md = `# ${article.title}\n\n${article.content}`;
-      const blob = new Blob([md], { type: 'text/markdown;charset=utf-8' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `${filename}.md`;
-      a.click();
-      URL.revokeObjectURL(url);
-    } else if (format === 'pdf') {
-      const renderedHtml = renderMarkdown(article.content);
-      const printHtml = `<!doctype html><html><head><meta charset="utf-8"><title>${article.title}</title><style>body{font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue","PingFang SC","Microsoft YaHei",sans-serif;max-width:800px;margin:0 auto;padding:40px;color:#333;line-height:1.8}h1{font-size:28px;border-bottom:2px solid #eee;padding-bottom:12px;margin-bottom:24px}h2{font-size:22px;margin:28px 0 12px;color:#222}h3{font-size:18px;margin:20px 0 10px}p{margin-bottom:16px;text-align:justify}ul,ol{margin-bottom:16px;padding-left:24px}li{margin-bottom:6px}blockquote{border-left:4px solid #ddd;padding-left:16px;color:#666;margin:16px 0;font-style:italic}pre{background:#f5f5f5;padding:16px;border-radius:6px;overflow-x:auto;font-size:14px;line-height:1.5}code{background:#f0f0f0;padding:2px 6px;border-radius:3px;font-family:"DM Mono",monospace;font-size:14px}pre code{background:none;padding:0}table{border-collapse:collapse;width:100%;margin:16px 0}th,td{border:1px solid #ddd;padding:8px 12px;text-align:left}th{background:#f5f5f5;font-weight:600}img{max-width:100%;border-radius:6px;margin:12px 0}a{color:#3b82f6}hr{border:none;border-top:1px solid #eee;margin:24px 0}@media print{body{padding:0;max-width:100%}}</style></head><body><h1>${article.title}</h1><div class="meta" style="color:#999;font-size:14px;margin-bottom:24px">Tech Radar · ${dateStr} · ${ARTICLE_TEMPLATES[article.template]} · ${ARTICLE_STATUS[article.status]}</div>${renderedHtml}</body></html>`;
-      const blob = new Blob([printHtml], { type: 'text/html;charset=utf-8' });
-      const url = URL.createObjectURL(blob);
-      const w = window.open(url, '_blank');
-      if (!w) return;
-      setTimeout(() => { w.print(); }, 300);
-    } else {
-      const renderedHtml = renderMarkdown(article.content);
-      const cssMap = {
-        html: `body{font-family:Arial,sans-serif;max-width:800px;margin:0 auto;padding:24px;color:#333;line-height:1.8}h1{border-bottom:2px solid #eee;padding-bottom:12px;margin-bottom:20px}h2{font-size:20px;margin:24px 0 12px;color:#222}h3{font-size:17px;margin:18px 0 8px}p{margin-bottom:14px}ul,ol{margin-bottom:14px;padding-left:24px}li{margin-bottom:4px}blockquote{border-left:4px solid #ddd;padding-left:16px;color:#666;margin:14px 0}pre{background:#f5f5f5;padding:14px;border-radius:6px;overflow-x:auto;font-size:14px}code{background:#f0f0f0;padding:2px 6px;border-radius:3px;font-family:monospace}pre code{background:none;padding:0}table{border-collapse:collapse;width:100%;margin:14px 0}th,td{border:1px solid #ddd;padding:8px 12px;text-align:left}th{background:#f5f5f5}img{max-width:100%;border-radius:6px}a{color:#3b82f6}hr{border:none;border-top:1px solid #eee;margin:20px 0}`,
-        wechat: `body{font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue","PingFang SC","Microsoft YaHei",sans-serif;max-width:677px;margin:0 auto;padding:16px;color:#333;line-height:1.8;font-size:16px}h1{font-size:24px;text-align:center;margin-bottom:8px}h2{font-size:20px;border-left:4px solid #07c160;padding-left:12px;margin:20px 0 12px;color:#333}h3{font-size:17px;color:#666;margin:16px 0 8px}.meta{text-align:center;color:#999;font-size:14px;margin-bottom:24px}p{margin-bottom:16px;text-align:justify}ul,ol{margin-bottom:16px;padding-left:20px}li{margin-bottom:6px}blockquote{background:#f7f7f7;border-left:none;padding:16px;margin:16px 0;border-radius:8px}pre{background:#f7f7f7;padding:16px;border-radius:8px;overflow-x:auto;font-size:14px}code{background:#f7f7f7;padding:2px 6px;border-radius:3px}pre code{background:none;padding:0}table{border-collapse:collapse;width:100%;margin:16px 0}th,td{border:1px solid #e0e0e0;padding:8px 12px;text-align:left}th{background:#f7f7f7}img{max-width:100%;border-radius:6px;margin:12px 0}a{color:#576b95}hr{border:none;border-top:1px solid #e0e0e0;margin:24px 0}`,
-        zhihu: `body{font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue","PingFang SC","Microsoft YaHei",sans-serif;max-width:700px;margin:0 auto;padding:20px;color:#1a1a1a;line-height:1.75;font-size:16px}h1{font-size:26px;font-weight:700;margin-bottom:16px}h2{font-size:22px;font-weight:600;margin:24px 0 12px}h3{font-size:18px;font-weight:600;margin:18px 0 8px}p{margin-bottom:16px}ul,ol{margin-bottom:16px;padding-left:20px}li{margin-bottom:6px}blockquote{border-left:4px solid #0066ff;padding-left:16px;color:#666;margin:16px 0}pre{background:#f6f6f6;padding:16px;border-radius:4px;overflow-x:auto;font-size:14px}code{background:#f6f6f6;padding:2px 6px;border-radius:3px;font-family:monospace}pre code{background:none;padding:0}table{border-collapse:collapse;width:100%;margin:16px 0}th,td{border:1px solid #e0e0e0;padding:8px 12px;text-align:left}th{background:#f6f6f6}img{max-width:100%;border-radius:4px;margin:12px 0}a{color:#0066ff}hr{border:none;border-top:1px solid #e0e0e0;margin:24px 0}`
-      };
-      const css = cssMap[format] || cssMap.html;
-      const htmlContent = `<!doctype html><html><head><meta charset="utf-8"><title>${article.title}</title><style>${css}</style></head><body><h1>${article.title}</h1><div class="meta" style="color:#999;font-size:14px;margin-bottom:24px">Tech Radar · ${dateStr}</div>${renderedHtml}</body></html>`;
-
-      if (format === 'html') {
-        const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `${filename}.html`;
-        a.click();
-        URL.revokeObjectURL(url);
-      } else {
-        const w = window.open('', '_blank');
-        if (!w) return;
-        w.document.write(htmlContent);
-        w.document.close();
-        w.focus();
-      }
-    }
-  }
-
-  function copyArticleAsRichText(article) {
-    const renderedHtml = renderMarkdown(article.content);
-    const fullHtml = `<h1>${article.title}</h1>${renderedHtml}`;
-    if (navigator.clipboard && window.ClipboardItem) {
-      const htmlBlob = new Blob([fullHtml], { type: 'text/html' });
-      const textBlob = new Blob([article.content], { type: 'text/plain' });
-      navigator.clipboard.write([new ClipboardItem({ 'text/html': htmlBlob, 'text/plain': textBlob })]).then(() => {
-        showToast('✓ 已复制富文本到剪贴板');
-      });
-    } else {
-      const ta = document.createElement('textarea');
-      ta.value = article.content;
-      document.body.appendChild(ta);
-      ta.select();
-      document.execCommand('copy');
-      document.body.removeChild(ta);
-      showToast('✓ 已复制 Markdown 文本');
-    }
-  }
 
   function addFollowKeyword(kw) {
     const keyword = kw || newKeyword;
@@ -4219,6 +3814,22 @@ ${signals}
                   </div>
                 </div>
               )}
+          </div>
+        </div>
+        </header>
+
+        {showStatsBar && <div className="stats-bar">
+          {nav === 'all' && <><div className="stat-item"><span className="stat-value">{items.length}</span><span className="stat-label">资讯总数</span></div><div className="stat-item"><span className="stat-value highlight">{filtered.length}</span><span className="stat-label">筛选结果</span></div><div className="stat-item"><span className="stat-value live">{stats.sourceCount - stats.failedSources}</span><span className="stat-label">活跃源</span></div></>}
+          {nav === 'trending' && <><div className="stat-item"><span className="stat-value highlight">{trendingItems.length}</span><span className="stat-label">热门榜单</span></div><div className="stat-item"><span className="stat-value live">热门</span><span className="stat-label">全网热搜</span></div></>}
+          {nav === 'github' && <><div className="stat-item"><span className="stat-value highlight">{githubRepos.length}</span><span className="stat-label">热门项目</span></div><div className="stat-item"><span className="stat-value live">{GITHUB_PERIODS.find(p => p.id === githubSince)?.label || '周榜'}</span><span className="stat-label">当前榜单</span></div></>}
+          {nav === 'reading-list' && <><div className="stat-item"><span className="stat-value highlight">{bookmarks.length}</span><span className="stat-label">收藏总数</span></div><div className="stat-item"><span className="stat-value live">{bookmarks.filter(b => !b.isRead).length}</span><span className="stat-label">未读</span></div></>}
+          {nav === 'calendar' && <><div className="stat-item"><span className="stat-value highlight">{events.length}</span><span className="stat-label">日程事件</span></div></>}
+          {nav === 'recommendations' && <><div className="stat-item"><span className="stat-value highlight">{filtered.length}</span><span className="stat-label">推荐内容</span></div><div className="stat-item"><span className="stat-value live">{selectedInterests.length}</span><span className="stat-label">兴趣领域</span></div></>}
+          <div className="stat-item time">{ICONS.clock}<span>{stats.updatedAt ? formatTime(stats.updatedAt) : '--'}</span></div>
+          <button className="panel-toggle" onClick={() => setPanelCollapsed(c => !c)}>{panelCollapsed ? ICONS.chevronLeft : ICONS.chevronRight}</button>
+        </div>}
+
+        <div className={`feed custom-scrollbar ${(nav === 'home' || nav === 'recommendations') ? 'feed-workbench' : ''} ${nav === 'stock' ? 'feed-stock' : ''}`} ref={feedRef}>
           {nav === 'materials' && (
             <MaterialsPage
               materials={materials}

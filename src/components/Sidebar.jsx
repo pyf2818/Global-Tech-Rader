@@ -201,6 +201,9 @@ export default function Sidebar({ sidebarCollapsed, setSidebarCollapsed, mobileM
                     <button className="nav-follow-add-btn" onClick={() => addFollowKeyword()}>{ICONS.plus}</button>
                   </div>
                 </div>
+              )}
+            </div>
+          )}
         </nav>
 
         <div className="sidebar-footer">

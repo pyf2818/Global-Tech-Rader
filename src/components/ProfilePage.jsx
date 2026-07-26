@@ -5,7 +5,7 @@ import {
   PROFILE_TIERS,
   SPECIAL_FOLLOW_TYPES,
 } from '../domain/intelligence/profileTiers.js';
-import { ICONS } from '../App.jsx';
+import { ICONS } from '../constants/index.jsx';
 import { showToast } from '../utils/toast.js';
 
 export default function ProfilePage({
