@@ -1061,3 +1061,260 @@ describe('WorkflowEngine', () => {
     expect(step.output).toContain('素材候选提取完成');
   });
 });
+
+// ---------------------------------------------------------------------------
+// 方案 C Phase 5：subworkflow / parallel / router 节点
+// ---------------------------------------------------------------------------
+
+describe('WorkflowEngine 多 agent 编排节点', () => {
+  let engine;
+  beforeEach(() => {
+    engine = new WorkflowEngine();
+    vi.unstubAllGlobals();
+  });
+
+  it('subworkflow 节点：找不到目标工作流时返回错误', async () => {
+    const wf = {
+      id: 'parent', name: '父工作流', nodes: [
+        { id: 'sub', type: 'subworkflow', title: '子流程', workflowId: 'not-exist', inputKey: 'context', outputKey: 'sub_out' }
+      ]
+    };
+    const r = await engine.run(wf, { workflows: [] });
+    expect(r.status).toBe('completed'); // 节点级错误，不中断 run
+    expect(r.trace[0].status).toBe('failed');
+    expect(r.trace[0].detail).toContain('未找到子工作流');
+    expect(r.trace[0].output).toContain('未找到子工作流');
+  });
+
+  it('subworkflow 节点：成功递归执行子工作流', async () => {
+    const fetchMock = vi.fn(async () => ({
+      ok: true, json: async () => ({ content: '子流程输出' })
+    }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const subWorkflow = {
+      id: 'sub-wf', name: '子工作流', nodes: [
+        { id: 'sub-llm', type: 'llm', title: '子 LLM', prompt: '请输出', inputKey: 'context', outputKey: 'sub_final' }
+      ]
+    };
+    const wf = {
+      id: 'parent', name: '父工作流', nodes: [
+        { id: 'sub', type: 'subworkflow', title: '调用子流程', workflowId: 'sub-wf', inputKey: 'context', outputKey: 'sub_out' }
+      ]
+    };
+    const ctx = {
+      workflows: [subWorkflow],
+      llmConfig: { baseUrl: 'http://x', apiKey: 'k', selectedModel: 'gpt' },
+      agents: []
+    };
+    const r = await engine.run(wf, ctx);
+    expect(r.status).toBe('completed');
+    expect(r.trace[0].status).toBe('completed');
+    expect(r.trace[0].detail).toContain('子工作流 "子工作流" 完成');
+    expect(r.trace[0].output).toContain('子流程输出');
+  });
+
+  it('parallel 节点：缺少 branches 配置时返回错误', async () => {
+    const wf = {
+      id: 'w', name: 'parallel-no-branches', nodes: [
+        { id: 'p', type: 'parallel', title: '并行', inputKey: 'context', outputKey: 'p_out' }
+      ]
+    };
+    const r = await engine.run(wf, {});
+    expect(r.status).toBe('completed');
+    expect(r.trace[0].status).toBe('failed');
+    expect(r.trace[0].detail).toContain('branches');
+  });
+
+  it('parallel 节点：concat 合并策略默认拼接所有分支', async () => {
+    const fetchMock = vi.fn(async (url, opts) => {
+      const body = JSON.parse(opts.body);
+      // 不同分支返回不同内容（用 systemPrompt 区分）
+      const content = body.systemPrompt?.includes('技术') ? '技术视角结论' : '其他视角';
+      return { ok: true, json: async () => ({ content }) };
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const wf = {
+      id: 'w', name: 'parallel-concat', nodes: [
+        {
+          id: 'p', type: 'parallel', title: '并行', mergeStrategy: 'concat',
+          branches: [
+            { name: '技术视角', prompt: '从技术角度分析' },
+            { name: '商业视角', prompt: '从商业角度分析' }
+          ],
+          inputKey: 'context', outputKey: 'p_out'
+        }
+      ]
+    };
+    const r = await engine.run(wf, { llmConfig: { baseUrl: 'http://x', apiKey: 'k', selectedModel: 'gpt' } });
+    expect(r.status).toBe('completed');
+    expect(r.trace[0].status).toBe('completed');
+    expect(r.trace[0].structured.branches).toHaveLength(2);
+    expect(r.trace[0].structured.mergeStrategy).toBe('concat');
+    expect(r.trace[0].output).toContain('分支 1');
+    expect(r.trace[0].output).toContain('分支 2');
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('parallel 节点：first 合并策略只取第一个完成的分支', async () => {
+    const fetchMock = vi.fn(async () => ({
+      ok: true, json: async () => ({ content: '分支结果' })
+    }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const wf = {
+      id: 'w', name: 'parallel-first', nodes: [
+        {
+          id: 'p', type: 'parallel', title: '并行', mergeStrategy: 'first',
+          branches: [
+            { name: 'A', prompt: 'p1' },
+            { name: 'B', prompt: 'p2' }
+          ],
+          inputKey: 'context', outputKey: 'p_out'
+        }
+      ]
+    };
+    const r = await engine.run(wf, { llmConfig: { baseUrl: 'http://x', apiKey: 'k', selectedModel: 'gpt' } });
+    expect(r.status).toBe('completed');
+    expect(r.trace[0].output).toBe('分支结果');
+  });
+
+  it('parallel 节点：分支失败时保留错误信息但不中断', async () => {
+    const fetchMock = vi.fn(async () => ({
+      ok: true, json: async () => ({ error: 'LLM 调用失败' })
+    }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const wf = {
+      id: 'w', name: 'parallel-failed', nodes: [
+        {
+          id: 'p', type: 'parallel', title: '并行', mergeStrategy: 'concat',
+          branches: [{ name: '失败分支', prompt: 'p' }],
+          inputKey: 'context', outputKey: 'p_out'
+        }
+      ]
+    };
+    const r = await engine.run(wf, { llmConfig: { baseUrl: 'http://x', apiKey: 'k', selectedModel: 'gpt' } });
+    expect(r.status).toBe('completed');
+    expect(r.trace[0].structured.branches[0].status).toBe('rejected');
+    expect(r.trace[0].output).toContain('分支失败');
+  });
+
+  it('router 节点：缺少 routes 配置时返回错误', async () => {
+    const wf = {
+      id: 'w', name: 'router-no-routes', nodes: [
+        { id: 'r', type: 'router', title: '路由', inputKey: 'context', outputKey: 'r_out' }
+      ]
+    };
+    const r = await engine.run(wf, {});
+    expect(r.status).toBe('completed');
+    expect(r.trace[0].status).toBe('failed');
+    expect(r.trace[0].detail).toContain('routes');
+  });
+
+  it('router 节点：contains 匹配命中子工作流', async () => {
+    const fetchMock = vi.fn(async () => ({
+      ok: true, json: async () => ({ content: '子工作流输出' })
+    }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const targetWorkflow = {
+      id: 'target-wf', name: '目标子工作流', nodes: [
+        { id: 't-llm', type: 'llm', title: 'LLM', prompt: 'p', inputKey: 'context', outputKey: 't_final' }
+      ]
+    };
+    const wf = {
+      id: 'w', name: 'router-match', nodes: [
+        {
+          id: 'r', type: 'router', title: '路由',
+          routes: [
+            { match: { op: 'contains', value: 'github' }, target: 'target-wf', targetName: 'GitHub 流' }
+          ],
+          default: null,
+          inputKey: 'context', outputKey: 'r_out'
+        }
+      ]
+    };
+    const ctx = {
+      workflows: [targetWorkflow],
+      llmConfig: { baseUrl: 'http://x', apiKey: 'k', selectedModel: 'gpt' },
+      agents: [],
+      customPrompt: '请分析 github 上的项目'
+    };
+    const r = await engine.run(wf, ctx);
+    expect(r.status).toBe('completed');
+    expect(r.trace[0].status).toBe('completed');
+    expect(r.trace[0].structured.matched).toBe(true);
+    expect(r.trace[0].structured.target).toBe('target-wf');
+    expect(r.trace[0].output).toContain('子工作流输出');
+  });
+
+  it('router 节点：无匹配时使用 default 路由（透传 input）', async () => {
+    const wf = {
+      id: 'w', name: 'router-default', nodes: [
+        {
+          id: 'r', type: 'router', title: '路由',
+          routes: [
+            { match: { op: 'contains', value: 'github' }, target: 'no-such-wf' }
+          ],
+          default: null,
+          inputKey: 'context', outputKey: 'r_out'
+        },
+        { id: 'out', type: 'output', title: '输出', inputKey: 'r_out', outputKey: 'final' }
+      ]
+    };
+    const ctx = { workflows: [], customPrompt: '普通文本不含关键词' };
+    const r = await engine.run(wf, ctx);
+    expect(r.status).toBe('completed');
+    expect(r.trace[0].structured.matched).toBe(false);
+    // 透传 input 给后续节点
+    expect(r.trace[1].status).toBe('completed');
+  });
+
+  it('router 节点：regex 匹配股票代码', async () => {
+    const fetchMock = vi.fn(async () => ({
+      ok: true, json: async () => ({ content: '股票分析结果' })
+    }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const targetWorkflow = {
+      id: 'stock-wf', name: '股票分析', nodes: [
+        { id: 's-llm', type: 'llm', title: 'LLM', prompt: 'p', inputKey: 'context', outputKey: 's_final' }
+      ]
+    };
+    const wf = {
+      id: 'w', name: 'router-regex', nodes: [
+        {
+          id: 'r', type: 'router', title: '路由',
+          routes: [
+            { match: { op: 'regex', value: '\\d{6}' }, target: 'stock-wf' }
+          ],
+          inputKey: 'context', outputKey: 'r_out'
+        }
+      ]
+    };
+    const r = await engine.run(wf, {
+      workflows: [targetWorkflow],
+      llmConfig: { baseUrl: 'http://x', apiKey: 'k', selectedModel: 'gpt' },
+      agents: [],
+      customPrompt: '帮我分析 600519 的走势'
+    });
+    expect(r.status).toBe('completed');
+    expect(r.trace[0].structured.matched).toBe(true);
+    expect(r.trace[0].output).toContain('股票分析结果');
+  });
+
+  it('_matchRoute：各种操作符的边界', () => {
+    expect(engine._matchRoute({ op: 'contains', value: 'foo' }, 'foobar')).toBe(true);
+    expect(engine._matchRoute({ op: 'contains', value: 'foo' }, 'bar')).toBe(false);
+    expect(engine._matchRoute({ op: 'not_contains', value: 'foo' }, 'bar')).toBe(true);
+    expect(engine._matchRoute({ op: 'equals', value: 'x' }, 'x')).toBe(true);
+    expect(engine._matchRoute({ op: 'equals', value: 'x' }, 'y')).toBe(false);
+    expect(engine._matchRoute({ op: 'starts_with', value: 'http' }, 'https://x')).toBe(true);
+    expect(engine._matchRoute({ op: 'regex', value: '^\\d+$' }, '12345')).toBe(true);
+    expect(engine._matchRoute({ op: 'regex', value: '[' }, 'foo')).toBe(false); // 非法正则
+    expect(engine._matchRoute(null, '')).toBe(false);
+    expect(engine._matchRoute({ op: 'unknown' }, '')).toBe(false);
+  });
+});

@@ -15,6 +15,12 @@ import { searchFiles } from '../utils/workspaceIndex.js';
 import { observeQuestion, observeReply, getLearnedPreferences } from '../utils/profileLearning.js';
 import { extractTodos } from '../utils/todoExtractor.js';
 import { isAiElfAsset, normalizeAsset } from '../domain/creative/assetModel.js';
+import { selectToolSchemas, executeAgentTool } from '../utils/agentTools.js';
+import { getRootHandle } from '../utils/workspaceHandleStore.js';
+import { buildSessionContextText, appendHistory } from '../utils/sessionStore.js';
+import {
+  subscribePending, getPendingApprovals, respondApproval, cancelAllPending,
+} from '../utils/sandbox.js';
 
 const WELCOME_MSGS = ['今天有什么情报需要我深入分析？', '准备好为你梳理今日要点了', '想从哪条资讯开始剖析？', '随时可以问我今日趋势与风险'];
 
@@ -29,6 +35,122 @@ const SUGGEST_ICONS = {
   chart: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="3" y1="21" x2="21" y2="21"/><rect x="5" y="11" width="3" height="7"/><rect x="10.5" y="6" width="3" height="12"/><rect x="16" y="9" width="3" height="9"/></svg>,
   sparkle: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3l1.9 5.8L20 11l-6.1 2.2L12 19l-1.9-5.8L4 11l6.1-2.2Z"/></svg>,
 };
+
+/* 工具元信息：友好名称 + 简短图标，用于工具调用卡片展示 */
+const TOOL_META = {
+  read_workspace_file: { label: '读取文件', icon: '📄' },
+  write_workspace_file: { label: '写入文件', icon: '✍️' },
+  search_news: { label: '检索资讯', icon: '🔍' },
+  fetch_page: { label: '抓取网页', icon: '🌐' },
+  get_stock_quote: { label: '股票行情', icon: '📈' },
+  get_stock_kline: { label: 'K 线数据', icon: '📊' },
+};
+
+function summarizeArgs(name, args) {
+  try {
+    const a = args || {};
+    if (name === 'read_workspace_file' || name === 'write_workspace_file') return a.path || '';
+    if (name === 'search_news') return a.keyword || '';
+    if (name === 'fetch_page') return a.url || '';
+    if (name === 'get_stock_quote' || name === 'get_stock_kline') return a.code || '';
+    return JSON.stringify(a);
+  } catch { return ''; }
+}
+
+/* 工具调用卡片：展示工具名 / 参数摘要 / 状态 / 可展开结果 */
+function ToolCallCard({ tc }) {
+  const [expanded, setExpanded] = useState(false);
+  const meta = TOOL_META[tc.name] || { label: tc.name, icon: '⚙️' };
+  const summary = summarizeArgs(tc.name, tc.args);
+  const isRunning = tc.status === 'running';
+  // 检测工具结果是否为错误（约定：以"错误："或"工具执行失败"开头）
+  const isError = !isRunning && typeof tc.result === 'string' &&
+    /^(错误：|工具执行失败)/.test(tc.result.trim());
+  const statusLabel = isRunning ? '执行中…' : (isError ? '出错' : '已完成');
+  const statusClass = isError ? 'error' : tc.status;
+  return (
+    <div className={`tool-call tool-call-${statusClass}`}>
+      <div className="tool-call-header" onClick={() => setExpanded(v => !v)} role="button" tabIndex={0}>
+        <span className="tool-call-icon">{meta.icon}</span>
+        <span className="tool-call-name">{meta.label}</span>
+        {summary && <span className="tool-call-arg-summary" title={summary}>{summary}</span>}
+        <span className={`tool-call-status tool-call-status-${statusClass}`}>
+          {statusLabel}
+        </span>
+        <span className={`tool-call-chevron${expanded ? ' is-open' : ''}`}>▾</span>
+      </div>
+      {expanded && (
+        <div className="tool-call-body">
+          <div className="tool-call-section">
+            <div className="tool-call-section-label">参数</div>
+            <pre className="tool-call-args">{JSON.stringify(tc.args || {}, null, 2)}</pre>
+          </div>
+          {tc.result && (
+            <div className="tool-call-section">
+              <div className="tool-call-section-label">返回结果</div>
+              <pre className={`tool-call-result${isError ? ' tool-call-result-error' : ''}`}>{tc.result}</pre>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* 沙箱审批卡片：工具调用前展示，用户决策 Allow once / Allow always / Deny */
+const APPROVAL_TOOL_META = {
+  read_workspace_file: { label: '读取文件', icon: '📄' },
+  write_workspace_file: { label: '写入文件', icon: '✍️' },
+  fetch_page: { label: '抓取网页', icon: '🌐' },
+  execute_command: { label: '执行命令', icon: '⌨️' },
+};
+
+function ApprovalCard({ approval, onRespond }) {
+  const { id, request } = approval;
+  const meta = APPROVAL_TOOL_META[request.toolName] || { label: request.toolName, icon: '⚙️' };
+  const argsPreview = request.summary || JSON.stringify(request.args || {}).slice(0, 120);
+  return (
+    <div className="approval-card">
+      <div className="approval-card-header">
+        <span className="approval-card-icon">{meta.icon}</span>
+        <span className="approval-card-title">沙箱审批请求</span>
+        <span className="approval-card-tool">{meta.label}</span>
+      </div>
+      <div className="approval-card-body">
+        <div className="approval-card-row">
+          <span className="approval-card-label">工具：</span>
+          <code className="approval-card-code">{request.toolName}</code>
+        </div>
+        {argsPreview && (
+          <div className="approval-card-row">
+            <span className="approval-card-label">参数：</span>
+            <code className="approval-card-code">{argsPreview}</code>
+          </div>
+        )}
+        {request.agentName && (
+          <div className="approval-card-row">
+            <span className="approval-card-label">智能体：</span>
+            <span className="approval-card-text">{request.agentName}</span>
+          </div>
+        )}
+        <div className="approval-card-hint">
+          工具调用前需要你确认。点「允许」本次会话内同工具免再问。
+        </div>
+      </div>
+      <div className="approval-card-actions">
+        <button type="button" className="approval-btn approval-btn-once" onClick={() => onRespond(id, 'allow-once')}>
+          允许一次
+        </button>
+        <button type="button" className="approval-btn approval-btn-always" onClick={() => onRespond(id, 'allow-always')}>
+          本会话免问
+        </button>
+        <button type="button" className="approval-btn approval-btn-deny" onClick={() => onRespond(id, 'deny')}>
+          拒绝
+        </button>
+      </div>
+    </div>
+  );
+}
 
 function loadSessions() {
   try {
@@ -78,6 +200,7 @@ export default function AiChatPanel({
   todayBriefing,
   todayLanes,
   materials,
+  agent,
   variant = 'copilot',
 }) {
   // 订阅模块级 sessionsStore：组件 unmount 后流式 fetch 继续更新 store，
@@ -107,6 +230,20 @@ export default function AiChatPanel({
   const [selectedModel, setSelectedModel] = useState(llmConfig?.selectedModel || '');
   const [attachments, setAttachments] = useState([]);
   const [sessionCollapsed, setSessionCollapsed] = useState(false);
+
+  // 输入历史：上下键浏览之前发送的消息（Claude Code / shell 风格）
+  const inputHistoryRef = useRef([]); // 数组：[oldest, ..., newest]
+  const draftRef = useRef(''); // 进入历史浏览前的草稿
+  const historyIndexRef = useRef(null); // 用 ref 避免 rapid keypress 时的闭包陈旧
+  const [, setHistoryIndexTick] = useState(0); // 仅用于触发 textarea 重渲染（值本身存在 ref 中）
+
+  // 沙箱审批：订阅 pending 列表，UI 在聊天流末尾渲染审批卡片
+  const [pendingApprovals, setPendingApprovals] = useState(() => getPendingApprovals());
+  useEffect(() => subscribePending(() => setPendingApprovals(getPendingApprovals())), []);
+  // 切换会话时取消所有未决审批（避免错乱）
+  useEffect(() => {
+    return () => { /* 不在切换时取消，让 abort 流程自己处理 */ };
+  }, [activeSessionId]);
 
   // Sync model selection when llmConfig changes externally (e.g. from LLM modal)
   useEffect(() => {
@@ -208,7 +345,8 @@ export default function AiChatPanel({
       `画像置信度：${profile.confidence || 0}%`,
     ].filter(Boolean);
     return [
-      '你是用户的个人情报分析助手，拥有对用户的长期记忆。请用 markdown 格式回复。',
+      // 当前智能体的角色 prompt（若 agent 提供）优先于默认助手描述
+      agent?.systemPrompt || '你是用户的个人情报分析助手，拥有对用户的长期记忆。请用 markdown 格式回复。',
       '【用户画像】你了解以下关于用户的信息，回复时主动贴合其关注点和偏好：',
       profileLines.map(l => `  - ${l}`).join('\n'),
       // 学习画像：从用户行为观测到的偏好
@@ -241,7 +379,7 @@ export default function AiChatPanel({
         ? `用户从本地工作空间加入了以下文件作为分析上下文：\n${workspaceFiles.map(f => `[文件:${f.name}]\n${String(f.content || '').slice(0, 2000)}`).join('\n\n')}`
         : '',
     ].filter(Boolean).join('\n');
-  }, [selectedInterests, categories, intelligenceProfile, workbenchItems?.length, intelligenceContext, workspaceFiles, relevantMemories, recalledFiles, learnedPrefs, excludeAllEvidence, materialContext]);
+  }, [selectedInterests, categories, intelligenceProfile, workbenchItems?.length, intelligenceContext, workspaceFiles, relevantMemories, recalledFiles, learnedPrefs, excludeAllEvidence, materialContext, agent]);
 
   // 情境化快捷建议：基于今日情报动态生成，空状态引导
   const quickActions = useMemo(() => {
@@ -406,6 +544,231 @@ export default function AiChatPanel({
     }
   }, []);
 
+  // Agent loop：tool_calls 循环执行
+  // 流程：发请求 → 若返回 tool_calls 则执行工具并把结果回灌 → 重新请求，直到无 tool_calls 或达到最大轮数
+  // 用户点"停止"时通过 controller.abort() 中断当前 fetch；已完成的 toolCalls 痕迹保留展示
+  const runAgentLoop = useCallback(async ({ targetId, userMessage, controller, toolSchemas, baseMessages }) => {
+    const MAX_ITERATIONS = 6; // 防止无限循环
+    const toolCtx = {
+      rootHandle: getRootHandle(),
+      sessionId: targetId,
+      agentId: agent?.id || '',
+      agentName: agent?.name || '',
+      agentTools: Array.isArray(agent?.tools) ? agent.tools : [],
+    };
+    // 工作中的消息列表（包含 user / assistant / tool 三种角色），逐步累积
+    const conversationMessages = baseMessages.map(m => ({ role: m.role, content: m.content }));
+    // 给 UI 用的工具调用记录（不带原始 messages 结构，便于渲染卡片）
+    const toolCallTrace = [];
+    let finalContent = '';
+    let aborted = false;
+
+    const updateAssistantMsg = (patch) => {
+      setSessions(prev => prev.map(s => {
+        if (s.id !== targetId) return s;
+        const msgs = [...s.messages];
+        msgs[msgs.length - 1] = { ...msgs[msgs.length - 1], ...patch, loading: true };
+        return { ...s, messages: msgs };
+      }));
+    };
+
+    try {
+      for (let iter = 0; iter < MAX_ITERATIONS; iter += 1) {
+        // 更新 UI：当前轮次的"思考中"状态
+        updateAssistantMsg({
+          content: finalContent,
+          toolCalls: toolCallTrace.slice(),
+          thinking: iter === 0 ? '正在思考...' : '继续推理...',
+          toolCallCount: toolCallTrace.length,
+        });
+
+        // 注入会话级状态（执行计划 / 变量 / 黑板 / 最近工具调用），让 LLM 看到上下文
+        const sessionContextText = buildSessionContextText(targetId);
+        const fullSystemPrompt = sessionContextText
+          ? `${systemPrompt}\n\n【会话状态】你正在执行一个多步任务，以下是当前会话的状态快照，可作为接力推理的依据：\n${sessionContextText}`
+          : systemPrompt;
+
+        const response = await fetch('/api/ai-generate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          signal: controller.signal,
+          body: JSON.stringify({
+            baseUrl: llmConfig.baseUrl,
+            apiKey: llmConfig.apiKey,
+            model: selectedModel,
+            action: 'chat',
+            systemPrompt: fullSystemPrompt,
+            messages: conversationMessages.slice(-30),
+            max_tokens: 4000,
+            tools: toolSchemas,
+            tool_choice: 'auto',
+          }),
+        });
+
+        if (!response.ok) {
+          const errData = await response.json().catch(() => ({}));
+          throw new Error(typeof errData.error === 'string' ? errData.error : errData.error?.message || `AI 请求失败 (${response.status})`);
+        }
+        const data = await response.json();
+        if (data.ok === false) throw new Error(data.error || 'AI 请求失败');
+
+        // 若无 tool_calls，本次即为最终答案
+        if (!Array.isArray(data.tool_calls) || data.tool_calls.length === 0) {
+          finalContent = data.content || '（无内容返回）';
+          break;
+        }
+
+        // 有 tool_calls：先把 assistant 的 tool_calls 消息追加到 conversation
+        conversationMessages.push({
+          role: 'assistant',
+          content: data.content || '',
+          tool_calls: data.tool_calls,
+        });
+        // 若 LLM 同时返回了文本，更新到 UI
+        if (data.content) finalContent = data.content;
+
+        // 逐个执行工具调用
+        for (const tc of data.tool_calls) {
+          const toolName = tc?.function?.name || 'unknown';
+          let args = {};
+          try { args = JSON.parse(tc?.function?.arguments || '{}'); } catch { args = {}; }
+
+          // 更新 UI：开始执行工具
+          toolCallTrace.push({
+            id: tc.id,
+            name: toolName,
+            args,
+            status: 'running',
+            startedAt: Date.now(),
+          });
+          updateAssistantMsg({
+            content: finalContent,
+            toolCalls: toolCallTrace.slice(),
+            thinking: `正在调用工具：${toolName}`,
+            toolCallCount: toolCallTrace.length,
+          });
+
+          // 执行工具（executeAgentTool 内部已 try/catch，不抛异常；但 fetch 自身可能因 abort 抛出）
+          let result;
+          try {
+            result = await executeAgentTool(toolName, args, toolCtx);
+          } catch (err) {
+            // abort 时 fetch 抛 AbortError，向上传播让外层捕获
+            if (err?.name === 'AbortError') throw err;
+            result = `工具执行失败：${err?.message || String(err)}`;
+          }
+
+          // 更新 UI：工具执行完成
+          const traceItem = toolCallTrace.find(t => t.id === tc.id);
+          if (traceItem) {
+            traceItem.status = 'done';
+            traceItem.result = String(result).slice(0, 4000);
+            traceItem.completedAt = Date.now();
+          }
+          updateAssistantMsg({
+            content: finalContent,
+            toolCalls: toolCallTrace.slice(),
+            thinking: `工具 ${toolName} 已返回，继续推理...`,
+            toolCallCount: toolCallTrace.length,
+          });
+
+          // 追加到会话历史（sessionStore），供后续轮次的 LLM 看到「最近调用」
+          try {
+            appendHistory(targetId, {
+              toolName,
+              args,
+              result: String(result).slice(0, 1000),
+              status: String(result).startsWith('错误：') ? 'failed' : 'done',
+            });
+          } catch { /* ignore */ }
+
+          // 把工具结果作为 tool message 追加到 conversation
+          conversationMessages.push({
+            role: 'tool',
+            tool_call_id: tc.id,
+            content: String(result).slice(0, 20000),
+          });
+
+          // 用户已 abort：停止后续工具调用
+          if (controller.signal.aborted) {
+            aborted = true;
+            break;
+          }
+        }
+        // 用户已 abort：跳出 LLM 循环
+        if (controller.signal.aborted) {
+          aborted = true;
+          break;
+        }
+        // 进入下一轮：LLM 看到 tool 结果后继续推理
+      }
+    } catch (err) {
+      // abort：标记并保留已有内容与 toolCalls
+      if (err?.name === 'AbortError' || controller.signal.aborted) {
+        aborted = true;
+      } else {
+        // 其他错误：向上传播，由 sendMessage 的 catch 统一处理
+        throw err;
+      }
+    }
+
+    if (aborted) {
+      if (!finalContent) finalContent = '（已停止）';
+      // 写入最终消息：保留 toolCalls 痕迹，标记 stopped
+      setSessions(prev => prev.map(s => {
+        if (s.id !== targetId) return s;
+        const msgs = [...s.messages];
+        msgs[msgs.length - 1] = {
+          role: 'assistant',
+          content: finalContent,
+          toolCalls: toolCallTrace.slice(),
+          toolCallCount: toolCallTrace.length,
+          loading: false,
+          stopped: true,
+        };
+        return { ...s, messages: msgs, updatedAt: Date.now() };
+      }));
+      return;
+    }
+
+    if (!finalContent) finalContent = '（agent 达到最大轮数仍未给出最终回复）';
+
+    // 引用校验（与流式路径一致）
+    const allowedCitationIds = new Set((intelligenceContext?.items || []).map(item => String(item.id)));
+    const citedIds = [...finalContent.matchAll(/\[资讯:([^\]]+)\]/g)].map(match => match[1].trim());
+    const invalidIds = [...new Set(citedIds.filter(id => !allowedCitationIds.has(id)))];
+    const finalFinalContent = invalidIds.length
+      ? `${finalContent}\n\n> 引用校验失败：以下资讯 ID 不在当前证据集中：${invalidIds.join('、')}`
+      : finalContent;
+
+    // 写入最终 assistant 消息（保留 toolCalls 痕迹供 UI 展示）
+    setSessions(prev => prev.map(s => {
+      if (s.id !== targetId) return s;
+      const msgs = [...s.messages];
+      msgs[msgs.length - 1] = {
+        role: 'assistant',
+        content: finalFinalContent,
+        toolCalls: toolCallTrace.slice(),
+        loading: false,
+      };
+      return { ...s, messages: msgs, updatedAt: Date.now() };
+    }));
+
+    // 画像学习与摘要（与流式路径一致）
+    observeReply(finalFinalContent);
+    setLearnedVersion(v => v + 1);
+    const extracted = extractTodos(finalFinalContent);
+    if (extracted.length > 0) setAutoTodos(extracted);
+
+    const currentSession = sessions.find(s => s.id === targetId) || { id: targetId, messages: [...messages, userMessage, { role: 'assistant', content: finalFinalContent }] };
+    const totalRounds = currentSession.messages.filter(m => m.role === 'user').length;
+    if (totalRounds >= 3) {
+      generateSessionSummary(currentSession, { baseUrl: llmConfig.baseUrl, apiKey: llmConfig.apiKey, selectedModel }).then(mem => {
+        if (mem) setMemoriesVersion(v => v + 1);
+      });
+    }
+  }, [llmConfig, selectedModel, systemPrompt, intelligenceContext, sessions, messages, setSessions, setLearnedVersion, setAutoTodos, setMemoriesVersion]);
+
   const sendMessage = useCallback(async (text) => {
     const msg = text || input.trim();
     if (!msg || isStreaming) return;
@@ -442,10 +805,33 @@ export default function AiChatPanel({
     setLearnedVersion(v => v + 1);
     setInput('');
 
+    // 记录到输入历史（去重最新项，最多保留 50 条）
+    const hist = inputHistoryRef.current;
+    if (hist.length === 0 || hist[hist.length - 1] !== msg) {
+      hist.push(msg);
+      if (hist.length > 50) hist.shift();
+    }
+    draftRef.current = '';
+    historyIndexRef.current = null;
+
     try {
       const controller = new AbortController();
       abortControllerRef.current = controller;
       activeAbortController = controller; // 模块级引用，组件 unmount 后仍可 abort
+
+      // Agent 模式：当前智能体配置了 tools 时走 agent loop（非流式 + tool_calls 循环）
+      const toolSchemas = agent?.tools?.length ? selectToolSchemas(agent.tools) : [];
+      if (toolSchemas.length > 0) {
+        await runAgentLoop({
+          targetId,
+          userMessage,
+          controller,
+          toolSchemas,
+          baseMessages: [...messages, userMessage],
+        });
+        return;
+      }
+
       const response = await fetch('/api/ai-generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -553,11 +939,12 @@ export default function AiChatPanel({
       activeAbortController = null;
       setIsStreaming(false);
     }
-  }, [input, messages, isStreaming, llmConfig, selectedModel, systemPrompt, onOpenLlmConfig, activeSessionId, intelligenceContext]);
+  }, [input, messages, isStreaming, llmConfig, selectedModel, systemPrompt, onOpenLlmConfig, activeSessionId, intelligenceContext, agent, runAgentLoop]);
 
-  // 停止生成
+  // 停止生成：同时取消所有未决审批，让 Agent Loop 解除阻塞
   const stopGeneration = useCallback(() => {
     abortControllerRef.current?.abort() || activeAbortController?.abort();
+    cancelAllPending('用户停止生成');
   }, []);
 
   // 复制消息内容到剪贴板
@@ -571,6 +958,12 @@ export default function AiChatPanel({
         setTimeout(() => { btn.textContent = orig; }, 1200);
       }
     } catch {}
+  }, []);
+
+  // 沙箱审批响应
+  const handleRespondApproval = useCallback((id, decision) => {
+    respondApproval(id, decision);
+    setPendingApprovals(getPendingApprovals());
   }, []);
 
   // 重新生成最后一条 AI 回复：移除末尾 assistant 消息后重发上一条 user 消息
@@ -615,6 +1008,67 @@ export default function AiChatPanel({
   }, [pendingMessage, isStreaming, sendMessage, onMessageSent]);
 
   const handleKeyDown = useCallback((e) => {
+    // 输入历史导航（Claude Code / shell 风格）：
+    //   - 单行输入（无换行）下 ↑/↓ 总是触发历史导航，避免光标位置判断导致连续按失效
+    //   - 多行编辑时 ↑/↓ 移动光标，不拦截
+    //   - 历史浏览态下即使当前内容含换行也允许 ↑/↓ 导航（因为是历史消息）
+    // 全部使用 ref（inputRef/historyIndexRef），避免 rapid keypress 时 React 闭包陈旧
+    const currentInput = inputRef.current?.value || '';
+    const currentIdx = historyIndexRef.current;
+    const isBrowsing = currentIdx !== null;
+    const isSingleLine = !currentInput.includes('\n');
+    const navigateHistory = isSingleLine || isBrowsing;
+
+    const moveCursorToEnd = () => {
+      const el = inputRef.current;
+      if (el) el.selectionStart = el.selectionEnd = el.value.length;
+    };
+
+    if (e.key === 'ArrowUp' && navigateHistory) {
+      const hist = inputHistoryRef.current;
+      if (hist.length === 0) return;
+      e.preventDefault();
+      if (currentIdx === null) {
+        // 进入历史浏览：保存草稿，跳到最新一条
+        draftRef.current = currentInput;
+        historyIndexRef.current = 0;
+        setHistoryIndexTick(v => v + 1);
+        setInput(hist[hist.length - 1]);
+        requestAnimationFrame(moveCursorToEnd);
+      } else if (currentIdx < hist.length - 1) {
+        // 继续往更旧的方向走
+        const next = currentIdx + 1;
+        historyIndexRef.current = next;
+        setHistoryIndexTick(v => v + 1);
+        setInput(hist[hist.length - 1 - next]);
+        requestAnimationFrame(moveCursorToEnd);
+      }
+      // 已经在最旧一条，按 ↑ 不再前进
+      return;
+    }
+
+    if (e.key === 'ArrowDown' && navigateHistory) {
+      const hist = inputHistoryRef.current;
+      if (currentIdx === null || hist.length === 0) return;
+      e.preventDefault();
+      if (currentIdx === 0) {
+        // 已在最新一条，再按 ↓ 回到空白（恢复草稿，通常为空）
+        setInput(draftRef.current);
+        draftRef.current = '';
+        historyIndexRef.current = null;
+        setHistoryIndexTick(v => v + 1);
+        requestAnimationFrame(moveCursorToEnd);
+      } else {
+        // 往更新的方向走
+        const next = currentIdx - 1;
+        historyIndexRef.current = next;
+        setHistoryIndexTick(v => v + 1);
+        setInput(hist[hist.length - 1 - next]);
+        requestAnimationFrame(moveCursorToEnd);
+      }
+      return;
+    }
+
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
   }, [sendMessage]);
 
@@ -730,9 +1184,33 @@ export default function AiChatPanel({
                 </svg>
               </div>
             )}
-            <div className={`chat-bubble ${msg.error ? 'chat-bubble-error' : ''}`}>
+            <div className={`chat-bubble ${msg.error ? 'chat-bubble-error' : ''}${msg.toolCalls?.length ? ' chat-bubble-has-tools' : ''}`}>
+              {/* Agent 工具调用痕迹：agent loop 进行中与完成后均展示 */}
+              {msg.toolCalls && msg.toolCalls.length > 0 && (
+                <div className="chat-tool-calls">
+                  {msg.thinking && msg.loading && (
+                    <div className="chat-tool-thinking">
+                      <span className="chat-tool-thinking-dot" />
+                      {msg.thinking}
+                    </div>
+                  )}
+                  {msg.toolCalls.map((tc, idx) => (
+                    <ToolCallCard key={tc.id || idx} tc={tc} />
+                  ))}
+                </div>
+              )}
               {msg.loading ? (
-                <div className="chat-typing"><span /><span /><span /></div>
+                msg.toolCalls && msg.toolCalls.length > 0 ? (
+                  // agent loop 进行中：展示已有内容片段（可能为空），不再显示三点动画
+                  msg.content ? (
+                    <div
+                      className="chat-bubble-content is-streaming"
+                      dangerouslySetInnerHTML={{ __html: renderMarkdown(msg.content) }}
+                    />
+                  ) : null
+                ) : (
+                  <div className="chat-typing"><span /><span /><span /></div>
+                )
               ) : (
                 <div
                   className={`chat-bubble-content${(isStreaming && i === messages.length - 1) ? ' is-streaming' : ''}${msg.stopped ? ' is-stopped' : ''}`}
@@ -749,6 +1227,18 @@ export default function AiChatPanel({
             )}
           </div>
         ))}
+        {/* 沙箱审批卡片：当前会话有 pending 时在聊天流末尾渲染 */}
+        {pendingApprovals.length > 0 && (
+          <div className="approval-cards-wrap">
+            {pendingApprovals.map(approval => (
+              <ApprovalCard
+                key={approval.id}
+                approval={approval}
+                onRespond={handleRespondApproval}
+              />
+            ))}
+          </div>
+        )}
         <div ref={messagesEndRef} />
       </div>
 
@@ -856,6 +1346,7 @@ export default function AiChatPanel({
           onAddContextFiles={handleAddContextFiles}
           learnedPrefs={learnedPrefs}
           autoTodos={autoTodos}
+          agent={agent}
         />
       )}
     </div>

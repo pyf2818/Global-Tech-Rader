@@ -8,6 +8,14 @@
  */
 import { useMemo, useState, useEffect } from 'react';
 import { setLearningEnabled } from '../utils/profileLearning.js';
+import { AGENT_TOOL_SCHEMAS, getToolMetaByName } from '../utils/agentTools.js';
+import { useAgentSession } from '../hooks/useAgentSession.js';
+
+/* 工具元信息：从 toolRegistry 派生，无法找到时使用 fallback */
+function getToolDisplay(name) {
+  const meta = getToolMetaByName(name);
+  return { label: meta?.label || name, icon: meta?.icon || '⚙️' };
+}
 
 function todosKey(sessionId) { return `aiTodos_${sessionId || 'default'}`; }
 
@@ -31,9 +39,13 @@ export default function AgentPanel({
   onAddContextFiles,
   learnedPrefs = {},
   autoTodos = [],
+  agent,
 }) {
   const [manualTodos, setManualTodos] = useState(() => loadTodos(activeSessionId));
   const [todoInput, setTodoInput] = useState('');
+
+  // 订阅会话状态（执行计划 / 变量 / 黑板），仅展示
+  const sessionState = useAgentSession(activeSessionId);
 
   // 切换会话时重新加载手动待办
   useEffect(() => {
@@ -63,16 +75,32 @@ export default function AgentPanel({
     const aiMsgs = messages.filter(m => m.role === 'assistant' && !m.error);
     const charCount = messages.reduce((sum, m) => sum + (m.content?.length || 0), 0);
     const firstQuestion = userMsgs[0]?.content?.slice(0, 60) || '—';
+    // 统计本次会话的工具调用次数（来自 assistant 消息的 toolCalls 字段）
+    const toolCallTotal = messages.reduce((sum, m) => sum + (Array.isArray(m.toolCalls) ? m.toolCalls.length : 0), 0);
     return {
       total: messages.length,
       rounds: userMsgs.length,
       aiReplies: aiMsgs.length,
       firstQuestion,
       estTokens: Math.ceil(charCount / 2.5),
+      toolCallTotal,
     };
   }, [messages]);
 
   const hasConfig = Boolean(llmConfig?.baseUrl && selectedModel);
+
+  // 当前 agent 的工具能力清单（用于右栏展示）
+  const agentTools = useMemo(() => {
+    const names = Array.isArray(agent?.tools) ? agent.tools : [];
+    if (names.length === 0) return [];
+    return names
+      .map(name => {
+        const schema = AGENT_TOOL_SCHEMAS.find(s => s.function.name === name);
+        const display = getToolDisplay(name);
+        return schema ? { name, label: display.label, icon: display.icon, desc: schema.function.description || '' } : null;
+      })
+      .filter(Boolean);
+  }, [agent]);
 
   const addTodo = () => {
     const text = todoInput.trim();
@@ -112,9 +140,106 @@ export default function AgentPanel({
             <div><dt>对话轮次</dt><dd>{stats.rounds}</dd></div>
             <div><dt>AI 回复</dt><dd>{stats.aiReplies}</dd></div>
             <div><dt>用量估算</dt><dd>~{stats.estTokens}</dd></div>
+            {stats.toolCallTotal > 0 && (
+              <div><dt>工具调用</dt><dd>{stats.toolCallTotal}</dd></div>
+            )}
           </dl>
         </div>
       </section>
+
+      {/* Agent 工具能力：当智能体配置了 tools 白名单时展示 */}
+      {agentTools.length > 0 && (
+        <section className="agent-section">
+          <header className="agent-section-head">
+            <h3>工具能力</h3>
+            <span className="agent-badge agent-badge-tool">{agentTools.length}</span>
+          </header>
+          <div className="agent-capabilities">
+            {agentTools.map(t => (
+              <div key={t.name} className="agent-capability-chip" title={t.desc}>
+                <span className="agent-capability-icon">{t.icon}</span>
+                <span className="agent-capability-name">{t.label}</span>
+              </div>
+            ))}
+            <p className="agent-capabilities-hint">
+              该智能体走 Agent Loop 模式：可主动调用工具并基于返回结果继续推理。
+            </p>
+          </div>
+        </section>
+      )}
+
+      {/* 会话执行计划（Phase 3）：当存在 plan / variables / blackboard 时展示 */}
+      {(sessionState.plan.length > 0 || Object.keys(sessionState.variables).length > 0 || Object.keys(sessionState.blackboard).length > 0) && (
+        <section className="agent-section">
+          <header className="agent-section-head">
+            <h3>执行计划</h3>
+            {sessionState.plan.length > 0 && (
+              <span className="agent-badge">
+                {sessionState.plan.filter(t => t.status === 'done').length}/{sessionState.plan.length}
+              </span>
+            )}
+          </header>
+          <div className="session-state-panel">
+            {sessionState.plan.length > 0 && (
+              <ol className="session-plan-list">
+                {sessionState.plan.map(t => {
+                  const icon = { pending: '⏳', running: '▶️', done: '✅', failed: '❌', skipped: '⏭️' }[t.status] || '❓';
+                  return (
+                    <li key={t.id} className={`session-plan-item is-${t.status}`}>
+                      <span className="session-plan-icon">{icon}</span>
+                      <div className="session-plan-text">
+                        <div className="session-plan-title">{t.title}</div>
+                        {t.result && <div className="session-plan-result">{t.result}</div>}
+                      </div>
+                    </li>
+                  );
+                })}
+              </ol>
+            )}
+            {Object.keys(sessionState.variables).length > 0 && (
+              <div className="session-variables">
+                <div className="session-state-label">变量空间</div>
+                <ul className="session-variable-list">
+                  {Object.entries(sessionState.variables).slice(0, 10).map(([k, v]) => (
+                    <li key={k} className="session-variable-item">
+                      <span className="session-variable-key">{k}</span>
+                      <span className="session-variable-value">{typeof v === 'string' ? v.slice(0, 80) : JSON.stringify(v).slice(0, 80)}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {Object.keys(sessionState.blackboard).length > 0 && (
+              <div className="session-blackboard">
+                <div className="session-state-label">黑板（工具产出共享）</div>
+                <ul className="session-variable-list">
+                  {Object.entries(sessionState.blackboard).slice(0, 10).map(([k, entry]) => (
+                    <li key={k} className="session-variable-item">
+                      <span className="session-variable-key">{k}</span>
+                      <span className="session-variable-value">
+                        {typeof entry?.value === 'string' ? entry.value.slice(0, 80) : JSON.stringify(entry?.value).slice(0, 80)}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {sessionState.history.length > 0 && (
+              <div className="session-history">
+                <div className="session-state-label">最近工具调用（{sessionState.history.length}）</div>
+                <ul className="session-history-list">
+                  {sessionState.history.slice(-3).reverse().map(h => (
+                    <li key={h.id} className="session-history-item">
+                      <span className="session-history-tool">{h.toolName}</span>
+                      <span className="session-history-status">{h.status}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        </section>
+      )}
 
       {/* 待办清单 */}
       <section className="agent-section">

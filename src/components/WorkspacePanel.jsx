@@ -17,6 +17,7 @@ import {
   listFiles, readFile, exportMaterials, exportBriefing, downloadMarkdown,
   materialToMarkdown, briefingToMarkdown,
 } from '../utils/workspace.js';
+import { setRootHandle as setSharedRootHandle } from '../utils/workspaceHandleStore.js';
 
 // 支持预览的文件扩展名（其他类型直接显示原始文本）
 const PREVIEWABLE_EXT = new Set(['.md', '.markdown', '.txt']);
@@ -65,6 +66,11 @@ export default function WorkspacePanel({
       setLoading(false);
     }
   }, []);
+
+  // rootHandle 变化时同步到模块级 store，供 AiChatPanel agent loop 读取
+  useEffect(() => {
+    setSharedRootHandle(rootHandle);
+  }, [rootHandle]);
 
   // 启动时尝试恢复已授权的目录
   useEffect(() => {
@@ -343,40 +349,48 @@ export default function WorkspacePanel({
         {!loading && files.length === 0 && <div className="workspace-list-empty">文件夹为空</div>}
         {!loading && files.length > 0 && (
           <>
-            {dirs.map(d => (
-              <div key={d.path}>
-                <button
-                  type="button"
-                  className={`workspace-tree-dir ${expanded.has(d.path) ? 'expanded' : ''}`}
-                  style={{ paddingLeft: 8 + d.depth * 12 }}
-                  onClick={() => toggleExpand(d.path)}
-                >
-                  <span className="workspace-tree-arrow">{expanded.has(d.path) ? '▾' : '▸'}</span>
-                  <span className="workspace-tree-name">{d.name}</span>
-                </button>
-              </div>
-            ))}
-            {fileItems.map(f => {
-              // 仅当所有父目录展开时显示文件
-              const parents = f.path.split('/').slice(0, -1);
-              let prefix = '';
-              const allExpanded = parents.every((_, i) => {
-                const p = parents.slice(0, i + 1).join('/');
-                return expanded.has(p);
-              });
+            {/* 工具栏：全部展开 / 全部折叠 */}
+            <div className="workspace-tree-toolbar">
+              <button type="button" className="workspace-tree-tool-btn" onClick={() => {
+                setExpanded(new Set(files.filter(f => f.isDir).map(f => f.path)));
+              }}>全部展开</button>
+              <button type="button" className="workspace-tree-tool-btn" onClick={() => setExpanded(new Set())}>全部折叠</button>
+            </div>
+            {/*
+              按 DFS 顺序混合渲染目录与文件，确保文件出现在它的父目录下方。
+              files 数组由 listFiles 以深度优先遍历产生，天然保持父子顺序。
+              每个条目先检查所有父目录是否展开，未展开则跳过。
+            */}
+            {files.map(item => {
+              const parents = item.path.split('/').slice(0, -1);
+              const allExpanded = parents.every((_, i) => expanded.has(parents.slice(0, i + 1).join('/')));
               if (!allExpanded) return null;
+              if (item.isDir) {
+                return (
+                  <button
+                    type="button"
+                    key={item.path}
+                    className={`workspace-tree-dir ${expanded.has(item.path) ? 'expanded' : ''}`}
+                    style={{ paddingLeft: 8 + item.depth * 12 }}
+                    onClick={() => toggleExpand(item.path)}
+                  >
+                    <span className="workspace-tree-arrow">{expanded.has(item.path) ? '▾' : '▸'}</span>
+                    <span className="workspace-tree-name">{item.name}</span>
+                  </button>
+                );
+              }
               return (
                 <button
                   type="button"
-                  key={f.path}
-                  className={`workspace-tree-file has-dblclick ${selected.has(f.path) ? 'selected' : ''}`}
-                  style={{ paddingLeft: 8 + f.depth * 12 }}
-                  onClick={() => toggleSelect(f.path)}
-                  onDoubleClick={() => handlePreview(f)}
-                  title={`${f.path} · 双击预览`}
+                  key={item.path}
+                  className={`workspace-tree-file has-dblclick ${selected.has(item.path) ? 'selected' : ''}`}
+                  style={{ paddingLeft: 8 + item.depth * 12 }}
+                  onClick={() => toggleSelect(item.path)}
+                  onDoubleClick={() => handlePreview(item)}
+                  title={`${item.path} · 双击预览`}
                 >
                   <span className="workspace-tree-file-icon"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></span>
-                  <span className="workspace-tree-name">{f.name}</span>
+                  <span className="workspace-tree-name">{item.name}</span>
                 </button>
               );
             })}

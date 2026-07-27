@@ -1,4 +1,57 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import { selectToolSchemas, executeAgentTool } from './utils/agentTools.js';
+import { getRootHandle } from './utils/workspaceHandleStore.js';
+
+/* 工具元信息：友好名称 + 简短图标，与 AiChatPanel 内保持一致 */
+const TOOL_META = {
+  read_workspace_file: { label: '读取文件', icon: '📄' },
+  write_workspace_file: { label: '写入文件', icon: '✍️' },
+  search_news: { label: '检索资讯', icon: '🔍' },
+  fetch_page: { label: '抓取网页', icon: '🌐' },
+  get_stock_quote: { label: '股票行情', icon: '📈' },
+  get_stock_kline: { label: 'K 线数据', icon: '📊' },
+};
+
+function summarizeToolArgs(name, args) {
+  try {
+    const a = args || {};
+    if (name === 'read_workspace_file' || name === 'write_workspace_file') return a.path || '';
+    if (name === 'search_news') return a.keyword || '';
+    if (name === 'fetch_page') return a.url || '';
+    if (name === 'get_stock_quote' || name === 'get_stock_kline') return a.code || '';
+    return JSON.stringify(a);
+  } catch { return ''; }
+}
+
+/* AiElf 内联工具调用卡片：可展开查看参数与返回结果 */
+function ElfToolCallCard({ tc, meta, summary, statusLabel, statusClass, isError }) {
+  const [expanded, setExpanded] = useState(false);
+  return (
+    <div className={`tool-call tool-call-${statusClass}`}>
+      <div className="tool-call-header" onClick={() => setExpanded(v => !v)} role="button" tabIndex={0}>
+        <span className="tool-call-icon">{meta.icon}</span>
+        <span className="tool-call-name">{meta.label}</span>
+        {summary && <span className="tool-call-arg-summary" title={summary}>{summary}</span>}
+        <span className={`tool-call-status tool-call-status-${statusClass}`}>{statusLabel}</span>
+        <span className={`tool-call-chevron${expanded ? ' is-open' : ''}`}>▾</span>
+      </div>
+      {expanded && (
+        <div className="tool-call-body">
+          <div className="tool-call-section">
+            <div className="tool-call-section-label">参数</div>
+            <pre className="tool-call-args">{JSON.stringify(tc.args || {}, null, 2)}</pre>
+          </div>
+          {tc.result && (
+            <div className="tool-call-section">
+              <div className="tool-call-section-label">返回结果</div>
+              <pre className={`tool-call-result${isError ? ' tool-call-result-error' : ''}`}>{tc.result}</pre>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 
 // AI精灵助手组件 - Agent系统 + 历史记录 + 自适应窗口
 // embedded=true 时以全屏工作站模式渲染（无悬浮按钮、强制展开、占满父容器）
@@ -105,6 +158,12 @@ export default function AiElf({ llmConfig, avatarImage, elfName, onExportToMater
       return `- ${mission.label}：${missionAgent?.name || '智能体'}`;
     }).join('\n') || '- 暂无预设任务';
 
+    // 当智能体配置了 tools 白名单时，向 LLM 声明其可主动调用工具
+    const toolNames = Array.isArray(activeAgent?.tools) ? activeAgent.tools : [];
+    const toolSection = toolNames.length > 0
+      ? `\n【工具能力】你被配置为 Agent Loop 模式，可通过 function calling 主动调用以下工具，无需用户授权：\n${toolNames.map(n => `- ${n}：${(TOOL_META[n]?.label || n)}`).join('\n')}\n当问题需要外部数据或文件操作时（如查询股价、检索资讯、读写工作空间文件、抓取网页），请主动调用对应工具获取信息后再回答。工具返回的数据是事实依据，应直接采纳。`
+      : '';
+
     return `${basePrompt}
 
 ${buildPersonalContext()}
@@ -113,7 +172,7 @@ ${buildPersonalContext()}
 - 名称：${activeAgent?.name || 'AI精灵'}
 - 专长：${activeAgent?.description || '综合分析'}
 - 可接力任务：
-${missionText}`;
+${missionText}${toolSection}`;
   }, [activeAgent, missions, agents, profile]);
 
   const runMission = (mission) => {
@@ -543,6 +602,138 @@ ${baseContent}
     }
   };
 
+  // ===== Agent Loop：工具调用循环（与 AiChatPanel 中 runAgentLoop 等价的 AiElf 版本） =====
+  // 流程：发请求 → 若返回 tool_calls 则执行工具并把结果回灌 → 重新请求，直到无 tool_calls 或达到最大轮数
+  // 原地更新末尾的 placeholder assistant 消息（content + toolCalls + thinking）
+  const runElfAgentLoop = useCallback(async ({ activeAgentId, baseMessages, toolSchemas, systemPrompt }) => {
+    const MAX_ITERATIONS = 6;
+    const toolCtx = { rootHandle: getRootHandle() };
+    const conversationMessages = baseMessages.map(m => ({ role: m.role, content: m.content }));
+    const toolCallTrace = [];
+    let finalContent = '';
+
+    const patchLast = (patch) => {
+      setAgentMessages(prev => {
+        const list = prev[activeAgentId] || [];
+        if (list.length === 0) return prev;
+        const lastIdx = list.length - 1;
+        const replaced = list.map((m, idx) => idx === lastIdx ? { ...m, ...patch } : m);
+        return { ...prev, [activeAgentId]: replaced };
+      });
+    };
+
+    try {
+      for (let iter = 0; iter < MAX_ITERATIONS; iter += 1) {
+        patchLast({
+          content: finalContent,
+          toolCalls: toolCallTrace.slice(),
+          thinking: iter === 0 ? '正在思考...' : '继续推理...',
+          loading: true,
+        });
+
+        const response = await fetch('/api/ai-generate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            baseUrl: llmConfig.baseUrl,
+            apiKey: llmConfig.apiKey,
+            model: llmConfig.selectedModel,
+            action: 'chat',
+            systemPrompt,
+            messages: conversationMessages.slice(-30),
+            max_tokens: 4000,
+            tools: toolSchemas,
+            tool_choice: 'auto',
+          })
+        });
+
+        if (!response.ok) {
+          const errData = await response.json().catch(() => ({}));
+          throw new Error(typeof errData.error === 'string' ? errData.error : errData.error?.message || `AI 请求失败 (${response.status})`);
+        }
+        const data = await response.json();
+        if (data.ok === false) throw new Error(data.error || 'AI 请求失败');
+
+        // 若无 tool_calls，本次即为最终答案
+        if (!Array.isArray(data.tool_calls) || data.tool_calls.length === 0) {
+          finalContent = data.content || '（无内容返回）';
+          break;
+        }
+
+        // 有 tool_calls：先把 assistant 的 tool_calls 消息追加到 conversation
+        conversationMessages.push({
+          role: 'assistant',
+          content: data.content || '',
+          tool_calls: data.tool_calls,
+        });
+        if (data.content) finalContent = data.content;
+
+        // 逐个执行工具调用
+        for (const tc of data.tool_calls) {
+          const toolName = tc?.function?.name || 'unknown';
+          let args = {};
+          try { args = JSON.parse(tc?.function?.arguments || '{}'); } catch { args = {}; }
+
+          toolCallTrace.push({
+            id: tc.id,
+            name: toolName,
+            args,
+            status: 'running',
+            startedAt: Date.now(),
+          });
+          patchLast({
+            content: finalContent,
+            toolCalls: toolCallTrace.slice(),
+            thinking: `正在调用工具：${toolName}`,
+            loading: true,
+          });
+
+          let result;
+          try {
+            result = await executeAgentTool(toolName, args, toolCtx);
+          } catch (err) {
+            result = `工具执行失败：${err?.message || String(err)}`;
+          }
+
+          const traceItem = toolCallTrace.find(t => t.id === tc.id);
+          if (traceItem) {
+            traceItem.status = 'done';
+            traceItem.result = String(result).slice(0, 4000);
+            traceItem.completedAt = Date.now();
+          }
+          patchLast({
+            content: finalContent,
+            toolCalls: toolCallTrace.slice(),
+            thinking: `工具 ${toolName} 已返回，继续推理...`,
+            loading: true,
+          });
+
+          conversationMessages.push({
+            role: 'tool',
+            tool_call_id: tc.id,
+            content: String(result).slice(0, 20000),
+          });
+        }
+      }
+    } catch (err) {
+      // 任何错误：保留已完成的 toolCalls 痕迹，写入错误信息
+      if (!finalContent) {
+        finalContent = `分析失败: ${err?.message || String(err)}`;
+      }
+    }
+
+    if (!finalContent) finalContent = '（agent 达到最大轮数仍未给出最终回复）';
+
+    return {
+      role: 'assistant',
+      content: finalContent,
+      toolCalls: toolCallTrace.slice(),
+      toolCallCount: toolCallTrace.length,
+      loading: false,
+      timestamp: Date.now(),
+    };
+  }, [llmConfig, llmConfig?.selectedModel]);
+
   // 发送消息给AI
   const sendMessage = async (text = inputText, itemData = null) => {
     if (!text.trim() && !itemData) return;
@@ -586,87 +777,150 @@ ${baseContent}
         return;
       }
 
-      const systemPrompt = buildAgenticSystemPrompt();
+      const systemPrompt = buildAgenticSystemPrompt;
 
       const currentMessages = agentMessages[activeAgentId] || [];
 
-      const response = await fetch('/api/ai-generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          baseUrl: llmConfig.baseUrl,
-          apiKey: llmConfig.apiKey,
-          model: llmConfig.selectedModel,
-          action: 'chat',
-          content: messageText,
-          systemPrompt,
-          messages: currentMessages.map(msg => ({
-            role: msg.role,
-            content: msg.content
-          }))
-        })
-      });
+      // ===== Agent Loop 模式：当智能体配置了 tools 白名单时走工具调用循环 =====
+      const toolSchemas = activeAgent?.tools?.length ? selectToolSchemas(activeAgent.tools) : null;
 
-      const data = await response.json();
-      if (data.error) {
+      if (toolSchemas && toolSchemas.length > 0) {
+        // 预先插入一条 placeholder assistant 消息，agent loop 会原地更新它
+        const placeholderMsg = {
+          role: 'assistant',
+          content: '',
+          toolCalls: [],
+          loading: true,
+          timestamp: Date.now()
+        };
         setAgentMessages(prev => ({
           ...prev,
-          [activeAgentId]: [...(prev[activeAgentId] || []), {
-            role: 'assistant',
-            content: `分析失败: ${data.error}`,
-            timestamp: Date.now()
-          }]
+          [activeAgentId]: [...(prev[activeAgentId] || []), placeholderMsg]
         }));
-      } else {
+
+        const baseConversation = [
+          ...currentMessages.map(msg => ({ role: msg.role, content: msg.content })),
+          { role: 'user', content: messageText }
+        ];
+        const finalAssistant = await runElfAgentLoop({
+          activeAgentId,
+          baseMessages: baseConversation,
+          toolSchemas,
+          systemPrompt,
+        });
+
+        // 用最终结果替换 placeholder，并保存到 session 历史
         setAgentMessages(prev => {
-          const updatedMessages = [...(prev[activeAgentId] || []), {
-            role: 'assistant',
-            content: data.content || '暂无分析结果',
-            timestamp: Date.now()
-          }];
+          const list = prev[activeAgentId] || [];
+          const replaced = list.map((m, idx) => idx === list.length - 1 ? finalAssistant : m);
+          const allMessages = { ...prev, [activeAgentId]: replaced };
 
-          const allMessages = {
-            ...prev,
-            [activeAgentId]: updatedMessages
-          };
-
-          // 保存对话历史到当前session
           if (!currentSessionId) {
             const newSessionId = Date.now();
             setCurrentSessionId(newSessionId);
-            
-            // 创建新session
             const session = {
               id: newSessionId,
               title: newMessage.content.slice(0, 50) + (newMessage.content.length > 50 ? '...' : ''),
               timestamp: Date.now(),
-              messages: updatedMessages
+              messages: replaced
             };
             setAgentHistory(history => {
               const sessions = Array.isArray(history[activeAgentId]) ? history[activeAgentId] : [];
-              return {
-                ...history,
-                [activeAgentId]: [session, ...sessions].slice(0, 10)
-              };
+              return { ...history, [activeAgentId]: [session, ...sessions].slice(0, 10) };
             });
           } else {
-            // 更新现有session
             setAgentHistory(history => {
               const sessions = Array.isArray(history[activeAgentId]) ? history[activeAgentId] : [];
               const updatedSessions = sessions.map(s =>
                 s.id === currentSessionId
-                  ? { ...s, messages: updatedMessages, timestamp: Date.now(), title: newMessage.content.slice(0, 50) + (newMessage.content.length > 50 ? '...' : '') }
+                  ? { ...s, messages: replaced, timestamp: Date.now(), title: newMessage.content.slice(0, 50) + (newMessage.content.length > 50 ? '...' : '') }
                   : s
               );
-              return {
-                ...history,
-                [activeAgentId]: updatedSessions
-              };
+              return { ...history, [activeAgentId]: updatedSessions };
             });
           }
-
           return allMessages;
         });
+      } else {
+        // ===== 普通模式：无 tools，单次请求 =====
+        const response = await fetch('/api/ai-generate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            baseUrl: llmConfig.baseUrl,
+            apiKey: llmConfig.apiKey,
+            model: llmConfig.selectedModel,
+            action: 'chat',
+            content: messageText,
+            systemPrompt,
+            messages: currentMessages.map(msg => ({
+              role: msg.role,
+              content: msg.content
+            }))
+          })
+        });
+
+        const data = await response.json();
+        if (data.error) {
+          setAgentMessages(prev => ({
+            ...prev,
+            [activeAgentId]: [...(prev[activeAgentId] || []), {
+              role: 'assistant',
+              content: `分析失败: ${data.error}`,
+              timestamp: Date.now()
+            }]
+          }));
+        } else {
+          setAgentMessages(prev => {
+            const updatedMessages = [...(prev[activeAgentId] || []), {
+              role: 'assistant',
+              content: data.content || '暂无分析结果',
+              timestamp: Date.now()
+            }];
+
+            const allMessages = {
+              ...prev,
+              [activeAgentId]: updatedMessages
+            };
+
+            // 保存对话历史到当前session
+            if (!currentSessionId) {
+              const newSessionId = Date.now();
+              setCurrentSessionId(newSessionId);
+              
+              // 创建新session
+              const session = {
+                id: newSessionId,
+                title: newMessage.content.slice(0, 50) + (newMessage.content.length > 50 ? '...' : ''),
+                timestamp: Date.now(),
+                messages: updatedMessages
+              };
+              setAgentHistory(history => {
+                const sessions = Array.isArray(history[activeAgentId]) ? history[activeAgentId] : [];
+                return {
+                  ...history,
+                  [activeAgentId]: [session, ...sessions].slice(0, 10)
+                };
+              });
+            } else {
+              // 更新现有session
+              setAgentHistory(history => {
+                const sessions = Array.isArray(history[activeAgentId]) ? history[activeAgentId] : [];
+                const updatedSessions = sessions.map(s =>
+                  s.id === currentSessionId
+                    ? { ...s, messages: updatedMessages, timestamp: Date.now(), title: newMessage.content.slice(0, 50) + (newMessage.content.length > 50 ? '...' : '') }
+                    : s
+                );
+                return {
+                  ...history,
+                  [activeAgentId]: updatedSessions
+                };
+              });
+            }
+
+            return allMessages;
+          });
+        }
       }
     } catch (e) {
       setAgentMessages(prev => ({
@@ -1269,11 +1523,49 @@ ${baseContent}
                     )}
                   </div>
                   <div className="ai-elf-message-content">
-                    <div
-                      className="ai-elf-message-text"
-                      dangerouslySetInnerHTML={{ __html: renderMarkdown(msg.content) }}
-                    />
-                    {msg.role === 'assistant' && (
+                    {/* Agent 工具调用痕迹：进行中与完成后均展示 */}
+                    {msg.toolCalls && msg.toolCalls.length > 0 && (
+                      <div className="chat-tool-calls">
+                        {msg.thinking && msg.loading && (
+                          <div className="chat-tool-thinking">
+                            <span className="chat-tool-thinking-dot" />
+                            {msg.thinking}
+                          </div>
+                        )}
+                        {msg.toolCalls.map((tc, idx) => {
+                          const meta = TOOL_META[tc.name] || { label: tc.name, icon: '⚙️' };
+                          const summary = summarizeToolArgs(tc.name, tc.args);
+                          const isRunning = tc.status === 'running';
+                          const isError = !isRunning && typeof tc.result === 'string' &&
+                            /^(错误：|工具执行失败)/.test(tc.result.trim());
+                          const statusLabel = isRunning ? '执行中…' : (isError ? '出错' : '已完成');
+                          const statusClass = isError ? 'error' : tc.status;
+                          return (
+                            <ElfToolCallCard
+                              key={tc.id || idx}
+                              tc={tc}
+                              meta={meta}
+                              summary={summary}
+                              statusLabel={statusLabel}
+                              statusClass={statusClass}
+                              isError={isError}
+                            />
+                          );
+                        })}
+                      </div>
+                    )}
+                    {msg.content && (
+                      <div
+                        className="ai-elf-message-text"
+                        dangerouslySetInnerHTML={{ __html: renderMarkdown(msg.content) }}
+                      />
+                    )}
+                    {msg.loading && !msg.toolCalls?.length && (
+                      <div className="ai-elf-message-loading">
+                        <span /><span /><span />
+                      </div>
+                    )}
+                    {msg.role === 'assistant' && !msg.loading && (
                       <div className="ai-elf-message-actions">
                         <button
                           className="ai-elf-action-btn"
@@ -1343,7 +1635,9 @@ ${baseContent}
                   </div>
                 </div>
               ))}
-              {isLoading && (
+              {/* 全局 loading 指示器：仅当 messages 中没有正在 loading 的 placeholder 时显示
+                  （agent loop 模式下 placeholder 自带 loading 状态，避免双重指示器） */}
+              {isLoading && !messages.some(m => m.loading) && (
                 <div className="ai-elf-message assistant">
                   <div className="ai-elf-message-avatar">
                     <img

@@ -11,9 +11,10 @@ const DEFAULT_AGENTS = [
     icon: 'sparkle',
     avatar: '',
     tags: ['任务编排', '全局判断'],
-    systemPrompt: '你是用户的个人情报智能体总控。你要基于用户画像、今日资讯、历史反馈和当前任务，调度不同分析视角完成判断。输出必须包含：一句话结论、优先级、关键依据、下一步动作。不要泛泛聊天，要像一个懂用户目标的情报工作伙伴。',
+    systemPrompt: '你是用户的个人情报智能体总控。你要基于用户画像、今日资讯、历史反馈和当前任务，调度不同分析视角完成判断。输出必须包含：一句话结论、优先级、关键依据、下一步动作。不要泛泛聊天，要像一个懂用户目标的情报工作伙伴。需要时可以主动调用工具：检索资讯库、读取/写入工作空间文件、抓取网页补充信息。对于复杂任务请先用 set_plan 拆解为多步执行计划，每步完成后用 update_task 标记状态，重要中间结果用 set_variable / write_blackboard 沉淀。',
     category: '指挥',
-    isDefault: true
+    isDefault: true,
+    tools: ['search_news', 'read_workspace_file', 'write_workspace_file', 'fetch_page', 'set_plan', 'add_task', 'update_task', 'set_variable', 'write_blackboard']
   },
   {
     id: 'analyst',
@@ -22,9 +23,10 @@ const DEFAULT_AGENTS = [
     icon: 'chart',
     avatar: '',
     tags: ['资讯分析', '结构化思维'],
-    systemPrompt: '你是一位资深资讯分析师。你的任务是对用户提供的信息进行结构化分析，输出格式清晰、内容精炼的分析报告。概述部分控制在100字以内，影响分析适当展开。',
+    systemPrompt: '你是一位资深资讯分析师。你的任务是对用户提供的信息进行结构化分析，输出格式清晰、内容精炼的分析报告。概述部分控制在100字以内，影响分析适当展开。需要深入时可以调用工具检索资讯库或抓取网页原文。',
     category: '分析',
-    isDefault: true
+    isDefault: true,
+    tools: ['search_news', 'fetch_page']
   },
   {
     id: 'tech-advisor',
@@ -33,9 +35,10 @@ const DEFAULT_AGENTS = [
     icon: 'cpu',
     avatar: '',
     tags: ['技术趋势', '技术评估'],
-    systemPrompt: '你是一位技术领域资深顾问。擅长解读最新技术动态，评估技术价值和落地可行性。输出简洁有力，技术判断精准，避免空话套话。请用技术人的视角，快速提炼核心技术点、技术原理、优劣势对比。',
+    systemPrompt: '你是一位技术领域资深顾问。擅长解读最新技术动态，评估技术价值和落地可行性。输出简洁有力，技术判断精准，避免空话套话。请用技术人的视角，快速提炼核心技术点、技术原理、优劣势对比。可主动抓取官方文档或技术博客原文做深度解读。',
     category: '技术',
-    isDefault: true
+    isDefault: true,
+    tools: ['search_news', 'fetch_page', 'read_workspace_file']
   },
   {
     id: 'business-analyst',
@@ -44,9 +47,10 @@ const DEFAULT_AGENTS = [
     icon: 'trend',
     avatar: '',
     tags: ['商业模式', '市场分析'],
-    systemPrompt: '你是一位资深商业分析师。擅长从商业视角分析资讯，评估市场机会、竞争格局和商业模式。输出数据驱动，观点明确，直接给出actionable insights。',
+    systemPrompt: '你是一位资深商业分析师。擅长从商业视角分析资讯，评估市场机会、竞争格局和商业模式。输出数据驱动，观点明确，直接给出actionable insights。可主动查询上市公司行情/K线辅助判断。',
     category: '商业',
-    isDefault: true
+    isDefault: true,
+    tools: ['search_news', 'fetch_page', 'get_stock_quote', 'get_stock_kline']
   },
   {
     id: 'writer',
@@ -55,9 +59,10 @@ const DEFAULT_AGENTS = [
     icon: 'document',
     avatar: '',
     tags: ['写作辅助', '文案创作'],
-    systemPrompt: '你是一位专业写作助手。擅长润色、改写、创作各类文案。保持专业、简洁的风格，突出核心信息。',
+    systemPrompt: '你是一位专业写作助手。擅长润色、改写、创作各类文案。保持专业、简洁的风格，突出核心信息。可将成稿直接写入用户工作空间。',
     category: '写作',
-    isDefault: true
+    isDefault: true,
+    tools: ['read_workspace_file', 'write_workspace_file']
   },
   {
     id: 'memory-agent',
@@ -66,9 +71,10 @@ const DEFAULT_AGENTS = [
     icon: 'bookmark',
     avatar: '',
     tags: ['长期记忆', '偏好学习'],
-    systemPrompt: '你是用户的追踪记忆智能体。你的任务是把用户的关注领域、历史反馈、收藏、追踪关键词和今日新信号连接起来。回答时要说明：这与用户过去关注的什么有关、是否应该持续追踪、下次推荐应该如何调整。',
+    systemPrompt: '你是用户的追踪记忆智能体。你的任务是把用户的关注领域、历史反馈、收藏、追踪关键词和今日新信号连接起来。回答时要说明：这与用户过去关注的什么有关、是否应该持续追踪、下次推荐应该如何调整。可将追踪结论沉淀到工作空间。',
     category: '记忆',
-    isDefault: true
+    isDefault: true,
+    tools: ['search_news', 'read_workspace_file', 'write_workspace_file']
   },
   {
     id: 'risk-scout',
@@ -77,9 +83,10 @@ const DEFAULT_AGENTS = [
     icon: 'alert',
     avatar: '',
     tags: ['风险识别', '预警判断'],
-    systemPrompt: '你是风险雷达智能体。你要从资讯中识别政策监管、市场变化、竞争格局、安全事件和技术路线风险。输出要克制、具体，区分事实、推断和不确定性，并给出需要继续观察的触发信号。',
+    systemPrompt: '你是风险雷达智能体。你要从资讯中识别政策监管、市场变化、竞争格局、安全事件和技术路线风险。输出要克制、具体，区分事实、推断和不确定性，并给出需要继续观察的触发信号。可主动检索历史资讯与抓取原文核实风险信号。',
     category: '风险',
-    isDefault: true
+    isDefault: true,
+    tools: ['search_news', 'fetch_page']
   },
   {
     id: 'creation-agent',
@@ -88,9 +95,10 @@ const DEFAULT_AGENTS = [
     icon: 'document',
     avatar: '',
     tags: ['选题生成', '素材沉淀'],
-    systemPrompt: '你是创作转化智能体。你要把资讯转化为可写的观点、标题、短文结构、汇报提纲或素材卡片。输出要可直接进入创作中心，避免空泛总结。',
+    systemPrompt: '你是创作转化智能体。你要把资讯转化为可写的观点、标题、短文结构、汇报提纲或素材卡片。输出要可直接进入创作中心，避免空泛总结。可将选题大纲或成稿直接写入用户工作空间。',
     category: '创作',
-    isDefault: true
+    isDefault: true,
+    tools: ['search_news', 'read_workspace_file', 'write_workspace_file']
   }
 ];
 
@@ -123,7 +131,7 @@ export function useAgents() {
   });
   const [showAgentForm, setShowAgentForm] = useState(false);
   const [editingAgent, setEditingAgent] = useState(null);
-  const [newAgent, setNewAgent] = useState({ name: '', description: '', systemPrompt: '', category: '分析', avatar: '' });
+  const [newAgent, setNewAgent] = useState({ name: '', description: '', systemPrompt: '', category: '分析', avatar: '', tools: [] });
 
   // 持久化自定义智能体（仅存 isCustom=true 的）
   const persistAgents = useCallback((next) => {

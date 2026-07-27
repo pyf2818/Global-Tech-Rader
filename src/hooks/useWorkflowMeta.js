@@ -13,6 +13,10 @@ export function useWorkflowMeta(agentWorkflowDraft, selectedWorkflowNodeId) {
     classifier: { label: '分类语句',      tone: 'violet' },
     reply:      { label: '指定回复',      tone: 'rose'   },
     output:     { label: '输出',          tone: 'slate'  },
+    // 方案 C Phase 5：多 agent 编排节点
+    subworkflow: { label: '子工作流',     tone: 'pink'   },
+    parallel:    { label: '并行扇出',     tone: 'orange' },
+    router:      { label: '路由分发',     tone: 'purple' },
   }), []);
 
   const workflowRunStatusMeta = useMemo(() => ({

@@ -3986,6 +3986,7 @@ ${signals}
               todayBriefing={todayBriefing}
               todayLanes={todayLanes}
               materials={materials}
+              agent={agents.find(a => a.id === currentAgent) || agents[0]}
             />
           )}
 

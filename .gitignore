@@ -5,6 +5,10 @@
 .omc/
 .agents/
 .monkeycode/
+.openanlan/
+
+# Local backup / scratch files
+_app_pre_refactor.jsx
 
 # IDE and Editors
 **/.idea/

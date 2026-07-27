@@ -346,7 +346,16 @@ export class WorkflowEngine {
         let structured = null;
         let shouldContinue = true;
 
-        if (node.type === 'llm') {
+        /* ============ 多 agent 编排节点（方案 C Phase 5） ============ */
+        let nodeResult = null;
+        if (node.type === 'subworkflow') {
+          nodeResult = await this._runSubworkflow(node, String(nodeInput), ctx, setTrace, onStep, trace);
+        } else if (node.type === 'parallel') {
+          nodeResult = await this._runParallel(node, String(nodeInput), ctx, setTrace, onStep, trace);
+        } else if (node.type === 'router') {
+          nodeResult = await this._runRouter(node, String(nodeInput), ctx, setTrace, onStep, trace);
+          if (nodeResult.shouldContinue === false) shouldContinue = false;
+        } else if (node.type === 'llm') {
           const agent = (ctx.agents || []).find(a => a.id === node.agentId) || (ctx.agents || [])[0];
           const systemPrompt = `${agent?.systemPrompt || '你是个人情报智能体。'}
 
@@ -400,19 +409,33 @@ export class WorkflowEngine {
           shouldContinue = typeof localResult === 'string' ? true : localResult.shouldContinue !== false;
         }
 
+        // 编排节点（subworkflow/parallel/router）失败时已经 setTrace(status='failed')，
+        // 主循环不应覆盖其 status 与 detail（避免"未找到子工作流"被截断输出覆盖）。
+        if (nodeResult) {
+          output = nodeResult.output;
+          structured = nodeResult.structured;
+        }
         stepResults[outputKey] = output;
         previousOutput = output;
-
-        setTrace(node.id, {
-          status: 'completed',
-          detail: output.slice(0, 220),
-          output,
-          structured,
-          inputKey,
-          outputKey,
-          variablePreview: `${inputKey} → ${outputKey}`
-        });
-        if (onStep) onStep(node.id, 'completed', output, structured, undefined, trace);
+        const currentStep = trace.find(s => s.nodeId === node.id);
+        const isFailed = currentStep?.status === 'failed';
+        // 编排节点成功时优先使用其自定义 detail（如"子工作流 完成（N 步）"）
+        const detailText = nodeResult?.detail || output.slice(0, 220);
+        if (!isFailed) {
+          setTrace(node.id, {
+            status: 'completed',
+            detail: detailText,
+            output,
+            structured,
+            inputKey,
+            outputKey,
+            variablePreview: `${inputKey} → ${outputKey}`
+          });
+        } else {
+          // 仍然补齐 output/structured/inputKey/outputKey，便于后续节点读取与 UI 展示
+          setTrace(node.id, { output, structured, inputKey, outputKey });
+        }
+        if (onStep) onStep(node.id, isFailed ? 'failed' : 'completed', output, structured, undefined, trace);
 
         if (node.type === 'condition' && !shouldContinue) {
           haltedByCondition = node;
@@ -448,6 +471,202 @@ export class WorkflowEngine {
       }
       if (onStep) onStep(failedNodeId || 'error', 'failed', undefined, undefined, error.message, trace);
       return { runId, status: 'failed', trace, finalOutput: '', error: error.message || '智能体工作流运行失败', startedAt, finishedAt: new Date().toISOString() };
+    }
+  }
+
+  /* ============ 多 agent 编排节点实现（方案 C Phase 5） ============ */
+
+  /**
+   * 子工作流节点：从 ctx.workflows 找到对应 id 的工作流，递归执行
+   * config: { workflowId: string, passThroughInput?: boolean }
+   */
+  async _runSubworkflow(node, input, ctx, setTrace, onStep, parentTrace) {
+    const workflowId = node.workflowId || node.config?.workflowId;
+    const workflows = Array.isArray(ctx.workflows) ? ctx.workflows : [];
+    const targetWorkflow = workflows.find(w => w.id === workflowId);
+    if (!targetWorkflow) {
+      setTrace(node.id, { status: 'failed', detail: `未找到子工作流：${workflowId}` });
+      return { output: `错误：未找到子工作流 "${workflowId}"`, structured: null };
+    }
+    // 复用父 ctx 但用新 prompt（input 作为子工作流的 customPrompt）
+    const subCtx = { ...ctx, customPrompt: node.passThroughInput === false ? '' : input };
+    const subEngine = new WorkflowEngine();
+    subEngine.abortController = this.abortController; // 共享 abort 信号
+    const result = await subEngine.run(targetWorkflow, subCtx, (subNodeId, status, subOutput) => {
+      if (onStep) onStep(node.id, status === 'running' ? 'running' : status, subOutput, undefined, undefined, parentTrace);
+    });
+    setTrace(node.id, {
+      status: result.status === 'failed' ? 'failed' : 'completed',
+      detail: `子工作流 "${targetWorkflow.name}" 完成（${result.trace?.length || 0} 步）`,
+      output: result.finalOutput,
+    });
+    return {
+      output: result.finalOutput || `子工作流 "${targetWorkflow.name}" 已执行`,
+      structured: { workflowId, subRunId: result.runId, subStatus: result.status },
+      detail: `子工作流 "${targetWorkflow.name}" 完成（${result.trace?.length || 0} 步）`,
+    };
+  }
+
+  /**
+   * 并行节点：并发执行多个分支（每个分支是一个简化的 LLM 调用）
+   * config: { branches: [{ name, prompt, agentId? }], mergeStrategy: 'concat'|'first'|'last'|'summarize' }
+   */
+  async _runParallel(node, input, ctx, setTrace, onStep, parentTrace) {
+    const branches = Array.isArray(node.branches) ? node.branches : (node.config?.branches || []);
+    if (branches.length === 0) {
+      setTrace(node.id, { status: 'failed', detail: '并行节点缺少 branches 配置' });
+      return { output: '错误：并行节点未配置分支', structured: null };
+    }
+    const mergeStrategy = node.mergeStrategy || node.config?.mergeStrategy || 'concat';
+    setTrace(node.id, { status: 'running', detail: `并行执行 ${branches.length} 个分支` });
+
+    // 并发执行每个分支
+    const branchResults = await Promise.allSettled(branches.map(async (branch) => {
+      const agent = (ctx.agents || []).find(a => a.id === branch.agentId) || (ctx.agents || [])[0];
+      const systemPrompt = `${agent?.systemPrompt || '你是个人情报智能体。'}\n\n你在并行分支 "${branch.name}" 中工作，请基于输入独立给出该分支的结论。`;
+      const messages = [{ role: 'user', content: `${branch.prompt || ''}\n\n${input.slice(-4000)}` }];
+      const response = await fetch('/api/ai-generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          baseUrl: ctx.llmConfig?.baseUrl,
+          apiKey: ctx.llmConfig?.apiKey,
+          model: ctx.llmConfig?.selectedModel,
+          action: 'chat',
+          systemPrompt,
+          messages,
+        }),
+        signal: this.abortController?.signal,
+      });
+      const data = await response.json();
+      if (data.error) throw new Error(data.error);
+      return { name: branch.name, output: data.content || '(无内容)' };
+    }));
+
+    // 收集成功的分支结果（失败的保留错误信息）
+    const completed = branchResults.map((r, i) => ({
+      name: branches[i].name,
+      status: r.status,
+      output: r.status === 'fulfilled' ? r.value.output : `分支失败：${r.reason?.message || r.reason}`,
+    }));
+
+    let mergedOutput = '';
+    if (mergeStrategy === 'first') {
+      const firstOk = completed.find(b => b.status === 'fulfilled');
+      mergedOutput = firstOk ? firstOk.output : completed[0].output;
+    } else if (mergeStrategy === 'last') {
+      const lastOk = [...completed].reverse().find(b => b.status === 'fulfilled');
+      mergedOutput = lastOk ? lastOk.output : completed[completed.length - 1].output;
+    } else if (mergeStrategy === 'summarize') {
+      // 让 LLM 汇总各分支结果
+      const branchDigest = completed.map((b, i) => `### 分支 ${i + 1}：${b.name}\n${b.output}`).join('\n\n');
+      const summarizeResp = await fetch('/api/ai-generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          baseUrl: ctx.llmConfig?.baseUrl,
+          apiKey: ctx.llmConfig?.apiKey,
+          model: ctx.llmConfig?.selectedModel,
+          action: 'chat',
+          systemPrompt: '你是并行执行汇总器。请基于多个分支的结果生成综述，保留关键差异和共识。',
+          messages: [{ role: 'user', content: branchDigest.slice(-6000) }],
+        }),
+        signal: this.abortController?.signal,
+      });
+      const summarizeData = await summarizeResp.json();
+      mergedOutput = summarizeData.content || branchDigest;
+    } else {
+      // concat：默认拼接
+      mergedOutput = completed.map((b, i) => `### 分支 ${i + 1}：${b.name}\n${b.output}`).join('\n\n---\n\n');
+    }
+
+    setTrace(node.id, {
+      status: 'completed',
+      detail: `并行完成：${completed.length} 个分支，合并策略 ${mergeStrategy}`,
+      output: mergedOutput,
+    });
+    return {
+      output: mergedOutput,
+      structured: { branches: completed, mergeStrategy },
+      detail: `并行完成：${completed.length} 个分支，合并策略 ${mergeStrategy}`,
+    };
+  }
+
+  /**
+   * 路由节点：按规则匹配 input，路由到对应的 target（子工作流或 nodeId）
+   * config: { routes: [{ match: { op, value }, target, targetName }], default?: { target, targetName } }
+   */
+  async _runRouter(node, input, ctx, setTrace, onStep, parentTrace) {
+    const routes = Array.isArray(node.routes) ? node.routes : (node.config?.routes || []);
+    if (routes.length === 0) {
+      setTrace(node.id, { status: 'failed', detail: '路由节点缺少 routes 配置' });
+      return { output: '错误：路由节点未配置 routes', structured: null };
+    }
+    // 按顺序匹配 routes
+    let matchedRoute = null;
+    for (const route of routes) {
+      if (this._matchRoute(route.match, input)) { matchedRoute = route; break; }
+    }
+    if (!matchedRoute) matchedRoute = node.default || node.config?.default || null;
+
+    if (!matchedRoute || !matchedRoute.target) {
+      setTrace(node.id, { status: 'completed', detail: '无匹配路由，跳过' });
+      return { output: '(无匹配路由，跳过)', structured: { matched: false }, shouldContinue: true };
+    }
+
+    const targetWorkflowId = matchedRoute.target;
+    const workflows = Array.isArray(ctx.workflows) ? ctx.workflows : [];
+    const targetWorkflow = workflows.find(w => w.id === targetWorkflowId);
+
+    setTrace(node.id, {
+      status: 'running',
+      detail: `路由命中：${matchedRoute.targetName || matchedRoute.target}`,
+    });
+
+    if (!targetWorkflow) {
+      // target 是 nodeId：把 input 透传给后续节点（不中断执行链）
+      setTrace(node.id, {
+        status: 'completed',
+        detail: `路由到节点 ${targetWorkflowId}（透传 input）`,
+        output: input,
+      });
+      return {
+        output: input,
+        structured: { matched: true, target: targetWorkflowId, mode: 'passthrough' },
+        detail: `路由到节点 ${targetWorkflowId}（透传 input）`,
+      };
+    }
+
+    // target 是子工作流：递归执行
+    const subCtx = { ...ctx, customPrompt: input };
+    const subEngine = new WorkflowEngine();
+    subEngine.abortController = this.abortController;
+    const result = await subEngine.run(targetWorkflow, subCtx);
+    setTrace(node.id, {
+      status: result.status === 'failed' ? 'failed' : 'completed',
+      detail: `路由到子工作流 "${targetWorkflow.name}"`,
+      output: result.finalOutput,
+    });
+    return {
+      output: result.finalOutput || input,
+      structured: { matched: true, target: targetWorkflowId, subRunId: result.runId, subStatus: result.status },
+      detail: `路由到子工作流 "${targetWorkflow.name}"`,
+    };
+  }
+
+  /** 路由规则匹配 */
+  _matchRoute(match, input) {
+    if (!match || !match.op || match.value === undefined) return false;
+    const inputStr = String(input || '');
+    const val = String(match.value);
+    switch (match.op) {
+      case 'contains':     return inputStr.includes(val);
+      case 'not_contains': return !inputStr.includes(val);
+      case 'equals':       return inputStr === val;
+      case 'starts_with':  return inputStr.startsWith(val);
+      case 'regex':
+        try { return new RegExp(val).test(inputStr); } catch { return false; }
+      default: return false;
     }
   }
 

@@ -5,6 +5,8 @@ import {
   WORKFLOW_SKILL_CATALOG,
   WORKFLOW_CONDITION_METRICS,
   WORKFLOW_CONDITION_OPERATORS,
+  WORKFLOW_ROUTER_OPERATORS,
+  WORKFLOW_PARALLEL_MERGE_STRATEGIES,
 } from '../constants/workflowConstants.js';
 
 /* Local helpers (used only by this page) */
@@ -416,6 +418,213 @@ function AgentsPage({
                             placeholder="例如 必读,追踪,素材,创作,降噪"
                           />
                         </label>
+                      )}
+                      {selectedWorkflowNode.type === 'subworkflow' && (
+                        <div className="workflow-node-subworkflow">
+                          <label>
+                            <span>子工作流目标</span>
+                            <select
+                              value={selectedWorkflowNode.workflowId || ''}
+                              onChange={e => updateWorkflowNode(selectedWorkflowNode.id, { workflowId: e.target.value })}
+                            >
+                              <option value="">— 请选择 —</option>
+                              {workflowTemplates.map(tpl => (
+                                <option key={tpl.id} value={tpl.id}>
+                                  {tpl.name}{tpl.id === activeWorkflowId ? '（当前）' : ''}
+                                </option>
+                              ))}
+                            </select>
+                          </label>
+                          <label className="workflow-checkbox-row">
+                            <input
+                              type="checkbox"
+                              checked={selectedWorkflowNode.passThroughInput !== false}
+                              onChange={e => updateWorkflowNode(selectedWorkflowNode.id, { passThroughInput: e.target.checked })}
+                            />
+                            <span>把当前输入作为子工作流的任务 prompt 传入（否则子工作流使用自己的 input 节点）</span>
+                          </label>
+                          <p className="workflow-hint">
+                            子工作流会复用当前的 LLM 配置与上下文，但拥有独立的节点链路。适合做"项目评估→素材生成"等可复用子流程。
+                          </p>
+                        </div>
+                      )}
+                      {selectedWorkflowNode.type === 'parallel' && (
+                        <div className="workflow-node-parallel">
+                          <label>
+                            <span>合并策略</span>
+                            <select
+                              value={selectedWorkflowNode.mergeStrategy || 'concat'}
+                              onChange={e => updateWorkflowNode(selectedWorkflowNode.id, { mergeStrategy: e.target.value })}
+                            >
+                              {WORKFLOW_PARALLEL_MERGE_STRATEGIES.map(s => (
+                                <option key={s.id} value={s.id}>{s.label}</option>
+                              ))}
+                            </select>
+                          </label>
+                          <div className="workflow-branches-list">
+                            <div className="workflow-branches-head">
+                              <span>并行分支（{(selectedWorkflowNode.branches || []).length} 个）</span>
+                              <button
+                                type="button"
+                                className="workflow-branch-add"
+                                onClick={() => {
+                                  const branches = Array.isArray(selectedWorkflowNode.branches) ? [...selectedWorkflowNode.branches] : [];
+                                  branches.push({
+                                    name: `分支 ${branches.length + 1}`,
+                                    prompt: '',
+                                    agentId: agents[0]?.id || '',
+                                  });
+                                  updateWorkflowNode(selectedWorkflowNode.id, { branches });
+                                }}
+                              >{ICONS.plus} 添加分支</button>
+                            </div>
+                            {(selectedWorkflowNode.branches || []).map((branch, idx) => (
+                              <div key={idx} className="workflow-branch-item">
+                                <div className="workflow-branch-row">
+                                  <input
+                                    className="workflow-branch-name"
+                                    value={branch.name || ''}
+                                    onChange={e => {
+                                      const branches = [...selectedWorkflowNode.branches];
+                                      branches[idx] = { ...branch, name: e.target.value };
+                                      updateWorkflowNode(selectedWorkflowNode.id, { branches });
+                                    }}
+                                    placeholder="分支名称"
+                                  />
+                                  <select
+                                    className="workflow-branch-agent"
+                                    value={branch.agentId || ''}
+                                    onChange={e => {
+                                      const branches = [...selectedWorkflowNode.branches];
+                                      branches[idx] = { ...branch, agentId: e.target.value };
+                                      updateWorkflowNode(selectedWorkflowNode.id, { branches });
+                                    }}
+                                  >
+                                    <option value="">默认 agent</option>
+                                    {agents.map(a => (
+                                      <option key={a.id} value={a.id}>{a.name}</option>
+                                    ))}
+                                  </select>
+                                  <button
+                                    type="button"
+                                    className="workflow-branch-remove"
+                                    onClick={() => {
+                                      const branches = selectedWorkflowNode.branches.filter((_, i) => i !== idx);
+                                      updateWorkflowNode(selectedWorkflowNode.id, { branches });
+                                    }}
+                                  >删除</button>
+                                </div>
+                                <textarea
+                                  value={branch.prompt || ''}
+                                  onChange={e => {
+                                    const branches = [...selectedWorkflowNode.branches];
+                                    branches[idx] = { ...branch, prompt: e.target.value };
+                                    updateWorkflowNode(selectedWorkflowNode.id, { branches });
+                                  }}
+                                  placeholder="该分支的指令 / Prompt（如：从技术可行性角度分析）"
+                                  rows={2}
+                                />
+                              </div>
+                            ))}
+                            {(selectedWorkflowNode.branches || []).length === 0 && (
+                              <p className="workflow-hint">尚未配置分支。每个分支会并发执行，最终按合并策略汇总结果。</p>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                      {selectedWorkflowNode.type === 'router' && (
+                        <div className="workflow-node-router">
+                          <div className="workflow-routes-list">
+                            <div className="workflow-routes-head">
+                              <span>路由规则（{(selectedWorkflowNode.routes || []).length} 条，按顺序匹配）</span>
+                              <button
+                                type="button"
+                                className="workflow-route-add"
+                                onClick={() => {
+                                  const routes = Array.isArray(selectedWorkflowNode.routes) ? [...selectedWorkflowNode.routes] : [];
+                                  routes.push({
+                                    match: { op: 'contains', value: '' },
+                                    target: '',
+                                    targetName: '',
+                                  });
+                                  updateWorkflowNode(selectedWorkflowNode.id, { routes });
+                                }}
+                              >{ICONS.plus} 添加规则</button>
+                            </div>
+                            {(selectedWorkflowNode.routes || []).map((route, idx) => (
+                              <div key={idx} className="workflow-route-item">
+                                <div className="workflow-route-match">
+                                  <select
+                                    value={route.match?.op || 'contains'}
+                                    onChange={e => {
+                                      const routes = [...selectedWorkflowNode.routes];
+                                      routes[idx] = { ...route, match: { ...route.match, op: e.target.value } };
+                                      updateWorkflowNode(selectedWorkflowNode.id, { routes });
+                                    }}
+                                  >
+                                    {WORKFLOW_ROUTER_OPERATORS.map(op => (
+                                      <option key={op.id} value={op.id}>{op.label}</option>
+                                    ))}
+                                  </select>
+                                  <input
+                                    className="workflow-route-value"
+                                    value={route.match?.value || ''}
+                                    onChange={e => {
+                                      const routes = [...selectedWorkflowNode.routes];
+                                      routes[idx] = { ...route, match: { ...route.match, value: e.target.value } };
+                                      updateWorkflowNode(selectedWorkflowNode.id, { routes });
+                                    }}
+                                    placeholder="匹配值（如 github 或 \\d{6}）"
+                                  />
+                                </div>
+                                <div className="workflow-route-target">
+                                  <select
+                                    value={route.target || ''}
+                                    onChange={e => {
+                                      const routes = [...selectedWorkflowNode.routes];
+                                      const targetName = workflowTemplates.find(t => t.id === e.target.value)?.name || '';
+                                      routes[idx] = { ...route, target: e.target.value, targetName };
+                                      updateWorkflowNode(selectedWorkflowNode.id, { routes });
+                                    }}
+                                  >
+                                    <option value="">— 选择子工作流 —</option>
+                                    {workflowTemplates.map(tpl => (
+                                      <option key={tpl.id} value={tpl.id}>{tpl.name}</option>
+                                    ))}
+                                  </select>
+                                  <button
+                                    type="button"
+                                    className="workflow-route-remove"
+                                    onClick={() => {
+                                      const routes = selectedWorkflowNode.routes.filter((_, i) => i !== idx);
+                                      updateWorkflowNode(selectedWorkflowNode.id, { routes });
+                                    }}
+                                  >删除</button>
+                                </div>
+                              </div>
+                            ))}
+                            {(selectedWorkflowNode.routes || []).length === 0 && (
+                              <p className="workflow-hint">尚未配置路由规则。点击"添加规则"创建一条匹配规则。</p>
+                            )}
+                          </div>
+                          <div className="workflow-route-default">
+                            <span>默认路由（无匹配时）</span>
+                            <select
+                              value={selectedWorkflowNode.default?.target || ''}
+                              onChange={e => {
+                                const targetName = workflowTemplates.find(t => t.id === e.target.value)?.name || '';
+                                updateWorkflowNode(selectedWorkflowNode.id, {
+                                  default: e.target.value ? { target: e.target.value, targetName } : null,
+                                });
+                              }}
+                            >
+                              <option value="">— 不处理（透传） —</option>
+                              {workflowTemplates.map(tpl => (
+                                <option key={tpl.id} value={tpl.id}>{tpl.name}</option>
+                              ))}
+                            </select>
+                          </div>
+                        </div>
                       )}
                       <div className="workflow-node-editor-grid">
                         <label>

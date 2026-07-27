@@ -59,7 +59,39 @@ export const DEFAULT_AGENT_WORKFLOW = {
   ]
 };
 
-export const WORKFLOW_NODE_TYPES = ['input', 'llm', 'skill', 'condition', 'classifier', 'reply', 'output'];
+export const WORKFLOW_NODE_TYPES = ['input', 'llm', 'skill', 'condition', 'classifier', 'reply', 'output', 'subworkflow', 'parallel', 'router'];
+
+/* ============ 多 agent 编排节点元信息（方案 C Phase 5） ============ */
+
+export const WORKFLOW_NODE_META = {
+  input:       { label: '输入', icon: '📥', color: '#3b82f6', category: 'flow' },
+  llm:         { label: 'LLM', icon: '🤖', color: '#8b5cf6', category: 'agent' },
+  skill:       { label: '技能', icon: '⚡', color: '#f59e0b', category: 'agent' },
+  condition:   { label: '条件', icon: '🔀', color: '#ef4444', category: 'flow' },
+  classifier:  { label: '分类器', icon: '🏷️', color: '#10b981', category: 'flow' },
+  reply:       { label: '回复', icon: '💬', color: '#06b6d4', category: 'output' },
+  output:      { label: '输出', icon: '📤', color: '#06b6d4', category: 'output' },
+  subworkflow: { label: '子工作流', icon: '🧩', color: '#ec4899', category: 'orchestration' },
+  parallel:    { label: '并行', icon: '⚡', color: '#f97316', category: 'orchestration' },
+  router:      { label: '路由', icon: '🧭', color: '#a855f7', category: 'orchestration' },
+};
+
+/* 路由规则支持的比较操作 */
+export const WORKFLOW_ROUTER_OPERATORS = [
+  { id: 'contains',   label: '包含' },
+  { id: 'not_contains', label: '不包含' },
+  { id: 'equals',     label: '等于' },
+  { id: 'starts_with', label: '前缀匹配' },
+  { id: 'regex',      label: '正则匹配' },
+];
+
+/* 并行节点的合并策略 */
+export const WORKFLOW_PARALLEL_MERGE_STRATEGIES = [
+  { id: 'concat',    label: '拼接（保留各分支输出）' },
+  { id: 'first',     label: '取首个完成的分支' },
+  { id: 'last',      label: '取最后完成的分支' },
+  { id: 'summarize', label: '让 LLM 汇总（生成综述）' },
+];
 
 export const WORKFLOW_SKILL_CATALOG = [
   {
@@ -231,6 +263,72 @@ export const WORKFLOW_TEMPLATE_LIBRARY = [
         role: '输出可进入内容创作中心继续编辑、导出和沉淀为私有知识库的草稿。',
         prompt: '输出 Markdown 草稿，包含素材引用清单、图片建议、标签和知识库归档建议。',
         inputKey: 'style_guardrails', outputKey: 'final_article_draft', enabled: true
+      }
+    ]
+  },
+  /* ====== 方案 C Phase 5：多 agent 编排模板 ====== */
+  {
+    id: 'parallel-perspective-analysis',
+    name: '多视角并行分析工作流',
+    description: '输入一条资讯，并行调度三个不同视角（技术、商业、风险）的智能体同时分析，最后由 LLM 汇总成综述。',
+    source: '方案 C Phase 5：并行扇出 + LLM 汇总',
+    tags: ['多视角', '并行', '综述'],
+    nodes: [
+      {
+        id: 'tpl-par-input', type: 'input', title: '输入资讯',
+        role: '聚合待分析的资讯上下文。',
+        prompt: '读取今日推荐资讯与用户画像，准备给三个并行分支使用。',
+        inputKey: 'context', outputKey: 'raw_input', enabled: true
+      },
+      {
+        id: 'tpl-par-parallel', type: 'parallel', title: '三视角并行',
+        role: '技术、商业、风险三个智能体同时分析同一份输入。',
+        prompt: '基于输入给出该视角的判断。',
+        inputKey: 'raw_input', outputKey: 'parallel_digest', enabled: true,
+        branches: [
+          { name: '技术视角', prompt: '从技术原理、技术价值、落地可行性角度分析。', agentId: 'tech-advisor' },
+          { name: '商业视角', prompt: '从商业模式、市场机会、竞争格局角度分析。', agentId: 'business-analyst' },
+          { name: '风险视角', prompt: '从政策、安全、市场风险角度识别潜在问题。', agentId: 'risk-scout' }
+        ],
+        mergeStrategy: 'summarize'
+      },
+      {
+        id: 'tpl-par-output', type: 'output', title: '综述输出',
+        role: '把汇总结果作为最终结论输出。',
+        prompt: '输出包含三视角判断的综述。',
+        inputKey: 'parallel_digest', outputKey: 'final_summary', enabled: true
+      }
+    ]
+  },
+  {
+    id: 'router-dispatcher',
+    name: '路由分发工作流',
+    description: '根据输入内容（含 GitHub 关键词 / 含股价代码 / 其他）路由到对应子工作流。',
+    source: '方案 C Phase 5：路由 + 子工作流',
+    tags: ['路由', '子工作流', '条件分发'],
+    nodes: [
+      {
+        id: 'tpl-rout-input', type: 'input', title: '输入待分发内容',
+        role: '聚合原始内容，准备路由判断。',
+        prompt: '读取用户输入或资讯摘要。',
+        inputKey: 'context', outputKey: 'dispatch_input', enabled: true
+      },
+      {
+        id: 'tpl-rout-router', type: 'router', title: '内容路由',
+        role: '按内容特征路由到对应子工作流。',
+        prompt: '检测输入是否包含 GitHub 关键词、股票代码或普通资讯。',
+        inputKey: 'dispatch_input', outputKey: 'routed_branch', enabled: true,
+        routes: [
+          { match: { op: 'contains', value: 'github' }, target: 'github-project-evaluator', targetName: 'GitHub 评估' },
+          { match: { op: 'regex', value: '\\d{6}' }, target: 'github-project-evaluator', targetName: '含股票代码（占位：股票评估子工作流）' }
+        ],
+        default: { target: 'daily-briefing-copilot', targetName: '每日简报（默认）' }
+      },
+      {
+        id: 'tpl-rout-output', type: 'output', title: '路由结果输出',
+        role: '输出路由命中后的子工作流结果。',
+        prompt: '输出最终结果。',
+        inputKey: 'routed_branch', outputKey: 'final_dispatched', enabled: true
       }
     ]
   }
