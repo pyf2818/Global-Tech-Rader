@@ -46,5 +46,25 @@ export function useCalendarMemos(calendarDate, items, events) {
     return { monthTotal: monthEvents.length, activeDays, upcoming };
   }, [events, calendarDate]);
 
-  return { calendarDays, calendarHeatMap, calendarInsights };
+  function getEventsForDay(dayInfo) {
+    if (!dayInfo.isCurrentMonth) return [];
+    const dateStr = `${dayInfo.year}-${String(dayInfo.month + 1).padStart(2, '0')}-${String(dayInfo.day).padStart(2, '0')}`;
+    return events.filter(e => e.date === dateStr);
+  }
+
+  function isToday(dayInfo) {
+    const now = new Date();
+    return dayInfo.isCurrentMonth && dayInfo.day === now.getDate() && dayInfo.month === now.getMonth() && dayInfo.year === now.getFullYear();
+  }
+
+  function getHeatLevel(day) {
+    const count = calendarHeatMap.get(day) || 0;
+    if (count === 0) return 0;
+    if (count <= 2) return 1;
+    if (count <= 5) return 2;
+    if (count <= 10) return 3;
+    return 4;
+  }
+
+  return { calendarDays, calendarHeatMap, calendarInsights, getEventsForDay, isToday, getHeatLevel };
 }

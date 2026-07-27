@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, useRef, useCallback, lazy, Suspense } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useUiStore, useLightboxStore, useWorkflowStore, useMaterialsStore, useProfileStore, useNewsStore, useRecommendStore, useAiStore, useGithubStore, useStockStore, useElfStore, useSourceStore } from './store/index.js';
+import { useUiStore, useLightboxStore, useWorkflowStore, useMaterialsStore, useProfileStore, useNewsStore, useRecommendStore, useAiStore, useStockStore, useElfStore, useSourceStore } from './store/index.js';
 import SettingsModal from './components/SettingsModal.jsx';
 import ArticleEditor from './components/ArticleEditor.jsx';
 import CreativeWorkspace from './components/CreativeWorkspace.jsx';
@@ -24,6 +24,7 @@ import { useCalendar } from './hooks/useCalendar.js';
 import { useUI } from './hooks/useUI.js';
 import { useCreativeWorkspace } from './hooks/useCreativeWorkspace.js';
 import { useCalendarMemos } from './hooks/useCalendarMemos.js';
+import { useRecommendationFeedback } from './hooks/useRecommendationFeedback.js';
 import { useMaterialsMemos } from './hooks/useMaterialsMemos.js';
 import { useReadingStatsMemos } from './hooks/useReadingStatsMemos.js';
 import { useWorkflowMeta } from './hooks/useWorkflowMeta.js';
@@ -35,6 +36,8 @@ import { useIntelligenceMemos } from './hooks/useIntelligenceMemos.js';
 import { useRecommendationMemos } from './hooks/useRecommendationMemos.js';
 import { useBookmarkMaterial } from './hooks/useBookmarkMaterial.js';
 import { useArticleEditor } from './hooks/useArticleEditor.js';
+import { useBriefingOps } from './hooks/useBriefingOps.js';
+import { useGithubInsight } from './hooks/useGithubInsight.js';
 import { BlockGrid, BlockPanel, BlockStat, BlockToolbar } from './blocks/index.js';
 import CommandPalette from './shell/CommandPalette.jsx';
 import IntelligenceSidebar from './components/IntelligenceSidebar.jsx';
@@ -743,12 +746,7 @@ function App() {
   
   
   // ===== 股市监控状态（迁移自 useState -> Zustand stockStore）=====
-  const autoMonitorEnabled = useStockStore(s => s.autoMonitorEnabled);
-  const setAutoMonitorEnabled = useStockStore(s => s.setAutoMonitorEnabled);
-  const monitorInterval = useStockStore(s => s.monitorInterval);
-  const setMonitorInterval = useStockStore(s => s.setMonitorInterval);
-  const monitorAlerts = useStockStore(s => s.monitorAlerts);
-  const setMonitorAlerts = useStockStore(s => s.setMonitorAlerts);
+  // autoMonitorEnabled/monitorInterval/monitorAlerts 已迁移至 useSourceManager
   const showAlertPanel = useStockStore(s => s.showAlertPanel);
   const setShowAlertPanel = useStockStore(s => s.setShowAlertPanel);
   const {
@@ -760,9 +758,12 @@ function App() {
     llmTesting, setLlmTesting,
     llmManualInput, setLlmManualInput,
     showLlmQuickConfig, setShowLlmQuickConfig,
+    llmPresetName, setLlmPresetName,
     allLlmModels,
     llmPresets, upsertPreset, removePreset, activatePreset, activePresetId, setActivePresetId,
-  } = useLlmConfig();
+    fetchLlmModels, addManualModel, removeManualModel, testLlmConnection,
+    handleSelectPreset, handleQuickSave, handleQuickTest,
+  } = useLlmConfig({ LLM_PRESETS, onQuickSaveSuccess: () => setAiInsights({ loading: false, data: null, error: '' }) });
 
   // ========== 用户系统 ==========
   // 认证与用户会话 — 从 App.jsx 提取为独立 hook（减少 ~140 行）
@@ -783,7 +784,6 @@ function App() {
   const setCopilotPendingMessage = useAiStore(s => s.setCopilotPendingMessage);
   const showNewspaperOverlay = useUiStore(s => s.showNewspaperOverlay);
   const setShowNewspaperOverlay = useUiStore(s => s.setShowNewspaperOverlay);
-  const [llmPresetName, setLlmPresetName] = useState('');
   const showUserMenu = useUiStore(s => s.showUserMenu);
   const setShowUserMenu = useUiStore(s => s.setShowUserMenu);
   const showProfileModal = useUiStore(s => s.showProfileModal);
@@ -932,6 +932,15 @@ function App() {
     editingSource, setEditingSource,
     showSourceForm, setShowSourceForm,
     verifySource, discoverSource, addDiscoveredSource, verifyAllSources,
+    addCustomSource, removeCustomSource,
+    truncateUrl, truncateText,
+    getSourceHealthIndicator,
+    verifySingleSource,
+    exportSources, importSources,
+    clearAlerts,
+    autoMonitorEnabled, setAutoMonitorEnabled,
+    monitorInterval, setMonitorInterval,
+    monitorAlerts, setMonitorAlerts,
   } = useSourceManager({ allSources });  // githubLang/githubSince 已移入 useTrending
   // calendar states moved to useCalendar hook
 
@@ -996,11 +1005,6 @@ function App() {
   const setAiInsights = useAiStore(s => s.setAiInsights);
   const elfQuotedContext = useAiStore(s => s.elfQuotedContext);
   const setElfQuotedContext = useAiStore(s => s.setElfQuotedContext);
-  // ===== GitHub 项目 AI 情报状态（迁移自 useState -> Zustand githubStore）=====
-  const githubInsights = useGithubStore(s => s.githubInsights);
-  const setGithubInsights = useGithubStore(s => s.setGithubInsights);
-  const githubInsightLoading = useGithubStore(s => s.githubInsightLoading);
-  const setGithubInsightLoading = useGithubStore(s => s.setGithubInsightLoading);
   // moreNavOpen moved to useUI
   // ===== 素材库 UI 状态（迁移自 useState -> Zustand materialsStore）=====
   const materialFilter = useMaterialsStore(s => s.materialFilter);
@@ -2947,73 +2951,12 @@ ${blueprintSummary}`,
     }
   }, [agents, intelligenceMissions, llmConfig, buildWorkbenchContext, enabledWorkflowNodes, agentWorkflowDraft.nodes, agentWorkflowDraft.name, scopedAgentItems, selectedNewsDate, agentWorkflowScope, intelligenceProfile.focusLabels, intelligenceProfile.tracked, bookmarks, materials, selectedInterests, createWorkflowActions]);
 
-  function getFeedbackTerm(item) {
-    const tags = item.tags || [];
-    const preferredTag = tags.find(tag => tag && tag.length >= 2 && tag.length <= 24);
-    if (preferredTag) return preferredTag;
-    const titleWords = (item.title || '').match(/[A-Za-z][A-Za-z0-9-]{2,}|[\u4e00-\u9fa5]{2,6}/g) || [];
-    return titleWords[0] || item.category || item.source || '';
-  }
-
-  const handleRecommendationFeedback = useCallback((item, action) => {
-    if (!item) return;
-    setRecommendationFeedbackEvents(previous => [{
-      itemId: item.id,
-      action,
-      at: new Date().toISOString(),
-    }, ...previous].slice(0, 500));
-    if (action === 'hide') {
-      setRecommendationFeedback(prev => ({
-        ...prev,
-        hiddenIds: [...new Set([...(prev.hiddenIds || []), item.id])]
-      }));
-      showToast('已减少这类不感兴趣内容');
-      return;
-    }
-
-    if (action === 'more-like-this') {
-      if (!item.category) return;
-      setRecommendationFeedback(prev => ({
-        ...prev,
-        boostedCategories: {
-          ...(prev.boostedCategories || {}),
-          [item.category]: ((prev.boostedCategories || {})[item.category] || 0) + 1
-        }
-      }));
-      if (item.category && !selectedInterests.includes(item.category)) {
-        setSelectedInterests(prev => [...new Set([...prev, item.category])]);
-      }
-      showToast('已提高类似内容权重');
-      return;
-    }
-
-    if (action === 'mute-source') {
-      if (!item.source) return;
-      setRecommendationFeedback(prev => ({
-        ...prev,
-        mutedSources: {
-          ...(prev.mutedSources || {}),
-          [item.source]: ((prev.mutedSources || {})[item.source] || 0) + 1
-        }
-      }));
-      showToast(`已降低 ${item.source || '该来源'} 的推荐权重`);
-      return;
-    }
-
-    if (action === 'track') {
-      const term = getFeedbackTerm(item);
-      if (!term) return;
-      setRecommendationFeedback(prev => ({
-        ...prev,
-        trackedTerms: {
-          ...(prev.trackedTerms || {}),
-          [term]: ((prev.trackedTerms || {})[term] || 0) + 1
-        }
-      }));
-      setFollowKeywords(prev => prev.includes(term) ? prev : [term, ...prev].slice(0, 20));
-      showToast(`已开始追踪「${term}」`);
-    }
-  }, [selectedInterests]);
+  const { getFeedbackTerm, handleRecommendationFeedback } = useRecommendationFeedback({
+    recommendationFeedback, setRecommendationFeedback,
+    recommendationFeedbackEvents, setRecommendationFeedbackEvents,
+    selectedInterests, setSelectedInterests,
+    followKeywords, setFollowKeywords,
+  });
 
   const { calendarDays, calendarHeatMap, calendarInsights } = useCalendarMemos(calendarDate, items, events);
 
@@ -3168,75 +3111,10 @@ ${signals}
   // Markdown 简化渲染（支持标题、粗体、列表）- 用于 AI 简报
 
 
-  // 保存简报到素材库
-  function saveBriefToMaterials() {
-    if (!aiBrief.content) return;
-    const title = `AI简报 · ${new Date(aiBrief.generatedAt).toLocaleDateString('zh-CN')}`;
-    const newMaterial = {
-      id: Date.now(),
-      type: 'viewpoint',
-      title,
-      content: aiBrief.content,
-      source: 'AI 每日简报',
-      url: '',
-      tags: ['AI简报'],
-      note: '',
-      createdAt: new Date().toISOString()
-    };
-    setMaterials(prev => [...prev, newMaterial]);
-    const toast = document.createElement('div');
-    toast.className = 'material-toast';
-    toast.textContent = '已保存到素材库';
-    document.body.appendChild(toast);
-    setTimeout(() => toast.remove(), 2000);
-  }
-
-  // 导出简报为本地文件
-  function exportBriefToFile() {
-    if (!aiBrief.content) return;
-    const title = `AI简报_${new Date(aiBrief.generatedAt).toLocaleDateString('zh-CN').replace(/\//g, '-')}`;
-    const blob = new Blob([aiBrief.content], { type: 'text/markdown;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${title}.md`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    const toast = document.createElement('div');
-    toast.className = 'material-toast';
-    toast.textContent = '已下载为 markdown 文件';
-    document.body.appendChild(toast);
-    setTimeout(() => toast.remove(), 2000);
-  }
-
-  // 导出简报到创作中心
-  function exportBriefToEditor() {
-    if (!aiBrief.content) return;
-    const title = `AI简报 · ${new Date(aiBrief.generatedAt).toLocaleDateString('zh-CN')}`;
-    const newArticle = {
-      id: Date.now(),
-      title,
-      content: aiBrief.content,
-      template: 'blank',
-      materials: [],
-      tags: ['AI简报'],
-      status: 'draft',
-      spaceId: null,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      version: 1
-    };
-    setArticles(prev => [...prev, newArticle]);
-    setCurrentArticleId(newArticle.id);
-    setNav('editor');
-    const toast = document.createElement('div');
-    toast.className = 'material-toast';
-    toast.textContent = '已导出到创作中心';
-    document.body.appendChild(toast);
-    setTimeout(() => toast.remove(), 2000);
-  }
+  // 简报导出操作（保存到素材库 / 导出为本地文件 / 导出到创作中心）
+  const { saveBriefToMaterials, exportBriefToFile, exportBriefToEditor } = useBriefingOps({
+    aiBrief, setMaterials, setArticles, setCurrentArticleId, setNav
+  });
 
   const {
     readingStatsData,
@@ -3317,61 +3195,11 @@ ${signals}
 
 
   // GitHub 项目 AI 情报：实时调 LLM 生成应用场景/适合谁/落地难度/价值判断
-  async function requestGithubInsight(repo) {
-    const id = repo.id;
-    if (githubInsights[id] || githubInsightLoading[id]) return;
-    if (!llmConfig.baseUrl || !llmConfig.selectedModel) {
-      showToast('请先在设置中配置大模型 API');
-      return;
-    }
-    setGithubInsightLoading(prev => ({ ...prev, [id]: true }));
-    try {
-      const content = `项目：${repo.fullName}\n描述：${repo.description || '暂无'}\n语言：${repo.language || '未知'}\nStars：${repo.totalStars || 0}\nTopics：${(repo.topics || []).join(', ')}`;
-      const response = await fetch('/api/ai-generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          baseUrl: llmConfig.baseUrl,
-          apiKey: llmConfig.apiKey,
-          model: llmConfig.selectedModel,
-          action: 'github-evaluator',
-          content
-        })
-      });
-      const data = await response.json();
-      if (data.error) { showToast(`分析失败: ${data.error}`); return; }
-      // 解析返回的结构化 JSON（github-evaluator skill 输出）
-      let insight;
-      try {
-        const match = (data.content || '').match(/\{[\s\S]*\}/);
-        insight = match ? JSON.parse(match[0]) : null;
-      } catch { insight = null; }
-      if (!insight) {
-        // 降级：按行解析
-        const lines = (data.content || '').split('\n').filter(l => l.trim());
-        insight = {
-          scenario: lines[0] || '分析失败',
-          audience: lines[1] || '',
-          difficulty: lines[2] || '',
-          value: lines[3] || '',
-        };
-      }
-      const normalized = {
-        scenario: insight.scenario || insight.application || '暂无',
-        audience: insight.audience || insight.targetUsers || '暂无',
-        difficulty: insight.difficulty || insight.complexity || '暂无',
-        value: insight.value || insight.worth || '暂无',
-      };
-      setGithubInsights(prev => {
-        const next = { ...prev, [id]: normalized };
-        return next;
-      });
-    } catch (e) {
-      showToast(`分析失败: ${e.message}`);
-    } finally {
-      setGithubInsightLoading(prev => { const n = { ...prev }; delete n[id]; return n; });
-    }
-  }
+  const {
+    githubInsights, setGithubInsights,
+    githubInsightLoading, setGithubInsightLoading,
+    requestGithubInsight,
+  } = useGithubInsight({ llmConfig });
 
   function executeSearch(q) {
     setNav('all');
@@ -3389,26 +3217,6 @@ ${signals}
   }
 
   // addEvent/removeEvent moved to useCalendar
-
-  function getEventsForDay(dayInfo) {
-    if (!dayInfo.isCurrentMonth) return [];
-    const dateStr = `${dayInfo.year}-${String(dayInfo.month + 1).padStart(2, '0')}-${String(dayInfo.day).padStart(2, '0')}`;
-    return events.filter(e => e.date === dateStr);
-  }
-
-  function isToday(dayInfo) {
-    const now = new Date();
-    return dayInfo.isCurrentMonth && dayInfo.day === now.getDate() && dayInfo.month === now.getMonth() && dayInfo.year === now.getFullYear();
-  }
-
-  function getHeatLevel(day) {
-    const count = calendarHeatMap.get(day) || 0;
-    if (count === 0) return 0;
-    if (count <= 2) return 1;
-    if (count <= 5) return 2;
-    if (count <= 10) return 3;
-    return 4;
-  }
 
   const navToPrimary = {
     home: 'home',
@@ -4334,347 +4142,11 @@ ${signals}
     </div>
   );
 
-  function addCustomSource() {
-    if (!newSource.name || !newSource.url) return;
-    const nextUrl = normalizeSourceUrl(newSource.url);
-    const exists = customSources.some(source => normalizeSourceUrl(source.url) === nextUrl) || allSources.some(source => normalizeSourceUrl(source.url) === nextUrl);
-    if (exists) {
-      showToast('Source already exists');
-      return;
-    }
-    setCustomSources(prev => [...prev, { ...newSource, id: Date.now() }]);
-    setNewSource({ name: '', url: '', region: 'overseas' });
-    setSourceVerifyResult(null);
-  }
-
-  function removeCustomSource(id) {
-    setCustomSources(prev => prev.filter(s => s.id !== id));
-  }
-
-  // source handlers (verifySource/discoverSource/addDiscoveredSource/verifyAllSources) moved to useSourceManager
-
-  // 辅助函数：截断 URL
-  function truncateUrl(url, maxLength) {
-    if (!url) return '';
-    return url.length > maxLength ? url.slice(0, maxLength) + '...' : url;
-  }
-
-  function normalizeSourceUrl(url) {
-    return (url || '').replace(/\/$/, '').toLowerCase();
-  }
-
-  // 辅助函数：截断文本
-  function truncateText(text, maxLength) {
-    if (!text) return '';
-    return text.length > maxLength ? text.slice(0, maxLength) + '...' : text;
-  }
-
-  // 辅助函数：获取健康度指示器
-  function getSourceHealthIndicator(sourceId, type) {
-    const health = sourceHealth[sourceId];
-    if (!health) {
-      return <span className="health-indicator health-unknown" title="未验证">?</span>;
-    }
-    
-    if (health.status === 'healthy') {
-      return <span className="health-indicator health-good" title="健康">✓</span>;
-    } else if (health.status === 'warning') {
-      return <span className="health-indicator health-warning" title="警告">!</span>;
-    } else if (health.status === 'error') {
-      return <span className="health-indicator health-bad" title="错误">✗</span>;
-    }
-    return <span className="health-indicator health-unknown" title="未验证">?</span>;
-  }
-
-  // 验证单个源
-  function verifySingleSource(source, isBuiltin = false) {
-    if (!source || !source.url) {
-      console.warn('verifySingleSource: Invalid source', source);
-      return;
-    }
-    
-    const url = source.url;
-    const sourceKey = isBuiltin ? source.name : source.id;
-    const startTime = Date.now();
-    setSourceVerifying(true);
-    
-    fetch(`/api/verify-source?url=${encodeURIComponent(url)}`)
-      .then(r => r.json())
-      .then(d => {
-        const responseTime = Date.now() - startTime;
-        const previousHealth = sourceHealth[sourceKey];
-        const failCount = d.ok ? 0 : (previousHealth?.failCount || 0) + 1;
-        
-        // 健康状态判断逻辑
-        let status = 'healthy';
-        if (!d.ok) {
-          status = 'error';
-        } else if (responseTime > 3000) {
-          // 响应时间超过3秒视为警告
-          status = 'warning';
-        } else if (failCount >= 2) {
-          // 即使验证成功，但之前有失败记录也标记为警告
-          status = 'warning';
-        }
-        
-        setSourceHealth(prev => ({
-          ...prev,
-          [sourceKey]: {
-            status,
-            lastCheck: Date.now(),
-            responseTime,
-            failCount,
-            itemCount: d.itemCount || 0
-          }
-        }));
-      })
-      .catch(e => {
-        console.error('verifySingleSource: Error for', source.name || sourceKey, ':', e);
-        setSourceHealth(prev => ({
-          ...prev,
-          [sourceKey]: {
-            status: 'error',
-            lastCheck: Date.now(),
-            responseTime: 0,
-            failCount: (prev[sourceKey]?.failCount || 0) + 1,
-            itemCount: 0
-          }
-        }));
-      })
-      .finally(() => {
-        setSourceVerifying(false);
-      });
-  }
-
-  // 导出配置
-  function exportSources() {
-    const config = {
-      version: '1.0',
-      exportDate: new Date().toISOString(),
-      customSources: customSources,
-      sourceHealth: sourceHealth,
-      disabledSources: disabledSources
-    };
-    
-    const blob = new Blob([JSON.stringify(config, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `sources-config-${new Date().toISOString().slice(0, 10)}.json`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  }
-
-  // 导入配置
-  function importSources(e) {
-    const file = e.target.files[0];
-    if (!file) return;
-    
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      try {
-        const config = JSON.parse(event.target.result);
-        
-        if (config.version && config.customSources) {
-          const confirmed = confirm(
-            `即将导入 ${config.customSources.length} 个自定义源。\n\n` +
-            `注意：这将覆盖现有的自定义源配置。\n\n` +
-            `是否继续？`
-          );
-          
-          if (confirmed) {
-            setCustomSources(config.customSources);
-            if (config.sourceHealth) {
-              setSourceHealth(config.sourceHealth);
-            }
-            if (config.disabledSources) {
-              setDisabledSources(config.disabledSources);
-            }
-            alert('导入成功！');
-          }
-        } else {
-          alert('配置文件格式错误！');
-        }
-      } catch (error) {
-        alert('导入失败：文件解析错误');
-        console.error('Import error:', error);
-      }
-    };
-    reader.readAsText(file);
-    e.target.value = ''; // 重置文件输入
-  }
-
-  // 自动监控相关函数
-  useEffect(() => {
-    if (!autoMonitorEnabled) return;
-    
-    const interval = setInterval(() => {
-      // 自动验证所有启用的源
-      const allEnabledSources = [...(customSources || []).filter(s => !disabledSources.includes(s.name)), ...(allSources || []).filter(s => !disabledSources.includes(s.name))];
-      
-      // 只验证有健康记录的源，避免首次验证所有源
-      const sourcesToMonitor = allEnabledSources.filter(source => {
-        const key = source.id || source.name;
-        return sourceHealth[key] && sourceHealth[key].lastCheck;
-      });
-      
-      if (sourcesToMonitor.length > 0) {
-        sourcesToMonitor.forEach(source => {
-          verifySingleSource(source, !source.id);
-        });
-      }
-    }, monitorInterval * 60 * 1000); // 分钟转换为毫秒
-    
-    return () => clearInterval(interval);
-  }, [autoMonitorEnabled, monitorInterval, customSources, allSources, disabledSources, sourceHealth]);
-
-  // 检查健康状态并发送警告
-  useEffect(() => {
-    const newAlerts = [];
-    
-    // 检查自定义源
-    customSources.forEach(source => {
-      const health = sourceHealth[source.id];
-      if (health && health.failCount >= 3) {
-        newAlerts.push({
-          id: source.id,
-          name: source.name,
-          type: 'error',
-          message: `${source.name} 连续失败 ${health.failCount} 次`,
-          timestamp: health.lastCheck
-        });
-      } else if (health && health.status === 'warning') {
-        newAlerts.push({
-          id: source.id,
-          name: source.name,
-          type: 'warning',
-          message: `${source.name} 响应较慢：${health.responseTime}ms`,
-          timestamp: health.lastCheck
-        });
-      }
-    });
-    
-    // 检查内置源
-    allSources.forEach(source => {
-      const health = sourceHealth[source.name];
-      if (health && health.failCount >= 3) {
-        newAlerts.push({
-          id: source.name,
-          name: source.name,
-          type: 'error',
-          message: `${source.name} 连续失败 ${health.failCount} 次`,
-          timestamp: health.lastCheck
-        });
-      } else if (health && health.status === 'warning') {
-        newAlerts.push({
-          id: source.name,
-          name: source.name,
-          type: 'warning',
-          message: `${source.name} 响应较慢：${health.responseTime}ms`,
-          timestamp: health.lastCheck
-        });
-      }
-    });
-    
-    // 只显示最近10条警告
-    setMonitorAlerts(newAlerts.slice(-10));
-  }, [sourceHealth, customSources, allSources]);
-
-  // 监控设置（autoMonitorEnabled/monitorInterval）持久化由 stockStore 的 persist 中间件自动处理
-  // 清除警告
-  function clearAlerts() {
-    setMonitorAlerts([]);
-  }
-
-  function fetchLlmModels() {
-    if (!llmConfig.baseUrl) return;
-    setLlmFetching(true);
-    setLlmFetchError('');
-    const params = new URLSearchParams({ baseUrl: llmConfig.baseUrl, apiKey: llmConfig.apiKey });
-    fetch(`/api/llm-models?${params}`).then(r => r.json()).then(d => {
-      if (d.ok) {
-        setLlmModels(d.models || []);
-      } else {
-        setLlmFetchError(d.message || 'Failed to fetch models');
-        setLlmModels([]);
-      }
-    }).catch(() => {
-      setLlmFetchError('Network error');
-      setLlmModels([]);
-    }).finally(() => setLlmFetching(false));
-  }
+  // source 相关函数（addCustomSource/removeCustomSource/truncateUrl/truncateText/
+  // getSourceHealthIndicator/verifySingleSource/exportSources/importSources/clearAlerts）
+  // 及自动监控/健康检查 useEffect 已移至 useSourceManager
 
   // fetchCustomUrl moved to useCustomUrl
-
-  function addManualModel() {
-    if (!llmManualInput.trim()) return;
-    setLlmConfig(prev => ({
-      ...prev,
-      manualModels: [...(prev.manualModels || []), { id: llmManualInput.trim(), name: llmManualInput.trim() }],
-      selectedModel: prev.selectedModel || llmManualInput.trim()
-    }));
-    setLlmManualInput('');
-  }
-
-  function removeManualModel(modelId) {
-    setLlmConfig(prev => ({
-      ...prev,
-      manualModels: (prev.manualModels || []).filter(m => m.id !== modelId),
-      selectedModel: prev.selectedModel === modelId ? '' : prev.selectedModel
-    }));
-  }
-
-  function testLlmConnection() {
-    if (!llmConfig.baseUrl || !llmConfig.selectedModel) return;
-    setLlmTesting(true);
-    setLlmTestResult(null);
-    fetch('/api/llm-test', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ baseUrl: llmConfig.baseUrl, apiKey: llmConfig.apiKey, model: llmConfig.selectedModel })
-    }).then(r => r.json()).then(d => {
-      setLlmTestResult(d);
-    }).catch(() => {
-      setLlmTestResult({ ok: false, message: 'Network error' });
-    }).finally(() => setLlmTesting(false));
-  }
-
-  function handleSelectPreset(preset) {
-    setActivePresetId(null);
-    setLlmConfig(prev => ({
-      ...prev,
-      provider: preset.id,
-      baseUrl: preset.baseUrl,
-      apiKey: ''
-    }));
-    setLlmModels(preset.models.map(m => ({ id: m, name: m, owned_by: preset.name })));
-  }
-
-  function handleQuickSave() {
-    if (!llmConfig.baseUrl || !llmConfig.selectedModel) return;
-    const providerName = LLM_PRESETS.find(p => p.id === llmConfig.provider)?.name || '自定义';
-    const fallbackName = `${providerName}-${llmConfig.selectedModel}`;
-    const name = llmPresetName.trim() || fallbackName;
-    upsertPreset({
-      id: llmPresetName.trim() ? undefined : activePresetId || undefined,
-      name,
-      provider: llmConfig.provider || 'custom',
-      baseUrl: llmConfig.baseUrl,
-      apiKey: llmConfig.apiKey,
-      selectedModel: llmConfig.selectedModel,
-      manualModels: llmConfig.manualModels || [],
-    }, { activate: true });
-    setLlmPresetName('');
-    setShowLlmQuickConfig(false);
-    setAiInsights({ loading: false, data: null, error: '' });
-  }
-
-  function handleQuickTest() {
-    if (!llmConfig.baseUrl || !llmConfig.selectedModel) return;
-    testLlmConnection();
-  }
 
 }
 

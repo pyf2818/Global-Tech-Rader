@@ -40,7 +40,7 @@ function loadPresets() {
   return Array.isArray(presets) ? presets.map(normalizePreset) : [];
 }
 
-export function useLlmConfig() {
+export function useLlmConfig({ LLM_PRESETS = [], onQuickSaveSuccess } = {}) {
   const [llmConfig, setLlmConfig] = useState(loadConfig);
   const [llmPresets, setLlmPresets] = useState(loadPresets);
   const [activePresetId, setActivePresetId] = useState(() => loadLS(ACTIVE_KEY, null));
@@ -51,6 +51,7 @@ export function useLlmConfig() {
   const [llmTesting, setLlmTesting] = useState(false);
   const [llmManualInput, setLlmManualInput] = useState('');
   const [showLlmQuickConfig, setShowLlmQuickConfig] = useState(false);
+  const [llmPresetName, setLlmPresetName] = useState('');
 
   const allLlmModels = useMemo(() => {
     const models = [...llmModels, ...(llmConfig.manualModels || [])];
@@ -107,6 +108,92 @@ export function useLlmConfig() {
     setLlmTestResult(null);
   }, []);
 
+  function fetchLlmModels() {
+    if (!llmConfig.baseUrl) return;
+    setLlmFetching(true);
+    setLlmFetchError('');
+    const params = new URLSearchParams({ baseUrl: llmConfig.baseUrl, apiKey: llmConfig.apiKey });
+    fetch(`/api/llm-models?${params}`).then(r => r.json()).then(d => {
+      if (d.ok) {
+        setLlmModels(d.models || []);
+      } else {
+        setLlmFetchError(d.message || 'Failed to fetch models');
+        setLlmModels([]);
+      }
+    }).catch(() => {
+      setLlmFetchError('Network error');
+      setLlmModels([]);
+    }).finally(() => setLlmFetching(false));
+  }
+
+  function addManualModel() {
+    if (!llmManualInput.trim()) return;
+    setLlmConfig(prev => ({
+      ...prev,
+      manualModels: [...(prev.manualModels || []), { id: llmManualInput.trim(), name: llmManualInput.trim() }],
+      selectedModel: prev.selectedModel || llmManualInput.trim()
+    }));
+    setLlmManualInput('');
+  }
+
+  function removeManualModel(modelId) {
+    setLlmConfig(prev => ({
+      ...prev,
+      manualModels: (prev.manualModels || []).filter(m => m.id !== modelId),
+      selectedModel: prev.selectedModel === modelId ? '' : prev.selectedModel
+    }));
+  }
+
+  function testLlmConnection() {
+    if (!llmConfig.baseUrl || !llmConfig.selectedModel) return;
+    setLlmTesting(true);
+    setLlmTestResult(null);
+    fetch('/api/llm-test', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ baseUrl: llmConfig.baseUrl, apiKey: llmConfig.apiKey, model: llmConfig.selectedModel })
+    }).then(r => r.json()).then(d => {
+      setLlmTestResult(d);
+    }).catch(() => {
+      setLlmTestResult({ ok: false, message: 'Network error' });
+    }).finally(() => setLlmTesting(false));
+  }
+
+  function handleSelectPreset(preset) {
+    setActivePresetId(null);
+    setLlmConfig(prev => ({
+      ...prev,
+      provider: preset.id,
+      baseUrl: preset.baseUrl,
+      apiKey: ''
+    }));
+    setLlmModels(preset.models.map(m => ({ id: m, name: m, owned_by: preset.name })));
+  }
+
+  function handleQuickSave() {
+    if (!llmConfig.baseUrl || !llmConfig.selectedModel) return;
+    const providerName = LLM_PRESETS.find(p => p.id === llmConfig.provider)?.name || '自定义';
+    const fallbackName = `${providerName}-${llmConfig.selectedModel}`;
+    const name = llmPresetName.trim() || fallbackName;
+    upsertPreset({
+      id: llmPresetName.trim() ? undefined : activePresetId || undefined,
+      name,
+      provider: llmConfig.provider || 'custom',
+      baseUrl: llmConfig.baseUrl,
+      apiKey: llmConfig.apiKey,
+      selectedModel: llmConfig.selectedModel,
+      manualModels: llmConfig.manualModels || [],
+    }, { activate: true });
+    setLlmPresetName('');
+    setShowLlmQuickConfig(false);
+    if (typeof onQuickSaveSuccess === 'function') onQuickSaveSuccess();
+  }
+
+  function handleQuickTest() {
+    if (!llmConfig.baseUrl || !llmConfig.selectedModel) return;
+    testLlmConnection();
+  }
+
   return {
     llmConfig, setLlmConfig,
     llmPresets, setLlmPresets, upsertPreset, removePreset, activatePreset,
@@ -118,6 +205,9 @@ export function useLlmConfig() {
     llmTesting, setLlmTesting,
     llmManualInput, setLlmManualInput,
     showLlmQuickConfig, setShowLlmQuickConfig,
+    llmPresetName, setLlmPresetName,
     allLlmModels,
+    fetchLlmModels, addManualModel, removeManualModel, testLlmConnection,
+    handleSelectPreset, handleQuickSave, handleQuickTest,
   };
 }
