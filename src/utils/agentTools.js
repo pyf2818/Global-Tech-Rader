@@ -112,6 +112,42 @@ async function toolFetchPage(args, ctx) {
   return text || '(网页正文为空)';
 }
 
+/**
+ * 联网搜索：Tavily 优先（如配置 Key），自动 fallback 到 DuckDuckGo
+ * 返回结构化文本：标题、链接、摘要，便于 LLM 后续引用
+ */
+async function toolWebSearch(args, ctx) {
+  const query = String(args?.query || args?.keyword || '').trim();
+  if (!query) return '错误：query 参数不能为空';
+  const maxResults = Math.max(1, Math.min(Number(args?.max_results) || 6, 20));
+  // 优先从 ctx 取 Tavily Key（用户在设置面板配置），未配置则后端使用环境变量
+  const tavilyKey = ctx?.tavilyKey || ctx?.llmConfig?.tavilyKey || '';
+  const headers = { 'Content-Type': 'application/json' };
+  if (tavilyKey) headers['X-Tavily-Key'] = tavilyKey;
+  const res = await fetch('/api/web-search', {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ query, max_results: maxResults }),
+  });
+  if (!res.ok) return `错误：搜索接口返回 ${res.status}`;
+  const data = await res.json();
+  if (!data?.ok) {
+    const errMsg = typeof data?.error === 'string' ? data.error : (data?.error?.message || '搜索失败');
+    return `错误：${errMsg}`;
+  }
+  const items = Array.isArray(data.results) ? data.results : [];
+  if (items.length === 0) return `未找到与 "${query}" 相关的网页`;
+  const providerLabel = data.provider === 'tavily' ? 'Tavily' : 'DuckDuckGo';
+  const lines = items.map((item, i) => {
+    const title = item.title || '(无标题)';
+    const url = item.url || '';
+    const snippet = String(item.snippet || '').slice(0, 280);
+    const score = Number.isFinite(Number(item.score)) ? `（相关性 ${Math.round(Number(item.score) * 100)}%）` : '';
+    return `${i + 1}. ${title}${score}\n   链接：${url}\n   摘要：${snippet}`;
+  });
+  return `已通过 ${providerLabel} 联网搜索 "${query}"，找到 ${items.length} 条结果：\n\n${lines.join('\n\n')}`;
+}
+
 async function toolGetStockQuote(args, ctx) {
   const rawCode = String(args?.code || '').trim();
   if (!rawCode) return '错误：code 参数不能为空';
@@ -241,6 +277,7 @@ function toolWriteBlackboard(args, ctx) {
  *
  * 支持的子命令：
  *   news <keyword>            搜索资讯
+ *   search <query>            联网搜索（Tavily/DuckDuckGo）
  *   fetch <url>               抓取网页正文
  *   stock <code>              查询股票行情
  *   kline <code> [period] [count]  获取 K 线
@@ -275,6 +312,12 @@ async function toolExecuteCommand(args, ctx) {
       const url = rest[0] || '';
       if (!url) return '用法：fetch <url>';
       return await toolFetchPage({ url }, ctx);
+    }
+    case 'search':
+    case 'web': {
+      const query = rest.join(' ').trim();
+      if (!query) return '用法：search <query>';
+      return await toolWebSearch({ query, max_results: 6 }, ctx);
     }
     case 'stock': {
       const code = rest[0] || '';
@@ -460,6 +503,7 @@ const EXEC_HELP_TEXT = `execute_command 支持的子命令：
 
 【资讯 / 网络】
   news <keyword>              搜索资讯库
+  search <query>              联网搜索（Tavily 优先，自动 fallback DuckDuckGo）
   fetch <url>                 抓取网页正文（受沙箱出口白名单约束）
 
 【股票】
@@ -836,6 +880,26 @@ const BUILTIN_TOOL_DEFS = [
     },
     meta: { label: '抓取网页', icon: '🌐', description: '抓取指定 URL 的网页正文', category: 'web', requiresApproval: true },
     executor: toolFetchPage,
+  },
+  {
+    name: 'web_search',
+    schema: {
+      type: 'function',
+      function: {
+        name: 'web_search',
+        description: '联网搜索（实时获取互联网最新信息）。优先用 Tavily API（需配置 Key），自动 fallback 到 DuckDuckGo 免费搜索。适用于查询超出训练数据时间范围、最新资讯、最新版本信息等场景',
+        parameters: {
+          type: 'object',
+          properties: {
+            query: { type: 'string', description: '搜索关键词（建议精炼，去掉"请问""你知道吗"等口语化词）' },
+            max_results: { type: 'number', description: '返回结果数（默认 6，最多 20）' }
+          },
+          required: ['query']
+        }
+      }
+    },
+    meta: { label: '联网搜索', icon: '🔎', description: '联网搜索互联网最新信息（Tavily / DuckDuckGo）', category: 'web' },
+    executor: toolWebSearch,
   },
   {
     name: 'get_stock_quote',

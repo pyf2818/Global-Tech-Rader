@@ -220,3 +220,135 @@ describe('execute_command 工具（方案 C Phase 4）', () => {
     expect(r).toContain('read <path>');
   });
 });
+
+describe('web_search 工具（联网搜索）', () => {
+  beforeEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('工具已注册到 toolRegistry', () => {
+    const names = AGENT_TOOL_SCHEMAS.map(s => s.function.name);
+    expect(names).toContain('web_search');
+    const meta = getToolMetaByName('web_search');
+    expect(meta.label).toBe('联网搜索');
+    expect(meta.category).toBe('web');
+  });
+
+  it('空 query 返回错误', async () => {
+    const r = await executeAgentTool('web_search', { query: '' }, {});
+    expect(r).toContain('错误');
+    expect(r).toContain('query');
+  });
+
+  it('Tavily 优先模式：返回结果包含标题/链接/摘要', async () => {
+    const mockData = {
+      ok: true,
+      provider: 'tavily',
+      results: [
+        { title: 'React 19 Release', url: 'https://react.dev/blog/19', snippet: 'React 19 is now stable.', score: 0.95 },
+        { title: 'Vite 7 Notes', url: 'https://vite.dev/blog/7', snippet: 'Vite 7 improvements.' },
+      ],
+      meta: { query: 'react 19', count: 2, latencyMs: 320 },
+    };
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      json: async () => mockData,
+    }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const r = await executeAgentTool('web_search', { query: 'react 19', max_results: 3 }, { tavilyKey: 'tvly-test' });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe('/api/web-search');
+    expect(init.method).toBe('POST');
+    // 请求头应携带 Tavily Key
+    expect(init.headers['X-Tavily-Key']).toBe('tvly-test');
+    // 请求体应包含 query
+    const body = JSON.parse(init.body);
+    expect(body.query).toBe('react 19');
+    expect(body.max_results).toBe(3);
+    // 响应应包含 Tavily 标签和结果
+    expect(r).toContain('Tavily');
+    expect(r).toContain('React 19 Release');
+    expect(r).toContain('https://react.dev/blog/19');
+    expect(r).toContain('React 19 is now stable.');
+    // Tavily 返回 score 时应展示相关性百分比
+    expect(r).toContain('95%');
+  });
+
+  it('DuckDuckGo 兜底模式：返回结果格式一致', async () => {
+    const mockData = {
+      ok: true,
+      provider: 'duckduckgo',
+      results: [
+        { title: 'Tavily Docs', url: 'https://docs.tavily.com', snippet: 'Tavily API documentation.' },
+      ],
+      meta: { query: 'tavily', count: 1, latencyMs: 800, tavilyConfigured: false },
+    };
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      json: async () => mockData,
+    }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    // 未传 tavilyKey 时不应在请求头里加 X-Tavily-Key
+    const r = await executeAgentTool('web_search', { query: 'tavily' }, {});
+
+    const [, init] = fetchMock.mock.calls[0];
+    expect(init.headers['X-Tavily-Key']).toBeUndefined();
+    expect(r).toContain('DuckDuckGo');
+    expect(r).toContain('Tavily Docs');
+  });
+
+  it('空结果返回未找到提示', async () => {
+    vi.stubGlobal('fetch', async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({ ok: true, provider: 'duckduckgo', results: [], meta: {} }),
+    }));
+    const r = await executeAgentTool('web_search', { query: 'zzz_nonexistent_xxx' }, {});
+    expect(r).toContain('未找到');
+  });
+
+  it('HTTP 错误返回错误码', async () => {
+    vi.stubGlobal('fetch', async () => ({ ok: false, status: 500 }));
+    const r = await executeAgentTool('web_search', { query: 'test' }, {});
+    expect(r).toContain('错误');
+    expect(r).toContain('500');
+  });
+
+  it('后端返回 ok=false 时透传错误信息', async () => {
+    vi.stubGlobal('fetch', async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({ ok: false, error: { message: '上游服务降级' } }),
+    }));
+    const r = await executeAgentTool('web_search', { query: 'test' }, {});
+    expect(r).toContain('上游服务降级');
+  });
+
+  it('支持 keyword 别名（向后兼容 search_news 调用习惯）', async () => {
+    const mockData = { ok: true, provider: 'duckduckgo', results: [{ title: 'A', url: 'https://a.com', snippet: 's' }], meta: {} };
+    const fetchMock = vi.fn(async () => ({ ok: true, status: 200, json: async () => mockData }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const r = await executeAgentTool('web_search', { keyword: 'ai news' }, {});
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+    expect(body.query).toBe('ai news');
+    expect(r).toContain('ai news');
+  });
+
+  it('execute_command 的 search 子命令也能调用 web_search', async () => {
+    const mockData = { ok: true, provider: 'tavily', results: [{ title: 'T1', url: 'https://t1.com', snippet: 's1' }], meta: {} };
+    vi.stubGlobal('fetch', async () => ({ ok: true, status: 200, json: async () => mockData }));
+
+    const r = await executeAgentTool('execute_command', {
+      command: 'search "openai gpt 5"',
+    }, {});
+    expect(r).toContain('openai gpt 5');
+    expect(r).toContain('T1');
+  });
+});

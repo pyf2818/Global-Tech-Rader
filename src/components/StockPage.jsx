@@ -878,6 +878,34 @@ export default function StockPage({ llmConfig, onOpenLlmConfig }) {
     setShowBriefing(true);
   }, [ai, dashboard, sectors]);
 
+  // 首次进入股市页自动生成早报：用户进入页面即可看到当日早报，无需主动点击
+  // 条件：有 LLM 配置 + dashboard 已加载 + 当日尚未生成过 + 会话内只触发一次
+  const autoBriefingTriggeredRef = useRef(false);
+  useEffect(() => {
+    if (autoBriefingTriggeredRef.current) return;
+    // 必须有 LLM 配置才能调用 AI
+    if (!llmConfig?.baseUrl || !llmConfig?.selectedModel) return;
+    // dashboard 必须已加载（指数 + 热门股）
+    if (!dashboard?.indices || dashboard.indices.length === 0) return;
+    // 当日已生成过则跳过（按日期+id 检查 briefingHistory）
+    const today = new Date().toLocaleDateString('zh-CN');
+    const hasToday = (ai.briefingHistory || []).some(r =>
+      r?.generatedAt && new Date(r.generatedAt).toLocaleDateString('zh-CN') === today
+    );
+    if (hasToday) {
+      autoBriefingTriggeredRef.current = true;
+      return;
+    }
+    autoBriefingTriggeredRef.current = true;
+    // 静默生成，不弹出 modal（用户可在面板查看进度）
+    ai.generateMorningBrief({
+      indices: dashboard.indices,
+      stocks: dashboard.stocks || [],
+      sectors,
+      coverage: dashboard.coverage,
+    });
+  }, [llmConfig, dashboard, ai, sectors]);
+
   // 触发自选监控
   const runAlerts = useCallback(() => {
     ai.checkAlerts(watchlist, alertConditions);
@@ -908,10 +936,15 @@ export default function StockPage({ llmConfig, onOpenLlmConfig }) {
   };
 
   const loadStock = useCallback(async (code) => {
-    setKlineData(null); setTimelineData(null); setRealtime(null);
+    // 体验优化：不清空旧数据，让 UI 保持上一只股票的图表直到新数据到达，消除白屏
+    // 仅重置市场数据状态为"加载中"，realtime/kline/timeline 保留，由新数据覆盖
     setMarketDataState({ stale: false, unavailable: false, message: '', timestamp: '' });
     try {
-      const rRes = await fetch(`/api/stock/realtime?code=${code}`);
+      // 并行获取 realtime + timeline，比串行快 1 RTT
+      const [rRes, tRes] = await Promise.all([
+        fetch(`/api/stock/realtime?code=${code}`),
+        fetch(`/api/stock/timeline?code=${code}`),
+      ]);
       const payload = await rRes.json();
       const normalized = normalizeRealtimePayload(payload);
       setRealtime(normalized.realtime);
@@ -919,13 +952,28 @@ export default function StockPage({ llmConfig, onOpenLlmConfig }) {
       // 后端若返回真实 name 则更新；否则保留 pickStock 已设的 name，避免用 code 覆盖
       const apiName = normalized.realtime?.name;
       if (apiName) setSelectedName(apiName);
-      // 分时图（指数和个股都支持）
-      const tRes = await fetch(`/api/stock/timeline?code=${code}`);
       setTimelineData(await tRes.json());
     } catch {
       setMarketDataState({ stale: false, unavailable: true, message: '行情数据暂不可用', timestamp: '' });
     }
   }, []);
+
+  // 相邻自选股预取：用户切股票时大概率会看列表中的下一只，
+  // 提前 fire-and-forget 预取相邻股票的 realtime 到服务端缓存（不更新 UI）
+  const prefetchAdjacentStock = useCallback((currentCode) => {
+    if (!currentCode) return;
+    // 仅在自选股 tab 下预取（热门列表太多不预取）
+    if (listTab !== 'watchlist') return;
+    const items = watchlist || [];
+    const idx = items.findIndex(s => s.code === currentCode || s.secid === currentCode);
+    if (idx < 0) return;
+    // 预取下一只（环绕到 0）
+    const next = items[(idx + 1) % items.length];
+    if (next && next.code && next.code !== currentCode) {
+      // 用 query 参数标记 prefetch，服务端可识别后只填缓存不返回完整响应
+      fetch(`/api/stock/realtime?code=${next.code}&prefetch=1`).catch(() => {});
+    }
+  }, [listTab, watchlist]);
 
   // 轻量刷新：只拉实时行情，不清空 K线/分时（定时轮询用）
   const refreshRealtime = useCallback(async (code) => {
@@ -938,33 +986,53 @@ export default function StockPage({ llmConfig, onOpenLlmConfig }) {
     } catch { /* ignore */ }
   }, []);
 
-  // 实时行情轮询：每 2 秒刷新选中个股行情（接近实时）
+  // A 股交易时段感知：交易时段密集轮询，盘后/周末/节假日降频到 60s 省 95% 请求
+  // 时段：周一至周五 9:30-11:30 / 13:00-15:00（北京时间）
+  const isMarketOpen = useCallback((now = new Date()) => {
+    const day = now.getDay(); // 0=周日, 6=周六
+    if (day === 0 || day === 6) return false;
+    // 节假日简化处理：春节/国庆等大假需要用户自己感知，这里只判周末
+    const minutes = now.getHours() * 60 + now.getMinutes();
+    const morning = minutes >= 9 * 60 + 30 && minutes <= 11 * 60 + 30;
+    const afternoon = minutes >= 13 * 60 && minutes <= 15 * 60;
+    // 9:25-9:30 集合竞价也算"接近开盘"，给个稍慢的频率
+    const preOpen = minutes >= 9 * 60 + 25 && minutes < 9 * 60 + 30;
+    return morning || afternoon || preOpen;
+  }, []);
+
+  // 实时行情轮询：交易时段 2s，盘后 60s
   useEffect(() => {
     if (!selectedCode) return;
-    const timer = setInterval(() => refreshRealtime(selectedCode), 2000);
+    const interval = isMarketOpen() ? 2000 : 60000;
+    const timer = setInterval(() => {
+      refreshRealtime(selectedCode);
+    }, interval);
     return () => clearInterval(timer);
-  }, [selectedCode, refreshRealtime]);
+  }, [selectedCode, refreshRealtime, isMarketOpen, clockNow]);
 
-  // 大盘指数轮询：每 5 秒刷新 dashboard（指数 + 涨跌家数）
+  // 大盘指数轮询：交易时段 5s，盘后 60s
   useEffect(() => {
     if (!dashboard) return;
-    const timer = setInterval(() => loadDashboard(), 5000);
+    const interval = isMarketOpen() ? 5000 : 60000;
+    const timer = setInterval(() => loadDashboard(), interval);
     return () => clearInterval(timer);
-  }, [dashboard, loadDashboard]);
+  }, [dashboard, loadDashboard, isMarketOpen, clockNow]);
 
-  // K 线 / 分时图轮询：每 10 秒重新加载保持图表实时
+  // K 线轮询：交易时段 10s，盘后不轮询（K 线盘后不变）
   useEffect(() => {
     if (!selectedCode || period === 'timeline') return;
+    if (!isMarketOpen()) return; // 盘后 K 线不会变化，不轮询
     const timer = setInterval(() => setKlineReloadKey(k => k + 1), 10000);
     return () => clearInterval(timer);
-  }, [selectedCode, period]);
+  }, [selectedCode, period, isMarketOpen, clockNow]);
 
-  // 分时图轮询：每 5 秒重新加载保持分时线实时
+  // 分时图轮询：交易时段 5s，盘后不轮询
   useEffect(() => {
     if (!selectedCode || period !== 'timeline') return;
+    if (!isMarketOpen()) return;
     const timer = setInterval(() => setKlineReloadKey(k => k + 1), 5000);
     return () => clearInterval(timer);
-  }, [selectedCode, period]);
+  }, [selectedCode, period, isMarketOpen, clockNow]);
 
   // K线按需加载（切到日K/周K/月K时）
   useEffect(() => {
@@ -1065,6 +1133,8 @@ export default function StockPage({ llmConfig, onOpenLlmConfig }) {
     if (name) setSelectedName(name);
     setSearchKeyword('');
     setSearchResults([]);
+    // 预取下一只自选股，下次切换时直接命中服务端缓存
+    prefetchAdjacentStock(code);
   };
   const scrollTo = ref => ref.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   const openResearchTools = tab => {

@@ -1,23 +1,37 @@
 import { useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 
 function formatScore(value) {
   const score = Number(value || 0);
   return Number.isFinite(score) ? Math.round(score) : 0;
 }
 
-function formatRelativeTime(value) {
+function formatRelativeTime(value, t) {
   const time = Date.parse(value);
-  if (!Number.isFinite(time)) return '时间未知';
+  if (!Number.isFinite(time)) return t('common.unknown');
   const diffMs = Date.now() - time;
   const minutes = Math.max(0, Math.floor(diffMs / 60000));
-  if (minutes < 60) return `${minutes || 1} 分钟前`;
+  if (minutes < 60) return t('news.minutesAgo', { count: minutes || 1 });
   const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours} 小时前`;
+  if (hours < 24) return t('news.hoursAgo', { count: hours });
   const days = Math.floor(hours / 24);
-  if (days < 7) return `${days} 天前`;
+  if (days < 7) return t('news.daysAgo', { count: days });
   return new Intl.DateTimeFormat('zh-CN', { month: 'numeric', day: 'numeric' }).format(new Date(time));
 }
 
+/**
+ * IntelligenceFeedPanel - 精准推荐顶部「最热门情报」Hero 卡片
+ *
+ * 设计原则：只显示一个最显眼的关键信息（综合评分最高的那条），不堆砌。
+ * 详细资讯由下方的 RecommendationFeed 卡片流承载。
+ *
+ * Hero 卡片包含：
+ * - 综合评分徽章 + 分类标签
+ * - 大字号标题
+ * - 摘要（2-3 行）
+ * - 来源 + 时间 + 原文链接
+ * - 右侧紧凑指标条：影响 / 热度 / 综合三个数字
+ */
 export default function IntelligenceFeedPanel({
   items = [],
   opportunities = [],
@@ -28,142 +42,107 @@ export default function IntelligenceFeedPanel({
   updatedAt = '',
   onRefresh,
 }) {
-  const topEntities = useMemo(() => {
-    const counts = new Map();
-    items.forEach(item => {
-      (item.entities || []).forEach(entity => counts.set(entity, (counts.get(entity) || 0) + 1));
-    });
-    return [...counts.entries()]
-      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
-      .slice(0, 12)
-      .map(([name, count]) => ({ name, count }));
+  const { t } = useTranslation();
+  // 选出综合评分最高的作为 Hero（无评分时取第一条）
+  const hero = useMemo(() => {
+    if (!items.length) return null;
+    return items.reduce((best, cur) => {
+      const bestScore = Number(best.intelligenceScore || 0);
+      const curScore = Number(cur.intelligenceScore || 0);
+      return curScore > bestScore ? cur : best;
+    }, items[0]);
   }, [items]);
 
-  const lead = items[0];
-  const topSectors = Array.isArray(weeklySectors?.sectors) ? weeklySectors.sectors.slice(0, 6) : [];
-  const leadSector = weeklySectors?.leadSector || topSectors[0];
-  const topAlerts = Array.isArray(alerts) ? alerts.slice(0, 6) : [];
+  // 关键提醒条：仅展示优先级最高的 1 条（避免视觉噪声）
+  const topAlert = useMemo(() => {
+    if (!Array.isArray(alerts) || alerts.length === 0) return null;
+    return alerts.reduce((top, cur) =>
+      Number(cur.priority || 0) > Number(top.priority || 0) ? cur : top
+    , alerts[0]);
+  }, [alerts]);
 
   return (
-    <section className="intelligence-feed-panel" aria-label="AI 行业情报">
+    <section className="intelligence-feed-panel" aria-label={t('intelligence.title')}>
       <header className="intelligence-feed-head">
         <div>
-          <span className="intelligence-feed-kicker">AI Intelligence</span>
-          <h2>行业情报雷达</h2>
+          <span className="intelligence-feed-kicker">{t('intelligence.kicker')}</span>
+          <h2>{t('intelligence.title')}</h2>
         </div>
         <div className="intelligence-feed-actions">
-          {updatedAt && <span>{formatRelativeTime(updatedAt)}更新</span>}
-          <button type="button" onClick={onRefresh} disabled={loading} aria-label="刷新行业情报">
-            {loading ? '刷新中' : '刷新'}
+          {updatedAt && <span>{formatRelativeTime(updatedAt, t)}{t('intelligence.updatedAt')}</span>}
+          <button type="button" onClick={onRefresh} disabled={loading} aria-label={t('intelligence.refresh')}>
+            {loading ? t('common.refreshing') : t('intelligence.refresh')}
           </button>
         </div>
       </header>
 
       {error && (
         <div className="intelligence-feed-error">
-          <strong>情报源暂不可用</strong>
+          <strong>{t('errors.serverError')}</strong>
           <span>{error}</span>
         </div>
       )}
 
-      {!error && loading && items.length === 0 && (
+      {!error && loading && !hero && (
         <div className="intelligence-feed-skeleton">
-          {Array.from({ length: 3 }).map((_, index) => <span key={index} />)}
+          {Array.from({ length: 1 }).map((_, index) => <span key={index} />)}
         </div>
       )}
 
-      {!error && !loading && items.length === 0 && (
-        <div className="intelligence-feed-empty">暂无可展示的行业情报</div>
+      {!error && !loading && !hero && (
+        <div className="intelligence-feed-empty">{t('intelligence.noData')}</div>
       )}
 
-      {topAlerts.length > 0 && (
-        <div className="intelligence-alert-strip" aria-label="主动情报提醒">
-          {topAlerts.map(alert => (
-            <div key={alert.id} className={`intelligence-alert intelligence-alert-${alert.kind || 'priority'}`}>
-              <span>{alert.kind === 'risk' ? '风险' : alert.kind === 'opportunity' ? '机会' : alert.kind === 'sector' ? '赛道' : '提醒'}</span>
-              <strong>{alert.title}</strong>
-              <em>{formatScore(alert.priority)}</em>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {lead && (
-        <div className="intelligence-feed-layout">
-          <article className="intelligence-lead-card">
-            <div className="intelligence-lead-meta">
-              <span>{lead.categoryLabel || lead.category || 'Industry'}</span>
-              <strong>{formatScore(lead.intelligenceScore)}</strong>
-            </div>
-            <h3>{lead.title}</h3>
-            <p>{lead.summary || '暂无摘要'}</p>
-            <footer>
-              <span>{lead.source || '未知来源'} · {formatRelativeTime(lead.publishedAt)}</span>
-              {lead.url && <a href={lead.url} target="_blank" rel="noreferrer">查看原文</a>}
-            </footer>
-          </article>
-
-          <div className="intelligence-side-stack">
-            <div className="intelligence-score-grid">
-              <div><span>影响</span><strong>{formatScore(lead.impactScore)}</strong></div>
-              <div><span>热度</span><strong>{formatScore(lead.heatScore)}</strong></div>
-              <div><span>综合</span><strong>{formatScore(lead.intelligenceScore)}</strong></div>
-            </div>
-
-            <div className="intelligence-entity-strip">
-              {topEntities.length > 0 ? topEntities.map(entity => (
-                <span key={entity.name}>{entity.name}<b>{entity.count}</b></span>
-              )) : <span>等待实体信号</span>}
-            </div>
-            {opportunities.length > 0 && (
-              <div className="intelligence-opportunity-list">
-                {opportunities.slice(0, 6).map(signal => (
-                  <div key={signal.id} className={`intelligence-opportunity ${signal.type || 'watch'}`}>
-                    <span>{signal.label || 'Opportunity'}</span>
-                    <strong>{signal.title}</strong>
-                    <em>{formatScore(signal.score)}</em>
-                  </div>
-                ))}
-              </div>
-            )}
-            {leadSector && (
-              <div className="intelligence-weekly-sector">
-                <div className="intelligence-weekly-sector-head">
-                  <span>周度赛道</span>
-                  <strong>{leadSector.label}</strong>
-                  <em>{formatScore(leadSector.score)}</em>
-                </div>
-                <div className="intelligence-weekly-sector-meta">
-                  <span>{leadSector.eventCount || 0} 事件</span>
-                  <span>{leadSector.sourceCount || 0} 来源</span>
-                  <span>{leadSector.trend === 'surging' ? '升温' : leadSector.trend === 'active' ? '活跃' : '观察'}</span>
-                </div>
-                {topSectors.length > 1 && (
-                  <div className="intelligence-weekly-sector-list">
-                    {topSectors.slice(1).map(sector => (
-                      <span key={sector.id}>
-                        <b>{sector.label}</b>
-                        <em>{formatScore(sector.score)}</em>
-                      </span>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
+      {/* 关键提醒条：仅 1 条最高优先级，避免多条堆砌 */}
+      {topAlert && (
+        <div className="intelligence-alert-strip" aria-label={t('intelligence.alertReminder')}>
+          <div className={`intelligence-alert intelligence-alert-${topAlert.kind || 'priority'}`}>
+            <span>{topAlert.kind === 'risk' ? t('intelligence.alertRisk') : topAlert.kind === 'opportunity' ? t('intelligence.alertOpportunity') : topAlert.kind === 'sector' ? t('intelligence.alertSector') : t('intelligence.alertReminder')}</span>
+            <strong>{topAlert.title}</strong>
+            <em>{formatScore(topAlert.priority)}</em>
           </div>
         </div>
       )}
 
-      {items.length > 1 && (
-        <div className="intelligence-mini-list">
-          {items.slice(1, 13).map(item => (
-            <a key={item.id} href={item.url} target="_blank" rel="noreferrer" className="intelligence-mini-item">
-              <span>{formatScore(item.intelligenceScore)}</span>
-              <strong>{item.title}</strong>
-              <em>{item.source || '未知来源'}</em>
-            </a>
-          ))}
-        </div>
+      {/* Hero 卡片：最热门的那条情报，最显眼 */}
+      {hero && (
+        <article className="intelligence-hero-card">
+          <div className="intelligence-hero-main">
+            <div className="intelligence-hero-meta">
+              <span className="intelligence-hero-category">{hero.categoryLabel || hero.category || 'Industry'}</span>
+              <span className="intelligence-hero-score" title={t('intelligence.score')}>
+                <strong>{formatScore(hero.intelligenceScore)}</strong>
+                <em>{t('intelligence.comprehensive')}</em>
+              </span>
+            </div>
+            <h3 className="intelligence-hero-title">{hero.title}</h3>
+            <p className="intelligence-hero-summary">{hero.summary || t('common.empty')}</p>
+            <footer className="intelligence-hero-footer">
+              <span className="intelligence-hero-source">{hero.source || t('common.unknown')} · {formatRelativeTime(hero.publishedAt, t)}</span>
+              {hero.url && (
+                <a href={hero.url} target="_blank" rel="noreferrer" className="intelligence-hero-link">
+                  {t('intelligence.viewOriginal')}
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="7" y1="17" x2="17" y2="7"/><polyline points="7 7 17 7 17 17"/></svg>
+                </a>
+              )}
+            </footer>
+          </div>
+          {/* 右侧紧凑指标条：3 个核心数字 */}
+          <div className="intelligence-hero-metrics">
+            <div className="intelligence-hero-metric" title={t('intelligence.impact')}>
+              <span className="intelligence-hero-metric-label">{t('intelligence.impact')}</span>
+              <strong className="intelligence-hero-metric-value">{formatScore(hero.impactScore)}</strong>
+            </div>
+            <div className="intelligence-hero-metric" title={t('intelligence.heat')}>
+              <span className="intelligence-hero-metric-label">{t('intelligence.heat')}</span>
+              <strong className="intelligence-hero-metric-value">{formatScore(hero.heatScore)}</strong>
+            </div>
+            <div className="intelligence-hero-metric intelligence-hero-metric-primary" title={t('intelligence.score')}>
+              <span className="intelligence-hero-metric-label">{t('intelligence.comprehensive')}</span>
+              <strong className="intelligence-hero-metric-value">{formatScore(hero.intelligenceScore)}</strong>
+            </div>
+          </div>
+        </article>
       )}
     </section>
   );

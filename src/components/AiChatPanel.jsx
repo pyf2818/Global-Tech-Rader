@@ -12,7 +12,8 @@ import SessionSidebar from './SessionSidebar.jsx';
 import AgentPanel from './AgentPanel.jsx';
 import { generateSessionSummary, retrieveRelevantMemories } from '../utils/sessionMemory.js';
 import { searchFiles } from '../utils/workspaceIndex.js';
-import { observeQuestion, observeReply, getLearnedPreferences } from '../utils/profileLearning.js';
+import { observeQuestion, observeReply, observeFeedback, observeToolUsage, observeSessionEnd, getLearnedPreferences } from '../utils/profileLearning.js';
+import { evolveMemory, fetchPersonaSummary } from '../utils/memoryEvolver.js';
 import { extractTodos } from '../utils/todoExtractor.js';
 import { isAiElfAsset, normalizeAsset } from '../domain/creative/assetModel.js';
 import { selectToolSchemas, executeAgentTool } from '../utils/agentTools.js';
@@ -21,6 +22,7 @@ import { buildSessionContextText, appendHistory } from '../utils/sessionStore.js
 import {
   subscribePending, getPendingApprovals, respondApproval, cancelAllPending,
 } from '../utils/sandbox.js';
+import { PersonaDrawer } from './PersonaEditor.jsx';
 
 const WELCOME_MSGS = ['今天有什么情报需要我深入分析？', '准备好为你梳理今日要点了', '想从哪条资讯开始剖析？', '随时可以问我今日趋势与风险'];
 
@@ -41,6 +43,7 @@ const TOOL_META = {
   read_workspace_file: { label: '读取文件', icon: '📄' },
   write_workspace_file: { label: '写入文件', icon: '✍️' },
   search_news: { label: '检索资讯', icon: '🔍' },
+  web_search: { label: '联网搜索', icon: '🔎' },
   fetch_page: { label: '抓取网页', icon: '🌐' },
   get_stock_quote: { label: '股票行情', icon: '📈' },
   get_stock_kline: { label: 'K 线数据', icon: '📊' },
@@ -51,6 +54,7 @@ function summarizeArgs(name, args) {
     const a = args || {};
     if (name === 'read_workspace_file' || name === 'write_workspace_file') return a.path || '';
     if (name === 'search_news') return a.keyword || '';
+    if (name === 'web_search') return a.query || a.keyword || '';
     if (name === 'fetch_page') return a.url || '';
     if (name === 'get_stock_quote' || name === 'get_stock_kline') return a.code || '';
     return JSON.stringify(a);
@@ -102,6 +106,7 @@ const APPROVAL_TOOL_META = {
   read_workspace_file: { label: '读取文件', icon: '📄' },
   write_workspace_file: { label: '写入文件', icon: '✍️' },
   fetch_page: { label: '抓取网页', icon: '🌐' },
+  web_search: { label: '联网搜索', icon: '🔎' },
   execute_command: { label: '执行命令', icon: '⌨️' },
 };
 
@@ -201,6 +206,7 @@ export default function AiChatPanel({
   todayLanes,
   materials,
   agent,
+  onUpdateAgent,
   variant = 'copilot',
 }) {
   // 订阅模块级 sessionsStore：组件 unmount 后流式 fetch 继续更新 store，
@@ -245,6 +251,16 @@ export default function AiChatPanel({
     return () => { /* 不在切换时取消，让 abort 流程自己处理 */ };
   }, [activeSessionId]);
 
+  // 角色设定侧滑面板：从 chat-header 入口打开，编辑当前 agent 的 persona/soul/voice/habits
+  const [showPersonaDrawer, setShowPersonaDrawer] = useState(false);
+  const handleSavePersona = useCallback((agentId, patch) => {
+    if (!onUpdateAgent) {
+      console.warn('[AiChatPanel] onUpdateAgent prop 未传入，无法保存角色设定');
+      return;
+    }
+    onUpdateAgent(agentId, patch);
+  }, [onUpdateAgent]);
+
   // Sync model selection when llmConfig changes externally (e.g. from LLM modal)
   useEffect(() => {
     if (llmConfig?.selectedModel && llmConfig.selectedModel !== selectedModel) {
@@ -256,6 +272,11 @@ export default function AiChatPanel({
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
   const fileInputRef = useRef(null);
+
+  // 消息队列：流式生成中允许用户继续输入下一条消息并排队，流结束后自动发送
+  // 类似 Codex / Claude Code 的多消息排队体验
+  const messageQueueRef = useRef([]);
+  const [queueCount, setQueueCount] = useState(0);
   const abortControllerRef = useRef(null);
 
   const currentSession = sessions.find(s => s.id === activeSessionId);
@@ -303,6 +324,17 @@ export default function AiChatPanel({
 
   // 工作空间召回：异步检索相关文件（IndexedDB），debounce 避免频繁查询
   const [recalledFiles, setRecalledFiles] = useState([]);
+
+  // 用户性格画像：从服务端 persona_summary 加载，让 agent 跨会话「记得」用户
+  const [personaSummary, setPersonaSummary] = useState(null);
+  useEffect(() => {
+    let cancelled = false;
+    fetchPersonaSummary().then(ps => {
+      if (!cancelled && ps) setPersonaSummary(ps);
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [memoriesVersion]); // memoriesVersion 变化时重新拉取（记忆进化后刷新画像）
+
   useEffect(() => {
     const query = input || messages.filter(m => m.role === 'user').pop()?.content || '';
     if (!query || query.length < 4) { setRecalledFiles([]); return; }
@@ -347,8 +379,20 @@ export default function AiChatPanel({
     return [
       // 当前智能体的角色 prompt（若 agent 提供）优先于默认助手描述
       agent?.systemPrompt || '你是用户的个人情报分析助手，拥有对用户的长期记忆。请用 markdown 格式回复。',
+      // 灵魂设定：persona/soul/voice/habits 结构化注入，让 LLM 内化角色
+      agent?.persona ? `【角色设定】\n  - 性格特质：${(agent.persona.traits || []).join('、')}\n  - 背景：${agent.persona.background || ''}\n  - 价值观：${(agent.persona.values || []).join('、')}` : '',
+      agent?.soul ? `【灵魂】${agent.soul}` : '',
+      agent?.voice ? `【语气】${[agent.voice.tone, agent.voice.pace && `节奏：${agent.voice.pace}`, agent.voice.formality && `正式度：${agent.voice.formality}`].filter(Boolean).join('；')}` : '',
+      agent?.habits?.length ? `【行为习惯】回复时请遵循以下习惯：\n${agent.habits.map(h => `  - ${h}`).join('\n')}` : '',
       '【用户画像】你了解以下关于用户的信息，回复时主动贴合其关注点和偏好：',
       profileLines.map(l => `  - ${l}`).join('\n'),
+      // 用户性格画像（跨会话持久化，从服务端 persona_summary 加载）
+      personaSummary && (personaSummary.habits?.length || personaSummary.traits?.length || personaSummary.needs?.length) ? [
+        '【用户性格画像】基于历史对话总结的用户性格（重要：回复时主动贴合）：',
+        personaSummary.habits?.length ? `  - 用户习惯：${personaSummary.habits.join('；')}` : '',
+        personaSummary.traits?.length ? `  - 用户性格：${personaSummary.traits.join('；')}` : '',
+        personaSummary.needs?.length ? `  - 用户需求：${personaSummary.needs.join('；')}` : '',
+      ].filter(Boolean).join('\n') : '',
       // 学习画像：从用户行为观测到的偏好
       learnedPrefs.hasData ? [
         '【学习偏好】根据用户历史交互，你观察到以下偏好，回复时主动贴合：',
@@ -379,7 +423,7 @@ export default function AiChatPanel({
         ? `用户从本地工作空间加入了以下文件作为分析上下文：\n${workspaceFiles.map(f => `[文件:${f.name}]\n${String(f.content || '').slice(0, 2000)}`).join('\n\n')}`
         : '',
     ].filter(Boolean).join('\n');
-  }, [selectedInterests, categories, intelligenceProfile, workbenchItems?.length, intelligenceContext, workspaceFiles, relevantMemories, recalledFiles, learnedPrefs, excludeAllEvidence, materialContext, agent]);
+  }, [selectedInterests, categories, intelligenceProfile, workbenchItems?.length, intelligenceContext, workspaceFiles, relevantMemories, recalledFiles, learnedPrefs, excludeAllEvidence, materialContext, agent, personaSummary]);
 
   // 情境化快捷建议：基于今日情报动态生成，空状态引导
   const quickActions = useMemo(() => {
@@ -555,6 +599,9 @@ export default function AiChatPanel({
       agentId: agent?.id || '',
       agentName: agent?.name || '',
       agentTools: Array.isArray(agent?.tools) ? agent.tools : [],
+      // 联网搜索 Tavily Key（用户在设置面板配置；未配置则后端使用环境变量）
+      tavilyKey: llmConfig?.tavilyKey || '',
+      llmConfig,
     };
     // 工作中的消息列表（包含 user / assistant / tool 三种角色），逐步累积
     const conversationMessages = baseMessages.map(m => ({ role: m.role, content: m.content }));
@@ -641,6 +688,8 @@ export default function AiChatPanel({
             status: 'running',
             startedAt: Date.now(),
           });
+          // 画像学习：记录用户偏好的工具
+          observeToolUsage([toolName]);
           updateAssistantMsg({
             content: finalContent,
             toolCalls: toolCallTrace.slice(),
@@ -766,12 +815,28 @@ export default function AiChatPanel({
       generateSessionSummary(currentSession, { baseUrl: llmConfig.baseUrl, apiKey: llmConfig.apiKey, selectedModel }).then(mem => {
         if (mem) setMemoriesVersion(v => v + 1);
       });
+      // 自我进化记忆闭环：每 N 轮触发 LLM 总结用户行为，写入服务端 persona_summary
+      // fire-and-forget，失败不影响对话流
+      evolveMemory({
+        messages: currentSession.messages,
+        sessionId: targetId,
+        agentId: agent?.id || 'orchestrator',
+        llmConfig: { baseUrl: llmConfig.baseUrl, apiKey: llmConfig.apiKey, selectedModel },
+        totalRounds,
+      }).catch(() => { /* 静默失败 */ });
     }
   }, [llmConfig, selectedModel, systemPrompt, intelligenceContext, sessions, messages, setSessions, setLearnedVersion, setAutoTodos, setMemoriesVersion]);
 
   const sendMessage = useCallback(async (text) => {
     const msg = text || input.trim();
-    if (!msg || isStreaming) return;
+    if (!msg) return;
+    // 队列模式：流式生成中允许排队，不阻塞用户输入
+    if (isStreaming) {
+      messageQueueRef.current.push(msg);
+      setQueueCount(messageQueueRef.current.length);
+      setInput('');
+      return;
+    }
     if (!llmConfig?.baseUrl || !selectedModel) {
       onOpenLlmConfig?.();
       return;
@@ -800,8 +865,10 @@ export default function AiChatPanel({
       return { ...s, title, messages: [...s.messages, userMessage, assistantPlaceholder], updatedAt: Date.now() };
     }));
 
-    // 画像学习：观测用户提问主题
+    // 画像学习：观测用户提问主题 + 兴趣领域 + 提问模式 + 时段 + 实体
     observeQuestion(msg);
+    // 负面反馈信号识别：用户的"不对/太长/再想想"等
+    observeFeedback(msg);
     setLearnedVersion(v => v + 1);
     setInput('');
 
@@ -813,6 +880,9 @@ export default function AiChatPanel({
     }
     draftRef.current = '';
     historyIndexRef.current = null;
+
+    // 标记流式生成中：触发 send 按钮变为 stop 按钮，输入框允许继续输入排队
+    setIsStreaming(true);
 
     try {
       const controller = new AbortController();
@@ -919,6 +989,14 @@ export default function AiChatPanel({
         generateSessionSummary(currentSession, { baseUrl: llmConfig.baseUrl, apiKey: llmConfig.apiKey, selectedModel }).then(mem => {
           if (mem) setMemoriesVersion(v => v + 1);
         });
+        // 自我进化记忆闭环：流式 chat 路径也触发
+        evolveMemory({
+          messages: currentSession.messages,
+          sessionId: targetId,
+          agentId: agent?.id || 'orchestrator',
+          llmConfig: { baseUrl: llmConfig.baseUrl, apiKey: llmConfig.apiKey, selectedModel },
+          totalRounds,
+        }).catch(() => { /* 静默失败 */ });
       }
     } catch (err) {
       const aborted = err?.name === 'AbortError';
@@ -935,9 +1013,23 @@ export default function AiChatPanel({
         return { ...s, messages: msgs };
       }));
     } finally {
+      // 先捕获 abort 状态再清空 ref（避免 race）
+      const wasAborted = abortControllerRef.current?.signal?.aborted || activeAbortController?.signal?.aborted || false;
       abortControllerRef.current = null;
       activeAbortController = null;
       setIsStreaming(false);
+      // 消费消息队列：若用户在流式生成期间排队了下一条消息，自动发送
+      // 仅当本次非用户主动停止时才消费（避免停止后还自动发下一条）
+      if (!wasAborted && messageQueueRef.current.length > 0) {
+        const nextMsg = messageQueueRef.current.shift();
+        setQueueCount(messageQueueRef.current.length);
+        // 异步触发下一条，避免在 finally 中嵌套调用
+        setTimeout(() => sendMessage(nextMsg), 50);
+      } else if (wasAborted) {
+        // 用户主动停止：清空队列
+        messageQueueRef.current = [];
+        setQueueCount(0);
+      }
     }
   }, [input, messages, isStreaming, llmConfig, selectedModel, systemPrompt, onOpenLlmConfig, activeSessionId, intelligenceContext, agent, runAgentLoop]);
 
@@ -984,12 +1076,13 @@ export default function AiChatPanel({
     sendMessage(lastUser.content);
   }, [isStreaming, activeSessionId, sessions, sendMessage]);
 
-  // 引用追问：把消息内容作为引用填入输入框
+  // 引用追问：直接发送带引用的追问消息（不再填入输入框，避免长内容污染输入区）
+  // 走 sendMessage，自动复用队列逻辑：流式中自动排队，空闲时立即发送
   const quoteReply = useCallback((content) => {
-    const snippet = content.length > 200 ? content.slice(0, 200) + '…' : content;
-    setInput(prev => prev ? `${prev}\n\n> ${snippet}\n\n` : `> ${snippet}\n\n`);
-    inputRef.current?.focus();
-  }, []);
+    const snippet = content.length > 300 ? content.slice(0, 300) + '…' : content;
+    // 直接发起一次追问，引用原文并要求深入分析
+    sendMessage(`请基于以下内容深入分析，提炼关键信息、影响和后续值得关注的信号：\n\n> ${snippet}`);
+  }, [sendMessage]);
 
   // 工作空间文件加入对话上下文
   const handleAddContextFiles = useCallback((files) => {
@@ -1138,6 +1231,17 @@ export default function AiChatPanel({
               </svg>
             </button>
           )}
+          <button
+            className="chat-header-btn chat-header-persona-btn"
+            onClick={() => setShowPersonaDrawer(true)}
+            title={`角色设定${agent ? `：${agent.name}` : ''}`}
+            disabled={!agent}
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+              <circle cx="12" cy="7" r="4"/>
+            </svg>
+          </button>
           <button className="chat-header-btn" onClick={onOpenLlmConfig} title="配置模型">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
@@ -1318,15 +1422,22 @@ export default function AiChatPanel({
               <path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
             </svg>
           </button>
-          <textarea ref={inputRef} className="chat-input" value={input} onChange={e => setInput(e.target.value)} onKeyDown={handleKeyDown} placeholder={hasConfig ? "给智能体发消息…  (Shift+Enter 换行)" : "请先配置大模型"} rows={1} disabled={!hasConfig} />
-          <button className={`chat-send-btn ${isStreaming ? 'chat-send-stop' : ''}`} onClick={() => isStreaming ? stopGeneration() : sendMessage()} disabled={!isStreaming && (!input.trim() || !hasConfig)} title={isStreaming ? '停止生成' : '发送'}>
-            {isStreaming ? (
+          <textarea ref={inputRef} className="chat-input" value={input} onChange={e => setInput(e.target.value)} onKeyDown={handleKeyDown} placeholder={hasConfig ? (isStreaming ? "正在生成中，输入下一条消息自动排队…" : "给智能体发消息…  (Shift+Enter 换行)") : "请先配置大模型"} rows={1} disabled={!hasConfig} />
+          {queueCount > 0 && (
+            <span className="chat-queue-indicator" title={`${queueCount} 条消息排队中`}>
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+              {queueCount}
+            </span>
+          )}
+          {isStreaming && (
+            <button className="chat-stop-btn" onClick={stopGeneration} title="停止生成" aria-label="停止生成">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
-            ) : (
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
-              </svg>
-            )}
+            </button>
+          )}
+          <button className="chat-send-btn" onClick={() => sendMessage()} disabled={!input.trim() || !hasConfig} title={isStreaming ? '排队发送' : '发送'}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
+            </svg>
           </button>
         </div>
       </div>
@@ -1349,6 +1460,12 @@ export default function AiChatPanel({
           agent={agent}
         />
       )}
+      <PersonaDrawer
+        open={showPersonaDrawer}
+        onClose={() => setShowPersonaDrawer(false)}
+        agent={agent}
+        onChange={handleSavePersona}
+      />
     </div>
   );
 }

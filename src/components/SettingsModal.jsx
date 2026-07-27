@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ICONS, REGION_MAP, AGENT_CATEGORIES } from '../constants/index.jsx';
 import { showToast } from '../utils/toast.js';
 import SourceOpsPanel from './SourceOpsPanel.jsx';
+import LanguageSwitcher from './LanguageSwitcher.jsx';
 import {
   getAllTools, subscribeTools, registerCustomHttpTool,
   deleteCustomTool, updateCustomHttpTool, testCustomHttpTool,
@@ -647,6 +649,7 @@ export default function SettingsModal({
   loadNews,
 }) {
   const [showSourceAdvanced, setShowSourceAdvanced] = React.useState(false);
+  const { t } = useTranslation();
 
   if (!showSettings) return null;
 
@@ -665,7 +668,16 @@ export default function SettingsModal({
                 </div>
                 <div className={`settings-content ${settingsTab === 'sources' && !showSourceAdvanced ? 'sources-simple-mode' : ''}`}>
                 {settingsTab === 'general' && (
-                  <div className="setting-item"><label>关键词屏蔽</label><textarea value={blocked} onChange={e => setBlocked(e.target.value)} placeholder="输入屏蔽词，逗号分隔" /><p className="setting-note">已过滤 {stats.blockedCount} 条资讯</p></div>
+                  <>
+                    <div className="setting-item">
+                      <label>{t('settings.general.language')}</label>
+                      <p className="setting-desc">{t('settings.general.languageDesc')}</p>
+                      <div style={{ marginTop: 8 }}>
+                        <LanguageSwitcher variant="full" />
+                      </div>
+                    </div>
+                    <div className="setting-item"><label>关键词屏蔽</label><textarea value={blocked} onChange={e => setBlocked(e.target.value)} placeholder="输入屏蔽词，逗号分隔" /><p className="setting-note">已过滤 {stats.blockedCount} 条资讯</p></div>
+                  </>
                 )}
 
                 {settingsTab === 'sources' && (
@@ -1574,6 +1586,35 @@ export default function SettingsModal({
                           {llmTestResult.ok ? <>{ICONS.check} 连接成功 ({llmTestResult.model}): {llmTestResult.reply}</> : <>连接失败: {llmTestResult.message}</>}
                         </div>
                       )}
+                    </div>
+                  </div>
+                )}
+
+                {settingsTab === 'llm' && (
+                  <div className="setting-item">
+                    <label>联网搜索（Tavily API Key）</label>
+                    <p className="setting-desc">
+                      Agent 调用 web_search 工具时优先用 Tavily（每月 1000 次免费，<a href="https://tavily.com" target="_blank" rel="noreferrer">tavily.com</a> 注册）。
+                      未填写时自动 fallback 到 DuckDuckGo 免费搜索（无需注册）。
+                    </p>
+                    <div className="llm-config-form">
+                      <div className="llm-config-row">
+                        <input
+                          type="password"
+                          placeholder="Tavily API Key（可选，留空使用 DuckDuckGo 免费搜索）"
+                          value={llmConfig.tavilyKey || ''}
+                          onChange={e => setLlmConfig(prev => ({ ...prev, tavilyKey: e.target.value }))}
+                          className="llm-input"
+                          autoComplete="off"
+                        />
+                        {(llmConfig.tavilyKey || '').trim() && (
+                          <button
+                            className="fetch-models-btn"
+                            onClick={() => setLlmConfig(prev => ({ ...prev, tavilyKey: '' }))}
+                            title="清空 Tavily Key"
+                          >清空</button>
+                        )}
+                      </div>
                     </div>
                   </div>
                 )}

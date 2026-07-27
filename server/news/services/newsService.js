@@ -9,8 +9,11 @@ import {
 import { isGoodImageUrl, normalizeImageKey } from '../images/imageProcessing.js';
 
 // 缓存（服务内部拥有）
-export const newsCache = { data: null, expiresAt: 0, key: '' };
+// SWR 模式：staleWhileRevalidate=true 时返回过期数据但后台静默刷新
+// staleAt = expiresAt + 5min（stale 窗口），用户过期后仍能秒返旧数据，后台静默刷新
+export const newsCache = { data: null, expiresAt: 0, staleAt: 0, key: '', lastWarmAt: 0 };
 let fetchingPromise = null; // 防止并发抓取循环
+let backgroundRefreshTimer = null; // 后台刷新定时器
 
 // 涉华关键词（中英混合匹配）—— 与前端保持一致，服务端预计算避免前端同步扫描
 const CHINA_FOCUSED_KEYWORDS = ['China', '中国', '中企', '中国企业', '人民币', '华为', '腾讯', '阿里巴巴', '字节跳动', '对华', '涉华', '中美', '中欧', '一带一路', 'RCEP', '东盟'];
@@ -80,7 +83,7 @@ export function crossVerifyItems(items) {
   });
 }
 
-export async function getNews(blocked, customSources, page = 0, pageSize = PAGE_SIZE, search = '', disabledSources = [], interests = []) {
+export async function getNews(blocked, customSources, page = 0, pageSize = PAGE_SIZE, search = '', disabledSources = [], interests = [], options = {}) {
   const now = Date.now();
   console.log('[getNews] Called with:', { blockedCount: blocked.length, customSourcesCount: customSources.length, disabledSourcesCount: disabledSources.length, page, pageSize, interestsCount: interests.length });
 
@@ -90,7 +93,15 @@ export async function getNews(blocked, customSources, page = 0, pageSize = PAGE_
   const allSources = [...filteredDefaultSources, ...customSources];
   const cacheKey = JSON.stringify({ blocked, customSources: customSources.map(s => s.url), disabledSources, interests });
 
-  const cacheValid = newsCache.data && newsCache.expiresAt > now && newsCache.key === cacheKey;
+  // SWR 模式：
+  //   - 新鲜（expiresAt 未到）：直接返回缓存
+  //   - 过期但在 stale 窗口内（staleAt 未到）：立即返回旧数据 + 后台静默刷新
+  //   - 超过 stale 窗口：等抓取完成（避免首屏白屏，但旧数据已太旧不可信）
+  //   - forceRefresh=true：跳过 cacheValid 直接抓取（用户点"刷新"按钮）
+  const cacheHit = newsCache.data && newsCache.key === cacheKey;
+  const isFresh = cacheHit && newsCache.expiresAt > now;
+  const isStale = cacheHit && newsCache.expiresAt <= now && newsCache.staleAt > now;
+  const cacheValid = isFresh && !options?.forceRefresh;
   let fullItems;
   let sourceResults;
   let failedSources;
@@ -101,6 +112,21 @@ export async function getNews(blocked, customSources, page = 0, pageSize = PAGE_
     sourceResults = newsCache.data.sourceResults;
     failedSources = newsCache.data.failedSources;
     blockedCount = newsCache.data.blockedCount;
+  } else if (isStale && !options?.forceRefresh) {
+    // SWR：返回旧数据 + 后台静默刷新（不阻塞当前请求）
+    fullItems = newsCache.data.items;
+    sourceResults = newsCache.data.sourceResults;
+    failedSources = newsCache.data.failedSources;
+    blockedCount = newsCache.data.blockedCount;
+    // 后台静默刷新：递归调用 forceRefresh=true，但不 await
+    if (!fetchingPromise) {
+      console.log('[getNews] SWR: returning stale data, refreshing in background...');
+      // setImmediate 让当前响应先返回，再触发抓取
+      setImmediate(() => {
+        getNews(blocked, customSources, 1, 40, '', disabledSources, interests, { forceRefresh: true })
+          .catch(err => console.error('[getNews] Background refresh failed:', err.message));
+      });
+    }
   } else {
     // 如果已有抓取在进行中，等待其完成
     if (fetchingPromise) {
@@ -113,18 +139,17 @@ export async function getNews(blocked, customSources, page = 0, pageSize = PAGE_
       blockedCount = newsCache.data.blockedCount;
     } else {
     console.log('[getNews] Cache invalid, fetching from sources...', { total: allSources.length });
-    const BATCH_SIZE = 18;
+    // 全部源并行抓取：每个 fetchSource 内部已有 10s 超时控制
+    // 之前是分批串行（18 个/批 × 12 批 × 10s = 2 分钟），改为并行后总耗时 ≈ 单源最慢超时（10s）
     const doFetch = async () => {
-    const allSettled = [];
-    for (let i = 0; i < allSources.length; i += BATCH_SIZE) {
-      const batch = allSources.slice(i, i + BATCH_SIZE);
-      const batchNum = Math.floor(i / BATCH_SIZE) + 1;
-      const totalBatches = Math.ceil(allSources.length / BATCH_SIZE);
-      console.log(`[getNews] Fetching batch ${batchNum}/${totalBatches} (${batch.length} sources)`);
-      const batchSettled = await Promise.allSettled(batch.map(source => fetchSource(source)));
-      allSettled.push(...batchSettled);
-    }
-    return allSettled;
+      console.log(`[getNews] Fetching all ${allSources.length} sources in parallel...`);
+      const settled = await Promise.allSettled(allSources.map(source => fetchSource(source)));
+      console.log('[getNews] Fetch done', {
+        total: settled.length,
+        fulfilled: settled.filter(r => r.status === 'fulfilled').length,
+        rejected: settled.filter(r => r.status === 'rejected').length,
+      });
+      return settled;
     };
     fetchingPromise = doFetch().then(r => { fetchingPromise = null; return r; }).catch(e => { fetchingPromise = null; throw e; });
     const settled = await fetchingPromise;
@@ -262,6 +287,7 @@ export async function getNews(blocked, customSources, page = 0, pageSize = PAGE_
 
     newsCache.data = { items: fullItems, sourceResults, failedSources, blockedCount };
     newsCache.expiresAt = now + 1000 * 60 * 5;
+    newsCache.staleAt = now + 1000 * 60 * 10; // 过期后 5 分钟内仍可返回旧数据（SWR）
     newsCache.key = cacheKey;
     } // end else (no fetchingPromise)
     } // end else (!cacheValid)
@@ -331,5 +357,54 @@ export async function getNews(blocked, customSources, page = 0, pageSize = PAGE_
     sourceCount: allSources.length,
     failedSources,
     blockedCount
+  };
+}
+
+/**
+ * 服务端预热：在用户到来之前主动刷新缓存。
+ * 用于启动后定时预热（每 5 分钟一次），让用户进入即看到新鲜数据。
+ * fire-and-forget，错误不影响服务运行。
+ */
+export async function warmNewsCache(options = {}) {
+  const now = Date.now();
+  // 距上次预热不足 4 分钟则跳过（避免并发调用）
+  if (now - newsCache.lastWarmAt < 4 * 60 * 1000) {
+    return { skipped: true, reason: 'recently warmed' };
+  }
+  newsCache.lastWarmAt = now;
+  try {
+    await getNews(
+      options.blocked || [],
+      options.customSources || [],
+      1,
+      40,
+      '',
+      options.disabledSources || [],
+      options.interests || [],
+      { forceRefresh: true }
+    );
+    return { skipped: false, ok: true };
+  } catch (err) {
+    console.error('[warmNewsCache] failed:', err.message);
+    return { skipped: false, ok: false, error: err.message };
+  }
+}
+
+/**
+ * 启动定时预热：服务启动时调用一次，每 5 分钟自动刷新缓存。
+ * 返回 stop 函数，可清理定时器。
+ */
+export function startNewsWarming(intervalMs = 5 * 60 * 1000) {
+  if (backgroundRefreshTimer) return () => {};
+  // 启动后立即预热一次
+  warmNewsCache().catch(() => {});
+  backgroundRefreshTimer = setInterval(() => {
+    warmNewsCache().catch(err => console.error('[news warming] error:', err.message));
+  }, intervalMs);
+  return () => {
+    if (backgroundRefreshTimer) {
+      clearInterval(backgroundRefreshTimer);
+      backgroundRefreshTimer = null;
+    }
   };
 }

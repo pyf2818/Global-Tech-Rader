@@ -226,6 +226,7 @@ function summarizeToolCall(name, args) {
     const a = args || {};
     if (name === 'read_workspace_file' || name === 'write_workspace_file') return a.path || '';
     if (name === 'search_news') return a.keyword || '';
+    if (name === 'web_search') return a.query || a.keyword || '';
     if (name === 'fetch_page') return a.url || '';
     if (name === 'get_stock_quote' || name === 'get_stock_kline') return a.code || '';
     if (name === 'execute_command') return a.command || '';

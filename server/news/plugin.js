@@ -5,10 +5,15 @@ import { handleAuthRequest } from '../http/authHandlers.js';
 import { handleCommunityRequest } from '../http/communityHandlers.js';
 import { handleCreativeRequest } from '../http/creativeHandlers.js';
 import { handleProfileRequest } from '../http/profileHandlers.js';
+import { handleAgentMemoryRequest } from '../http/agentMemoryHandlers.js';
+import { handleAgentRunRequest } from '../http/agentRunHandlers.js';
+import { handleAgentJobsRequest } from '../http/agentJobsHandlers.js';
+import { startCronDaemon } from '../agent/agentJobsService.js';
 import { handleAiGenerateRequest } from '../http/aiHandlers.js';
 import { handleFetchPageRequest } from '../http/fetchPageHandler.js';
+import { handleWebSearchRequest } from '../http/webSearchHandler.js';
 import { handleIntelligenceRequest } from '../http/intelligenceHandlers.js';
-import { getNews } from './services/newsService.js';
+import { getNews, warmNewsCache, startNewsWarming } from './services/newsService.js';
 import { getTrending, getGithubTrending } from './services/trendingService.js';
 import { discoverSourceCandidates, validateFeedUrl } from './services/sourceDiscovery.js';
 import { getDashboard, getRealtime, getKline, getTimeline, getSectors, searchStock, resolveSecid } from './services/stockService.js';
@@ -52,6 +57,14 @@ export function newsPlugin() {
   return {
     name: 'global-tech-news-api',
     configureServer(server) {
+      // 启动资讯缓存定时预热：服务启动即预热一次，之后每 5 分钟自动刷新
+      // 用户进入页面看到的总是新鲜或不超过 5 分钟的缓存数据
+      const stopWarming = startNewsWarming(5 * 60 * 1000);
+      // 启动 agent cron 守护：每 60 秒扫描到期任务，自动执行
+      // 注意：cron 任务执行 LLM 需要 AGENT_LLM_CONFIG 环境变量
+      const stopCron = startCronDaemon(60 * 1000);
+      server.httpServer?.on?.('close', () => { stopWarming(); stopCron(); });
+
       const handleApiRequest = async (req, res, next) => {
         const requestUrl = new URL(req.url, 'http://localhost');
         if (sendE2eFixture(res, requestUrl)) return;
@@ -101,11 +114,23 @@ export function newsPlugin() {
         if (requestUrl.pathname === '/api/profile/state') {
           return handleProfileRequest(req, res, { action: 'state' });
         }
+        if (requestUrl.pathname.startsWith('/api/agent-memory/')) {
+          return handleAgentMemoryRequest(req, res, requestUrl.pathname, req.method);
+        }
+        if (requestUrl.pathname === '/api/agent/run' && req.method === 'POST') {
+          return handleAgentRunRequest(req, res);
+        }
+        if (requestUrl.pathname.startsWith('/api/agent-jobs')) {
+          return handleAgentJobsRequest(req, res, requestUrl.pathname, req.method);
+        }
         if (requestUrl.pathname === '/api/ai-generate') {
           return handleAiGenerateRequest(req, res);
         }
         if (requestUrl.pathname === '/api/fetch-page') {
           return handleFetchPageRequest(req, res);
+        }
+        if (requestUrl.pathname === '/api/web-search') {
+          return handleWebSearchRequest(req, res);
         }
 
         if (requestUrl.pathname === '/api/intelligence' || requestUrl.pathname.startsWith('/api/intelligence/')) {
@@ -139,8 +164,16 @@ export function newsPlugin() {
           const search = requestUrl.searchParams.get('search') || '';
           const interestsParam = requestUrl.searchParams.get('interests') || '';
           const interests = interestsParam ? interestsParam.split(',').filter(Boolean) : [];
-          const payload = await getNews(blocked, customSources, page, pageSize, search, disabledSources, interests);
+          const forceRefresh = requestUrl.searchParams.get('forceRefresh') === '1';
+          const payload = await getNews(blocked, customSources, page, pageSize, search, disabledSources, interests, { forceRefresh });
           return sendJson(res, payload);
+        }
+
+        // 强制刷新资讯缓存：用户点"刷新"按钮或定时预热调用
+        if (requestUrl.pathname === '/api/news/refresh') {
+          const blocked = requestUrl.searchParams.get('blocked')?.split(',').map(w => w.trim().toLowerCase()).filter(Boolean) ?? [];
+          const result = await warmNewsCache({ blocked });
+          return sendJson(res, { ok: true, ...result });
         }
 
         if (requestUrl.pathname === '/api/trending') {

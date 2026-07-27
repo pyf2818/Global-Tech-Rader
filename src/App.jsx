@@ -1,4 +1,5 @@
 ﻿import { useEffect, useMemo, useState, useRef, useCallback, lazy, Suspense } from 'react';
+import { useTranslation } from 'react-i18next';
 import SettingsModal from './components/SettingsModal.jsx';
 import ArticleEditor from './components/ArticleEditor.jsx';
 import CreativeWorkspace from './components/CreativeWorkspace.jsx';
@@ -38,6 +39,7 @@ import { BlockGrid, BlockPanel, BlockStat, BlockToolbar } from './blocks/index.j
 import CommandPalette from './shell/CommandPalette.jsx';
 import IntelligenceSidebar from './components/IntelligenceSidebar.jsx';
 import IntelligenceFeedPanel from './components/IntelligenceFeedPanel.jsx';
+import LanguageSwitcher from './components/LanguageSwitcher.jsx';
 import RecommendationFeed from './components/RecommendationFeed.jsx';
 import RecommendationDateRail from './components/RecommendationDateRail.jsx';
 import TodayNewspaper from './components/TodayNewspaper.jsx';
@@ -125,63 +127,65 @@ const MOTIVATIONAL_QUOTES = [
   '永不放弃'
 ];
 
+// NAV_ITEMS / PRIMARY_NAV_ITEMS / NAV_CONTEXT_SECTIONS 的 label/desc/short 字段
+// 存储的是 i18n key（如 'nav.aiWorkstation'），运行时通过 t() 翻译
 const NAV_ITEMS = [
-  { id: 'home', label: 'AI 工作站', icon: 'sparkle' },
-  { id: 'recommendations', label: '精准推荐', icon: 'calendar' },
-  { id: 'all', label: '全部动态', icon: 'grid' },
-  { id: 'stock', label: '股市动向', icon: 'trendingUp' },
+  { id: 'home', labelKey: 'nav.aiWorkstation', icon: 'sparkle' },
+  { id: 'recommendations', labelKey: 'nav.recommendations', icon: 'calendar' },
+  { id: 'all', labelKey: 'nav.allNews', icon: 'grid' },
+  { id: 'stock', labelKey: 'nav.stock', icon: 'trendingUp' },
 
-  { id: 'github', label: 'GitHub 热门', icon: 'github' },
-  { id: 'materials', label: '素材库', icon: 'layers' },
-  { id: 'studio', label: '智创中心', icon: 'edit' },
-  { id: 'agents', label: '智能体', icon: 'bot' },
-  { id: 'editor', label: '内容创作', icon: 'edit' },
-  { id: 'square', label: '用户广场', icon: 'user' },
-  { id: 'profile-center', label: '用户画像', icon: 'target' },
+  { id: 'github', labelKey: 'nav.github', icon: 'github' },
+  { id: 'materials', labelKey: 'nav.materials', icon: 'layers' },
+  { id: 'studio', labelKey: 'nav.studio', icon: 'edit' },
+  { id: 'agents', labelKey: 'nav.agents', icon: 'bot' },
+  { id: 'editor', labelKey: 'nav.editor', icon: 'edit' },
+  { id: 'square', labelKey: 'nav.square', icon: 'user' },
+  { id: 'profile-center', labelKey: 'nav.profileCenter', icon: 'target' },
 ];
 
 const PRIMARY_NAV_ITEMS = [
-  { id: 'home', label: 'AI 工作站', desc: '今日总判断', short: '情报', icon: 'cpu', nav: 'home', children: ['home'] },
-  { id: 'recommendations', label: '精准推荐', desc: '日历时间线', short: '推荐', icon: 'calendar', nav: 'recommendations', children: ['recommendations'] },
-  { id: 'all', label: '全部动态', desc: '扩展视野', short: '动态', icon: 'grid', nav: 'all', children: ['all'] },
-  { id: 'stock', label: '股市动向', desc: '行情分析', short: '股市', icon: 'trendingUp', nav: 'stock', children: [] },
-  { id: 'github', label: 'GitHub 热门', desc: '三榜项目', short: '开源', icon: 'github', nav: 'github', children: ['github'] },
-  { id: 'studio', label: '智创中心', desc: '素材智能体创作', short: '智创', icon: 'edit', nav: 'studio', children: ['materials', 'agents', 'editor'] },
-  { id: 'square', label: '用户广场', desc: '分享交流', short: '广场', icon: 'user', nav: 'square', children: ['square'] },
-  { id: 'profile-center', label: '用户画像', desc: '越用越懂你', short: '画像', icon: 'target', nav: 'profile-center', children: ['profile-center'] }
+  { id: 'home', labelKey: 'nav.aiWorkstation', descKey: 'nav.today', shortKey: 'nav.aiWorkstation', icon: 'cpu', nav: 'home', children: ['home'] },
+  { id: 'recommendations', labelKey: 'nav.recommendations', descKey: 'nav.calendarTimeline', shortKey: 'nav.recommendations', icon: 'calendar', nav: 'recommendations', children: ['recommendations'] },
+  { id: 'all', labelKey: 'nav.allNews', descKey: 'nav.expandVision', shortKey: 'nav.allNews', icon: 'grid', nav: 'all', children: ['all'] },
+  { id: 'stock', labelKey: 'nav.stock', descKey: 'nav.marketAnalysis', shortKey: 'nav.stock', icon: 'trendingUp', nav: 'stock', children: [] },
+  { id: 'github', labelKey: 'nav.github', descKey: 'nav.githubProjects', shortKey: 'nav.github', icon: 'github', nav: 'github', children: ['github'] },
+  { id: 'studio', labelKey: 'nav.studio', descKey: 'nav.materialsAgentsCreation', shortKey: 'nav.studio', icon: 'edit', nav: 'studio', children: ['materials', 'agents', 'editor'] },
+  { id: 'square', labelKey: 'nav.square', descKey: 'nav.shareCommunity', shortKey: 'nav.square', icon: 'user', nav: 'square', children: ['square'] },
+  { id: 'profile-center', labelKey: 'nav.profileCenter', descKey: 'nav.profileLearning', shortKey: 'nav.profileCenter', icon: 'target', nav: 'profile-center', children: ['profile-center'] }
 ];
 
 const NAV_CONTEXT_SECTIONS = {
   home: {
-    label: 'AI 工作站',
+    labelKey: 'context.aiWorkstation',
     items: ['home']
   },
   recommendations: {
-    label: '精准推荐',
+    labelKey: 'context.recommendations',
     items: ['recommendations']
   },
   all: {
-    label: '多领域资讯',
+    labelKey: 'context.multiDomainNews',
     items: ['all']
   },
   github: {
-    label: '开源发现',
+    labelKey: 'context.openSourceDiscovery',
     items: ['github']
   },
   stock: {
-    label: '行情分析',
+    labelKey: 'context.marketAnalysis',
     items: []
   },
   studio: {
-    label: '智创中心',
+    labelKey: 'context.creativeCenter',
     items: ['materials', 'agents', 'editor']
   },
   square: {
-    label: '社区生态',
+    labelKey: 'context.communitySquare',
     items: ['square']
   },
   'profile-center': {
-    label: '个人生态',
+    labelKey: 'context.userProfile',
     items: ['profile-center']
   },
 };
@@ -920,6 +924,24 @@ const ICONS = {
 
 function App() {
   clearStaleLS();
+  // i18n：t 翻译函数，i18n.language 当前语言（用于 useMemo 依赖触发重新翻译）
+  const { t, i18n } = useTranslation();
+  // 派生翻译后的导航数据（语言切换时自动重算）
+  const navItems = useMemo(() => NAV_ITEMS.map(item => ({ ...item, label: t(item.labelKey) })), [t, i18n.language]);
+  const primaryNavItems = useMemo(() => PRIMARY_NAV_ITEMS.map(item => ({
+    ...item,
+    label: t(item.labelKey),
+    desc: t(item.descKey),
+    short: t(item.shortKey),
+  })), [t, i18n.language]);
+  const navContextSections = useMemo(() => {
+    const translated = {};
+    for (const [key, section] of Object.entries(NAV_CONTEXT_SECTIONS)) {
+      translated[key] = { ...section, label: t(section.labelKey) };
+    }
+    return translated;
+  }, [t, i18n.language]);
+
   const [showThemePicker, setShowThemePicker] = useState(false);
   const [themeMode, setThemeMode] = useState(() => localStorage.getItem('themeMode') || 'dark');
   const [palette, setPalette] = useState(() => {
@@ -976,7 +998,7 @@ function App() {
       return 'AI精灵';
     }
   });
-  const { agents, setAgents, currentAgent, setCurrentAgent, showAgentForm, setShowAgentForm, editingAgent, setEditingAgent, newAgent, setNewAgent } = useAgents();
+  const { agents, setAgents, updateAgent, currentAgent, setCurrentAgent, showAgentForm, setShowAgentForm, editingAgent, setEditingAgent, newAgent, setNewAgent } = useAgents();
   const [agentFilter, setAgentFilter] = useState('全部');
   const [agentPromptRefining, setAgentPromptRefining] = useState(false);
   const [agentWorkflowResult, setAgentWorkflowResult] = useState(() => {
@@ -3349,7 +3371,7 @@ ${blueprintSummary}`,
     }
   }, [focusedIndex]);
 
-  function loadNews(b = blocked, append = false, searchQuery = '') {
+  function loadNews(b = blocked, append = false, searchQuery = '', options = {}) {
     if (!append) { setLoading(true); setError(''); setNewsPage(0); setNewsHasMore(true); setRenderLimit(40); }
     const page = append ? newsPage + 1 : 0;
     const customParams = customSources.map(s => `custom=${encodeURIComponent(JSON.stringify(s))}`).join('&');
@@ -3360,7 +3382,9 @@ ${blueprintSummary}`,
     if (nav === 'recommendations' && isLoggedIn && selectedInterests.length > 0) {
       interestsParam = `&interests=${encodeURIComponent(selectedInterests.join(','))}`;
     }
-    fetch(`/api/news?blocked=${encodeURIComponent(b)}&page=${page}&pageSize=40${searchParam}${disabledParam}${interestsParam}${customParams ? '&' + customParams : ''}`)
+    // 用户主动点"刷新"按钮时强制刷新（绕过缓存）；后台预取走 SWR
+    const forceRefreshParam = options.forceRefresh ? '&forceRefresh=1' : '';
+    fetch(`/api/news?blocked=${encodeURIComponent(b)}&page=${page}&pageSize=40${searchParam}${disabledParam}${interestsParam}${customParams ? '&' + customParams : ''}${forceRefreshParam}`)
       .then(r => r.json())
       .then(d => {
         if (d.items && d.items.length > 0) {
@@ -3708,8 +3732,8 @@ ${signals}
     github: 'github',
   };
   const activePrimaryNav = navToPrimary[nav] || 'home';
-  const activeContextSection = NAV_CONTEXT_SECTIONS[activePrimaryNav] || NAV_CONTEXT_SECTIONS.home;
-  const activeContextItems = activeContextSection.items.map(id => NAV_ITEMS.find(item => item.id === id)).filter(Boolean);
+  const activeContextSection = navContextSections[activePrimaryNav] || navContextSections.home;
+  const activeContextItems = activeContextSection.items.map(id => navItems.find(item => item.id === id)).filter(Boolean);
   const goNav = (nextNav) => {
     if (nextNav === 'agents') {
       setCurrentAgent('orchestrator');
@@ -3728,6 +3752,50 @@ ${signals}
     setFocusedIndex(-1);
     setMobileMenuOpen(false);
   };
+
+  // 路由 hover prefetch：鼠标悬停导航按钮时预取该路由的数据/lazy chunk
+  // fire-and-forget，去重保证同一路由会话内只预取一次
+  const prefetchedNavsRef = useRef(new Set());
+  const prefetchNav = useCallback((nextNav) => {
+    if (!nextNav || prefetchedNavsRef.current.has(nextNav)) return;
+    prefetchedNavsRef.current.add(nextNav);
+    try {
+      switch (nextNav) {
+        case 'all':
+          // 资讯列表（如果首页 backgroundLoadedRef 已预取则服务端缓存命中）
+          if (items.length === 0) loadNews(blocked, false, debouncedQuery);
+          break;
+        case 'stock':
+          // 预取 StockPage lazy chunk + dashboard API 填充服务端缓存
+          import('./components/StockPage.jsx').catch(() => {});
+          fetch('/api/stock/dashboard').catch(() => {});
+          break;
+        case 'github':
+          if (githubRepos.length === 0) loadGithub();
+          break;
+        case 'trending':
+          if (trendingItems.length === 0) loadTrending();
+          break;
+        case 'studio':
+          // 智创中心 lazy chunk
+          import('./components/StudioPage.jsx').catch(() => {});
+          break;
+        case 'square':
+          // 社区广场 lazy chunk + 帖子列表
+          import('./components/CommunityPage.jsx').catch(() => {});
+          break;
+        case 'recommendations':
+          // 推荐页依赖 trending + briefing，已由 backgroundLoadedRef 预取
+          break;
+        case 'home':
+          // AI 工作站 lazy chunk
+          import('./AiElf.jsx').catch(() => {});
+          break;
+        default:
+          break;
+      }
+    } catch { /* ignore prefetch errors */ }
+  }, [items.length, githubRepos.length, trendingItems.length, blocked, debouncedQuery, loadNews, loadGithub, loadTrending]);
   const wideWorkspaceNavs = ['home', 'recommendations', 'studio', 'agents', 'editor', 'materials', 'square', 'profile-center'];
   // 右侧面板：「全部动态」显示关注关键词；「AI 情报首页」显示情报时间线；「精准推荐」显示日期竖向时间线
   const showRightPanel = nav === 'recommendations';
@@ -3742,7 +3810,7 @@ ${signals}
       {mobileMenuOpen && <div className="mobile-overlay" onClick={() => setMobileMenuOpen(false)} />}
 
       {/* Sidebar */}
-<Sidebar sidebarCollapsed={sidebarCollapsed} setSidebarCollapsed={setSidebarCollapsed} mobileMenuOpen={mobileMenuOpen} nav={nav} goNav={goNav} addRecentVisit={addRecentVisit} activePrimaryNav={activePrimaryNav} activeContextItems={activeContextItems} contextGroupOpen={contextGroupOpen} setContextGroupOpen={setContextGroupOpen} agents={agents} currentAgent={currentAgent} setCurrentAgent={setCurrentAgent} setElfQuotedContext={setElfQuotedContext} buildWorkbenchContext={buildWorkbenchContext} showFollowDropdown={showFollowDropdown} setShowFollowDropdown={setShowFollowDropdown} followKeywords={followKeywords} sortedFollowKeywords={sortedFollowKeywords} pinnedKeywords={pinnedKeywords} pinFollowKeyword={pinFollowKeyword} unpinFollowKeyword={unpinFollowKeyword} removeFollowKeyword={removeFollowKeyword} executeSearch={executeSearch} newKeyword={newKeyword} setNewKeyword={setNewKeyword} addFollowKeyword={addFollowKeyword} bookmarks={bookmarks} filtered={filtered} isLoggedIn={isLoggedIn} user={user} setShowProfileModal={setShowProfileModal} setAuthMode={setAuthMode} setShowAuthModal={setShowAuthModal} setShowThemePicker={setShowThemePicker} setShowSettings={setShowSettings} setShowShortcuts={setShowShortcuts} PRODUCT_NAME={PRODUCT_NAME} PRODUCT_TAGLINE={PRODUCT_TAGLINE} PRIMARY_NAV_ITEMS={PRIMARY_NAV_ITEMS} />
+<Sidebar sidebarCollapsed={sidebarCollapsed} setSidebarCollapsed={setSidebarCollapsed} mobileMenuOpen={mobileMenuOpen} nav={nav} goNav={goNav} addRecentVisit={addRecentVisit} onPrefetchNav={prefetchNav} activePrimaryNav={activePrimaryNav} activeContextItems={activeContextItems} contextGroupOpen={contextGroupOpen} setContextGroupOpen={setContextGroupOpen} agents={agents} currentAgent={currentAgent} setCurrentAgent={setCurrentAgent} setElfQuotedContext={setElfQuotedContext} buildWorkbenchContext={buildWorkbenchContext} showFollowDropdown={showFollowDropdown} setShowFollowDropdown={setShowFollowDropdown} followKeywords={followKeywords} sortedFollowKeywords={sortedFollowKeywords} pinnedKeywords={pinnedKeywords} pinFollowKeyword={pinFollowKeyword} unpinFollowKeyword={unpinFollowKeyword} removeFollowKeyword={removeFollowKeyword} executeSearch={executeSearch} newKeyword={newKeyword} setNewKeyword={setNewKeyword} addFollowKeyword={addFollowKeyword} bookmarks={bookmarks} filtered={filtered} isLoggedIn={isLoggedIn} user={user} setShowProfileModal={setShowProfileModal} setAuthMode={setAuthMode} setShowAuthModal={setShowAuthModal} setShowThemePicker={setShowThemePicker} setShowSettings={setShowSettings} setShowShortcuts={setShowShortcuts} PRODUCT_NAME={PRODUCT_NAME} PRODUCT_TAGLINE={PRODUCT_TAGLINE} PRIMARY_NAV_ITEMS={primaryNavItems} />
 
       {/* Theme picker modal */}
       <ThemePicker mode={themeMode} setMode={setThemeMode} palette={palette} setPalette={setPalette} show={showThemePicker} onClose={() => setShowThemePicker(false)} />
@@ -3900,7 +3968,7 @@ ${signals}
                       全球大屏
                     </button>
                   )}
-                  <button className={`btn-refresh ${nav === 'all' ? 'btn-refresh-all' : ''}`} onClick={() => { if (nav === 'all') loadNews(); else if (nav === 'trending') loadTrending(false, trendingPlatform, trendingType); else if (nav === 'github') loadGithub(); }}>
+                  <button className={`btn-refresh ${nav === 'all' ? 'btn-refresh-all' : ''}`} onClick={() => { if (nav === 'all') loadNews(blocked, false, debouncedQuery, { forceRefresh: true }); else if (nav === 'trending') loadTrending(false, trendingPlatform, trendingType); else if (nav === 'github') loadGithub(); }}>
                     {ICONS.refresh}
                   </button>
                   {nav === 'trending' && (
@@ -3949,6 +4017,8 @@ ${signals}
                   )}
                 </>
               )}
+              {/* 语言切换器：所有页面顶部右侧均可见，点击切换中英文 */}
+              <LanguageSwitcher variant="compact" />
           </div>
         </div>
         </header>
@@ -3987,6 +4057,7 @@ ${signals}
               todayLanes={todayLanes}
               materials={materials}
               agent={agents.find(a => a.id === currentAgent) || agents[0]}
+              onUpdateAgent={updateAgent}
             />
           )}
 
@@ -5416,12 +5487,12 @@ ${signals}
       <CommandPalette
         open={showCommandPalette}
         onClose={() => setShowCommandPalette(false)}
-        navItems={PRIMARY_NAV_ITEMS}
+        navItems={primaryNavItems}
         onNavigate={(navId) => goNav(navId)}
         onSearch={(q) => executeSearch(q)}
         recentVisits={recentVisits}
         actions={[
-          { id: 'refresh', label: '刷新资讯', icon: 'refresh', hint: '动作', run: () => loadNews() },
+          { id: 'refresh', label: '刷新资讯', icon: 'refresh', hint: '动作', run: () => loadNews(blocked, false, debouncedQuery, { forceRefresh: true }) },
           { id: 'theme', label: '切换主题', icon: 'palette', hint: '动作', run: () => setShowThemePicker(true) },
           { id: 'settings', label: '打开设置', icon: 'settings', hint: '动作', run: () => setShowSettings(true) },
         ]}

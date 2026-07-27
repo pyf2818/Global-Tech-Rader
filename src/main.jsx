@@ -1,5 +1,6 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
+import './i18n/index.js'; // i18n 初始化（中英文双语支持，默认中文，可切换）
 import App from './App.jsx';
 import './styles.css';
 import './themes.css';

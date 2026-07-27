@@ -1,6 +1,6 @@
 import { ICONS } from '../constants/index.jsx';
 
-export default function Sidebar({ sidebarCollapsed, setSidebarCollapsed, mobileMenuOpen, nav, goNav, addRecentVisit, activePrimaryNav, activeContextItems, contextGroupOpen, setContextGroupOpen, agents, currentAgent, setCurrentAgent, setElfQuotedContext, buildWorkbenchContext, showFollowDropdown, setShowFollowDropdown, followKeywords, sortedFollowKeywords, pinnedKeywords, pinFollowKeyword, unpinFollowKeyword, removeFollowKeyword, executeSearch, newKeyword, setNewKeyword, addFollowKeyword, bookmarks, filtered, isLoggedIn, user, setShowProfileModal, setAuthMode, setShowAuthModal, setShowThemePicker, setShowSettings, setShowShortcuts, PRODUCT_NAME, PRODUCT_TAGLINE, PRIMARY_NAV_ITEMS }) {
+export default function Sidebar({ sidebarCollapsed, setSidebarCollapsed, mobileMenuOpen, nav, goNav, addRecentVisit, onPrefetchNav, activePrimaryNav, activeContextItems, contextGroupOpen, setContextGroupOpen, agents, currentAgent, setCurrentAgent, setElfQuotedContext, buildWorkbenchContext, showFollowDropdown, setShowFollowDropdown, followKeywords, sortedFollowKeywords, pinnedKeywords, pinFollowKeyword, unpinFollowKeyword, removeFollowKeyword, executeSearch, newKeyword, setNewKeyword, addFollowKeyword, bookmarks, filtered, isLoggedIn, user, setShowProfileModal, setAuthMode, setShowAuthModal, setShowThemePicker, setShowSettings, setShowShortcuts, PRODUCT_NAME, PRODUCT_TAGLINE, PRIMARY_NAV_ITEMS }) {
   return (
     <aside className={`sidebar ${sidebarCollapsed ? 'collapsed' : ''} ${mobileMenuOpen ? 'mobile-open' : ''}`}>
         <div className="sidebar-header">
@@ -104,6 +104,7 @@ export default function Sidebar({ sidebarCollapsed, setSidebarCollapsed, mobileM
                       addRecentVisit('nav', item.nav, item.label);
                       setContextGroupOpen(current => isActive ? !current : true);
                     }}
+                    onMouseEnter={() => { if (onPrefetchNav) onPrefetchNav(item.nav); }}
                     title={sidebarCollapsed ? item.label : undefined}
                     aria-expanded={showContext ? contextGroupOpen : undefined}
                   >

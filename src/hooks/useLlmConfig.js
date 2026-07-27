@@ -7,6 +7,7 @@ const DEFAULT_LLM_CONFIG = {
   selectedModel: '',
   manualModels: [],
   provider: 'custom',
+  tavilyKey: '', // 联网搜索 Tavily API Key（可选，未填则自动 fallback 到 DuckDuckGo 免费搜索）
 };
 
 const CONFIG_KEY = 'llmConfig';
