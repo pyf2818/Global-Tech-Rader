@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-styles.css 精确删除脚本 v3
-基于 class 名定位规则块，自动解析 CSS 规则边界。
-支持后代选择器、多 class 选择器，仅当选择器中所有 class 都在死列表中时才删除。
+styles.css 孤儿选择器清理脚本
+扫描并删除以下情形：
+1. 连续的选择器行（以 , 结尾）后跟空行 / 另一规则，没有 { 块
+2. 多 selector rule 中所有 class 都在死列表中的孤儿行
 """
 import re
 from pathlib import Path
@@ -12,36 +13,25 @@ ROOT = Path(__file__).parent.parent
 CSS_PATH = ROOT / "src" / "styles.css"
 JSX_DIR = ROOT / "src"
 
-# 动态拼接 class 白名单（保留这些 class，即使未在源码中直接出现）
+# 复用 css-diet.py 的死 class 列表（包括动态白名单）
 KEEP_DYNAMIC_PATTERNS = {
-    # status-${status} - WorkflowNodeCard, AgentsPage, ArticleEditor
     "status-archived", "status-blocked", "status-completed", "status-done",
     "status-draft", "status-failed", "status-published", "status-running", "status-skipped",
-    # tool-call-${statusClass}, tool-call-status-${statusClass} - AiElf, AiChatPanel
     "tool-call-done", "tool-call-error", "tool-call-running",
     "tool-call-status-done", "tool-call-status-error", "tool-call-status-running",
-    # editor-mode-${editorTab} - ArticleEditor
     "editor-mode-edit", "editor-mode-preview", "editor-mode-split",
-    # tone-${tone} - WorkflowNodeCard, AgentsPage (WORKFLOW_NODE_TYPES tones)
     "tone-amber", "tone-blue", "tone-green",
-    # type-${m.type} - ArticleEditor, MaterialsPage (material types)
     "type-case", "type-chart", "type-data", "type-project", "type-quote", "type-viewpoint",
-    # is-${t.status} - AgentPanel session-plan-item
     "is-done", "is-failed", "is-running", "is-skipped",
-    # mode-${item.mode} - NewsItem
     "mode-deep", "mode-flash", "mode-technical",
-    # health-${health.status} - SettingsModal
     "health-error", "health-healthy",
-    # sandbox-approval-${state.state}, sandbox-tool-state-${state.state} - SettingsModal
     "sandbox-approval-default", "sandbox-approval-off", "sandbox-approval-on",
     "sandbox-tool-state-off", "sandbox-tool-state-on",
-    # alert-${alert.type} - SettingsModal
     "alert-error", "alert-warning",
 }
 
-# 已验证未使用的死 class 列表（基于 scripts/unused-classes.txt 排除动态 class 后）
+# 重新计算 truly_dead 列表（与 css-diet.py 相同）
 DEAD_CLASSES = [
-    # workbench 死代码（旧版工作台）
     "workbench-shell", "workbench-ai", "workbench-overview", "workbench-feed-panel",
     "workbench-title", "workbench-subtitle", "workbench-preferences", "workbench-metrics",
     "workbench-text-btn", "workbench-toolbar", "workbench-toolbar-actions", "workbench-search",
@@ -49,11 +39,9 @@ DEAD_CLASSES = [
     "workbench-profile-strip", "workbench-news-list", "workbench-news-card",
     "workbench-score-badge", "workbench-reason-strip", "workbench-bubble-area",
     "workbench-block-title", "workbench-section-label",
-    # agent 死代码
     "agent-ecosystem-card", "agent-status-list", "agent-status-item",
     "agent-profile-strip", "agent-memory-card", "agent-memory-row",
     "agent-task-card", "agent-task-stats", "agent-task-title",
-    # ai 死代码
     "ai-daily-insight", "ai-signal-grid", "ai-priority-list",
     "ai-command-card", "ai-prompt-list", "ai-mission-list",
     "ai-card-judgement", "ai-daily-main",
@@ -65,10 +53,8 @@ DEAD_CLASSES = [
     "ai-elf-sidebar-empty", "ai-elf-sidebar-tab", "ai-elf-sidebar-tabs",
     "ai-chat-mobile-toggle", "ai-resize-handle", "ai-result-inline",
     "ai-toolbar-btn", "ai-toolbar-label",
-    # 其他死代码
     "date-manager", "date-pill-row", "date-pill", "date-info", "date-manager-head",
     "quality-card", "next-actions-card", "interest-chip",
-    # intelligence 死代码
     "intelligence-side-stack", "intelligence-score-grid",
     "intelligence-entity-strip", "intelligence-opportunity-list",
     "intelligence-opportunity", "intelligence-weekly-sector",
@@ -76,7 +62,6 @@ DEAD_CLASSES = [
     "intelligence-alert-opportunity", "intelligence-alert-risk",
     "intelligence-alert-sector", "intelligence-feed-layout",
     "intelligence-lead-card",
-    # briefing 死代码（旧版早报）
     "briefing-cat-item", "briefing-cat-item-source", "briefing-cat-item-title",
     "briefing-cat-items", "briefing-cat-title", "briefing-categories",
     "briefing-category-card", "briefing-config", "briefing-config-row",
@@ -85,46 +70,36 @@ DEAD_CLASSES = [
     "briefing-length-btn", "briefing-rank", "briefing-section",
     "briefing-section-title", "briefing-stat-label", "briefing-stat-value",
     "briefing-stats", "briefing-top-news",
-    # insight 死代码
     "insight-keywords", "insight-kw", "insight-news-body", "insight-news-item",
     "insight-news-meta", "insight-news-num", "insight-news-title",
     "insight-signal-accent", "insight-signal-body", "insight-signal-card",
     "insight-signal-count", "insight-signal-desc", "insight-signal-name",
     "insight-signal-pct", "insight-signals", "insight-top-news",
-    # must-read 死代码
     "must-read-badge", "must-read-card", "must-read-grade", "must-read-grid",
     "must-read-header", "must-read-top5-card", "must-read-top5-cards",
     "must-read-top5-count", "must-read-top5-grade", "must-read-top5-grid",
     "must-read-top5-header", "must-read-top5-meta", "must-read-top5-rank",
     "must-read-top5-reason", "must-read-top5-score", "must-read-top5-title",
-    # tracker 死代码
     "tracker-add-btn", "tracker-add-form", "tracker-card", "tracker-card-header",
     "tracker-grid", "tracker-name", "tracker-preset-btn", "tracker-preset-label",
     "tracker-recent", "tracker-recent-item", "tracker-recent-source",
     "tracker-recent-title", "tracker-recent-title-text", "tracker-remove-btn",
     "tracker-stat", "tracker-stat-label", "tracker-stat-value", "tracker-stats",
-    # sector 死代码
     "sector-chart", "sector-chart-legend", "sector-daily-breakdown",
     "sector-daily-date", "sector-daily-item", "sector-daily-val",
     "sector-legend-item", "sector-line-chart", "sector-stats-growth",
     "sector-stats-left", "sector-stats-name", "sector-stats-panel",
     "sector-stats-right", "sector-stats-status", "sector-stats-val",
-    # gh-* 死代码（旧版 GitHub 详情）
     "gh-intel-grid", "gh-readme-intro", "gh-readme-label", "gh-readme-text",
     "gh-scenario", "gh-scenario-inline", "gh-scenario-label", "gh-scenario-text",
     "gh-value",
-    # hotspot 死代码
     "hotspot-fire", "hotspot-header", "hotspot-meta", "hotspot-rank",
     "hotspot-rows", "hotspot-subtitle", "hotspot-title", "hotspot-title-main",
-    # emerging 死代码
     "emerging-count", "emerging-kw", "emerging-topic-item", "emerging-topics", "emerging-trend",
-    # reading-heat 死代码
     "reading-heat-block", "reading-heat-cell", "reading-heat-count",
     "reading-heat-day", "reading-heat-row",
-    # newspaper-quick 死代码
     "newspaper-quick-card", "newspaper-quick-date", "newspaper-quick-expand",
     "newspaper-quick-head", "newspaper-quick-kicker",
-    # calendar / cal-* 死代码（已被 trends-dashboard 替代）
     "calendar-grid", "calendar-insight-card", "calendar-insight-label",
     "calendar-insight-value", "calendar-insights", "calendar-nav",
     "calendar-page", "calendar-upcoming", "calendar-upcoming-dot",
@@ -133,169 +108,108 @@ DEAD_CLASSES = [
     "cal-day", "cal-day-detail", "cal-day-header", "cal-day-num", "cal-days",
     "cal-event-dot", "cal-event-more", "cal-heat-indicator", "cal-nav-btn",
     "cal-title", "cal-today-btn", "cal-weekday", "cal-weekdays",
-    # chat-* 死代码（旧版聊天 UI）
     "chat-mobile-close", "chat-model-bar", "chat-model-dot", "chat-model-select",
     "chat-msg-assistant", "chat-msg-user", "chat-quick-btn", "chat-send-spinner",
     "chat-send-stop", "chat-session-delete", "chat-session-info", "chat-session-item",
     "chat-session-time", "chat-session-title", "chat-sessions", "chat-sessions-empty",
     "chat-sessions-header", "chat-sessions-list", "chat-welcome-actions", "chat-welcome-cursor",
-    # event-* 死代码（旧版事件管理）
     "event-color", "event-info", "event-input", "event-list",
     "event-modal", "event-modal-footer", "event-modal-header",
-    # elf-appearance / elf-avatar 死代码
     "elf-appearance-preview", "elf-appearance-upload", "elf-avatar-history",
     "elf-avatar-history-item", "elf-avatar-history-list", "elf-avatar-history-title",
     "elf-avatar-preview-img",
-    # block-* 死代码（已被 BlockGrid 等替代）
     "block-grid-card-primary", "block-grid-cols-2", "block-grid-cols-3", "block-grid-cols-4",
     "block-grid-gap-lg", "block-grid-gap-md", "block-grid-gap-sm",
     "block-list-gap-lg", "block-list-gap-md", "block-list-gap-sm",
     "block-panel-flat", "block-panel-highlight",
     "block-stat-lg", "block-stat-md", "block-stat-sm",
     "block-stat-trend-down", "block-stat-trend-neutral", "block-stat-trend-up",
-    # llm-config 死代码
     "llm-config-actions-row", "llm-config-fetch-btn", "llm-config-hint",
     "llm-config-input", "llm-config-input-group", "llm-config-label",
     "llm-config-section", "llm-config-section-title", "llm-config-test-status",
     "llm-config-title-icon", "llm-preset-picker", "llm-provider-icon", "llm-provider-name",
-    # stock-watch 死代码（旧版自选列表样式）
     "stock-header-actions", "stock-kline-container", "stock-search-price",
     "stock-watch-code", "stock-watch-item", "stock-watch-main",
     "stock-watch-name", "stock-watch-op", "stock-watch-ops",
     "stock-watchlist", "stock-watchlist-count", "stock-watchlist-empty",
     "stock-watchlist-grid",
-    # studio-* 死代码
     "studio-asset-panel", "studio-module-desc", "studio-module-icon", "studio-module-title",
-    # square-* 死代码（旧版社区 UI，已被 CommunityPage 替代）
     "square-comment", "square-comment-input", "square-comment-time",
     "square-comment-user", "square-comments-empty", "square-comments-list",
     "square-feed", "square-layout", "square-post", "square-post-actions",
     "square-post-comments", "square-post-head", "square-post-tag", "square-post-type",
     "square-side",
-    # user-menu 死代码
     "user-avatar-lg", "user-menu-badge", "user-menu-btn", "user-menu-divider",
     "user-menu-dropdown", "user-menu-email", "user-menu-header", "user-menu-icon",
     "user-menu-info", "user-menu-item", "user-menu-login", "user-menu-logout",
     "user-menu-name", "user-menu-wrap", "user-name",
-    # signal-* 死代码
     "signal-center-header", "signal-empty", "signal-filter-btn", "signal-filters",
-    # source-* 死代码
     "source-activity-item", "source-activity-list", "source-cats", "source-dot",
     "source-num", "source-select-checkbox", "source-stats", "source-time",
     "sources-group-title",
-    # custom-sources 死代码
     "custom-sources-actions", "custom-sources-list", "custom-sources-toolbar",
-    # builtin-* 死代码
     "builtin-action-btn", "builtin-actions", "builtin-header", "builtin-list",
     "builtin-more", "builtin-search", "builtin-title",
-    # timeline-manager 死代码
     "timeline-manager", "timeline-manager-head",
-    # trends-note 死代码
     "trends-note",
-    # toast-notification 死代码
     "toast-notification",
-    # template-dropdown 死代码
     "template-dropdown-item", "template-dropdown-menu",
-    # nav-* 死代码
     "nav-context-arrow", "nav-context-toggle", "nav-follow-badge", "nav-more-toggle",
-    # item-* 死代码
     "item-actions-left", "item-intro", "item-media-grid", "item-media-grid-cell",
     "item-media-more", "item-platform", "item-reading-time", "item-translation",
-    # keyword 死代码
     "keyword-cloud", "keyword-count",
-    # legend 死代码
     "legend-label", "legend-val",
-    # metric 死代码
     "metric-card", "metric-change",
-    # load-more 死代码
     "load-more-btn", "load-more-sentinel-center", "load-more-sentinel-done",
-    # level 死代码
     "level-good", "level-light", "level-neutral",
-    # score 死代码
     "score-high", "score-low", "score-mid",
-    # region 死代码
     "region-domestic", "region-global", "region-overseas",
-    # recommendation 死代码
     "recommendation-label", "recommendation-text", "recommendations-toolbar",
-    # profile-load 死代码
     "profile-load-more-btn", "profile-load-more-wrap", "profile-recommendations",
-    # progress 死代码
     "progress-bar", "progress-bar-fill",
-    # quality 死代码
     "quality-card",
-    # read-toggle 死代码
     "read-toggle",
-    # panel 死代码
     "panel-intelligence",
-    # other-month 死代码
     "other-month",
-    # no-* 死代码
     "no-emerging", "no-events",
-    # next-actions 死代码
     "next-actions-card",
-    # nav 死代码（旧版导航）
     "neon-text",
-    # scrolling-news 死代码
     "scrolling-news-nav",
-    # select-by-grade 死代码
     "select-by-grade",
-    # settings-tab 死代码
     "settings-tab", "settings-tabs",
-    # sidebar 死代码
     "sidebar-nav-item", "sidebar-section-title",
-    # view 死代码
     "view-compact",
-    # verify 死代码
     "verify-progress", "verify-source-btn",
-    # tech 死代码
     "tech-badge",
-    # trend 死代码
     "trend-source-stats",
-    # trending 死代码
     "trending-platform-bar", "trending-toolbar",
-    # hero 死代码
     "hero-briefing-stat-num", "hero-briefing-summary",
-    # glass / glow 死代码
     "glass-card", "glow-border", "glow-red", "glow-title",
-    # globe-tooltip / globe-section 死代码
     "globe-tooltip", "globe-section",
-    # follow-panel 死代码
     "follow-panel-match",
-    # import-export 死代码
     "import-export-btn",
-    # material-project 死代码
     "material-project", "materials-filters",
-    # meta-text 死代码
     "meta-text",
-    # cat-heat 死代码
     "cat-heat-bar", "cat-heat-count", "cat-heat-fill", "cat-heat-icon",
     "cat-heat-info", "cat-heat-name", "cat-heat-sources",
     "category-heat-card",
-    # cross-source 死代码
     "cross-source",
-    # color 死代码
     "color-dot", "color-picker",
-    # article-ai 死代码
     "article-ai-toolbar",
-    # ask-ai 死代码
     "ask-ai-btn",
-    # batch-mode 死代码
     "batch-mode-icon", "batch-mode-toggle-btn", "batch-select-all", "batch-selection-count",
-    # btn 死代码
     "btn-goto-settings", "btn-quick-config-inline", "btn-template-menu",
-    # add-* 死代码
     "add-event-btn", "add-source-form",
-    # app-bg 死代码
     "app-bg-grid",
-    # heat-* 死代码（cal-day.heat-N 已被列入 cal-* 删除）
     "heat-1", "heat-2", "heat-3", "heat-4",
-    # grade-a 死代码（standalone - must-read-grade.grade-a 已被 must-read-grade 删除）
     "grade-a",
 ]
 
+TRULY_DEAD = set(DEAD_CLASSES) - KEEP_DYNAMIC_PATTERNS
+
 
 def find_class_in_jsx(class_name):
-    """检查 class 名是否在任何 jsx/js 文件中使用（排除 _pre_refactor 备份）"""
+    """检查 class 名是否在任何 jsx/js 文件中使用"""
     for ext in ['*.jsx', '*.js']:
         for f in JSX_DIR.rglob(ext):
             if '_pre_refactor' in f.name:
@@ -309,30 +223,31 @@ def find_class_in_jsx(class_name):
     return False
 
 
-def parse_css_rules(lines):
-    """解析 CSS 规则，返回 [(start_idx, end_idx, selector_text)] 列表"""
-    rules = []
-    i = 0
-    while i < len(lines):
-        line = lines[i].strip()
-        if not line or line.startswith('/*') or line.startswith('//'):
-            i += 1
-            continue
-        if '{' in lines[i]:
-            brace_count = 0
-            start = i
-            for j in range(i, len(lines)):
-                brace_count += lines[j].count('{') - lines[j].count('}')
-                if brace_count == 0:
-                    selector = lines[start].split('{')[0].strip()
-                    rules.append((start, j, selector))
-                    i = j + 1
-                    break
-            else:
-                i += 1
-        else:
-            i += 1
-    return rules
+def is_orphan_selector(line):
+    """判断是否为孤儿选择器行（无 { 的选择器行）"""
+    s = line.strip()
+    if not s:
+        return False
+    if '{' in s:
+        return False
+    if s.startswith('/*') or s.startswith('//') or s.startswith('*'):
+        return False
+    if s.startswith('@'):
+        return False
+    if s.startswith('--'):
+        return False
+    # 跳过属性行（缩进+冒号+分号）
+    if s.endswith(';') and ':' in s and not s.startswith('.'):
+        return False
+    # 选择器特征：包含 .class 或 #id
+    if re.search(r'[.#][a-zA-Z]', s) or s.endswith(','):
+        return True
+    return False
+
+
+def selector_classes(line):
+    """提取选择器行中的所有 class 名"""
+    return re.findall(r'\.([\w-]+)', line)
 
 
 def main():
@@ -341,51 +256,70 @@ def main():
     total = len(lines)
     print(f"原始行数: {total}")
 
-    # 排除动态拼接 class（白名单）
-    candidates = [c for c in DEAD_CLASSES if c not in KEEP_DYNAMIC_PATTERNS]
-    print(f"待验证死 class: {len(candidates)} (排除 {len(DEAD_CLASSES) - len(candidates)} 个动态 class)")
+    # 找出所有孤儿选择器行
+    print("\n扫描孤儿选择器...")
+    orphans = []
+    for i, line in enumerate(lines):
+        if is_orphan_selector(line):
+            # 检查附近上下文，确认是真的孤儿（前后没有 {）
+            ctx_start = max(0, i - 5)
+            ctx_end = min(len(lines), i + 5)
+            ctx_text = ''.join(lines[ctx_start:ctx_end])
+            # 如果上下文 5 行内有 {，则可能是正常多行选择器列表的一员
+            # 我们需要更精确：从孤儿行向前找直到遇到 { 或 文件开头
+            # 如果找到的最近的有 { 的行包含的死 class 全部在死列表中，则该孤儿也属于这条规则
+            # 简化策略：检查孤儿行自身所有 class 是否在死列表中
+            classes = selector_classes(line)
+            if not classes:
+                continue
+            # 如果该行所有 class 都是死 class，则可安全删除
+            if all(c in TRULY_DEAD for c in classes):
+                orphans.append((i, line.rstrip('\n')))
+            # 如果该行有死 class 也有活 class（如 .ai-command-card.compact），保留
+            # 这种情况说明原规则是混合的，不能简单删除
 
-    # 二次验证：每个 class 必须确实未在 jsx 中使用
-    print("\n验证死 class...")
-    truly_dead = []
-    skipped_used = []
-    for cls in candidates:
-        if not find_class_in_jsx(cls):
-            truly_dead.append(cls)
-        else:
-            skipped_used.append(cls)
+    print(f"找到 {len(orphans)} 个孤儿选择器行")
+    if orphans:
+        print("\n前 30 个示例:")
+        for i, line in orphans[:30]:
+            print(f"  L{i+1}: {line[:80]}")
 
-    if skipped_used:
-        print(f"  跳过 {len(skipped_used)} 个仍在使用的 class:")
-        for c in skipped_used:
-            print(f"    {c}")
-
-    print(f"\n确认死 class: {len(truly_dead)}/{len(candidates)}")
-
-    # 解析 CSS 规则
-    print("\n解析 CSS 规则...")
-    rules = parse_css_rules(lines)
-    print(f"找到 {len(rules)} 个规则")
-
-    # 标记要删除的规则
+    # 标记要删除的行
     to_delete = [False] * total
-    delete_rules = []
-    for start, end, selector in rules:
-        # 提取选择器中的所有 class 名
-        classes_in_selector = re.findall(r'\.([\w-]+)', selector)
-        # 仅当选择器中的所有 class 都在死列表中时才删除
-        if classes_in_selector and all(c in truly_dead for c in classes_in_selector):
-            for i in range(start, end + 1):
-                to_delete[i] = True
-            delete_rules.append((start + 1, end + 1, selector[:60]))
+    for i, _ in orphans:
+        to_delete[i] = True
 
-    print(f"\n将删除 {len(delete_rules)} 个规则:")
-    for start, end, sel in delete_rules[:30]:
-        print(f"  L{start}-{end}: {sel}")
-    if len(delete_rules) > 30:
-        print(f"  ... 还有 {len(delete_rules) - 30} 个")
+    # 同时删除相邻的空行（孤儿行之间经常有连续空行）
+    # 策略：标记删除后，重新扫描连续的孤儿+空行块
+    # 如果块中的所有非空行都是孤儿，则块中的空行也删除
+    print("\n清理相邻空行...")
+    i = 0
+    while i < total:
+        if to_delete[i]:
+            # 找到连续块
+            block_start = i
+            while i < total and (to_delete[i] or lines[i].strip() == ''):
+                # 检查块内是否还有非孤儿非空行
+                if not to_delete[i] and lines[i].strip() != '':
+                    break
+                i += 1
+            block_end = i
+            # 检查块内：是否所有非空行都是孤儿？
+            block_has_non_orphan = False
+            for j in range(block_start, block_end):
+                if lines[j].strip() == '':
+                    continue
+                if not to_delete[j]:
+                    block_has_non_orphan = True
+                    break
+            if not block_has_non_orphan and block_end - block_start > 1:
+                # 整块都是孤儿+空行，标记所有空行也删除
+                for j in range(block_start, block_end):
+                    to_delete[j] = True
+        else:
+            i += 1
 
-    delete_count = sum(1 for i in range(total) if to_delete[i])
+    delete_count = sum(1 for x in to_delete if x)
     print(f"\n总删除行数: {delete_count}")
 
     new_lines = [lines[i] for i in range(total) if not to_delete[i]]
