@@ -109,6 +109,20 @@ export const useUiStore = create(
       moreNavOpen: false,
       setMoreNavOpen: (v) => set({ moreNavOpen: v }),
 
+      // ===== Workflow 编辑器 UI 状态（非持久化，会话级）=====
+      agentFilter: '全部',
+      setAgentFilter: (v) => set({ agentFilter: v }),
+      agentPromptRefining: false,
+      setAgentPromptRefining: (v) => set({ agentPromptRefining: v }),
+      agentWorkflowPrompt: '',
+      setAgentWorkflowPrompt: (v) => set({ agentWorkflowPrompt: v }),
+      agentWorkflowScope: 'daily',
+      setAgentWorkflowScope: (v) => set({ agentWorkflowScope: v }),
+      newWorkflowNodeType: 'llm',
+      setNewWorkflowNodeType: (v) => set({ newWorkflowNodeType: v }),
+      draggingWorkflowNodeId: '',
+      setDraggingWorkflowNodeId: (v) => set({ draggingWorkflowNodeId: v }),
+
       // 最近访问（type/value/label/timestamp 对象数组，最多 3 条）
       recentVisits: (() => {
         try { return JSON.parse(localStorage.getItem('recentVisits')) || []; }
@@ -172,10 +186,19 @@ export const useLightboxStore = create((set) => ({
     }),
 }));
 
+// ============ Workflow Store ============
+// 智能体工作流状态：草稿、模板、运行记录、历史、动作队列、选中节点
+export { useWorkflowStore } from './workflowStore.js';
+
+// ============ Materials UI Store ============
+// 素材库 UI 状态：筛选、搜索、标签、弹窗开关
+export { useMaterialsStore } from './materialsStore.js';
+
+// ============ Profile Store ============
+// 用户画像与偏好：领域分层、来源分层、特别关注、简报配置、表单
+export { useProfileStore } from './profileStore.js';
+
 // 后续 slice 文件将按业务域逐步添加：
 // - useNewsStore: items/filtered/category/sourceFilter 等
-// - useWorkflowStore: agentWorkflow* 全家桶
 // - useGithubStore: githubInsights 等
-// - useMaterialStore: materialFilter/materialSearch 等
-// - useProfileStore: domainTiers/sourceTiers/specialFollows 等
 // - useAiInsightsStore: aiInsights/aiBrief 等

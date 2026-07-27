@@ -10,7 +10,7 @@ npm run dev                              # Dev server on 0.0.0.0:5175 (with API 
 npm run build                            # Production build -> dist/
 npm start                                # Production Node server (dist + full API, default port 3000)
 npm run preview                          # Preview production build (static only, no API)
-npm test                                 # Run unit tests (vitest) — 168 tests across src/utils, src/domain, src/hooks/__tests__/
+npm test                                 # Run unit tests (vitest) — 296 tests across src/utils, src/domain, src/hooks/__tests__, server/
 npm run test:watch                       # Watch mode
 node node_modules/vitest/vitest.mjs run <file>  # Run a single test file (bin symlink not created on Windows)
 npm run db:migrate
@@ -33,7 +33,7 @@ No lint, typecheck, or formatter commands exist.
 
 ### Frontend (`src/`)
 
-- **`App.jsx`** (10174 lines) - Main component containing ~140 useState hooks, routing logic, settings modal, and all page views. Being incrementally split into hooks and `src/blocks/`. Several UI sub-components (`SkeletonCard`, `NewsItem`, `GithubRepoCard`) are still **inline functions** at the bottom of App.jsx (lines ~9660/9702/10077), not separate files.
+- **`App.jsx`** (~4367 lines) - Main component with routing logic, settings modal, and page composition. State progressively extracted into Zustand stores (`src/store/`) and custom hooks. Several UI sub-components (`SkeletonCard`, `NewsItem`, `GithubRepoCard`) are still **inline functions** at the bottom of App.jsx, not separate files.
 - **`AiElf.jsx`** (1354 lines) - AI assistant with multi-Agent conversation, drag-to-analyze, history management. Uses localStorage per-agent (50 messages, 20 sessions max). Lazy-loaded via `React.lazy`.
 - **`GlobeView.jsx`** (999 lines) - 3D globe via `react-globe.gl`/Three.js. Fullscreen uses `createPortal` to `document.body`. Canvas needs `min-height: 420px`. Lazy-loaded.
 - **`main.jsx`** - Mounts `<App />` inside `<ErrorBoundary>` + `<React.StrictMode>`.
@@ -61,6 +61,27 @@ src/blocks/
 ```
 
 App.jsx consumes `BlockGrid, BlockPanel, BlockStat, BlockToolbar` from `./blocks/index.js` and `CommandPalette` from `./shell/CommandPalette.jsx`.
+
+#### Global State: Zustand Stores (`src/store/`)
+
+State progressively extracted from App.jsx `useState` into Zustand stores. Each slice is a separate file; `src/store/index.js` re-exports them. Persistence via `persist` middleware replaces hand-written `saveLS` effects.
+
+```
+src/store/
+  index.js              Barrel: exports useUiStore, useLightboxStore, useWorkflowStore, useMaterialsStore, useProfileStore
+  workflowStore.js      智能体工作流：draft/templates/activeId/selectedNodeId/run/result/history/actions (persisted)
+  materialsStore.js     素材库 UI：filter/search/tags/timeRange/sourceFilter/spaceFilter/showSpaceForm/showAddMaterial (non-persisted)
+  profileStore.js       用户画像：domainTiers/sourceTiers/specialFollows/dailyProfileSnapshots/briefingConfig (persisted) + profileForm/specialFollowForm/editingSpecialFollowId (non-persisted)
+```
+
+UI Store (`useUiStore`) and Lightbox Store (`useLightboxStore`) are defined inline in `src/store/index.js`. Usage:
+```js
+import { useWorkflowStore } from './store';
+const draft = useWorkflowStore(s => s.agentWorkflowDraft);
+const setDraft = useWorkflowStore(s => s.setAgentWorkflowDraft);
+```
+
+Setters support both direct value and updater function (React `setState` style): `setAgentWorkflowDraft(prev => ({ ...prev, name }))`.
 
 #### Extracted Modules (Phase 1-3 refactoring)
 
@@ -280,7 +301,7 @@ Categories, source grades, and tag rules are defined **independently** in both `
 - **GitHub card**: App.jsx has an **inline** `GithubRepoCard` function (defined near line 10077 in App.jsx, NOT a separate file). Inline version uses `inferGithubScenario/Audience/Difficulty/Value` + `buildGithubMaterial`; `deriveRepoInsight` in repoInsight.js is a parallel implementation. AI insight is collapsible by default.
 ## Known Issues
 
-- **Tests limited to pure-logic engines** — 168 unit tests cover workflowEngine.js (69) + profileModel.js (70) + src/domain/intelligence (11) + src/domain/stock (3) + hooks/stockAnalysisController (2) + format/repoInsight/smoke (13); no integration/E2E tests, no component tests
+- **Tests limited to pure-logic engines** — 296 unit tests cover workflowEngine.js (80) + profileModel.js (70) + src/domain/intelligence + src/domain/stock + sandbox + agentTools (31) + server/ tests; no integration/E2E tests, no component tests
 - **RSS failure rate ~40-50%** — many sources return 403/404 or HTML instead of RSS
 - **Auth requires PostgreSQL** - register/login/me/logout/profile/interests delegate to server/http/authHandlers.js -> server/auth/authService.js (password hashing + session tokens in sessions table). Dev (server/news/plugin.js) and prod (api/auth/[action].js) share the same handler. Without DATABASE_URL, auth endpoints return 503 DATABASE_UNAVAILABLE.
 - **`package.json` type: "module"** — all `.js` files use ESM; CI workflows using `require()` will crash
@@ -301,5 +322,5 @@ Categories, source grades, and tag rules are defined **independently** in both `
 - `scripts/` contains deployment and test scripts; `docs/reports/` contains historical optimization reports
 - v2 localStorage keys: `agentWorkflowHistory` (workflow run records, max 12), `dailyBriefingReport` (last generated briefing). AI Elf uses per-agent keys. All `setItem` calls must be wrapped in try-catch for `QuotaExceededError`.
 - WorkflowEngine: `condition` node failure halts the entire rest of the chain (subsequent nodes marked `skipped`), it does NOT branch. LLM nodes require `ctx.llmConfig` (baseUrl/apiKey/selectedModel) and an agent with `systemPrompt`; local nodes ignore LLM config entirely.
-- The monolithic `App.jsx` (10174 lines) imports the v2 modules but ALSO retains inline copies of some logic — when editing workflow/profile/briefing behavior, check whether App.jsx calls the extracted module or its inline copy. Prefer the extracted module. State has been progressively extracted into hooks (useAuth/useLlmConfig/useTrending/useSourceManager/useCustomUrl/useCalendar/useUI); ~140 useState remain in App.jsx, mostly cross-domain coupled (bookmarks/materials/agentWorkflow).
+- The `App.jsx` (~4367 lines) file imports v2 modules and Zustand stores (`useWorkflowStore`/`useMaterialsStore`/`useProfileStore`). When editing workflow/profile/materials state, prefer reading from the store directly rather than passing as props. Inline workflow constants (`WORKFLOW_SKILL_CATALOG`, `WORKFLOW_CONDITION_METRICS`, `getWorkflowSkillMeta`, `isWorkflowSkillId`, `formatWorkflowNodeConfig`) are still defined in App.jsx for live usage; the larger constants (`DEFAULT_AGENT_WORKFLOW`, `WORKFLOW_TEMPLATE_LIBRARY`, `normalizeWorkflowTemplate`, `createWorkflowTemplateInstance`, `validateWorkflowImportPayload`) live in `src/constants/workflowConstants.js` and are consumed by `workflowStore.js`.
 - Runtime `ReferenceError: useMemo is not defined` means a component file uses `useMemo` without importing it from `react` — add `import { useMemo } from 'react'` to that file.

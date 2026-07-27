@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, useRef, useCallback, lazy, Suspense } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useUiStore, useLightboxStore } from './store/index.js';
+import { useUiStore, useLightboxStore, useWorkflowStore, useMaterialsStore, useProfileStore } from './store/index.js';
 import SettingsModal from './components/SettingsModal.jsx';
 import ArticleEditor from './components/ArticleEditor.jsx';
 import CreativeWorkspace from './components/CreativeWorkspace.jsx';
@@ -74,12 +74,7 @@ import { useProfileSync } from './hooks/useProfileSync.js';
 import { useWorkbenchMemos } from './hooks/useWorkbenchMemos.js';
 import { useTranslationSummary } from './hooks/useTranslationSummary.js';
 import {
-  PROFILE_TIER_OPTIONS,
-  PROFILE_TIERS,
-  SPECIAL_FOLLOW_TYPES,
   domainTierScore,
-  migratePreferenceState,
-  migrateSpecialFollows,
   sourceTierScore,
 } from './domain/intelligence/profileTiers.js';
 import { clusterEvents } from './domain/intelligence/recommendationEngine.js';
@@ -194,66 +189,9 @@ const NAV_CONTEXT_SECTIONS = {
 };
 
 
-const DEFAULT_AGENT_WORKFLOW = {
-  name: '个人情报协作流',
-  description: '把每日汇报、用户画像和素材库交给多个智能体协作，输出可阅读、可追踪、可创作的结果。',
-  nodes: [
-    {
-      id: 'wf-input',
-      type: 'input',
-      title: '输入',
-      role: '接收今日推荐、用户画像、追踪关键词和已收藏素材。',
-      prompt: '读取今日情报工作台、用户画像、素材库和用户补充指令。',
-      inputKey: 'user_context',
-      outputKey: 'briefing_context',
-      enabled: true
-    },
-    {
-      id: 'wf-analyst',
-      type: 'llm',
-      title: '大模型分析',
-      role: '识别重要事实、机会、风险和不确定性。',
-      prompt: '请基于输入资料输出事实、推断、不确定性和优先级。',
-      inputKey: 'briefing_context',
-      outputKey: 'analysis',
-      enabled: true
-    },
-    {
-      id: 'wf-classifier',
-      type: 'classifier',
-      title: '分类判断',
-      role: '按领域、质量等级、应用场景和风险等级给内容分流。',
-      prompt: '将内容分类为：必读、追踪、素材、创作、忽略，并说明原因。',
-      classifierLabels: '必读,追踪,素材,创作,降噪',
-      inputKey: 'analysis',
-      outputKey: 'classified_signals',
-      enabled: true
-    },
-    {
-      id: 'wf-skill',
-      type: 'skill',
-      title: '工具 Skills',
-      role: '调用搜索、摘要、正文抽取、导出和格式化等工具能力。',
-      prompt: '需要时调用工具补充证据、提取正文图片、整理参考链接。',
-      skillId: 'evidence-pack',
-      inputKey: 'classified_signals',
-      outputKey: 'evidence_pack',
-      enabled: true
-    },
-    {
-      id: 'wf-output',
-      type: 'output',
-      title: '输出',
-      role: '生成今日简报、素材卡片、追踪记忆和创作选题。',
-      prompt: '输出结构：一句话判断、优先阅读、风险、行动、可沉淀素材。',
-      inputKey: 'evidence_pack',
-      outputKey: 'final_briefing',
-      enabled: true
-    }
-  ]
-};
-
-const WORKFLOW_NODE_TYPES = ['input', 'llm', 'skill', 'condition', 'classifier', 'reply', 'output'];
+// NOTE: DEFAULT_AGENT_WORKFLOW / WORKFLOW_NODE_TYPES / WORKFLOW_TEMPLATE_LIBRARY 等
+// 常量与模板实例化函数已迁移至 src/constants/workflowConstants.js，
+// 通过 workflowStore 间接消费。App.jsx 仅保留仍在使用的辅助常量与函数。
 
 const WORKFLOW_SKILL_CATALOG = [
   {
@@ -322,280 +260,6 @@ function formatWorkflowNodeConfig(node) {
   }
   if (node.type === 'classifier') return `分类桶：${node.classifierLabels || '必读,追踪,素材,创作,降噪'}`;
   return '';
-}
-
-const WORKFLOW_TEMPLATE_LIBRARY = [
-  {
-    id: 'daily-briefing-copilot',
-    name: '每日情报简报工作流',
-    description: '从用户画像、今日资讯、收藏素材中提取高价值信号，生成可追踪的每日汇报。',
-    source: '参考 Dify / Langflow 的模板化工作流设计',
-    tags: ['每日汇报', '用户画像', '可执行'],
-    nodes: [
-      {
-        id: 'tpl-daily-input',
-        type: 'input',
-        title: '汇总输入',
-        role: '收集今日推荐、关注领域、阅读历史、收藏素材和用户补充任务。',
-        prompt: '读取当前日期、用户画像、今日推荐列表、追踪关键词、收藏和素材库，形成完整任务上下文。',
-        inputKey: 'user_context',
-        outputKey: 'briefing_context',
-        enabled: true
-      },
-      {
-        id: 'tpl-daily-rank',
-        type: 'classifier',
-        title: '信号分层',
-        role: '把信息分为必读、追踪、素材、创作、降噪五类，并说明分层依据。',
-        prompt: '按照质量等级、用户兴趣、来源可信度、可行动性和新鲜度给资讯分层，避免平均用力。',
-        classifierLabels: '必读,追踪,素材,创作,降噪',
-        inputKey: 'briefing_context',
-        outputKey: 'ranked_signals',
-        enabled: true
-      },
-      {
-        id: 'tpl-daily-llm',
-        type: 'llm',
-        title: '大模型解读',
-        role: '把高价值信号解释成对用户有意义的判断、机会、风险和下一步行动。',
-        prompt: '输出一段清晰的每日汇报：一句话结论、三条必读、风险提醒、行动建议、可沉淀素材。',
-        inputKey: 'ranked_signals',
-        outputKey: 'briefing_analysis',
-        enabled: true
-      },
-      {
-        id: 'tpl-daily-actions',
-        type: 'skill',
-        title: '行动沉淀',
-        role: '生成可执行动作：收藏素材、追踪关键词、生成创作草稿、记录画像快照。',
-        prompt: '根据分析结果生成后续动作队列，并标明每个动作的触发原因和预期价值。',
-        skillId: 'profile-memory',
-        inputKey: 'briefing_analysis',
-        outputKey: 'action_queue',
-        enabled: true
-      },
-      {
-        id: 'tpl-daily-output',
-        type: 'output',
-        title: '结构化输出',
-        role: '生成可阅读、可追踪、可导出的最终汇报。',
-        prompt: '输出 Markdown 结构，包含结论、依据、引用来源、行动清单和素材沉淀建议。',
-        inputKey: 'action_queue',
-        outputKey: 'final_briefing',
-        enabled: true
-      }
-    ]
-  },
-  {
-    id: 'github-project-evaluator',
-    name: 'GitHub 项目评估工作流',
-    description: '评估热门开源项目的真实用途、成熟度、适用人群和可落地场景。',
-    source: '参考 Flowise / Langflow 的节点化评估链路',
-    tags: ['GitHub', '开源评估', '项目场景'],
-    nodes: [
-      {
-        id: 'tpl-github-input',
-        type: 'input',
-        title: '项目输入',
-        role: '读取 GitHub 榜单、README 摘要、Stars、更新时间、语言和媒体线索。',
-        prompt: '聚合项目元数据、README 介绍、图片线索、仓库活跃度和当前用户关注领域。',
-        inputKey: 'github_items',
-        outputKey: 'repo_context',
-        enabled: true
-      },
-      {
-        id: 'tpl-github-condition',
-        type: 'condition',
-        title: '质量门槛',
-        role: '过滤过期、描述空泛、缺少应用场景或证据不足的项目。',
-        prompt: '至少需要 3 个项目；优先保留有 README、近期更新、明确应用场景和可解释价值的项目。',
-        conditionMetric: 'githubCount',
-        conditionOperator: '>=',
-        conditionValue: 3,
-        inputKey: 'repo_context',
-        outputKey: 'quality_pass',
-        enabled: true
-      },
-      {
-        id: 'tpl-github-skill',
-        type: 'skill',
-        title: '证据增强',
-        role: '整理 README 图片、官网截图、演示视频、引用链接和重复媒体风险。',
-        prompt: '生成媒体质量审计：正文图片优先，过滤 logo/小图标，记录缺图、重复图和可引用链接。',
-        skillId: 'github-evaluator',
-        inputKey: 'quality_pass',
-        outputKey: 'evidence_pack',
-        enabled: true
-      },
-      {
-        id: 'tpl-github-llm',
-        type: 'llm',
-        title: '应用场景判断',
-        role: '用大模型解释项目解决什么问题、适合谁、能落地到什么业务场景。',
-        prompt: '为每个项目输出：核心价值、适用人群、典型应用场景、集成难度、风险和下一步试用建议。',
-        inputKey: 'evidence_pack',
-        outputKey: 'repo_judgement',
-        enabled: true
-      },
-      {
-        id: 'tpl-github-output',
-        type: 'output',
-        title: '项目卡片输出',
-        role: '形成可以进入资讯卡片、素材库和内容创作的项目洞察。',
-        prompt: '输出项目对比表和推荐排序，保留来源链接、图片线索和可沉淀素材字段。',
-        inputKey: 'repo_judgement',
-        outputKey: 'final_repo_cards',
-        enabled: true
-      }
-    ]
-  },
-  {
-    id: 'material-to-article',
-    name: '素材转文章工作流',
-    description: '把资讯卡片、每日汇报和本地素材转成可继续编辑的文章草稿。',
-    source: '参考 n8n 的可执行自动化与 Langflow 的多 Agent 协作',
-    tags: ['素材库', '内容创作', '知识资产'],
-    nodes: [
-      {
-        id: 'tpl-article-input',
-        type: 'input',
-        title: '素材读取',
-        role: '读取素材库、收藏资讯、今日汇报、用户选题和目标读者。',
-        prompt: '把可用素材按主题、来源、观点、证据、媒体资源分类，形成写作输入包。',
-        inputKey: 'material_pool',
-        outputKey: 'writing_context',
-        enabled: true
-      },
-      {
-        id: 'tpl-article-classifier',
-        type: 'classifier',
-        title: '选题聚类',
-        role: '把素材聚类为可写选题，并区分观点型、教程型、趋势型和复盘型文章。',
-        prompt: '输出 3 个候选选题，每个选题给出核心论点、关键证据、目标读者和缺口。',
-        classifierLabels: '观点型,教程型,趋势型,复盘型,资料型',
-        inputKey: 'writing_context',
-        outputKey: 'topic_candidates',
-        enabled: true
-      },
-      {
-        id: 'tpl-article-llm',
-        type: 'llm',
-        title: '文章架构',
-        role: '生成完整大纲、段落目的、引用安排和需要补充的证据。',
-        prompt: '选择最有价值的选题，生成类似 Word 文档的文章结构：标题、摘要、正文大纲、引用、结尾行动。',
-        inputKey: 'topic_candidates',
-        outputKey: 'article_outline',
-        enabled: true
-      },
-      {
-        id: 'tpl-article-reply',
-        type: 'reply',
-        title: '写作风格约束',
-        role: '确保文章不是资讯堆砌，而是清晰、有判断、有证据的成稿。',
-        prompt: '保持简洁、可信、可读；每个观点必须对应素材或来源；避免空泛口号。',
-        inputKey: 'article_outline',
-        outputKey: 'style_guardrails',
-        enabled: true
-      },
-      {
-        id: 'tpl-article-output',
-        type: 'output',
-        title: '导出草稿',
-        role: '输出可进入内容创作中心继续编辑、导出和沉淀为私有知识库的草稿。',
-        prompt: '输出 Markdown 草稿，包含素材引用清单、图片建议、标签和知识库归档建议。',
-        inputKey: 'style_guardrails',
-        outputKey: 'final_article_draft',
-        enabled: true
-      }
-    ]
-  }
-];
-
-function createWorkflowTemplateInstance(template, options = {}) {
-  const suffix = options.suffix || `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
-  const rawNodes = Array.isArray(template?.nodes) ? template.nodes : [];
-  if (!rawNodes.length) throw new Error('工作流至少需要一个节点');
-
-  const seenNodeIds = new Set();
-  const nodes = rawNodes.map((node, index) => {
-    const type = WORKFLOW_NODE_TYPES.includes(node?.type) ? node.type : 'llm';
-    const baseId = String(node?.id || `${type}-${index + 1}`).replace(/[^\w-]/g, '') || `${type}-${index + 1}`;
-    const id = options.preserveNodeIds && !seenNodeIds.has(baseId) ? baseId : `${baseId}-${suffix}`;
-    seenNodeIds.add(id);
-    return {
-      id,
-      type,
-      title: String(node?.title || `节点 ${index + 1}`).trim(),
-      role: String(node?.role || '').trim(),
-      prompt: String(node?.prompt || '').trim(),
-      skillId: type === 'skill' ? (node?.skillId || 'evidence-pack') : node?.skillId,
-      conditionMetric: type === 'condition' ? (node?.conditionMetric || 'itemCount') : node?.conditionMetric,
-      conditionOperator: type === 'condition' ? (node?.conditionOperator || '>=') : node?.conditionOperator,
-      conditionValue: type === 'condition' ? Number(node?.conditionValue ?? 1) : node?.conditionValue,
-      classifierLabels: type === 'classifier' ? (node?.classifierLabels || '必读,追踪,素材,创作,降噪') : node?.classifierLabels,
-      inputKey: String(node?.inputKey || (index === 0 ? 'context' : `step_${index}`)).trim(),
-      outputKey: String(node?.outputKey || (type === 'output' ? 'final' : `step_${index + 1}`)).trim(),
-      enabled: node?.enabled !== false
-    };
-  });
-
-  return {
-    id: options.id || `${options.idPrefix || template?.id || 'workflow'}-${suffix}`,
-    name: String(template?.name || '未命名工作流').trim(),
-    description: String(template?.description || '').trim(),
-    source: String(options.source || template?.source || 'custom').trim(),
-    tags: Array.isArray(template?.tags) ? template.tags.filter(Boolean) : [],
-    updatedAt: new Date().toISOString(),
-    nodes
-  };
-}
-
-function validateWorkflowImportPayload(payload) {
-  const workflow = payload?.workflow && typeof payload.workflow === 'object' ? payload.workflow : payload;
-  if (!workflow || typeof workflow !== 'object') throw new Error('JSON 不是有效的工作流对象');
-  if (!String(workflow.name || '').trim()) throw new Error('导入失败：缺少工作流名称 name');
-  if (!Array.isArray(workflow.nodes) || workflow.nodes.length === 0) throw new Error('导入失败：nodes 必须是非空数组');
-
-  workflow.nodes.forEach((node, index) => {
-    const label = `第 ${index + 1} 个节点`;
-    if (!WORKFLOW_NODE_TYPES.includes(node?.type)) throw new Error(`${label} 的 type 不受支持`);
-    if (!String(node?.title || '').trim()) throw new Error(`${label} 缺少 title`);
-    if (!String(node?.role || '').trim()) throw new Error(`${label} 缺少 role`);
-    if (!String(node?.prompt || '').trim()) throw new Error(`${label} 缺少 prompt`);
-  });
-
-  return createWorkflowTemplateInstance(workflow, { idPrefix: 'imported-workflow', source: 'imported-json' });
-}
-
-function normalizeWorkflowTemplate(workflow, fallback = DEFAULT_AGENT_WORKFLOW) {
-  const base = { ...fallback, ...(workflow || {}) };
-  const rawNodes = Array.isArray(base.nodes) && base.nodes.length ? base.nodes : fallback.nodes;
-  const nodes = rawNodes.map((node, index) => {
-    const type = WORKFLOW_NODE_TYPES.includes(node?.type) ? node.type : 'llm';
-    const previousOutputKey = index > 0 ? (rawNodes[index - 1]?.outputKey || `step_${index}`) : 'context';
-    return {
-      id: node?.id || `wf-${type}-${index + 1}`,
-      type,
-      title: node?.title || `节点 ${index + 1}`,
-      role: node?.role || '描述这个节点负责的判断、工具或输出职责。',
-      prompt: node?.prompt || '在这里填写该节点的执行指令。',
-      skillId: type === 'skill' ? (node?.skillId || 'evidence-pack') : node?.skillId,
-      conditionMetric: type === 'condition' ? (node?.conditionMetric || 'itemCount') : node?.conditionMetric,
-      conditionOperator: type === 'condition' ? (node?.conditionOperator || '>=') : node?.conditionOperator,
-      conditionValue: type === 'condition' ? Number(node?.conditionValue ?? 1) : node?.conditionValue,
-      classifierLabels: type === 'classifier' ? (node?.classifierLabels || '必读,追踪,素材,创作,降噪') : node?.classifierLabels,
-      inputKey: String(node?.inputKey || previousOutputKey).trim(),
-      outputKey: String(node?.outputKey || (type === 'output' ? 'final_output' : `step_${index + 1}`)).trim(),
-      enabled: node?.enabled !== false
-    };
-  });
-
-  return {
-    ...base,
-    name: base.name || fallback.name,
-    description: base.description || fallback.description,
-    nodes
-  };
 }
 
 const FALLBACK_CATEGORIES = [
@@ -1014,51 +678,36 @@ function App() {
     }
   });
   const { agents, setAgents, updateAgent, currentAgent, setCurrentAgent, showAgentForm, setShowAgentForm, editingAgent, setEditingAgent, newAgent, setNewAgent } = useAgents();
-  const [agentFilter, setAgentFilter] = useState('全部');
-  const [agentPromptRefining, setAgentPromptRefining] = useState(false);
-  const [agentWorkflowResult, setAgentWorkflowResult] = useState(() => {
-    const saved = loadLS('agentWorkflowResult', null);
-    return {
-      loading: false,
-      content: saved?.content || '',
-      error: saved?.error || '',
-      missionId: saved?.missionId || ''
-    };
-  });
-  const [agentWorkflowRun, setAgentWorkflowRun] = useState(() => loadLS('agentWorkflowRun', {
-    id: '',
-    status: 'idle',
-    missionLabel: '',
-    startedAt: '',
-    finishedAt: '',
-    trace: []
-  }));
-  const [agentWorkflowHistory, setAgentWorkflowHistory] = useState(() => {
-    const saved = loadLS('agentWorkflowHistory', []);
-    return Array.isArray(saved) ? saved : [];
-  });
-  const [agentWorkflowActions, setAgentWorkflowActions] = useState(() => {
-    const saved = loadLS('agentWorkflowActions', []);
-    return Array.isArray(saved) ? saved : [];
-  });
-  const [agentWorkflowPrompt, setAgentWorkflowPrompt] = useState('');
-  const [agentWorkflowScope, setAgentWorkflowScope] = useState('daily');
-  const [agentWorkflowDraft, setAgentWorkflowDraft] = useState(() => {
-    const saved = loadLS('agentWorkflowDraft', DEFAULT_AGENT_WORKFLOW);
-    if (!saved || !Array.isArray(saved.nodes) || saved.nodes.length === 0) return normalizeWorkflowTemplate(DEFAULT_AGENT_WORKFLOW);
-    return normalizeWorkflowTemplate(saved);
-  });
-  const [workflowTemplates, setWorkflowTemplates] = useState(() => {
-    const savedTemplates = loadLS('agentWorkflowTemplates', null);
-    if (Array.isArray(savedTemplates) && savedTemplates.length > 0) return savedTemplates.map(template => normalizeWorkflowTemplate(template));
-    const savedDraft = loadLS('agentWorkflowDraft', DEFAULT_AGENT_WORKFLOW);
-    const baseDraft = savedDraft && Array.isArray(savedDraft.nodes) && savedDraft.nodes.length > 0 ? normalizeWorkflowTemplate(savedDraft) : normalizeWorkflowTemplate(DEFAULT_AGENT_WORKFLOW);
-    return [{ ...baseDraft, id: baseDraft.id || 'default-workflow', updatedAt: new Date().toISOString() }];
-  });
-  const [activeWorkflowId, setActiveWorkflowId] = useState(() => loadLS('activeWorkflowId', 'default-workflow'));
-  const [selectedWorkflowNodeId, setSelectedWorkflowNodeId] = useState(() => loadLS('selectedWorkflowNodeId', 'wf-analyst'));
-  const [newWorkflowNodeType, setNewWorkflowNodeType] = useState('llm');
-  const [draggingWorkflowNodeId, setDraggingWorkflowNodeId] = useState('');
+  // Workflow 编辑器 UI 状态从 useUiStore 获取
+  const agentFilter = useUiStore(s => s.agentFilter);
+  const setAgentFilter = useUiStore(s => s.setAgentFilter);
+  const agentPromptRefining = useUiStore(s => s.agentPromptRefining);
+  const setAgentPromptRefining = useUiStore(s => s.setAgentPromptRefining);
+  const agentWorkflowPrompt = useUiStore(s => s.agentWorkflowPrompt);
+  const setAgentWorkflowPrompt = useUiStore(s => s.setAgentWorkflowPrompt);
+  const agentWorkflowScope = useUiStore(s => s.agentWorkflowScope);
+  const setAgentWorkflowScope = useUiStore(s => s.setAgentWorkflowScope);
+  const newWorkflowNodeType = useUiStore(s => s.newWorkflowNodeType);
+  const setNewWorkflowNodeType = useUiStore(s => s.setNewWorkflowNodeType);
+  const draggingWorkflowNodeId = useUiStore(s => s.draggingWorkflowNodeId);
+  const setDraggingWorkflowNodeId = useUiStore(s => s.setDraggingWorkflowNodeId);
+  // ===== 工作流状态（迁移自 useState -> Zustand workflowStore）=====
+  const agentWorkflowResult = useWorkflowStore(s => s.agentWorkflowResult);
+  const setAgentWorkflowResult = useWorkflowStore(s => s.setAgentWorkflowResult);
+  const agentWorkflowRun = useWorkflowStore(s => s.agentWorkflowRun);
+  const setAgentWorkflowRun = useWorkflowStore(s => s.setAgentWorkflowRun);
+  const agentWorkflowHistory = useWorkflowStore(s => s.agentWorkflowHistory);
+  const setAgentWorkflowHistory = useWorkflowStore(s => s.setAgentWorkflowHistory);
+  const agentWorkflowActions = useWorkflowStore(s => s.agentWorkflowActions);
+  const setAgentWorkflowActions = useWorkflowStore(s => s.setAgentWorkflowActions);
+  const agentWorkflowDraft = useWorkflowStore(s => s.agentWorkflowDraft);
+  const setAgentWorkflowDraft = useWorkflowStore(s => s.setAgentWorkflowDraft);
+  const workflowTemplates = useWorkflowStore(s => s.workflowTemplates);
+  const setWorkflowTemplates = useWorkflowStore(s => s.setWorkflowTemplates);
+  const activeWorkflowId = useWorkflowStore(s => s.activeWorkflowId);
+  const setActiveWorkflowId = useWorkflowStore(s => s.setActiveWorkflowId);
+  const selectedWorkflowNodeId = useWorkflowStore(s => s.selectedWorkflowNodeId);
+  const setSelectedWorkflowNodeId = useWorkflowStore(s => s.setSelectedWorkflowNodeId);
   const [stats, setStats] = useState({ sourceCount: 40, failedSources: 0, updatedAt: '', blockedCount: 0 });
   const sidebarCollapsed = useUiStore(s => s.sidebarCollapsed);
   const setSidebarCollapsed = useUiStore(s => s.setSidebarCollapsed);
@@ -1121,21 +770,23 @@ function App() {
   const setShowUserMenu = useUiStore(s => s.setShowUserMenu);
   const showProfileModal = useUiStore(s => s.showProfileModal);
   const setShowProfileModal = useUiStore(s => s.setShowProfileModal);
-  const [profileForm, setProfileForm] = useState({ displayName: '', signature: '' });
-  const [domainTiers, setDomainTiers] = useState(() => migratePreferenceState({
-    'domainTiers:v1': loadLS('domainTiers:v1', null),
-    domainPriorities: loadLS('domainPriorities', {}),
-  }, 'domain'));
-  const [sourceTiers, setSourceTiers] = useState(() => migratePreferenceState({
-    'sourceTiers:v1': loadLS('sourceTiers:v1', null),
-    sourcePriorities: loadLS('sourcePriorities', {}),
-  }, 'source'));
-  const [dailyProfileSnapshots, setDailyProfileSnapshots] = useState(() => loadLS('dailyProfileSnapshots', []));
-  const [specialFollows, setSpecialFollows] = useState(() => migrateSpecialFollows(
-    loadLS('specialFollows:v2', null) ?? loadLS('specialFollows', [])
-  ));
-  const [specialFollowForm, setSpecialFollowForm] = useState({ type: 'source', target: '', note: '' });
-  const [editingSpecialFollowId, setEditingSpecialFollowId] = useState(null);
+  // ===== 用户画像与偏好状态（迁移自 useState -> Zustand profileStore）=====
+  const profileForm = useProfileStore(s => s.profileForm);
+  const setProfileForm = useProfileStore(s => s.setProfileForm);
+  const domainTiers = useProfileStore(s => s.domainTiers);
+  const setDomainTiers = useProfileStore(s => s.setDomainTiers);
+  const sourceTiers = useProfileStore(s => s.sourceTiers);
+  const setSourceTiers = useProfileStore(s => s.setSourceTiers);
+  const dailyProfileSnapshots = useProfileStore(s => s.dailyProfileSnapshots);
+  const setDailyProfileSnapshots = useProfileStore(s => s.setDailyProfileSnapshots);
+  const specialFollows = useProfileStore(s => s.specialFollows);
+  const setSpecialFollows = useProfileStore(s => s.setSpecialFollows);
+  const briefingConfig = useProfileStore(s => s.briefingConfig);
+  const setBriefingConfig = useProfileStore(s => s.setBriefingConfig);
+  const specialFollowForm = useProfileStore(s => s.specialFollowForm);
+  const setSpecialFollowForm = useProfileStore(s => s.setSpecialFollowForm);
+  const editingSpecialFollowId = useProfileStore(s => s.editingSpecialFollowId);
+  const setEditingSpecialFollowId = useProfileStore(s => s.setEditingSpecialFollowId);
   useProfileSync({ user, domainTiers, sourceTiers, specialFollows, setDomainTiers, setSourceTiers, setSpecialFollows });
 
   // 打开资料弹窗时预填充表单
@@ -1148,13 +799,7 @@ function App() {
     }
   }, [showProfileModal, user]);
 
-  // user/token/selectedInterests 持久化由 useAuth 内部处理，此处不再重复
-  useEffect(() => {
-    saveLS('domainTiers:v1', domainTiers);
-    saveLS('sourceTiers:v1', sourceTiers);
-    saveLS('dailyProfileSnapshots', dailyProfileSnapshots);
-    saveLS('specialFollows:v2', specialFollows);
-  }, [domainTiers, sourceTiers, dailyProfileSnapshots, specialFollows]);
+  // 画像状态持久化由 profileStore 的 persist 中间件自动处理（不再需要手写 saveLS effect）
 
 
   // 认证函数已抽取至 useAuth — 这里不再定义
@@ -1309,7 +954,7 @@ function App() {
   // customUrl states moved to useCustomUrl hook
   // UI switch states (showFollowDropdown/mobileMenuOpen/showBackToTop) moved to useUI
   const [trackTargets, setTrackTargets] = useState(() => loadLS('trackTargets', []));
-  const [briefingConfig, setBriefingConfig] = useState(() => loadLS('briefingConfig', { length: 'standard', includeRead: false }));
+  // briefingConfig 已迁移到 profileStore
   const [newTrackTarget, setNewTrackTarget] = useState('');
   const [readingHistory, setReadingHistory] = useState(() => loadLS('readingHistory', []));
   useEffect(() => { saveLS('recommendationFeedback:v2', recommendationFeedbackEvents); }, [recommendationFeedbackEvents]);
@@ -1319,14 +964,23 @@ function App() {
   const [githubInsights, setGithubInsights] = useState(() => loadLS('githubInsights', {}));
   const [githubInsightLoading, setGithubInsightLoading] = useState({});
   // moreNavOpen moved to useUI
-  const [materialFilter, setMaterialFilter] = useState('all');
-  const [materialSearch, setMaterialSearch] = useState('');
-  const [materialTags, setMaterialTags] = useState([]);
-  const [materialTimeRange, setMaterialTimeRange] = useState('all');
-  const [materialSourceFilter, setMaterialSourceFilter] = useState('all');
-  const [materialSpaceFilter, setMaterialSpaceFilter] = useState('all');
-  const [showSpaceForm, setShowSpaceForm] = useState(false);
-  const [showAddMaterial, setShowAddMaterial] = useState(false);
+  // ===== 素材库 UI 状态（迁移自 useState -> Zustand materialsStore）=====
+  const materialFilter = useMaterialsStore(s => s.materialFilter);
+  const setMaterialFilter = useMaterialsStore(s => s.setMaterialFilter);
+  const materialSearch = useMaterialsStore(s => s.materialSearch);
+  const setMaterialSearch = useMaterialsStore(s => s.setMaterialSearch);
+  const materialTags = useMaterialsStore(s => s.materialTags);
+  const setMaterialTags = useMaterialsStore(s => s.setMaterialTags);
+  const materialTimeRange = useMaterialsStore(s => s.materialTimeRange);
+  const setMaterialTimeRange = useMaterialsStore(s => s.setMaterialTimeRange);
+  const materialSourceFilter = useMaterialsStore(s => s.materialSourceFilter);
+  const setMaterialSourceFilter = useMaterialsStore(s => s.setMaterialSourceFilter);
+  const materialSpaceFilter = useMaterialsStore(s => s.materialSpaceFilter);
+  const setMaterialSpaceFilter = useMaterialsStore(s => s.setMaterialSpaceFilter);
+  const showSpaceForm = useMaterialsStore(s => s.showSpaceForm);
+  const setShowSpaceForm = useMaterialsStore(s => s.setShowSpaceForm);
+  const showAddMaterial = useMaterialsStore(s => s.showAddMaterial);
+  const setShowAddMaterial = useMaterialsStore(s => s.setShowAddMaterial);
   const [aiBrief, setAiBrief] = useState({ loading: false, content: '', error: '', generatedAt: null });
   const [signalFilter, setSignalFilter] = useState('all');
   // article editor state moved to useArticleEditor hook
@@ -1457,16 +1111,7 @@ function App() {
     trackTargets, briefingConfig, readingHistory, translations, llmConfig,
     elfAvatar, elfAvatarHistory, elfName,
   ]);
-  useEffect(() => {
-    saveLS('agentWorkflowDraft', agentWorkflowDraft);
-    saveLS('agentWorkflowTemplates', workflowTemplates);
-    saveLS('activeWorkflowId', activeWorkflowId);
-    saveLS('agentWorkflowRun', agentWorkflowRun);
-    if (!agentWorkflowResult.loading) saveLS('agentWorkflowResult', agentWorkflowResult);
-    saveLS('agentWorkflowHistory', agentWorkflowHistory);
-    saveLS('agentWorkflowActions', agentWorkflowActions);
-    saveLS('selectedWorkflowNodeId', selectedWorkflowNodeId);
-  }, [agentWorkflowDraft, workflowTemplates, activeWorkflowId, agentWorkflowRun, agentWorkflowResult, agentWorkflowHistory, agentWorkflowActions, selectedWorkflowNodeId]);
+  // 工作流状态持久化由 workflowStore 的 persist 中间件自动处理（不再需要手写 saveLS effect）
 
   const fetchAiInsights = async () => {
     if (!llmConfig.baseUrl || !llmConfig.selectedModel || items.length === 0) {
