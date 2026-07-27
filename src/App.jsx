@@ -1,5 +1,6 @@
-﻿import { useEffect, useMemo, useState, useRef, useCallback, lazy, Suspense } from 'react';
+import { useEffect, useMemo, useState, useRef, useCallback, lazy, Suspense } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useUiStore, useLightboxStore } from './store/index.js';
 import SettingsModal from './components/SettingsModal.jsx';
 import ArticleEditor from './components/ArticleEditor.jsx';
 import CreativeWorkspace from './components/CreativeWorkspace.jsx';
@@ -942,16 +943,30 @@ function App() {
     return translated;
   }, [t, i18n.language]);
 
-  const [showThemePicker, setShowThemePicker] = useState(false);
-  const [themeMode, setThemeMode] = useState(() => localStorage.getItem('themeMode') || 'dark');
+  // ===== UI 状态从 useUiStore 获取（Zustand 全局 store）=====
+  const showThemePicker = useUiStore(s => s.showThemePicker);
+  const setShowThemePicker = useUiStore(s => s.setShowThemePicker);
+  const themeMode = useUiStore(s => s.themeMode);
+  const setThemeMode = useUiStore(s => s.setThemeMode);
+  const editorFullscreen = useUiStore(s => s.editorFullscreen);
+  const setEditorFullscreen = useUiStore(s => s.setEditorFullscreen);
+  const nav = useUiStore(s => s.nav);
+  const setNav = useUiStore(s => s.setNav);
+  const showSettings = useUiStore(s => s.showSettings);
+  const setShowSettings = useUiStore(s => s.setShowSettings);
+  const settingsTab = useUiStore(s => s.settingsTab);
+  const setSettingsTab = useUiStore(s => s.setSettingsTab);
+  // 一次性的 URL ?view=xxx 参数支持（仅在首次挂载时覆盖 store 的 nav）
+  useEffect(() => {
+    const requested = new URLSearchParams(window.location.search).get('view');
+    if (requested && NAV_ITEMS.some(item => item.id === requested)) {
+      setNav(requested);
+    }
+  }, [setNav]);
+
   const [palette, setPalette] = useState(() => {
     const saved = localStorage.getItem('palette');
     return (saved && PALETTES.some(p => p.id === saved)) ? saved : 'champagne';
-  });
-  const [editorFullscreen, setEditorFullscreen] = useState(false);
-  const [nav, setNav] = useState(() => {
-    const requested = new URLSearchParams(window.location.search).get('view');
-    return NAV_ITEMS.some(item => item.id === requested) ? requested : 'recommendations';
   });
   const [category, setCategory] = useState('all');
   const [categoryOpen, setCategoryOpen] = useState(false);
@@ -973,9 +988,7 @@ function App() {
   const [debouncedQuery, setDebouncedQuery] = useState('');
   const [error, setError] = useState('');
   const [blocked, setBlocked] = useState('');
-  const [showSettings, setShowSettings] = useState(false);
   const [globeFullscreenOpen, setGlobeFullscreenOpen] = useState(false);
-  const [settingsTab, setSettingsTab] = useState('general');
   const [elfAvatar, setElfAvatar] = useState(() => {
     try {
       return localStorage.getItem('elfAvatar') || '';
@@ -1045,27 +1058,20 @@ function App() {
   const [newWorkflowNodeType, setNewWorkflowNodeType] = useState('llm');
   const [draggingWorkflowNodeId, setDraggingWorkflowNodeId] = useState('');
   const [stats, setStats] = useState({ sourceCount: 40, failedSources: 0, updatedAt: '', blockedCount: 0 });
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
-    // 首次访问（无存储）默认缩进，腾出视觉空间；用户切换后记住偏好
-    const stored = localStorage.getItem('sidebarCollapsed');
-    return stored === null ? true : stored === 'true';
-  });
+  const sidebarCollapsed = useUiStore(s => s.sidebarCollapsed);
+  const setSidebarCollapsed = useUiStore(s => s.setSidebarCollapsed);
   const motivationalQuote = useMemo(() => {
     const idx = Math.floor(Math.random() * MOTIVATIONAL_QUOTES.length);
     return MOTIVATIONAL_QUOTES[idx];
   }, []);
   const [panelCollapsed, setPanelCollapsed] = useState(() => localStorage.getItem('panelCollapsed') === 'true');
   // 导航分组下拉展开：记录哪些主模块展开了细分项
-  const [expandedNavGroups, setExpandedNavGroups] = useState(() => {
-    try { return JSON.parse(localStorage.getItem('expandedNavGroups') || '[]'); } catch { return []; }
-  });
-  const toggleNavGroup = useCallback((id) => {
-    setExpandedNavGroups(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
-  }, []);
-  useEffect(() => { localStorage.setItem('expandedNavGroups', JSON.stringify(expandedNavGroups)); }, [expandedNavGroups]);
+  const expandedNavGroups = useUiStore(s => s.expandedNavGroups);
+  const setExpandedNavGroups = useUiStore(s => s.setExpandedNavGroups);
+  const toggleNavGroup = useUiStore(s => s.toggleNavGroup);
   // 细分模块下拉折叠状态（默认展开）
-  const [contextGroupOpen, setContextGroupOpen] = useState(() => localStorage.getItem('contextGroupOpen') !== 'false');
-  useEffect(() => { localStorage.setItem('contextGroupOpen', String(contextGroupOpen)); }, [contextGroupOpen]);
+  const contextGroupOpen = useUiStore(s => s.contextGroupOpen);
+  const setContextGroupOpen = useUiStore(s => s.setContextGroupOpen);
   // source management states moved to useSourceManager hook (called after allSources)
   
   const [searchQuery, setSearchQuery] = useState('');
@@ -1106,10 +1112,13 @@ function App() {
 
   const [profilePage, setProfilePage] = useState(1);
   const [copilotPendingMessage, setCopilotPendingMessage] = useState('');
-  const [showNewspaperOverlay, setShowNewspaperOverlay] = useState(false);
+  const showNewspaperOverlay = useUiStore(s => s.showNewspaperOverlay);
+  const setShowNewspaperOverlay = useUiStore(s => s.setShowNewspaperOverlay);
   const [llmPresetName, setLlmPresetName] = useState('');
-  const [showUserMenu, setShowUserMenu] = useState(false);
-  const [showProfileModal, setShowProfileModal] = useState(false);
+  const showUserMenu = useUiStore(s => s.showUserMenu);
+  const setShowUserMenu = useUiStore(s => s.setShowUserMenu);
+  const showProfileModal = useUiStore(s => s.showProfileModal);
+  const setShowProfileModal = useUiStore(s => s.setShowProfileModal);
   const [profileForm, setProfileForm] = useState({ displayName: '', signature: '' });
   const [domainTiers, setDomainTiers] = useState(() => migratePreferenceState({
     'domainTiers:v1': loadLS('domainTiers:v1', null),
@@ -1291,9 +1300,13 @@ function App() {
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchSort, setSearchSort] = useState('time');
   const [focusedIndex, setFocusedIndex] = useState(-1);
-  const [showShortcuts, setShowShortcuts] = useState(false);
-  const [showCommandPalette, setShowCommandPalette] = useState(false);
-  const [lightbox, setLightbox] = useState({ open: false, src: '', title: '', images: [], index: 0 });
+  const showShortcuts = useUiStore(s => s.showShortcuts);
+  const setShowShortcuts = useUiStore(s => s.setShowShortcuts);
+  const showCommandPalette = useUiStore(s => s.showCommandPalette);
+  const setShowCommandPalette = useUiStore(s => s.setShowCommandPalette);
+  // Lightbox 状态从 useLightboxStore 获取（跨页面共享的图片预览）
+  const lightbox = useLightboxStore(s => s.lightbox);
+  const setLightbox = useLightboxStore(s => s.setLightbox);
   const [expandedEvents, setExpandedEvents] = useState({});
   const [exportCategory, setExportCategory] = useState('all');
   const [exportRange, setExportRange] = useState('all');
@@ -1324,7 +1337,8 @@ function App() {
   // article editor state moved to useArticleEditor hook
 
   // 滚动资讯热点状态：从实时 items 派生热门资讯，保证数据准确实时
-  const [scrollingNewsPaused, setScrollingNewsPaused] = useState(false);
+  const scrollingNewsPaused = useUiStore(s => s.scrollingNewsPaused);
+  const setScrollingNewsPaused = useUiStore(s => s.setScrollingNewsPaused);
   const scrollingNewsRef = useRef(null);
   const { scrollingNews, sourceStats, availableNewsDates, sourceOptions } = useNewsFilter(items, category, mode);
 
@@ -1421,15 +1435,18 @@ function App() {
     return () => document.removeEventListener('mousedown', handler);
   }, [showTemplateMenu]);
 
-  const [recentVisits, setRecentVisits] = useState(() => loadLS('recentVisits', []));
+  const recentVisits = useUiStore(s => s.recentVisits);
+  const setRecentVisits = useUiStore(s => s.setRecentVisits);
 
   // 30+ 个 saveLS 合并为一个统一同步 effect — 任何 state 变化只触发一次写入
+  // 注：nav/sidebarCollapsed/themeMode/expandedNavGroups/contextGroupOpen/recentVisits
+  // 等已迁移到 useUiStore，由 store 自行持久化，不再需要在这里同步
   useEffect(() => {
     const map = {
       customSources, sourceHealth, disabledSources, calendarEvents: events,
       bookmarks, materials, materialSpaces, articleSpaces, articles,
       summaryCache, followKeywords, pinnedKeywords, recommendationFeedback,
-      searchHistory, viewMode, recentVisits, trackTargets, briefingConfig,
+      searchHistory, viewMode, trackTargets, briefingConfig,
       readingHistory, translations, llmConfig,
     };
     for (const [key, val] of Object.entries(map)) saveLS(key, val);
@@ -1441,7 +1458,7 @@ function App() {
   }, [
     customSources, sourceHealth, disabledSources, events, bookmarks, materials,
     materialSpaces, articleSpaces, articles, summaryCache, followKeywords,
-    pinnedKeywords, recommendationFeedback, searchHistory, viewMode, recentVisits,
+    pinnedKeywords, recommendationFeedback, searchHistory, viewMode,
     trackTargets, briefingConfig, readingHistory, translations, llmConfig,
     elfAvatar, elfAvatarHistory, elfName,
   ]);
