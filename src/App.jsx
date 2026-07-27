@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, useRef, useCallback, lazy, Suspense } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useUiStore, useLightboxStore, useWorkflowStore, useMaterialsStore, useProfileStore } from './store/index.js';
+import { useUiStore, useLightboxStore, useWorkflowStore, useMaterialsStore, useProfileStore, useNewsStore, useRecommendStore, useAiStore, useGithubStore, useStockStore, useElfStore, useSourceStore } from './store/index.js';
 import SettingsModal from './components/SettingsModal.jsx';
 import ArticleEditor from './components/ArticleEditor.jsx';
 import CreativeWorkspace from './components/CreativeWorkspace.jsx';
@@ -630,53 +630,61 @@ function App() {
     }
   }, [setNav]);
 
-  const [palette, setPalette] = useState(() => {
-    const saved = localStorage.getItem('palette');
-    return (saved && PALETTES.some(p => p.id === saved)) ? saved : 'champagne';
-  });
-  const [category, setCategory] = useState('all');
-  const [categoryOpen, setCategoryOpen] = useState(false);
-  const [verticalChannel, setVerticalChannel] = useState('all');
-  const [mode, setMode] = useState('all');
-  const [sourceFilter, setSourceFilter] = useState('all');
-  const [selectedNewsDate, setSelectedNewsDate] = useState(() => new Date().toISOString().slice(0, 10));
-  const [viewMode, setViewMode] = useState(() => loadLS('viewMode', 'standard'));
-  const [query, setQuery] = useState('');
-  const [items, setItems] = useState([]);
+  // ===== 主题与 UI 杂项状态（迁移自 useState -> Zustand uiStore）=====
+  const palette = useUiStore(s => s.palette);
+  const setPalette = useUiStore(s => s.setPalette);
+  const globeFullscreenOpen = useUiStore(s => s.globeFullscreenOpen);
+  const setGlobeFullscreenOpen = useUiStore(s => s.setGlobeFullscreenOpen);
+  const panelCollapsed = useUiStore(s => s.panelCollapsed);
+  const setPanelCollapsed = useUiStore(s => s.setPanelCollapsed);
+  const profilePage = useUiStore(s => s.profilePage);
+  const setProfilePage = useUiStore(s => s.setProfilePage);
+  // ===== AI 助手人格状态（迁移自 useState -> Zustand elfStore）=====
+  const elfAvatar = useElfStore(s => s.elfAvatar);
+  const setElfAvatar = useElfStore(s => s.setElfAvatar);
+  const elfAvatarHistory = useElfStore(s => s.elfAvatarHistory);
+  const setElfAvatarHistory = useElfStore(s => s.setElfAvatarHistory);
+  const elfName = useElfStore(s => s.elfName);
+  const setElfName = useElfStore(s => s.setElfName);
+  // ===== 新闻流与搜索状态（迁移自 useState -> Zustand newsStore）=====
+  const category = useNewsStore(s => s.category);
+  const setCategory = useNewsStore(s => s.setCategory);
+  const categoryOpen = useNewsStore(s => s.categoryOpen);
+  const setCategoryOpen = useNewsStore(s => s.setCategoryOpen);
+  const verticalChannel = useNewsStore(s => s.verticalChannel);
+  const setVerticalChannel = useNewsStore(s => s.setVerticalChannel);
+  const mode = useNewsStore(s => s.mode);
+  const setMode = useNewsStore(s => s.setMode);
+  const sourceFilter = useNewsStore(s => s.sourceFilter);
+  const setSourceFilter = useNewsStore(s => s.setSourceFilter);
+  const selectedNewsDate = useNewsStore(s => s.selectedNewsDate);
+  const setSelectedNewsDate = useNewsStore(s => s.setSelectedNewsDate);
+  const viewMode = useNewsStore(s => s.viewMode);
+  const setViewMode = useNewsStore(s => s.setViewMode);
+  const query = useNewsStore(s => s.query);
+  const setQuery = useNewsStore(s => s.setQuery);
+  const items = useNewsStore(s => s.items);
+  const setItems = useNewsStore(s => s.setItems);
   const { externalIntelligenceItems, setExternalIntelligenceItems, externalIntelligenceOpportunities, setExternalIntelligenceOpportunities, externalIntelligenceWeeklySectors, setExternalIntelligenceWeeklySectors, externalIntelligenceAlerts, setExternalIntelligenceAlerts, externalIntelligenceLoading, externalIntelligenceError, externalIntelligenceUpdatedAt, loadExternalIntelligence } = useExternalIntelligence();
-  const [loading, setLoading] = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [newsPage, setNewsPage] = useState(0);
-  const [newsHasMore, setNewsHasMore] = useState(true);
-  const [renderLimit, setRenderLimit] = useState(40);
+  const loading = useNewsStore(s => s.loading);
+  const setLoading = useNewsStore(s => s.setLoading);
+  const loadingMore = useNewsStore(s => s.loadingMore);
+  const setLoadingMore = useNewsStore(s => s.setLoadingMore);
+  const newsPage = useNewsStore(s => s.newsPage);
+  const setNewsPage = useNewsStore(s => s.setNewsPage);
+  const newsHasMore = useNewsStore(s => s.newsHasMore);
+  const setNewsHasMore = useNewsStore(s => s.setNewsHasMore);
+  const renderLimit = useNewsStore(s => s.renderLimit);
+  const setRenderLimit = useNewsStore(s => s.setRenderLimit);
   // 同步跟踪 filtered.length 给 IntersectionObserver 用（避免 observer 依赖 filtered 触发重建）
   const filteredLengthRef = useRef(0);
-  const [debouncedQuery, setDebouncedQuery] = useState('');
-  const [error, setError] = useState('');
-  const [blocked, setBlocked] = useState('');
-  const [globeFullscreenOpen, setGlobeFullscreenOpen] = useState(false);
-  const [elfAvatar, setElfAvatar] = useState(() => {
-    try {
-      return localStorage.getItem('elfAvatar') || '';
-    } catch {
-      return '';
-    }
-  });
-  const [elfAvatarHistory, setElfAvatarHistory] = useState(() => {
-    try {
-      const saved = localStorage.getItem('elfAvatarHistory');
-      return saved ? JSON.parse(saved) : [];
-    } catch {
-      return [];
-    }
-  });
-  const [elfName, setElfName] = useState(() => {
-    try {
-      return localStorage.getItem('elfName') || 'AI精灵';
-    } catch {
-      return 'AI精灵';
-    }
-  });
+  const debouncedQuery = useNewsStore(s => s.debouncedQuery);
+  const setDebouncedQuery = useNewsStore(s => s.setDebouncedQuery);
+  const error = useNewsStore(s => s.error);
+  const setError = useNewsStore(s => s.setError);
+  const blocked = useNewsStore(s => s.blocked);
+  const setBlocked = useNewsStore(s => s.setBlocked);
+  // globeFullscreenOpen / elfAvatar / elfAvatarHistory / elfName 已迁移到 uiStore/elfStore
   const { agents, setAgents, updateAgent, currentAgent, setCurrentAgent, showAgentForm, setShowAgentForm, editingAgent, setEditingAgent, newAgent, setNewAgent } = useAgents();
   // Workflow 编辑器 UI 状态从 useUiStore 获取
   const agentFilter = useUiStore(s => s.agentFilter);
@@ -715,7 +723,7 @@ function App() {
     const idx = Math.floor(Math.random() * MOTIVATIONAL_QUOTES.length);
     return MOTIVATIONAL_QUOTES[idx];
   }, []);
-  const [panelCollapsed, setPanelCollapsed] = useState(() => localStorage.getItem('panelCollapsed') === 'true');
+  // panelCollapsed 已迁移到 uiStore
   // 导航分组下拉展开：记录哪些主模块展开了细分项
   const expandedNavGroups = useUiStore(s => s.expandedNavGroups);
   const setExpandedNavGroups = useUiStore(s => s.setExpandedNavGroups);
@@ -723,18 +731,26 @@ function App() {
   // 细分模块下拉折叠状态（默认展开）
   const contextGroupOpen = useUiStore(s => s.contextGroupOpen);
   const setContextGroupOpen = useUiStore(s => s.setContextGroupOpen);
-  // source management states moved to useSourceManager hook (called after allSources)
+  // ===== 信息源管理状态（迁移自 useState -> Zustand sourceStore）=====
+  const searchQuery = useSourceStore(s => s.searchQuery);
+  const setSearchQuery = useSourceStore(s => s.setSearchQuery);
+  const customSourceFilter = useSourceStore(s => s.customSourceFilter);
+  const setCustomSourceFilter = useSourceStore(s => s.setCustomSourceFilter);
+  const regionFilter = useSourceStore(s => s.regionFilter);
+  const setRegionFilter = useSourceStore(s => s.setRegionFilter);
+  const statusFilter = useSourceStore(s => s.statusFilter);
+  const setStatusFilter = useSourceStore(s => s.setStatusFilter);
   
-  const [searchQuery, setSearchQuery] = useState('');
-  const [customSourceFilter, setCustomSourceFilter] = useState('all');
-  const [regionFilter, setRegionFilter] = useState('all');
-  const [statusFilter, setStatusFilter] = useState('all');
   
-  
-  const [autoMonitorEnabled, setAutoMonitorEnabled] = useState(() => loadLS('autoMonitorEnabled', false));
-  const [monitorInterval, setMonitorInterval] = useState(() => loadLS('monitorInterval', 60)); // 分钟
-  const [monitorAlerts, setMonitorAlerts] = useState([]);
-  const [showAlertPanel, setShowAlertPanel] = useState(false);
+  // ===== 股市监控状态（迁移自 useState -> Zustand stockStore）=====
+  const autoMonitorEnabled = useStockStore(s => s.autoMonitorEnabled);
+  const setAutoMonitorEnabled = useStockStore(s => s.setAutoMonitorEnabled);
+  const monitorInterval = useStockStore(s => s.monitorInterval);
+  const setMonitorInterval = useStockStore(s => s.setMonitorInterval);
+  const monitorAlerts = useStockStore(s => s.monitorAlerts);
+  const setMonitorAlerts = useStockStore(s => s.setMonitorAlerts);
+  const showAlertPanel = useStockStore(s => s.showAlertPanel);
+  const setShowAlertPanel = useStockStore(s => s.setShowAlertPanel);
   const {
     llmConfig, setLlmConfig,
     llmModels, setLlmModels,
@@ -761,8 +777,10 @@ function App() {
     // 同步更新外部 state
   } });
 
-  const [profilePage, setProfilePage] = useState(1);
-  const [copilotPendingMessage, setCopilotPendingMessage] = useState('');
+  // profilePage 已从 useUiStore 订阅（见上方 UI 状态区）
+  // ===== AI 助手与简报状态（迁移自 useState -> Zustand aiStore）=====
+  const copilotPendingMessage = useAiStore(s => s.copilotPendingMessage);
+  const setCopilotPendingMessage = useAiStore(s => s.setCopilotPendingMessage);
   const showNewspaperOverlay = useUiStore(s => s.showNewspaperOverlay);
   const setShowNewspaperOverlay = useUiStore(s => s.setShowNewspaperOverlay);
   const [llmPresetName, setLlmPresetName] = useState('');
@@ -804,9 +822,12 @@ function App() {
 
   // 认证函数已抽取至 useAuth — 这里不再定义
 
-  const [allSources, setAllSources] = useState([]);
-  const [sourceGrades, setSourceGrades] = useState({});
-  const [serverCategories, setServerCategories] = useState([]);
+  const allSources = useSourceStore(s => s.allSources);
+  const setAllSources = useSourceStore(s => s.setAllSources);
+  const sourceGrades = useSourceStore(s => s.sourceGrades);
+  const setSourceGrades = useSourceStore(s => s.setSourceGrades);
+  const serverCategories = useSourceStore(s => s.serverCategories);
+  const setServerCategories = useSourceStore(s => s.setServerCategories);
 
   // 分类单一来源：服务端 /api/meta 下发，离线时用 fallback
   const categories = useMemo(
@@ -860,8 +881,10 @@ function App() {
     return categories.filter(c => c.id !== 'all' && selectedInterests.includes(c.id));
   }, [categories, selectedInterests]);
 
-  const [gradeFilter, setGradeFilter] = useState('all');
-  const [sourceTypeTab, setSourceTypeTab] = useState('builtin');
+  const gradeFilter = useSourceStore(s => s.gradeFilter);
+  const setGradeFilter = useSourceStore(s => s.setGradeFilter);
+  const sourceTypeTab = useSourceStore(s => s.sourceTypeTab);
+  const setSourceTypeTab = useSourceStore(s => s.setSourceTypeTab);
   const {
     trendingItems, setTrendingItems,
     trendingLoading, trendingPlatform, setTrendingPlatform,
@@ -923,23 +946,28 @@ function App() {
     translatingItems, setTranslatingItems,
     getSummaryEntry, handleSummaryToggle, requestTranslation, getTranslation, toggleGithubTranslation,
   } = useTranslationSummary(llmConfig);
-  const [followKeywords, setFollowKeywords] = useState(() => loadLS('followKeywords', []));
-  const [pinnedKeywords, setPinnedKeywords] = useState(() => loadLS('pinnedKeywords', []));
-  const [recommendationFeedback, setRecommendationFeedback] = useState(() => loadLS('recommendationFeedback', {
-    hiddenIds: [],
-    boostedCategories: {},
-    mutedSources: {},
-    trackedTerms: {}
-  }));
-  const [recommendationFeedbackEvents, setRecommendationFeedbackEvents] = useState(() => loadLS('recommendationFeedback:v2', []));
+  // ===== 推荐反馈与追踪状态（迁移自 useState -> Zustand recommendStore）=====
+  const followKeywords = useRecommendStore(s => s.followKeywords);
+  const setFollowKeywords = useRecommendStore(s => s.setFollowKeywords);
+  const pinnedKeywords = useRecommendStore(s => s.pinnedKeywords);
+  const setPinnedKeywords = useRecommendStore(s => s.setPinnedKeywords);
+  const recommendationFeedback = useRecommendStore(s => s.recommendationFeedback);
+  const setRecommendationFeedback = useRecommendStore(s => s.setRecommendationFeedback);
+  const recommendationFeedbackEvents = useRecommendStore(s => s.recommendationFeedbackEvents);
+  const setRecommendationFeedbackEvents = useRecommendStore(s => s.setRecommendationFeedbackEvents);
   const snapshotStoreRef = useRef(null);
   if (!snapshotStoreRef.current) snapshotStoreRef.current = createSnapshotStore(localStorage);
-  const [recommendationSnapshots, setRecommendationSnapshots] = useState(() => snapshotStoreRef.current.list());
+  const recommendationSnapshots = useRecommendStore(s => s.recommendationSnapshots);
+  const setRecommendationSnapshots = useRecommendStore(s => s.setRecommendationSnapshots);
   const [newKeyword, setNewKeyword] = useState('');
-  const [searchHistory, setSearchHistory] = useState(() => loadLS('searchHistory', []));
-  const [searchOpen, setSearchOpen] = useState(false);
-  const [searchSort, setSearchSort] = useState('time');
-  const [focusedIndex, setFocusedIndex] = useState(-1);
+  const searchHistory = useRecommendStore(s => s.searchHistory);
+  const setSearchHistory = useRecommendStore(s => s.setSearchHistory);
+  const searchOpen = useRecommendStore(s => s.searchOpen);
+  const setSearchOpen = useRecommendStore(s => s.setSearchOpen);
+  const searchSort = useRecommendStore(s => s.searchSort);
+  const setSearchSort = useRecommendStore(s => s.setSearchSort);
+  const focusedIndex = useRecommendStore(s => s.focusedIndex);
+  const setFocusedIndex = useRecommendStore(s => s.setFocusedIndex);
   const showShortcuts = useUiStore(s => s.showShortcuts);
   const setShowShortcuts = useUiStore(s => s.setShowShortcuts);
   const showCommandPalette = useUiStore(s => s.showCommandPalette);
@@ -947,22 +975,32 @@ function App() {
   // Lightbox 状态从 useLightboxStore 获取（跨页面共享的图片预览）
   const lightbox = useLightboxStore(s => s.lightbox);
   const setLightbox = useLightboxStore(s => s.setLightbox);
-  const [expandedEvents, setExpandedEvents] = useState({});
-  const [exportCategory, setExportCategory] = useState('all');
-  const [exportRange, setExportRange] = useState('all');
+  const expandedEvents = useRecommendStore(s => s.expandedEvents);
+  const setExpandedEvents = useRecommendStore(s => s.setExpandedEvents);
+  const exportCategory = useRecommendStore(s => s.exportCategory);
+  const setExportCategory = useRecommendStore(s => s.setExportCategory);
+  const exportRange = useRecommendStore(s => s.exportRange);
+  const setExportRange = useRecommendStore(s => s.setExportRange);
 
   // customUrl states moved to useCustomUrl hook
   // UI switch states (showFollowDropdown/mobileMenuOpen/showBackToTop) moved to useUI
-  const [trackTargets, setTrackTargets] = useState(() => loadLS('trackTargets', []));
+  const trackTargets = useRecommendStore(s => s.trackTargets);
+  const setTrackTargets = useRecommendStore(s => s.setTrackTargets);
   // briefingConfig 已迁移到 profileStore
   const [newTrackTarget, setNewTrackTarget] = useState('');
-  const [readingHistory, setReadingHistory] = useState(() => loadLS('readingHistory', []));
-  useEffect(() => { saveLS('recommendationFeedback:v2', recommendationFeedbackEvents); }, [recommendationFeedbackEvents]);
-  const [aiInsights, setAiInsights] = useState({ loading: false, data: null, error: '' });
-  const [elfQuotedContext, setElfQuotedContext] = useState(null);
-  // GitHub 项目 AI 情报实时分析（per-repo，localStorage 持久化）
-  const [githubInsights, setGithubInsights] = useState(() => loadLS('githubInsights', {}));
-  const [githubInsightLoading, setGithubInsightLoading] = useState({});
+  const readingHistory = useRecommendStore(s => s.readingHistory);
+  const setReadingHistory = useRecommendStore(s => s.setReadingHistory);
+  // recommendationFeedbackEvents 持久化由 recommendStore 的 persist 中间件自动处理
+  // ===== AI Insights / Elf 引用上下文（迁移自 useState -> Zustand aiStore）=====
+  const aiInsights = useAiStore(s => s.aiInsights);
+  const setAiInsights = useAiStore(s => s.setAiInsights);
+  const elfQuotedContext = useAiStore(s => s.elfQuotedContext);
+  const setElfQuotedContext = useAiStore(s => s.setElfQuotedContext);
+  // ===== GitHub 项目 AI 情报状态（迁移自 useState -> Zustand githubStore）=====
+  const githubInsights = useGithubStore(s => s.githubInsights);
+  const setGithubInsights = useGithubStore(s => s.setGithubInsights);
+  const githubInsightLoading = useGithubStore(s => s.githubInsightLoading);
+  const setGithubInsightLoading = useGithubStore(s => s.setGithubInsightLoading);
   // moreNavOpen moved to useUI
   // ===== 素材库 UI 状态（迁移自 useState -> Zustand materialsStore）=====
   const materialFilter = useMaterialsStore(s => s.materialFilter);
@@ -981,8 +1019,11 @@ function App() {
   const setShowSpaceForm = useMaterialsStore(s => s.setShowSpaceForm);
   const showAddMaterial = useMaterialsStore(s => s.showAddMaterial);
   const setShowAddMaterial = useMaterialsStore(s => s.setShowAddMaterial);
-  const [aiBrief, setAiBrief] = useState({ loading: false, content: '', error: '', generatedAt: null });
-  const [signalFilter, setSignalFilter] = useState('all');
+  // ===== AI 简报状态（迁移自 useState -> Zustand aiStore，content 自动持久化）=====
+  const aiBrief = useAiStore(s => s.aiBrief);
+  const setAiBrief = useAiStore(s => s.setAiBrief);
+  const signalFilter = useStockStore(s => s.signalFilter);
+  const setSignalFilter = useStockStore(s => s.setSignalFilter);
   // article editor state moved to useArticleEditor hook
 
   // 滚动资讯热点状态：从实时 items 派生热门资讯，保证数据准确实时
@@ -1089,14 +1130,14 @@ function App() {
 
   // 30+ 个 saveLS 合并为一个统一同步 effect — 任何 state 变化只触发一次写入
   // 注：nav/sidebarCollapsed/themeMode/expandedNavGroups/contextGroupOpen/recentVisits
-  // 等已迁移到 useUiStore，由 store 自行持久化，不再需要在这里同步
+  // 等已迁移到 useUiStore；followKeywords/pinnedKeywords/recommendationFeedback/
+  // searchHistory/viewMode/trackTargets/briefingConfig/readingHistory/recommendationFeedbackEvents
+  // 已迁移到对应 Zustand store，由 store 自行持久化，不再需要在这里同步
   useEffect(() => {
     const map = {
       customSources, sourceHealth, disabledSources, calendarEvents: events,
       bookmarks, materials, materialSpaces, articleSpaces, articles,
-      summaryCache, followKeywords, pinnedKeywords, recommendationFeedback,
-      searchHistory, viewMode, trackTargets, briefingConfig,
-      readingHistory, translations, llmConfig,
+      summaryCache, translations, llmConfig,
     };
     for (const [key, val] of Object.entries(map)) saveLS(key, val);
     // localStorage 直写的字段
@@ -1106,9 +1147,7 @@ function App() {
     localStorage.setItem('elfName', elfName);
   }, [
     customSources, sourceHealth, disabledSources, events, bookmarks, materials,
-    materialSpaces, articleSpaces, articles, summaryCache, followKeywords,
-    pinnedKeywords, recommendationFeedback, searchHistory, viewMode,
-    trackTargets, briefingConfig, readingHistory, translations, llmConfig,
+    materialSpaces, articleSpaces, articles, summaryCache, translations, llmConfig,
     elfAvatar, elfAvatarHistory, elfName,
   ]);
   // 工作流状态持久化由 workflowStore 的 persist 中间件自动处理（不再需要手写 saveLS effect）
@@ -3325,7 +3364,6 @@ ${signals}
       };
       setGithubInsights(prev => {
         const next = { ...prev, [id]: normalized };
-        saveLS('githubInsights', next);
         return next;
       });
     } catch (e) {
@@ -4544,15 +4582,7 @@ ${signals}
     setMonitorAlerts(newAlerts.slice(-10));
   }, [sourceHealth, customSources, allSources]);
 
-  // 保存监控设置
-  useEffect(() => {
-    saveLS('autoMonitorEnabled', autoMonitorEnabled);
-  }, [autoMonitorEnabled]);
-
-  useEffect(() => {
-    saveLS('monitorInterval', monitorInterval);
-  }, [monitorInterval]);
-
+  // 监控设置（autoMonitorEnabled/monitorInterval）持久化由 stockStore 的 persist 中间件自动处理
   // 清除警告
   function clearAlerts() {
     setMonitorAlerts([]);

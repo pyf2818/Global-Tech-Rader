@@ -73,6 +73,37 @@ export const useUiStore = create(
         try { localStorage.setItem('themeMode', mode); } catch {}
       },
 
+      // 主题调色板（champagne / aurora / ...）
+      palette: (() => {
+        try {
+          const saved = localStorage.getItem('palette');
+          // PALETTES 在 App.jsx 中定义，这里仅做存在性检查的占位
+          return saved || 'champagne';
+        } catch { return 'champagne'; }
+      })(),
+      setPalette: (v) => {
+        set({ palette: v });
+        try { localStorage.setItem('palette', v); } catch {}
+      },
+
+      // 球图全屏
+      globeFullscreenOpen: false,
+      setGlobeFullscreenOpen: (v) => set({ globeFullscreenOpen: v }),
+
+      // 右侧上下文面板折叠
+      panelCollapsed: (() => {
+        try { return localStorage.getItem('panelCollapsed') === 'true'; }
+        catch { return false; }
+      })(),
+      setPanelCollapsed: (v) => {
+        set({ panelCollapsed: v });
+        try { localStorage.setItem('panelCollapsed', String(v)); } catch {}
+      },
+
+      // 资料中心分页
+      profilePage: 1,
+      setProfilePage: (v) => set({ profilePage: v }),
+
       // 模态框开关
       showSettings: false,
       setShowSettings: (v) => set({ showSettings: v }),
@@ -157,6 +188,8 @@ export const useUiStore = create(
         contextGroupOpen: state.contextGroupOpen,
         expandedNavGroups: state.expandedNavGroups,
         themeMode: state.themeMode,
+        palette: state.palette,
+        panelCollapsed: state.panelCollapsed,
         recentVisits: state.recentVisits,
       }),
     }
@@ -198,7 +231,30 @@ export { useMaterialsStore } from './materialsStore.js';
 // 用户画像与偏好：领域分层、来源分层、特别关注、简报配置、表单
 export { useProfileStore } from './profileStore.js';
 
-// 后续 slice 文件将按业务域逐步添加：
-// - useNewsStore: items/filtered/category/sourceFilter 等
-// - useGithubStore: githubInsights 等
-// - useAiInsightsStore: aiInsights/aiBrief 等
+// ============ News Store ============
+// 新闻流与搜索：分类/筛选/视图模式/搜索/列表/分页/错误
+export { useNewsStore } from './newsStore.js';
+
+// ============ Recommend Store ============
+// 推荐反馈与追踪：关键词/反馈/快照/搜索历史/追踪目标/阅读历史
+export { useRecommendStore } from './recommendStore.js';
+
+// ============ AI Store ============
+// AI 助手与简报：aiInsights/aiBrief/elfQuotedContext/copilotPendingMessage
+export { useAiStore } from './aiStore.js';
+
+// ============ GitHub Store ============
+// GitHub 项目 AI 情报：githubInsights / githubInsightLoading
+export { useGithubStore } from './githubStore.js';
+
+// ============ Stock Store ============
+// 股市监控：autoMonitorEnabled / monitorInterval / monitorAlerts / showAlertPanel
+export { useStockStore } from './stockStore.js';
+
+// ============ Elf Store ============
+// AI 助手人格：elfAvatar / elfAvatarHistory / elfName
+export { useElfStore } from './elfStore.js';
+
+// ============ Source Store ============
+// 信息源管理：数据缓存 + 筛选
+export { useSourceStore } from './sourceStore.js';
