@@ -277,7 +277,8 @@ export const LLM_PRESETS = [
 ];
 
 // 兼容旧引用：部分文件仍 import AGENT_CATEGORIES（全大写），统一为与 AGENT_categories 相同内容
-export const AGENT_CATEGORIES = AGENT_categories;
+// 注意：实际定义在下方 AGENT_categories，这里不能直接引用（TDZ）
+// 解决：在文件末尾用 re-export 或在 AGENT_categories 定义后导出别名
 
 // 滚动资讯热点数据源
 export const SCROLLING_NEWS_ITEMS = [
@@ -364,6 +365,9 @@ export const SCROLLING_NEWS_ITEMS = [
 ];
 
 export const AGENT_categories = ['全部', '指挥', '分析', '技术', '商业', '创作', '记忆', '风险', '语言', '教育', '思辨'];
+
+// 兼容旧引用：部分文件仍 import AGENT_CATEGORIES（全大写）
+export const AGENT_CATEGORIES = AGENT_categories;
 
 export const MODES = [
   { id: 'all', label: '全部' },
