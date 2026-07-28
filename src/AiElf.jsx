@@ -1,11 +1,12 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
-import { selectToolSchemas, executeAgentTool } from './utils/agentTools.js';
 import { getRootHandle } from './utils/workspaceHandleStore.js';
 import {
   buildAgenticSystemPrompt as buildAgenticSystemPromptImpl,
   buildRelayPrompt,
   buildAnalysisPrompt as buildAnalysisPromptImpl,
 } from './components/aielf/prompts.js';
+import { runElfAgentLoop as runElfAgentLoopImpl } from './components/aielf/runElfAgentLoop.js';
+import { useSendMessage } from './components/aielf/useSendMessage.js';
 import Sidebar from './components/aielf/Sidebar.jsx';
 import ChatHeader from './components/aielf/ChatHeader.jsx';
 import MessageList from './components/aielf/MessageList.jsx';
@@ -321,339 +322,36 @@ export default function AiElf({ llmConfig, avatarImage, elfName, onExportToMater
     }
   };
 
-  // ===== Agent Loop：工具调用循环（与 AiChatPanel 中 runAgentLoop 等价的 AiElf 版本） =====
+  // ===== Agent Loop：工具调用循环（已抽离至 components/aielf/runElfAgentLoop.js） =====
   // 流程：发请求 → 若返回 tool_calls 则执行工具并把结果回灌 → 重新请求，直到无 tool_calls 或达到最大轮数
   // 原地更新末尾的 placeholder assistant 消息（content + toolCalls + thinking）
   const runElfAgentLoop = useCallback(async ({ activeAgentId, baseMessages, toolSchemas, systemPrompt }) => {
-    const MAX_ITERATIONS = 6;
-    const toolCtx = { rootHandle: getRootHandle() };
-    const conversationMessages = baseMessages.map(m => ({ role: m.role, content: m.content }));
-    const toolCallTrace = [];
-    let finalContent = '';
+    return runElfAgentLoopImpl({
+      activeAgentId, baseMessages, toolSchemas, systemPrompt,
+      llmConfig, setAgentMessages,
+    });
+  }, [llmConfig, llmConfig?.selectedModel, setAgentMessages]);
 
-    const patchLast = (patch) => {
-      setAgentMessages(prev => {
-        const list = prev[activeAgentId] || [];
-        if (list.length === 0) return prev;
-        const lastIdx = list.length - 1;
-        const replaced = list.map((m, idx) => idx === lastIdx ? { ...m, ...patch } : m);
-        return { ...prev, [activeAgentId]: replaced };
-      });
-    };
-
-    try {
-      for (let iter = 0; iter < MAX_ITERATIONS; iter += 1) {
-        patchLast({
-          content: finalContent,
-          toolCalls: toolCallTrace.slice(),
-          thinking: iter === 0 ? '正在思考...' : '继续推理...',
-          loading: true,
-        });
-
-        const response = await fetch('/api/ai-generate', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            baseUrl: llmConfig.baseUrl,
-            apiKey: llmConfig.apiKey,
-            model: llmConfig.selectedModel,
-            action: 'chat',
-            systemPrompt,
-            messages: conversationMessages.slice(-30),
-            max_tokens: 4000,
-            tools: toolSchemas,
-            tool_choice: 'auto',
-          })
-        });
-
-        if (!response.ok) {
-          const errData = await response.json().catch(() => ({}));
-          throw new Error(typeof errData.error === 'string' ? errData.error : errData.error?.message || `AI 请求失败 (${response.status})`);
-        }
-        const data = await response.json();
-        if (data.ok === false) throw new Error(data.error || 'AI 请求失败');
-
-        // 若无 tool_calls，本次即为最终答案
-        if (!Array.isArray(data.tool_calls) || data.tool_calls.length === 0) {
-          finalContent = data.content || '（无内容返回）';
-          break;
-        }
-
-        // 有 tool_calls：先把 assistant 的 tool_calls 消息追加到 conversation
-        conversationMessages.push({
-          role: 'assistant',
-          content: data.content || '',
-          tool_calls: data.tool_calls,
-        });
-        if (data.content) finalContent = data.content;
-
-        // 逐个执行工具调用
-        for (const tc of data.tool_calls) {
-          const toolName = tc?.function?.name || 'unknown';
-          let args = {};
-          try { args = JSON.parse(tc?.function?.arguments || '{}'); } catch { args = {}; }
-
-          toolCallTrace.push({
-            id: tc.id,
-            name: toolName,
-            args,
-            status: 'running',
-            startedAt: Date.now(),
-          });
-          patchLast({
-            content: finalContent,
-            toolCalls: toolCallTrace.slice(),
-            thinking: `正在调用工具：${toolName}`,
-            loading: true,
-          });
-
-          let result;
-          try {
-            result = await executeAgentTool(toolName, args, toolCtx);
-          } catch (err) {
-            result = `工具执行失败：${err?.message || String(err)}`;
-          }
-
-          const traceItem = toolCallTrace.find(t => t.id === tc.id);
-          if (traceItem) {
-            traceItem.status = 'done';
-            traceItem.result = String(result).slice(0, 4000);
-            traceItem.completedAt = Date.now();
-          }
-          patchLast({
-            content: finalContent,
-            toolCalls: toolCallTrace.slice(),
-            thinking: `工具 ${toolName} 已返回，继续推理...`,
-            loading: true,
-          });
-
-          conversationMessages.push({
-            role: 'tool',
-            tool_call_id: tc.id,
-            content: String(result).slice(0, 20000),
-          });
-        }
-      }
-    } catch (err) {
-      // 任何错误：保留已完成的 toolCalls 痕迹，写入错误信息
-      if (!finalContent) {
-        finalContent = `分析失败: ${err?.message || String(err)}`;
-      }
-    }
-
-    if (!finalContent) finalContent = '（agent 达到最大轮数仍未给出最终回复）';
-
-    return {
-      role: 'assistant',
-      content: finalContent,
-      toolCalls: toolCallTrace.slice(),
-      toolCallCount: toolCallTrace.length,
-      loading: false,
-      timestamp: Date.now(),
-    };
-  }, [llmConfig, llmConfig?.selectedModel]);
-
-  // 发送消息给AI
-  const sendMessage = async (text = inputText, itemData = null) => {
-    if (!text.trim() && !itemData) return;
-
-    const quotedContent = quotedContext?.fullContent || quotedContext?.content || '';
-    let messageText = quotedContext
-      ? `【引用上下文】\n${quotedContent}\n\n【用户问题】\n${text}`
-      : text;
-
-    if (itemData) {
-      setIsLoading(true);
-      const pageContent = await fetchPageContent(itemData.url);
-      messageText = buildAnalysisPrompt(itemData, pageContent);
-    }
-
-    const newMessage = {
-      role: 'user',
-      content: text || `分析资讯：${itemData?.title || ''}`,
-      timestamp: Date.now()
-    };
-
-    setAgentMessages(prev => ({
-      ...prev,
-      [activeAgentId]: [...(prev[activeAgentId] || []), newMessage]
-    }));
-    setInputText('');
-    setQuotedContext(null);
-    setIsLoading(true);
-
-    try {
-      if (!llmConfig.baseUrl || !llmConfig.selectedModel) {
-        setAgentMessages(prev => ({
-          ...prev,
-          [activeAgentId]: [...(prev[activeAgentId] || []), {
-            role: 'assistant',
-            content: '请先在设置中配置大模型 API。',
-            timestamp: Date.now()
-          }]
-        }));
-        setIsLoading(false);
-        return;
-      }
-
-      const systemPrompt = buildAgenticSystemPrompt;
-
-      const currentMessages = agentMessages[activeAgentId] || [];
-
-      // ===== Agent Loop 模式：当智能体配置了 tools 白名单时走工具调用循环 =====
-      const toolSchemas = activeAgent?.tools?.length ? selectToolSchemas(activeAgent.tools) : null;
-
-      if (toolSchemas && toolSchemas.length > 0) {
-        // 预先插入一条 placeholder assistant 消息，agent loop 会原地更新它
-        const placeholderMsg = {
-          role: 'assistant',
-          content: '',
-          toolCalls: [],
-          loading: true,
-          timestamp: Date.now()
-        };
-        setAgentMessages(prev => ({
-          ...prev,
-          [activeAgentId]: [...(prev[activeAgentId] || []), placeholderMsg]
-        }));
-
-        const baseConversation = [
-          ...currentMessages.map(msg => ({ role: msg.role, content: msg.content })),
-          { role: 'user', content: messageText }
-        ];
-        const finalAssistant = await runElfAgentLoop({
-          activeAgentId,
-          baseMessages: baseConversation,
-          toolSchemas,
-          systemPrompt,
-        });
-
-        // 用最终结果替换 placeholder，并保存到 session 历史
-        setAgentMessages(prev => {
-          const list = prev[activeAgentId] || [];
-          const replaced = list.map((m, idx) => idx === list.length - 1 ? finalAssistant : m);
-          const allMessages = { ...prev, [activeAgentId]: replaced };
-
-          if (!currentSessionId) {
-            const newSessionId = Date.now();
-            setCurrentSessionId(newSessionId);
-            const session = {
-              id: newSessionId,
-              title: newMessage.content.slice(0, 50) + (newMessage.content.length > 50 ? '...' : ''),
-              timestamp: Date.now(),
-              messages: replaced
-            };
-            setAgentHistory(history => {
-              const sessions = Array.isArray(history[activeAgentId]) ? history[activeAgentId] : [];
-              return { ...history, [activeAgentId]: [session, ...sessions].slice(0, 10) };
-            });
-          } else {
-            setAgentHistory(history => {
-              const sessions = Array.isArray(history[activeAgentId]) ? history[activeAgentId] : [];
-              const updatedSessions = sessions.map(s =>
-                s.id === currentSessionId
-                  ? { ...s, messages: replaced, timestamp: Date.now(), title: newMessage.content.slice(0, 50) + (newMessage.content.length > 50 ? '...' : '') }
-                  : s
-              );
-              return { ...history, [activeAgentId]: updatedSessions };
-            });
-          }
-          return allMessages;
-        });
-      } else {
-        // ===== 普通模式：无 tools，单次请求 =====
-        const response = await fetch('/api/ai-generate', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            baseUrl: llmConfig.baseUrl,
-            apiKey: llmConfig.apiKey,
-            model: llmConfig.selectedModel,
-            action: 'chat',
-            content: messageText,
-            systemPrompt,
-            messages: currentMessages.map(msg => ({
-              role: msg.role,
-              content: msg.content
-            }))
-          })
-        });
-
-        const data = await response.json();
-        if (data.error) {
-          setAgentMessages(prev => ({
-            ...prev,
-            [activeAgentId]: [...(prev[activeAgentId] || []), {
-              role: 'assistant',
-              content: `分析失败: ${data.error}`,
-              timestamp: Date.now()
-            }]
-          }));
-        } else {
-          setAgentMessages(prev => {
-            const updatedMessages = [...(prev[activeAgentId] || []), {
-              role: 'assistant',
-              content: data.content || '暂无分析结果',
-              timestamp: Date.now()
-            }];
-
-            const allMessages = {
-              ...prev,
-              [activeAgentId]: updatedMessages
-            };
-
-            // 保存对话历史到当前session
-            if (!currentSessionId) {
-              const newSessionId = Date.now();
-              setCurrentSessionId(newSessionId);
-              
-              // 创建新session
-              const session = {
-                id: newSessionId,
-                title: newMessage.content.slice(0, 50) + (newMessage.content.length > 50 ? '...' : ''),
-                timestamp: Date.now(),
-                messages: updatedMessages
-              };
-              setAgentHistory(history => {
-                const sessions = Array.isArray(history[activeAgentId]) ? history[activeAgentId] : [];
-                return {
-                  ...history,
-                  [activeAgentId]: [session, ...sessions].slice(0, 10)
-                };
-              });
-            } else {
-              // 更新现有session
-              setAgentHistory(history => {
-                const sessions = Array.isArray(history[activeAgentId]) ? history[activeAgentId] : [];
-                const updatedSessions = sessions.map(s =>
-                  s.id === currentSessionId
-                    ? { ...s, messages: updatedMessages, timestamp: Date.now(), title: newMessage.content.slice(0, 50) + (newMessage.content.length > 50 ? '...' : '') }
-                    : s
-                );
-                return {
-                  ...history,
-                  [activeAgentId]: updatedSessions
-                };
-              });
-            }
-
-            return allMessages;
-          });
-        }
-      }
-    } catch (e) {
-      setAgentMessages(prev => ({
-        ...prev,
-        [activeAgentId]: [...(prev[activeAgentId] || []), {
-          role: 'assistant',
-          content: `分析失败: ${e.message}`,
-          timestamp: Date.now()
-        }]
-      }));
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  // 发送消息给AI（已抽离至 components/aielf/useSendMessage.js）
+  const sendMessage = useSendMessage({
+    inputText,
+    quotedContext,
+    llmConfig,
+    activeAgent,
+    activeAgentId,
+    agentMessages,
+    currentSessionId,
+    setIsLoading,
+    setAgentMessages,
+    setInputText,
+    setQuotedContext,
+    setCurrentSessionId,
+    setAgentHistory,
+    fetchPageContent,
+    buildAnalysisPrompt,
+    buildAgenticSystemPrompt,
+    runElfAgentLoop,
+  });
 
   // 拖拽处理
   const handleDragOver = (e) => {
