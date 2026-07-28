@@ -1,6 +1,7 @@
 import React from 'react';
 import { ICONS, REGION_MAP } from '../../constants/index.jsx';
 import SourceOpsPanel from '../SourceOpsPanel.jsx';
+import SourceForm from './SourceForm.jsx';
 
 export default function SourcesTab({
   allSources, customSources, setCustomSources, disabledSources, setDisabledSources,
@@ -584,153 +585,16 @@ export default function SourcesTab({
                       </div>
                          </div>
 
-                      {/* 编辑/添加源表单 */}
-                      {showSourceForm && (
-                        <div className="source-form-modal-overlay">
-                          <div className="source-form-modal">
-                            <div className="source-form-header">
-                              <h3>{editingSource ? '编辑信息源' : '添加信息源'}</h3>
-                              <button className="source-form-close" onClick={() => {
-                                setShowSourceForm(false);
-                                setEditingSource(null);
-                                setNewSource({ name: '', url: '', region: 'overseas', category: '', tags: '', notes: '' });
-                              }}>{ICONS.x}</button>
-                            </div>
-                            <div className="source-form-body">
-                              <div className="source-form-group">
-                                <label>名称 *</label>
-                                <input
-                                  type="text"
-                                  value={editingSource ? editingSource.name : newSource.name}
-                                  onChange={e => {
-                                    if (editingSource) {
-                                      setEditingSource(prev => ({ ...prev, name: e.target.value }));
-                                    } else {
-                                      setNewSource(prev => ({ ...prev, name: e.target.value }));
-                                    }
-                                  }}
-                                  placeholder="如：TechCrunch"
-                                  className="source-form-input"
-                                />
-                              </div>
-                              <div className="source-form-group">
-                                <label>RSS/Atom URL *</label>
-                                <input
-                                  type="text"
-                                  value={editingSource ? editingSource.url : newSource.url}
-                                  onChange={e => {
-                                    if (editingSource) {
-                                      setEditingSource(prev => ({ ...prev, url: e.target.value }));
-                                    } else {
-                                      setNewSource(prev => ({ ...prev, url: e.target.value }));
-                                    }
-                                  }}
-                                  placeholder="https://example.com/feed.xml"
-                                  className="source-form-input"
-                                />
-                              </div>
-                              <div className="source-form-group">
-                                <label>地区</label>
-                                <select
-                                  value={editingSource ? editingSource.region : newSource.region}
-                                  onChange={e => {
-                                    if (editingSource) {
-                                      setEditingSource(prev => ({ ...prev, region: e.target.value }));
-                                    } else {
-                                      setNewSource(prev => ({ ...prev, region: e.target.value }));
-                                    }
-                                  }}
-                                  className="source-form-select"
-                                >
-                                  <option value="overseas">海外</option>
-                                  <option value="domestic">国内</option>
-                                  <option value="global">全球</option>
-                                </select>
-                              </div>
-                              <div className="source-form-group">
-                                <label>分类</label>
-                                <input
-                                  type="text"
-                                  value={editingSource ? editingSource.category || '' : newSource.category}
-                                  onChange={e => {
-                                    if (editingSource) {
-                                      setEditingSource(prev => ({ ...prev, category: e.target.value }));
-                                    } else {
-                                      setNewSource(prev => ({ ...prev, category: e.target.value }));
-                                    }
-                                  }}
-                                  placeholder="如：AI、硬件、开源"
-                                  className="source-form-input"
-                                />
-                              </div>
-                              <div className="source-form-group">
-                                <label>标签（逗号分隔）</label>
-                                <input
-                                  type="text"
-                                  value={editingSource ? (editingSource.tags || []).join(', ') : newSource.tags}
-                                  onChange={e => {
-                                    const tags = e.target.value.split(',').map(t => t.trim()).filter(Boolean);
-                                    if (editingSource) {
-                                      setEditingSource(prev => ({ ...prev, tags }));
-                                    } else {
-                                      setNewSource(prev => ({ ...prev, tags }));
-                                    }
-                                  }}
-                                  placeholder="如：科技, AI, 机器学习"
-                                  className="source-form-input"
-                                />
-                              </div>
-                              <div className="source-form-group">
-                                <label>备注</label>
-                                <textarea
-                                  value={editingSource ? editingSource.notes || '' : newSource.notes}
-                                  onChange={e => {
-                                    if (editingSource) {
-                                      setEditingSource(prev => ({ ...prev, notes: e.target.value }));
-                                    } else {
-                                      setNewSource(prev => ({ ...prev, notes: e.target.value }));
-                                    }
-                                  }}
-                                  rows={3}
-                                  placeholder="可选备注信息..."
-                                  className="source-form-textarea"
-                                />
-                              </div>
-                            </div>
-                            <div className="source-form-footer">
-                              <button className="btn-cancel" onClick={() => {
-                                setShowSourceForm(false);
-                                setEditingSource(null);
-                                setNewSource({ name: '', url: '', region: 'overseas', category: '', tags: '', notes: '' });
-                              }}>取消</button>
-                              <button
-                                className="btn-save"
-                                onClick={() => {
-                                  if (editingSource) {
-                                    setCustomSources(prev => prev.map(s => s.id === editingSource.id ? editingSource : s));
-                                    setEditingSource(null);
-                                  } else {
-                                    if (!newSource.name.trim() || !newSource.url.trim()) {
-                                      alert('请填写名称和 URL');
-                                      return;
-                                    }
-                                    const source = {
-                                      ...newSource,
-                                      id: Date.now(),
-                                      tags: newSource.tags ? newSource.tags.split(',').map(t => t.trim()).filter(Boolean) : []
-                                    };
-                                    setCustomSources(prev => [...prev, source]);
-                                    setNewSource({ name: '', url: '', region: 'overseas', category: '', tags: '', notes: '' });
-                                  }
-                                  setShowSourceForm(false);
-                                }}
-                              >
-                                {editingSource ? '保存修改' : '添加'}
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      )}
+                      {/* 编辑/添加源表单（已抽离至 SourceForm.jsx） */}
+                      <SourceForm
+                        showSourceForm={showSourceForm}
+                        editingSource={editingSource}
+                        setEditingSource={setEditingSource}
+                        newSource={newSource}
+                        setNewSource={setNewSource}
+                        setShowSourceForm={setShowSourceForm}
+                        setCustomSources={setCustomSources}
+                      />
                     <div className="setting-item">
                       <label>内置信息源</label>
                       <p className="setting-desc">管理系统预设的信息源，支持批量操作和健康监控</p>

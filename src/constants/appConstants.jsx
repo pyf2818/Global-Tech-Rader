@@ -269,12 +269,15 @@ export const VERTICAL_CHANNELS = [
 ];
 
 export const LLM_PRESETS = [
-  { id: 'openai', name: 'OpenAI', baseUrl: 'https://api.openai.com', models: ['gpt-4o', 'gpt-4-turbo', 'gpt-4o-mini', 'gpt-3.5-turbo'], abbrev: 'OA', placeholder: 'sk-...' },
-  { id: 'deepseek', name: 'DeepSeek', baseUrl: 'https://api.deepseek.com', models: ['deepseek-chat', 'deepseek-coder'], abbrev: 'DS', placeholder: 'sk-...' },
-  { id: 'moonshot', name: 'Moonshot', baseUrl: 'https://api.moonshot.cn', models: ['moonshot-v1-8k', 'moonshot-v1-32k', 'moonshot-v1-128k'], abbrev: 'MS', placeholder: 'sk-...' },
-  { id: 'zhipu', name: '智谱 AI', baseUrl: 'https://open.bigmodel.cn/api/paas/v4', models: ['glm-4', 'glm-4-flash', 'glm-4-air'], abbrev: 'ZP', placeholder: '请输入 API Key' },
-  { id: 'custom', name: '自定义', baseUrl: '', models: [], abbrev: 'CT', placeholder: 'https://...' }
+  { id: 'openai', name: 'OpenAI', baseUrl: 'https://api.openai.com', models: ['gpt-4o', 'gpt-4-turbo', 'gpt-4o-mini', 'gpt-3.5-turbo'], icon: '🟢', abbrev: 'OA', placeholder: 'sk-...' },
+  { id: 'deepseek', name: 'DeepSeek', baseUrl: 'https://api.deepseek.com', models: ['deepseek-chat', 'deepseek-coder'], icon: '🔵', abbrev: 'DS', placeholder: 'sk-...' },
+  { id: 'moonshot', name: 'Moonshot', baseUrl: 'https://api.moonshot.cn', models: ['moonshot-v1-8k', 'moonshot-v1-32k', 'moonshot-v1-128k'], icon: '🌙', abbrev: 'MS', placeholder: 'sk-...' },
+  { id: 'zhipu', name: '智谱 AI', baseUrl: 'https://open.bigmodel.cn/api/paas/v4', models: ['glm-4', 'glm-4-flash', 'glm-4-air'], icon: '🟣', abbrev: 'ZP', placeholder: '请输入 API Key' },
+  { id: 'custom', name: '自定义', baseUrl: '', models: [], icon: '⚙️', abbrev: 'CT', placeholder: 'https://...' }
 ];
+
+// 兼容旧引用：部分文件仍 import AGENT_CATEGORIES（全大写），统一为与 AGENT_categories 相同内容
+export const AGENT_CATEGORIES = AGENT_categories;
 
 // 滚动资讯热点数据源
 export const SCROLLING_NEWS_ITEMS = [

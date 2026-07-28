@@ -33,8 +33,8 @@ No lint, typecheck, or formatter commands exist.
 
 ### Frontend (`src/`)
 
-- **`App.jsx`** (~4367 lines) - Main component with routing logic, settings modal, and page composition. State progressively extracted into Zustand stores (`src/store/`) and custom hooks. Several UI sub-components (`SkeletonCard`, `NewsItem`, `GithubRepoCard`) are still **inline functions** at the bottom of App.jsx, not separate files.
-- **`AiElf.jsx`** (1354 lines) - AI assistant with multi-Agent conversation, drag-to-analyze, history management. Uses localStorage per-agent (50 messages, 20 sessions max). Lazy-loaded via `React.lazy`.
+- **`App.jsx`** (~2789 lines) - Main component with routing logic, settings modal, and page composition. State progressively extracted into Zustand stores (`src/store/`) and custom hooks. Topbar JSX extracted to `src/components/Topbar.jsx`. Workflow runner logic in `src/hooks/useAgentWorkflowRunner.js`, workflow actions in `src/hooks/useWorkflowActions.js`.
+- **`AiElf.jsx`** (643 lines) - AI assistant with multi-Agent conversation, drag-to-analyze, history management. Uses localStorage per-agent (50 messages, 20 sessions max). Lazy-loaded via `React.lazy`. SendMessage logic extracted to `src/components/aielf/useSendMessage.js`, agent loop in `src/components/aielf/runElfAgentLoop.js`, sub-components in `src/components/aielf/` (Sidebar, ChatHeader, MessageList, InputArea).
 - **`GlobeView.jsx`** (999 lines) - 3D globe via `react-globe.gl`/Three.js. Fullscreen uses `createPortal` to `document.body`. Canvas needs `min-height: 420px`. Lazy-loaded.
 - **`main.jsx`** - Mounts `<App />` inside `<ErrorBoundary>` + `<React.StrictMode>`.
 - **`styles.css`** (16052 lines) - CSS custom properties for dark/light themes. Tailwind config only sets content paths - no Tailwind utilities used in practice.
@@ -90,11 +90,13 @@ State has been progressively moved into hooks. Some logic (e.g. `generateDailyBr
 **Standalone component files (actual, in `src/components/`):**
 ```
 src/components/
-  SettingsModal.jsx     (1377 lines, deeply nested tabs)
+  Topbar.jsx            顶部栏（从 App.jsx 抽离，~280 行）
+  SettingsModal.jsx     (~234 lines, 拆分为 settings/ 子目录)
   ArticleEditor.jsx     Markdown article editor
-  StockPage.jsx         股市动向三栏行情终端（637 lines; 分时/K线/五档/AI诊断）
-  AiChatPanel.jsx       AI chat panel
+  StockPage.jsx         股市动向三栏行情终端（967 lines; 分时/K线/五档/AI诊断）
+  AiChatPanel.jsx       AI chat panel（780 lines，已拆出 aichat/ 子目录）
   SourceOpsPanel.jsx    Source operations panel
+  NewsItem.jsx          资讯卡片（已从 App.jsx 抽离为独立文件）
   ColorfulBubbles.jsx   Decorative bubble animation
   WorkflowNodeCard.jsx  画布节点卡片
   WorkflowEdge.jsx      画布连线
@@ -103,13 +105,29 @@ src/components/
   RecommendationTimeline.jsx  推荐时间轴
   CommunityPage.jsx     社区广场页（nav='square'，发帖/评论/点赞/收藏/关注）
   CommunityPostDetail.jsx    社区帖子详情（被 CommunityPage 使用）
+  settings/             SettingsModal 子标签页
+    SourcesTab.jsx      信息源标签页（900 lines）
+    AgentsTab.jsx       Agent 管理标签页
+    LlmTab.jsx          大模型配置标签页
+    CustomToolsPanel.jsx 自定义 HTTP 工具
+    SandboxPanel.jsx    沙箱配置
+  aielf/                AiElf 子组件
+    Sidebar.jsx, ChatHeader.jsx, MessageList.jsx, InputArea.jsx
+    ElfToolCard.jsx, prompts.js, markdown.js
+    runElfAgentLoop.js  Agent 工具调用循环
+    useSendMessage.js   发送消息 hook
+  aichat/               AiChatPanel 子组件
+    ToolCards.jsx, buildSystemPrompt.js, buildQuickActions.js
+    buildMaterialContext.js, runAgentLoop.js, useInputHistory.js
+  stock/
+    KLineChart.jsx      K线图（klinecharts v10）
+    ResearchTools.jsx   研究工具
 ```
 
 **NOT separate files (inline in App.jsx or located elsewhere):**
-- `NewsItem`, `SkeletonCard`, `GithubRepoCard` are **inline functions** in App.jsx (bottom of file, ~lines 9660/9702/10077).
+- `SkeletonCard`, `GithubRepoCard` are **inline functions** in App.jsx.
 - `ThemePicker.jsx` lives at `src/ThemePicker.jsx` (NOT `src/components/`); exports default `ThemePicker` + named `PALETTES`.
 - `HexRadarChart`, `TrendLineChart` are not present as files; rendering is inline.
-- v2 pages `DailyReportPage`, `ProfileCenterPage`, `StudioPage`, `WorkflowCanvas` listed in older docs are **not separate files**. The daily briefing / intelligence profile / studio / workflow functionality is implemented inline in App.jsx via `useMemo` (`dailyBriefing` ~line 1770, `intelligenceProfile` ~line 2551), the `useWorkflowEngine` hook, and `nav === 'studio'` branches (~lines 1522/6150). Only `WorkflowNodeCard.jsx` + `WorkflowEdge.jsx` are extracted.
 
 **Utility / hook / constant files (actual):**
 ```
@@ -123,7 +141,8 @@ src/utils/
   workflowEngine.js     Pure-logic DAG executor. LLM nodes call POST /api/ai-generate (chat action); local nodes (input/classifier/condition/skill/output/reply) run synchronously with no React dependency. Condition nodes halt the rest of the chain on failure.
   profileModel.js       computeIntelligenceProfile / computeReadingProfile / computeProfileLearningEngine / computeTodayProfileSnapshot - derive profile from bookmarks, reading history, materials, interests
 src/constants/
-  index.jsx             All constants + ICONS (SVG icon map with JSX)
+  appConstants.jsx      权威常量源：PRODUCT_NAME, NAV_ITEMS, FALLBACK_CATEGORIES, CATEGORY_GROUPS, VERTICAL_CHANNELS, LLM_PRESETS, SCROLLING_NEWS_ITEMS, AGENT_categories, MODES, VIEW_MODES, TRENDING_TYPES, GITHUB_LANGS/PERIODS, REGION_MAP, MODE_MAP, MATERIAL_TYPES, ARTICLE_STATUS/TEMPLATES/TEMPLATE_CONTENT, WEEKDAYS, MONTHS, ICONS, WORKFLOW_SKILL_CATALOG, WORKFLOW_CONDITION_METRICS/OPERATORS, getWorkflowSkillMeta, isWorkflowSkillId, formatWorkflowNodeConfig
+  index.jsx             兼容 shim（92 行）：re-export appConstants.jsx 的 22 个常量，保留死代码 NAV_GROUPS/CATEGORIES/DEFAULT_AGENTS 供历史引用。新代码应直接 import appConstants.jsx
   workflowConstants.js  DEFAULT_AGENT_WORKFLOW, WORKFLOW_NODE_TYPES, WORKFLOW_SKILL_CATALOG, WORKFLOW_CONDITION_METRICS, WORKFLOW_TEMPLATE_LIBRARY (3 templates: daily-briefing / github-evaluator / material-to-article) + template instance/normalize/validate helpers
 src/hooks/
   useLocalStorage.js    Auto-syncing localStorage hook
@@ -139,6 +158,12 @@ src/hooks/
   useWorkflowEngine.js  React wrapper over WorkflowEngine: run/result/history/actions state, persists to localStorage `agentWorkflowHistory` (max 12)
   useCommunity.js       社区广场数据（posts/comments/likes，调用 /api/community/*）
   useProfileSync.js     画像分层同步（domainTiers/sourceTiers/specialFollows <-> /api/profile/state）
+  useAgentWorkflowRunner.js  智能体工作流运行器（runAgentWorkflow，从 App.jsx 抽离，~578 行）
+  useWorkflowActions.js     工作流行动队列（createWorkflowActions/executeWorkflowAction，从 App.jsx 抽离）
+  useBriefingOps.js          早报操作（从 App.jsx 抽离）
+  useGithubInsight.js        GitHub 情报（从 App.jsx 抽离）
+  useRecommendationFeedback.js 推荐反馈（从 App.jsx 抽离）
+  useCalendarMemos.js        日历备注（从 App.jsx 抽离）
 ```
 
 #### Domain Layer (`src/domain/`)
@@ -294,11 +319,13 @@ Categories, source grades, and tag rules are defined **independently** in both `
 | Source Grades | `SOURCE_GRADES` with color/icon | `gradeColors` object (different hex values!) |
 | Grade Badge Colors | S=#dc2626, A=#ea580c, B=#16a34a, C=#2563eb, D=#64748b | S=#ff0000, A=#ff8800, B=#00cc00, C=#0088ff, D=#666666 |
 
-> **Note**: Phase 1 统一了分级色值——App.jsx 和 NewsItem（App.jsx 内联组件） 已改用服务端 `SOURCE_GRADES` 权威色（#dc2626 系）。`api/news.js` 和 `api/meta.js` 已复用 `server/news/config/constants.js`。App.jsx 的 `categories` 现从 `/api/meta` 加载（`serverCategories`），离线时降级到 `FALLBACK_CATEGORIES`——双源问题已消除。
+> **Note**: Phase 1 统一了分级色值——App.jsx 和 NewsItem 已改用服务端 `SOURCE_GRADES` 权威色（#dc2626 系）。`api/news.js` 和 `api/meta.js` 已复用 `server/news/config/constants.js`。App.jsx 的 `categories` 现从 `/api/meta` 加载（`serverCategories`），离线时降级到 `FALLBACK_CATEGORIES`——双源问题已消除。
+>
+> **Note**: 前端常量双源问题已消除——`src/constants/index.jsx` 已变为 92 行的 re-export shim，真实定义统一在 `src/constants/appConstants.jsx`。37 个文件仍通过 index.jsx 引用（兼容性保留），但数据源已单一化。新代码应直接 import `appConstants.jsx`。
 
 - **Navigation**: Right context panel (`showRightPanel`) only shows on `nav === 'all'`. Global news search box (`search-wrap` in topbar) also only renders on `all`. Other pages (stock/github/studio/etc) have no right panel and full-width main. `navToPrimary` maps each nav to its primary group; missing entries fall back to `today` (caused stock highlight bug).
 - **Multi-image**: NewsItem renders `item.images` (2-4 imgs) as a 2-col grid; lightbox state is `{ open, src, title, images, index }` supporting prev/next nav. `onOpenLightbox` signature: `(src, title, images, index)`.
-- **GitHub card**: App.jsx has an **inline** `GithubRepoCard` function (defined near line 10077 in App.jsx, NOT a separate file). Inline version uses `inferGithubScenario/Audience/Difficulty/Value` + `buildGithubMaterial`; `deriveRepoInsight` in repoInsight.js is a parallel implementation. AI insight is collapsible by default.
+- **GitHub card**: App.jsx has an **inline** `GithubRepoCard` function (NOT a separate file). Inline version uses `inferGithubScenario/Audience/Difficulty/Value` + `buildGithubMaterial`; `deriveRepoInsight` in repoInsight.js is a parallel implementation. AI insight is collapsible by default.
 ## Known Issues
 
 - **Tests limited to pure-logic engines** — 296 unit tests cover workflowEngine.js (80) + profileModel.js (70) + src/domain/intelligence + src/domain/stock + sandbox + agentTools (31) + server/ tests; no integration/E2E tests, no component tests
